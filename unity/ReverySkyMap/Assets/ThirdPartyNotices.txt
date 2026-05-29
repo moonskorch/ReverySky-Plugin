@@ -1,0 +1,9 @@
+Texture: "Electric Power Lightning Texture Seamless" (Textures4Photoshop) https://www.textures4photoshop.com/
+Skybox: "Nebula Skyboxes" (Unity Asset Store, Standard EULA) https://assetstore.unity.com/packages/2d/textures-materials/sky/nebula-skyboxes-219924
+Vector graphics: "Decorative start collections" designed by Davidzydd (Freepik) http://www.freepik.com
+Icons: Google Fonts Icons (Google) https://fonts.google.com/icons
+Font: Exo (SIL Open Font License) https://fonts.google.com/specimen/Exo
+
+Libraries:
+Simple File Browser (MIT) github.com/yasirkula/UnitySimpleFileBrowser
+MCP Unity Editor (MIT) github.com/codergamester/mcp-unity

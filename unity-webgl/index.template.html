@@ -1,0 +1,345 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ReverySky Map Runtime</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: radial-gradient(circle at 25% 20%, #213a63 0%, #0c1324 55%, #060a14 100%);
+        color: #dce8ff;
+        font-family: "Segoe UI", Tahoma, sans-serif;
+      }
+
+      .wrap {
+        box-sizing: border-box;
+        width: 100%;
+        height: 100%;
+        display: grid;
+        place-items: center;
+        padding: 16px;
+      }
+
+      .card {
+        width: min(980px, 100%);
+        height: 100%;
+        border: 1px solid rgba(170, 205, 255, 0.35);
+        background: rgba(12, 20, 36, 0.7);
+        border-radius: 12px;
+        padding: 12px;
+        box-sizing: border-box;
+        display: grid;
+        grid-template-rows: 1fr auto;
+        gap: 10px;
+      }
+
+      .canvas-stack {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border-radius: 8px;
+        border: 1px solid rgba(170, 205, 255, 0.3);
+        background: linear-gradient(160deg, #0e1a30 0%, #101930 45%, #0a1222 100%);
+      }
+
+      .canvas-stack canvas {
+        position: absolute;
+        inset: 0;
+      }
+
+      #bridge-status {
+        font-size: 12px;
+        color: #b9d1ff;
+        opacity: 0.92;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="card">
+        <div id="canvas-viewport" class="canvas-stack">
+          <canvas id="unity-canvas" aria-label="ReverySky map runtime"></canvas>
+        </div>
+        <div id="bridge-status">Bridge: initializing...</div>
+      </section>
+    </main>
+
+    <script id="unity-build-config" type="application/json">{}</script>
+    <script id="unity-loader-source" type="application/octet-stream"></script>
+    <script id="unity-framework-source" type="application/octet-stream"></script>
+    <script id="unity-data-source" type="application/octet-stream"></script>
+    <script id="unity-code-source" type="application/octet-stream"></script>
+
+    <script>
+      (function () {
+        const protocolVersion = "1.0.0";
+        const statusEl = document.getElementById("bridge-status");
+        const viewportEl = document.getElementById("canvas-viewport");
+        const canvas = document.getElementById("unity-canvas");
+        const buildPath = "Build/";
+        const buildConfigPath = buildPath + "build-config.json";
+
+        let runtimeMode = "boot";
+        let unityInstance = null;
+        let readySent = false;
+        let latestGraphSetMessage = null;
+        let frameworkBlobUrl = null;
+        let dataBlobUrl = null;
+        let codeBlobUrl = null;
+
+        function setStatus(text) {
+          statusEl.textContent = text;
+        }
+
+        function getEmbeddedText(id) {
+          const el = document.getElementById(id);
+          return el && typeof el.textContent === "string" ? el.textContent.trim() : "";
+        }
+
+        function base64ToBytes(base64Text) {
+          const binary = atob(base64Text);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+          return bytes;
+        }
+
+        function base64ToUtf8(base64Text) {
+          return new TextDecoder().decode(base64ToBytes(base64Text));
+        }
+
+        function base64ToBlob(base64Text, mimeType) {
+          return new Blob([base64ToBytes(base64Text)], { type: mimeType });
+        }
+
+        function sendReady() {
+          if (readySent || !window.parent) {
+            return;
+          }
+
+          readySent = true;
+          window.parent.postMessage(
+            {
+              protocolVersion: protocolVersion,
+              type: "bridge:ready",
+              requestId: "evt_" + Date.now(),
+              payload: {}
+            },
+            "*"
+          );
+        }
+
+        function resizeCanvas() {
+          const ratio = window.devicePixelRatio || 1;
+          const rect = viewportEl.getBoundingClientRect();
+          const nextWidth = Math.max(1, Math.floor(rect.width * ratio));
+          const nextHeight = Math.max(1, Math.floor(rect.height * ratio));
+          if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
+            canvas.width = nextWidth;
+            canvas.height = nextHeight;
+          }
+        }
+
+        function ensureInlineUnityLoader() {
+          if (typeof window.createUnityInstance === "function") {
+            return;
+          }
+          const base64Text = getEmbeddedText("unity-loader-source");
+          if (!base64Text || base64Text === "__UNITY_LOADER_BASE64__") {
+            return;
+          }
+          const source = base64ToUtf8(base64Text);
+          (0, eval)(source + "\n//# sourceURL=unity-loader-inline.js");
+        }
+
+        function ensureInlineFrameworkBlobUrl() {
+          if (frameworkBlobUrl) {
+            return frameworkBlobUrl;
+          }
+          const base64Text = getEmbeddedText("unity-framework-source");
+          if (!base64Text || base64Text === "__UNITY_FRAMEWORK_BASE64__") {
+            return null;
+          }
+          const source = base64ToUtf8(base64Text);
+          frameworkBlobUrl = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
+          return frameworkBlobUrl;
+        }
+
+        function ensureInlineDataBlobUrl() {
+          if (dataBlobUrl) {
+            return dataBlobUrl;
+          }
+          const base64Text = getEmbeddedText("unity-data-source");
+          if (!base64Text || base64Text === "__UNITY_DATA_BASE64__") {
+            return null;
+          }
+          dataBlobUrl = URL.createObjectURL(base64ToBlob(base64Text, "application/octet-stream"));
+          return dataBlobUrl;
+        }
+
+        function ensureInlineCodeBlobUrl() {
+          if (codeBlobUrl) {
+            return codeBlobUrl;
+          }
+          const base64Text = getEmbeddedText("unity-code-source");
+          if (!base64Text || base64Text === "__UNITY_CODE_BASE64__") {
+            return null;
+          }
+          codeBlobUrl = URL.createObjectURL(base64ToBlob(base64Text, "application/wasm"));
+          return codeBlobUrl;
+        }
+
+        async function loadBuildConfig() {
+          const embedded = getEmbeddedText("unity-build-config");
+          if (embedded && embedded !== "__UNITY_BUILD_CONFIG_JSON__") {
+            return JSON.parse(embedded);
+          }
+
+          if (window.__UNITY_BUILD_CONFIG__ && typeof window.__UNITY_BUILD_CONFIG__ === "object") {
+            return window.__UNITY_BUILD_CONFIG__;
+          }
+
+          const cfgResp = await fetch(buildConfigPath, { cache: "no-store" });
+          if (!cfgResp.ok) {
+            throw new Error("build-config is unavailable");
+          }
+          return cfgResp.json();
+        }
+
+        function tryDispatchGraphSetToUnity(message) {
+          if (!unityInstance || typeof unityInstance.SendMessage !== "function") {
+            return false;
+          }
+
+          try {
+            unityInstance.SendMessage("ObsidianBridge", "OnGraphSet", JSON.stringify(message));
+            return true;
+          } catch (e) {
+            console.warn("[ReverySky] Failed to dispatch graph:set to Unity:", e);
+            return false;
+          }
+        }
+
+        function applyGraphSet(message) {
+          latestGraphSetMessage = message;
+          const payload = message.payload || { notes: [], links: [] };
+          const noteCount = payload && payload.vault ? payload.vault.noteCount : (payload.notes || []).length;
+          const linkCount = Array.isArray(payload.links) ? payload.links.length : 0;
+
+          if (runtimeMode === "unity" && tryDispatchGraphSetToUnity(message)) {
+            setStatus("Bridge: graph:set -> Unity (" + String(noteCount) + " notes, " + String(linkCount) + " links)");
+            return;
+          }
+
+          setStatus("Bridge: graph:set queued (" + String(noteCount) + " notes, " + String(linkCount) + " links), Unity not ready");
+        }
+
+        function handleWebglContextLoss() {
+          runtimeMode = "failed";
+          unityInstance = null;
+          setStatus("WebGL context lost. Reload the map view.");
+        }
+
+        function onBridgeMessage(event) {
+          const data = event && event.data;
+          if (!data || typeof data !== "object") {
+            return;
+          }
+
+          if (data.type === "graph:set") {
+            applyGraphSet(data);
+          }
+        }
+
+        function injectLoaderScript(loaderUrl) {
+          return new Promise((resolve, reject) => {
+            const s = document.createElement("script");
+            s.src = loaderUrl;
+            s.onload = () => resolve();
+            s.onerror = () => reject(new Error("Failed to load Unity loader: " + loaderUrl));
+            document.body.appendChild(s);
+          });
+        }
+
+        async function tryBootUnityRuntime() {
+          const cfg = await loadBuildConfig();
+          const loaderUrl = buildPath + cfg.loaderFile;
+          const dataUrl = ensureInlineDataBlobUrl() || buildPath + cfg.dataFile;
+          const frameworkUrl = ensureInlineFrameworkBlobUrl() || buildPath + cfg.frameworkFile;
+          const codeUrl = ensureInlineCodeBlobUrl() || buildPath + cfg.codeFile;
+
+          ensureInlineUnityLoader();
+          if (typeof window.createUnityInstance !== "function") {
+            await injectLoaderScript(loaderUrl);
+          }
+          if (typeof window.createUnityInstance !== "function") {
+            throw new Error("createUnityInstance is not available");
+          }
+
+          unityInstance = await window.createUnityInstance(
+            canvas,
+            {
+              dataUrl: dataUrl,
+              frameworkUrl: frameworkUrl,
+              codeUrl: codeUrl,
+              streamingAssetsUrl: cfg.streamingAssetsUrl || "StreamingAssets",
+              companyName: cfg.companyName || "ReverySky",
+              productName: cfg.productName || "ReverySky Map",
+              productVersion: cfg.productVersion || "0.0.0"
+            },
+            (progress) => {
+              setStatus("Unity: loading " + Math.round(progress * 100) + "%");
+            }
+          );
+
+          runtimeMode = "unity";
+          setStatus("Unity runtime ready");
+          sendReady();
+
+          if (latestGraphSetMessage) {
+            tryDispatchGraphSetToUnity(latestGraphSetMessage);
+          }
+        }
+
+        async function boot() {
+          window.addEventListener("message", onBridgeMessage);
+          canvas.addEventListener("webglcontextlost", (event) => {
+            event.preventDefault();
+            console.warn("[ReverySky] WebGL context lost.");
+            handleWebglContextLoss();
+          });
+          window.addEventListener("resize", () => {
+            resizeCanvas();
+          });
+
+          resizeCanvas();
+
+          try {
+            await tryBootUnityRuntime();
+          } catch (err) {
+            runtimeMode = "failed";
+            setStatus("Unity runtime failed to start. See console.");
+            console.error("[ReverySky] Unity runtime boot failed.", err);
+            sendReady();
+          }
+        }
+
+        boot();
+      })();
+    </script>
+  </body>
+</html>
+
+

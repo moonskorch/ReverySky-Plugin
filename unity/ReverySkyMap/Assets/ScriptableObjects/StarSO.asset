@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fce459b67ff0ebf4796ad11869dbf554, type: 3}
+  m_Name: StarSO
+  m_EditorClassIdentifier: 
+  prefab: {fileID: 7720539063730227376, guid: 6ecde791aa0e8c7468e8fc3069b6d714, type: 3}
+  minScale: 0.5
+  maxScale: 1.6
+  shortNotePercentile: 0.1
+  longNotePercentile: 0.85
+  minSignificantLengthDiff: 50

@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1d9346f772c9804a850c842c0965482, type: 3}
+  m_Name: SphereMaterialCatalogSO
+  m_EditorClassIdentifier: Assembly-CSharp::SphereMaterialCatalogSO
+  materials:
+  - sphereType: 1
+    material: {fileID: 2100000, guid: 002d6ce59c4a2b449a45d973bc1d2617, type: 2}
+  - sphereType: 2
+    material: {fileID: 2100000, guid: 1006d7b1adb8c2d4fa2b8f61ea53e179, type: 2}
+  - sphereType: 3
+    material: {fileID: 2100000, guid: 2b86209eeb54d1d4da9475c9d3d3ce3c, type: 2}
+  - sphereType: 4
+    material: {fileID: 2100000, guid: 48ee49e565d8c614fae2e42b52bada91, type: 2}
+  - sphereType: 5
+    material: {fileID: 2100000, guid: acb875342fce1be48a5a959ee930dda8, type: 2}
+  - sphereType: 6
+    material: {fileID: 2100000, guid: b65386336b9891b48bc18162efdb1294, type: 2}
+  - sphereType: 10
+    material: {fileID: 2100000, guid: 980cb5c153b23ea49a55227b6a901d21, type: 2}
+  defaultMaterial: {fileID: 2100000, guid: 2aab6752a5df16f46b1afe6a56a6843c, type: 2}

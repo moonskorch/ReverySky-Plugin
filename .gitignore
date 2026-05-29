@@ -1,0 +1,39 @@
+﻿# Core
+node_modules/
+reference/
+
+# Generated Unity WebGL runtime artifacts
+unity-webgl/index.html
+unity-webgl/Build/
+unity-webgl/TemplateData/
+
+# Optional large skybox textures are intentionally excluded
+unity/ReverySkyMap/Assets/_Visuals/Nebula Skyboxes/*.exr
+unity/ReverySkyMap/Assets/_Visuals/Nebula Skyboxes/Nebula_03_Cubemap.exr.meta
+unity/ReverySkyMap/Assets/_Visuals/Textures/electric_texture_bw_big_contrast.jpg
+unity/ReverySkyMap/Assets/_Visuals/Textures/electric_texture_bw_big_contrast.jpg.meta
+unity/ReverySkyMap/Assets/_Visuals/Sprites/importance_icons/stars_thin_*.png
+unity/ReverySkyMap/Assets/_Visuals/Sprites/importance_icons/stars_thin_*.png.meta
+
+# Unity generated/cache/output (keep source assets and settings)
+unity/ReverySkyMap/[Ll]ibrary/
+unity/ReverySkyMap/[Tt]emp/
+unity/ReverySkyMap/[Ll]ogs/
+unity/ReverySkyMap/[Oo]bj/
+unity/ReverySkyMap/[Uu]ser[Ss]ettings/
+unity/ReverySkyMap/[Mm]emoryCaptures/
+unity/ReverySkyMap/[Rr]ecordings/
+unity/ReverySkyMap/[Bb]uild/
+unity/ReverySkyMap/[Bb]uilds/
+
+# Unity IDE/project generated files
+unity/ReverySkyMap/*.csproj
+unity/ReverySkyMap/*.sln
+unity/ReverySkyMap/.vsconfig
+unity/ReverySkyMap/.vs/
+
+# IDE local state
+.vs/
+
+# Local cleanup tracking
+unity/ReverySkyMap/docs/CLEANUP_BATCH_LEDGER.md

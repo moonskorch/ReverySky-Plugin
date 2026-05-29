@@ -1,0 +1,5 @@
+{
+  "workbench.localHistory.enabled": true,
+  "checkpoints.addCheckpointOnSave": true,
+  "checkpoints.askForCheckpointName": false
+}

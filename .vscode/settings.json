@@ -1,0 +1,10 @@
+{
+  "dotnet.defaultSolution": "unity/ReverySkyMap/ReverySkyMap.sln",
+  "dotnet.preferCSharpExtension": true,
+  "workbench.localHistory.enabled": true,
+  "workbench.localHistory.maxFileEntries": 200,
+  "checkpoints.location": "explorer",
+  "checkpoints.addCheckpointOnSave": true,
+  "checkpoints.askForCheckpointName": false,
+  "vitest.rootConfig": "vitest.config.ts"
+}
