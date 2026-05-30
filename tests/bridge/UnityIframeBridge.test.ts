@@ -101,6 +101,32 @@ describe("UnityIframeBridge", () => {
     bridge.detach();
   });
 
+  it("invokes onNoteOpen for valid note:open from attached iframe source", () => {
+    const bridge = new UnityIframeBridge();
+    const onNoteOpen = vi.fn();
+    const iframeWindow = { postMessage: vi.fn() } as unknown as Window;
+
+    bridge.attach(iframeWindow, { onNoteOpen });
+    dispatchMessage(
+      {
+        type: "note:open",
+        protocolVersion: BRIDGE_PROTOCOL_VERSION,
+        payload: {
+          id: "note_1",
+          path: "Folder/Note.md"
+        }
+      },
+      iframeWindow
+    );
+
+    expect(onNoteOpen).toHaveBeenCalledTimes(1);
+    expect(onNoteOpen).toHaveBeenCalledWith({
+      id: "note_1",
+      path: "Folder/Note.md"
+    });
+    bridge.detach();
+  });
+
   it("removes listener on detach", () => {
     const bridge = new UnityIframeBridge();
     const onReady = vi.fn();

@@ -1,9 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using UnityEngine;
 
 public class ObsidianBridge : MonoBehaviour
 {
+#if UNITY_WEBGL && !UNITY_EDITOR
+  [DllImport("__Internal")]
+  private static extern void ReverySkyBridgePostNoteOpen(string noteId, string notePath);
+#endif
+
   [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
   private static void EnsureInstance()
   {
@@ -18,6 +24,16 @@ public class ObsidianBridge : MonoBehaviour
     var go = new GameObject("ObsidianBridge");
     DontDestroyOnLoad(go);
     go.AddComponent<ObsidianBridge>();
+  }
+
+  private void OnEnable()
+  {
+    MapRuntimeContext.OnOpenNoteRequested += HandleOpenNoteRequested;
+  }
+
+  private void OnDisable()
+  {
+    MapRuntimeContext.OnOpenNoteRequested -= HandleOpenNoteRequested;
   }
 
   public void OnGraphSet(string json)
@@ -113,6 +129,18 @@ public class ObsidianBridge : MonoBehaviour
     MapRuntimeContext.SetNotes(runtimeNotes);
 
     Debug.Log($"[ObsidianBridge] graph:set applied. notes={notes.Length}, links={links.Length}, runtimeNotes={runtimeNotes.Count}, tags={tagNameById.Count}");
+  }
+
+  private static void HandleOpenNoteRequested(string noteId, string notePath)
+  {
+    var safeId = noteId ?? string.Empty;
+    var safePath = notePath ?? string.Empty;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+    ReverySkyBridgePostNoteOpen(safeId, safePath);
+#else
+    Debug.Log($"[ObsidianBridge] note:open requested (Editor/Non-WebGL): id={safeId}, path={safePath}");
+#endif
   }
 
   private static DateTime ParseDate(NoteDates dates)

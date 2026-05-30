@@ -15,10 +15,10 @@ Freeze rule:
 - Plan edits are allowed only after the last `DONE` step.
 
 Current checkpoint:
-- Last completed step: `Step 16A (DONE)`.
+- Last completed step: `Step 17 (DONE)`.
 - Current renderer in Obsidian view: Unity WebGL runtime loaded from `unity-webgl/`.
 - Unity runtime project shell is created and scene starts in Unity Editor.
-- Current implementation step: `Step 17 (didn't start)`.
+- Current implementation step: `Step 18 (didn't start)`.
 
 ## Step 1 (DONE) - Plugin skeleton with custom map view
 
@@ -496,7 +496,7 @@ Likely risks:
 - Unity serialized field rename drift if refactors are not compatibility-safe.
 - Cross-repo naming drift between parent plugin code/docs and Unity runtime code.
 
-## Step 17 - Unity star click -> Obsidian note open
+## Step 17 (DONE) - Unity star click -> Obsidian note open
 
 Goal:
 - Implement Unity click event emission and TS-side open-note handling.
@@ -509,11 +509,11 @@ Files likely affected:
 - `src/main.ts`
 
 Acceptance criteria:
-- Clicking star in Unity opens corresponding note in Obsidian.
+- Single click on a star in Unity focuses the star and opens the corresponding note in Obsidian.
 - Resolution works by `id`, fallback by `path`.
 
 Manual test steps:
-1. Click several stars in map.
+1. Single-click several stars in map (without second click).
 2. Verify correct notes open.
 3. Rename/move note and validate fallback behavior.
 

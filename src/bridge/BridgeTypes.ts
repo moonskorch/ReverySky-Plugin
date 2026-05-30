@@ -7,6 +7,18 @@ export type BridgeReadyMessage = {
   payload?: Record<string, never>;
 };
 
+export type NoteOpenPayload = {
+  id?: string;
+  path?: string;
+};
+
+export type NoteOpenMessage = {
+  protocolVersion: string;
+  type: "note:open";
+  requestId?: string;
+  payload: NoteOpenPayload;
+};
+
 export type GraphNoteNode = {
   id: string;
   path: string;
@@ -43,4 +55,4 @@ export type GraphSetMessage = {
   payload: GraphPayload;
 };
 
-export type IncomingBridgeMessage = BridgeReadyMessage;
+export type IncomingBridgeMessage = BridgeReadyMessage | NoteOpenMessage;

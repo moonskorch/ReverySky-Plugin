@@ -6,6 +6,8 @@ export class ItemView {
     this.app = leaf?.app ?? {};
     this.contentEl = document.createElement("div");
   }
+
+  registerEvent(_eventRef: unknown): void {}
 }
 
 export class Notice {

@@ -33,18 +33,9 @@ public class FocusNode : MonoBehaviour
 
     if (tappedObj.TryGetComponent(out Star star))
     {
-      // First click - set camera to the selected star
-      if (selectedStar != star)
-      {
-        SelectStar(star);
-        FocusSelectedStar();
-      }
-
-      // Second click - request note open in plugin runtime host
-      else
-      {
-        MapRuntimeContext.RequestOpenNote(star.Data);
-      }
+      SelectStar(star);
+      FocusSelectedStar();
+      MapRuntimeContext.RequestOpenNote(star.Data);
     }
 
     else if (tappedObj.TryGetComponent(out TagNode tagNode))

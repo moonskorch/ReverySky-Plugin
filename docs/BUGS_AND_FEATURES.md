@@ -19,7 +19,7 @@ Purpose:
    - Impact: no immediate runtime break, but migration debt and potential future compatibility risk.
    - Follow-up direction: plan a dedicated migration task to `Input System` (or `Both`) with input regression checks.
 
-4. Verify star model data source and mapping (especially `Id`).
+4. Verify star model data source and mapping (especially `Id`). It shouldn't rely on frontmatter custom fields.
    - Expected: `Star` data fields are consistently populated from the intended runtime bridge source.
    - Current state: data origin/mapping path for `Star` fields (with focus on `Id`) must be validated.
 

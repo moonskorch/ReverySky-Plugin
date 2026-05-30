@@ -105,6 +105,30 @@ var MessageValidator = class {
     }
     return errors;
   }
+  static validateIncomingNoteOpenMessage(data) {
+    const errors = [];
+    if (!data || typeof data !== "object") {
+      return ["incoming message must be an object"];
+    }
+    if (data.type !== "note:open") {
+      errors.push("incoming message type must be note:open");
+    }
+    if (data.protocolVersion !== BRIDGE_PROTOCOL_VERSION) {
+      errors.push(
+        `incoming protocolVersion mismatch: expected ${BRIDGE_PROTOCOL_VERSION}, got ${String(data.protocolVersion)}`
+      );
+    }
+    if (!data.payload || typeof data.payload !== "object") {
+      errors.push("incoming note:open payload must be an object");
+      return errors;
+    }
+    const id = typeof data.payload.id === "string" ? data.payload.id.trim() : "";
+    const path3 = typeof data.payload.path === "string" ? data.payload.path.trim() : "";
+    if (!id && !path3) {
+      errors.push("incoming note:open payload must include non-empty id or path");
+    }
+    return errors;
+  }
   static isNonEmptyString(value) {
     return typeof value === "string" && value.trim().length > 0;
   }
@@ -175,6 +199,15 @@ var UnityIframeBridge = class {
         return;
       }
       this.callbacks.onReady?.();
+      return;
+    }
+    if (data.type === "note:open") {
+      const incomingErrors = MessageValidator.validateIncomingNoteOpenMessage(data);
+      if (incomingErrors.length > 0) {
+        this.callbacks.onError?.(`Invalid incoming bridge message: ${incomingErrors.join("; ")}`);
+        return;
+      }
+      this.callbacks.onNoteOpen?.(data.payload ?? {});
     }
   }
 };
@@ -330,6 +363,10 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
   constructor(leaf, plugin, deps = {}) {
     super(leaf);
     this.plugin = plugin;
+    this.navigation = false;
+    this.lastGraphPayload = null;
+    this.lastMarkdownLeaf = null;
+    this.leafTrackingRegistered = false;
     this.bridge = deps.createBridge?.() ?? new UnityIframeBridge();
     this.buildGraph = deps.buildGraph ?? VaultGraphBuilder.build;
     this.notify = deps.notify ?? ((message) => new import_obsidian.Notice(message));
@@ -342,6 +379,7 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     return "ReverySky Map";
   }
   async onOpen() {
+    this.ensureLeafTracking();
     const container = this.contentEl;
     emptyElement(container);
     let iframeSrc;
@@ -370,7 +408,11 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
       this.bridge.attach(iframe.contentWindow, {
         onReady: () => {
           const payload = this.buildGraph(this.app);
+          this.lastGraphPayload = payload;
           this.bridge.sendGraphSet(payload);
+        },
+        onNoteOpen: (payload) => {
+          void this.openRequestedNote(payload);
         },
         onError: (message) => {
           this.notify(message);
@@ -380,7 +422,126 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
   }
   async onClose() {
     this.bridge.detach();
+    this.lastGraphPayload = null;
     emptyElement(this.contentEl);
+  }
+  async openRequestedNote(payload) {
+    const resolvedPath = this.resolveRequestedPath(payload);
+    if (!resolvedPath) {
+      this.notify("Unable to open note: bridge payload did not include a valid note id or path.");
+      return;
+    }
+    const noteFile = this.app.vault.getAbstractFileByPath(resolvedPath);
+    if (!noteFile || typeof noteFile.path !== "string") {
+      this.notify(`Unable to open note: file not found for path '${resolvedPath}'.`);
+      return;
+    }
+    const targetLeaf = this.resolveTargetNoteLeaf();
+    const sourcePath = targetLeaf ? this.getLeafSourcePath(targetLeaf) : "";
+    try {
+      await this.app.workspace.openLinkText(
+        noteFile.path,
+        sourcePath,
+        false,
+        targetLeaf ? {
+          active: true,
+          group: targetLeaf
+        } : {
+          active: true
+        }
+      );
+    } catch (error) {
+      this.notify(`Unable to open note: ${String(error)}`);
+    }
+  }
+  resolveRequestedPath(payload) {
+    const requestedId = typeof payload.id === "string" ? payload.id.trim() : "";
+    const requestedPath = typeof payload.path === "string" ? payload.path.trim() : "";
+    if (requestedId && this.lastGraphPayload) {
+      const byId = this.lastGraphPayload.notes.find((note) => note.id === requestedId);
+      if (byId?.path?.trim()) {
+        return byId.path.replace(/\\/g, "/");
+      }
+    }
+    if (requestedPath) {
+      return requestedPath.replace(/\\/g, "/");
+    }
+    return null;
+  }
+  ensureLeafTracking() {
+    if (this.leafTrackingRegistered) {
+      return;
+    }
+    this.leafTrackingRegistered = true;
+    const workspace = this.app.workspace;
+    if (!workspace) {
+      return;
+    }
+    const currentActiveLeaf = workspace.activeLeaf ?? null;
+    if (this.isMarkdownLeaf(currentActiveLeaf)) {
+      this.lastMarkdownLeaf = currentActiveLeaf;
+    } else {
+      this.lastMarkdownLeaf = this.findAnyMarkdownLeaf();
+    }
+    this.registerEvent(
+      workspace.on("active-leaf-change", (leaf) => {
+        if (this.isMarkdownLeaf(leaf)) {
+          this.lastMarkdownLeaf = leaf;
+        }
+      })
+    );
+  }
+  resolveTargetNoteLeaf() {
+    const workspace = this.app.workspace;
+    if (!workspace) {
+      return null;
+    }
+    const activeLeaf = workspace.activeLeaf ?? null;
+    if (this.isMarkdownLeaf(activeLeaf)) {
+      return activeLeaf;
+    }
+    if (this.isMarkdownLeaf(this.lastMarkdownLeaf)) {
+      return this.lastMarkdownLeaf;
+    }
+    const anyMarkdownLeaf = this.findAnyMarkdownLeaf();
+    if (this.isMarkdownLeaf(anyMarkdownLeaf)) {
+      this.lastMarkdownLeaf = anyMarkdownLeaf;
+      return anyMarkdownLeaf;
+    }
+    return null;
+  }
+  isMarkdownLeaf(leaf) {
+    if (!leaf) {
+      return false;
+    }
+    const viewType = leaf.view?.getViewType?.();
+    if (viewType === "markdown") {
+      return true;
+    }
+    const stateType = leaf.getViewState?.().type;
+    return stateType === "markdown";
+  }
+  getLeafSourcePath(leaf) {
+    const view = leaf.view;
+    const path3 = view?.file?.path;
+    return typeof path3 === "string" ? path3 : "";
+  }
+  findAnyMarkdownLeaf() {
+    const workspace = this.app.workspace;
+    if (!workspace) {
+      return null;
+    }
+    const markdownLeaf = workspace.getLeavesOfType("markdown")[0] ?? null;
+    if (this.isMarkdownLeaf(markdownLeaf)) {
+      return markdownLeaf;
+    }
+    let fallbackLeaf = null;
+    workspace.iterateAllLeaves((leaf) => {
+      if (!fallbackLeaf && this.isMarkdownLeaf(leaf)) {
+        fallbackLeaf = leaf;
+      }
+    });
+    return fallbackLeaf;
   }
 };
 function emptyElement(element) {

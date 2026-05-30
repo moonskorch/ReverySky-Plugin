@@ -60,4 +60,26 @@ describe("MessageValidator", () => {
     expect(errors.length).toBeGreaterThan(0);
     expect(errors[0]).toContain("incoming protocolVersion mismatch");
   });
+
+  it("accepts incoming note:open with id", () => {
+    const errors = MessageValidator.validateIncomingNoteOpenMessage({
+      type: "note:open",
+      protocolVersion: BRIDGE_PROTOCOL_VERSION,
+      payload: {
+        id: "note_1"
+      }
+    });
+
+    expect(errors).toEqual([]);
+  });
+
+  it("rejects incoming note:open when id and path are missing", () => {
+    const errors = MessageValidator.validateIncomingNoteOpenMessage({
+      type: "note:open",
+      protocolVersion: BRIDGE_PROTOCOL_VERSION,
+      payload: {}
+    });
+
+    expect(errors).toContain("incoming note:open payload must include non-empty id or path");
+  });
 });

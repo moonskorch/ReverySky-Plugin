@@ -1,7 +1,8 @@
 import {
   BRIDGE_PROTOCOL_VERSION,
   GraphPayload,
-  IncomingBridgeMessage
+  IncomingBridgeMessage,
+  NoteOpenMessage
 } from "./BridgeTypes";
 
 export class MessageValidator {
@@ -78,6 +79,37 @@ export class MessageValidator {
       errors.push(
         `incoming protocolVersion mismatch: expected ${BRIDGE_PROTOCOL_VERSION}, got ${String(data.protocolVersion)}`
       );
+    }
+
+    return errors;
+  }
+
+  static validateIncomingNoteOpenMessage(data: NoteOpenMessage): string[] {
+    const errors: string[] = [];
+
+    if (!data || typeof data !== "object") {
+      return ["incoming message must be an object"];
+    }
+
+    if (data.type !== "note:open") {
+      errors.push("incoming message type must be note:open");
+    }
+
+    if (data.protocolVersion !== BRIDGE_PROTOCOL_VERSION) {
+      errors.push(
+        `incoming protocolVersion mismatch: expected ${BRIDGE_PROTOCOL_VERSION}, got ${String(data.protocolVersion)}`
+      );
+    }
+
+    if (!data.payload || typeof data.payload !== "object") {
+      errors.push("incoming note:open payload must be an object");
+      return errors;
+    }
+
+    const id = typeof data.payload.id === "string" ? data.payload.id.trim() : "";
+    const path = typeof data.payload.path === "string" ? data.payload.path.trim() : "";
+    if (!id && !path) {
+      errors.push("incoming note:open payload must include non-empty id or path");
     }
 
     return errors;

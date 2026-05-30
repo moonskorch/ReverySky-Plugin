@@ -1,8 +1,15 @@
-import { BRIDGE_PROTOCOL_VERSION, GraphPayload, GraphSetMessage, IncomingBridgeMessage } from "./BridgeTypes";
+import {
+  BRIDGE_PROTOCOL_VERSION,
+  GraphPayload,
+  GraphSetMessage,
+  IncomingBridgeMessage,
+  NoteOpenPayload
+} from "./BridgeTypes";
 import { MessageValidator } from "./MessageValidator";
 
 type BridgeCallbacks = {
   onReady?: () => void;
+  onNoteOpen?: (payload: NoteOpenPayload) => void;
   onError?: (message: string) => void;
 };
 
@@ -73,6 +80,16 @@ export class UnityIframeBridge {
         return;
       }
       this.callbacks.onReady?.();
+      return;
+    }
+
+    if (data.type === "note:open") {
+      const incomingErrors = MessageValidator.validateIncomingNoteOpenMessage(data);
+      if (incomingErrors.length > 0) {
+        this.callbacks.onError?.(`Invalid incoming bridge message: ${incomingErrors.join("; ")}`);
+        return;
+      }
+      this.callbacks.onNoteOpen?.(data.payload ?? {});
     }
   }
 }

@@ -141,6 +141,27 @@
           );
         }
 
+        function postNoteOpen(id, path) {
+          if (!window.parent) {
+            return;
+          }
+
+          const noteId = typeof id === "string" ? id : "";
+          const notePath = typeof path === "string" ? path : "";
+          window.parent.postMessage(
+            {
+              protocolVersion: protocolVersion,
+              type: "note:open",
+              requestId: "evt_" + Date.now(),
+              payload: {
+                id: noteId,
+                path: notePath
+              }
+            },
+            "*"
+          );
+        }
+
         function resizeCanvas() {
           const ratio = window.devicePixelRatio || 1;
           const rect = viewportEl.getBoundingClientRect();
@@ -314,6 +335,9 @@
         }
 
         async function boot() {
+          window.ReverySkyBridgePostNoteOpen = function (noteId, notePath) {
+            postNoteOpen(noteId, notePath);
+          };
           window.addEventListener("message", onBridgeMessage);
           canvas.addEventListener("webglcontextlost", (event) => {
             event.preventDefault();
