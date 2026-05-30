@@ -15,10 +15,10 @@ Freeze rule:
 - Plan edits are allowed only after the last `DONE` step.
 
 Current checkpoint:
-- Last completed step: `Step 17 (DONE)`.
+- Last completed step: `Step 18 (DONE)`.
 - Current renderer in Obsidian view: Unity WebGL runtime loaded from `unity-webgl/`.
 - Unity runtime project shell is created and scene starts in Unity Editor.
-- Current implementation step: `Step 18 (didn't start)`.
+- Current implementation step: `Post-MVP stabilization and iterative delivery from bugs/features backlog`.
 
 ## Step 1 (DONE) - Plugin skeleton with custom map view
 
@@ -520,10 +520,11 @@ Manual test steps:
 Likely risks:
 - Mapping drift between runtime IDs and vault paths.
 
-## Step 18 - Live refresh and release hardening
+## Step 18 (DONE) - Live refresh and release hardening
 
 Goal:
-- Finalize automatic graph refresh and package reliability.
+- Finalize graph refresh behavior and package reliability without disruptive focus jumps.
+- Refresh graph only for graph-relevant note changes (not for arbitrary text edits).
 
 Files likely affected:
 - `src/graph/VaultGraphBuilder.ts`
@@ -532,14 +533,57 @@ Files likely affected:
 - `manifest.json`
 - build/release scripts
 
+Refresh and focus policy (mandatory for this step):
+1. Semantic refresh trigger policy:
+   - Do not rebuild on every text edit.
+   - Rebuild only when graph-relevant note signature changes:
+     - normalized tags changed;
+     - outgoing links changed;
+   - Keep `create`, `rename`, and `delete` as graph-significant events.
+2. Refresh execution policy:
+   - Keep debounce/coalescing to prevent event storms.
+   - Use metadata `resolved` as a stabilization barrier, not as an unconditional rebuild trigger.
+3. Focus policy after refresh:
+   - Do not force stale remembered focus after graph rebuild.
+   - Primary focus source is current active markdown note in Obsidian.
+   - If user switched notes while typing, map focus follows the active note.
+4. New note focus policy:
+   - On markdown note creation, queue focus to the new note.
+   - Apply that focus only after graph update is delivered to runtime.
+   - If user switched to another note before apply, active-note focus wins.
+
 Acceptance criteria:
-- Graph refreshes after vault changes without plugin toggle.
+- Non-graph text edits do not trigger full graph rebuild.
+- Graph refresh is triggered by graph-significant changes (tags, links, create/rename/delete).
+- Map focus does not jump back to stale remembered nodes after refresh.
+- Active markdown note focus is reflected in map focus.
+- New markdown note creation moves map focus to the new note unless user focus changed meanwhile.
 - Clean install package includes all required Unity artifacts.
 
 Manual test steps:
-1. Add/edit/remove links and verify map refresh.
-2. Run clean-vault install smoke test.
-3. Verify startup and interaction performance baseline.
+1. Edit plain note text (without tag/link changes) and verify no full graph rebuild.
+2. Change tags and links and verify graph refresh happens and is stable.
+3. Create, rename, and delete markdown notes and verify graph updates correctly.
+4. While map is open, switch active markdown note in Obsidian and verify map focus follows active note.
+5. Create a new markdown note and verify map focuses it after refresh; then repeat while switching to another note before refresh completion and verify active-note priority.
+6. Run clean-vault install smoke test.
+7. Verify startup and interaction performance baseline.
 
 Likely risks:
+- Incorrect graph-signature comparison may cause missed or redundant refreshes.
+- Focus precedence race conditions between queued new-note focus and active-note focus.
 - Event storms, rebuild churn, and missing release assets.
+
+Post-step note:
+- Length-driven node-size recalculation on text typing is intentionally deferred and tracked in `docs/BUGS_AND_FEATURES.md`.
+
+## Post-MVP operating mode
+
+Goal:
+- Treat MVP as delivered and continue with backlog-driven iteration.
+
+Execution policy:
+1. Use `docs/BUGS_AND_FEATURES.md` as the working backlog for bugfixes and feature slices.
+2. Keep changes incremental: one focused behavior slice per task with explicit verification.
+3. Preserve current bridge/runtime stability gates (`npm run test`, `npm run build`, Unity checks when Unity runtime code changes).
+4. Revisit architecture-level changes only when backlog evidence shows a concrete need.

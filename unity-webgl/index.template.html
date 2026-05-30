@@ -94,6 +94,7 @@
         let unityInstance = null;
         let readySent = false;
         let latestGraphSetMessage = null;
+        let latestNoteFocusMessage = null;
         let frameworkBlobUrl = null;
         let dataBlobUrl = null;
         let codeBlobUrl = null;
@@ -253,6 +254,20 @@
           }
         }
 
+        function tryDispatchNoteFocusToUnity(message) {
+          if (!unityInstance || typeof unityInstance.SendMessage !== "function") {
+            return false;
+          }
+
+          try {
+            unityInstance.SendMessage("ObsidianBridge", "OnNoteFocus", JSON.stringify(message));
+            return true;
+          } catch (e) {
+            console.warn("[ReverySky] Failed to dispatch note:focus to Unity:", e);
+            return false;
+          }
+        }
+
         function applyGraphSet(message) {
           latestGraphSetMessage = message;
           const payload = message.payload || { notes: [], links: [] };
@@ -265,6 +280,20 @@
           }
 
           setStatus("Bridge: graph:set queued (" + String(noteCount) + " notes, " + String(linkCount) + " links), Unity not ready");
+        }
+
+        function applyNoteFocus(message) {
+          latestNoteFocusMessage = message;
+          const payload = message && message.payload ? message.payload : {};
+          const id = typeof payload.id === "string" ? payload.id : "";
+          const path = typeof payload.path === "string" ? payload.path : "";
+
+          if (runtimeMode === "unity" && tryDispatchNoteFocusToUnity(message)) {
+            setStatus("Bridge: note:focus -> Unity (" + (id || path || "unknown") + ")");
+            return;
+          }
+
+          setStatus("Bridge: note:focus queued, Unity not ready");
         }
 
         function handleWebglContextLoss() {
@@ -281,6 +310,11 @@
 
           if (data.type === "graph:set") {
             applyGraphSet(data);
+            return;
+          }
+
+          if (data.type === "note:focus") {
+            applyNoteFocus(data);
           }
         }
 
@@ -331,6 +365,9 @@
 
           if (latestGraphSetMessage) {
             tryDispatchGraphSetToUnity(latestGraphSetMessage);
+          }
+          if (latestNoteFocusMessage) {
+            tryDispatchNoteFocusToUnity(latestNoteFocusMessage);
           }
         }
 

@@ -354,6 +354,29 @@ public class Cartographer : MonoBehaviour
       focusNode.ResetFocus();
   }
 
+  public void FocusRuntimeNote(string noteId, string notePath)
+  {
+    var resolvedId = noteId;
+    if (string.IsNullOrWhiteSpace(resolvedId))
+    {
+      var byPath = MapRuntimeContext.FindNoteByPath(notePath);
+      resolvedId = byPath?.Id;
+    }
+
+    if (string.IsNullOrWhiteSpace(resolvedId))
+      return;
+
+    var star = _activeEngine?.FindStarByNoteId(resolvedId);
+    if (star != null)
+    {
+      StartCoroutine(RestoreFocusNextFrame(star));
+      return;
+    }
+
+    // Fallback for cases where graph rebuild is in-flight and star is not materialized yet.
+    MapRuntimeContext.CurrentNoteId = resolvedId;
+  }
+
   private IEnumerator RestoreFocusNextFrame(Star star)
   {
     yield return null;

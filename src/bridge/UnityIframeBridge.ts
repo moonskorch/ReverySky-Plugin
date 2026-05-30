@@ -1,5 +1,7 @@
 import {
   BRIDGE_PROTOCOL_VERSION,
+  NoteFocusMessage,
+  NoteFocusPayload,
   GraphPayload,
   GraphSetMessage,
   IncomingBridgeMessage,
@@ -58,6 +60,32 @@ export class UnityIframeBridge {
       type: "graph:set",
       requestId: `req_${Date.now()}`,
       payload
+    };
+
+    this.iframeWindow.postMessage(message, "*");
+  }
+
+  sendNoteFocus(payload: NoteFocusPayload): void {
+    if (!this.iframeWindow) {
+      this.callbacks.onError?.("Bridge is not attached to iframe window.");
+      return;
+    }
+
+    const noteId = typeof payload.id === "string" ? payload.id.trim() : "";
+    const notePath = typeof payload.path === "string" ? payload.path.trim() : "";
+    if (!noteId && !notePath) {
+      this.callbacks.onError?.("Invalid note focus payload: id or path is required.");
+      return;
+    }
+
+    const message: NoteFocusMessage = {
+      protocolVersion: BRIDGE_PROTOCOL_VERSION,
+      type: "note:focus",
+      requestId: `req_${Date.now()}`,
+      payload: {
+        id: noteId || undefined,
+        path: notePath || undefined
+      }
     };
 
     this.iframeWindow.postMessage(message, "*");

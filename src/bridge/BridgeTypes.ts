@@ -12,11 +12,23 @@ export type NoteOpenPayload = {
   path?: string;
 };
 
+export type NoteFocusPayload = {
+  id?: string;
+  path?: string;
+};
+
 export type NoteOpenMessage = {
   protocolVersion: string;
   type: "note:open";
   requestId?: string;
   payload: NoteOpenPayload;
+};
+
+export type NoteFocusMessage = {
+  protocolVersion: string;
+  type: "note:focus";
+  requestId?: string;
+  payload: NoteFocusPayload;
 };
 
 export type GraphNoteNode = {
@@ -56,3 +68,4 @@ export type GraphSetMessage = {
 };
 
 export type IncomingBridgeMessage = BridgeReadyMessage | NoteOpenMessage;
+export type OutgoingBridgeMessage = GraphSetMessage | NoteFocusMessage;

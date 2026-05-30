@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GraphPayload } from "../../src/bridge/BridgeTypes";
 import type { ReverySkyMapViewDependencies } from "../../src/view/ReverySkyMapView";
 
@@ -32,6 +32,9 @@ describe("ReverySkyMapView bridge integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it("creates iframe on open, wires bridge handshake, and detaches/cleans on close", async () => {
     const app = {
@@ -55,7 +58,8 @@ describe("ReverySkyMapView bridge integration", () => {
         callbacks.onError = received.onError;
       }),
       detach: vi.fn(),
-      sendGraphSet: vi.fn()
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
     };
 
     const payload = makePayload();
@@ -137,7 +141,8 @@ describe("ReverySkyMapView bridge integration", () => {
         callbacks.onError = received.onError;
       }),
       detach: vi.fn(),
-      sendGraphSet: vi.fn()
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
     };
 
     const payload = makePayload();
@@ -222,7 +227,8 @@ describe("ReverySkyMapView bridge integration", () => {
         callbacks.onError = received.onError;
       }),
       detach: vi.fn(),
-      sendGraphSet: vi.fn()
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
     };
 
     const payload = makePayload();
@@ -294,7 +300,8 @@ describe("ReverySkyMapView bridge integration", () => {
         callbacks.onError = received.onError;
       }),
       detach: vi.fn(),
-      sendGraphSet: vi.fn()
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
     };
 
     const payload = makePayload();
@@ -331,5 +338,445 @@ describe("ReverySkyMapView bridge integration", () => {
     });
     expect(openLinkText.mock.calls[0]?.[3]).not.toHaveProperty("group");
     expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("coalesces graph-significant changes and ignores plain text edits", async () => {
+    vi.useFakeTimers();
+
+    const metadataCallbacks: {
+      changed?: (file: { path?: string }, data: string, cache: { links?: Array<{ link: string }>; tags?: Array<{ tag: string }> }) => void;
+      resolved?: () => void;
+    } = {};
+
+    const app = {
+      metadataCache: {
+        on: vi.fn((name: "changed" | "resolved", callback: (...args: never[]) => void) => {
+          if (name === "changed") {
+            metadataCallbacks.changed = callback as (
+              file: { path?: string },
+              data: string,
+              cache: { links?: Array<{ link: string }>; tags?: Array<{ tag: string }> }
+            ) => void;
+          } else {
+            metadataCallbacks.resolved = callback as () => void;
+          }
+          return { id: `metadata-${name}` };
+        })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePayload();
+    const buildGraph = vi.fn().mockReturnValue(payload);
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: buildGraph as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+
+    metadataCallbacks.changed?.(
+      { path: "Folder/Note.md" },
+      "hello world",
+      { links: [{ link: "RefA" }], tags: [{ tag: "#tag-a" }] }
+    );
+    metadataCallbacks.resolved?.();
+    vi.advanceTimersByTime(250);
+
+    expect(buildGraph).toHaveBeenCalledTimes(2);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+
+    metadataCallbacks.changed?.(
+      { path: "Folder/Note.md" },
+      "hello world!!!",
+      { links: [{ link: "RefA" }], tags: [{ tag: "#tag-a" }] }
+    );
+    metadataCallbacks.resolved?.();
+    vi.advanceTimersByTime(250);
+
+    expect(buildGraph).toHaveBeenCalledTimes(2);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+  });
+
+  it("queues latest graph before bridge ready and flushes it on bridge:ready", async () => {
+    vi.useFakeTimers();
+
+    const metadataCallbacks: {
+      changed?: (file: { path?: string }, data: string, cache: { links?: Array<{ link: string }>; tags?: Array<{ tag: string }> }) => void;
+      resolved?: () => void;
+    } = {};
+    const app = {
+      metadataCache: {
+        on: vi.fn((name: "changed" | "resolved", callback: (...args: never[]) => void) => {
+          if (name === "changed") {
+            metadataCallbacks.changed = callback as (
+              file: { path?: string },
+              data: string,
+              cache: { links?: Array<{ link: string }>; tags?: Array<{ tag: string }> }
+            ) => void;
+          } else {
+            metadataCallbacks.resolved = callback as () => void;
+          }
+          return { id: `metadata-${name}` };
+        })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const queuedPayload = makePayload();
+    queuedPayload.notes[0].id = "queued";
+    const buildGraph = vi.fn().mockReturnValue(queuedPayload);
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: buildGraph as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+
+    metadataCallbacks.changed?.(
+      { path: "Folder/Note.md" },
+      "content changed",
+      { links: [{ link: "RefA" }], tags: [{ tag: "#tag-a" }] }
+    );
+    metadataCallbacks.resolved?.();
+    vi.advanceTimersByTime(250);
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(0);
+
+    callbacks.onReady?.();
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledWith(queuedPayload);
+  });
+
+  it("focuses a newly created note unless user switched to another active note first", async () => {
+    vi.useFakeTimers();
+
+    let onActiveLeafChange: ((leaf: unknown) => void) | null = null;
+    const vaultCallbacks: {
+      create?: (file: { path?: string }) => void;
+    } = {};
+
+    const activeLeafA = {
+      view: {
+        getViewType: () => "markdown",
+        file: { path: "Folder/A.md" }
+      }
+    };
+    const activeLeafB = {
+      view: {
+        getViewType: () => "markdown",
+        file: { path: "Folder/B.md" }
+      }
+    };
+
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn((name: "create" | "delete" | "rename", callback: (...args: never[]) => void) => {
+          if (name === "create") {
+            vaultCallbacks.create = callback as (file: { path?: string }) => void;
+          }
+          return { id: `vault-${name}` };
+        }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: activeLeafA,
+        getMostRecentLeaf: vi.fn().mockReturnValue(activeLeafA),
+        getLeavesOfType: vi.fn().mockReturnValue([activeLeafA]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn((eventName: string, callback: (leaf: unknown) => void) => {
+          if (eventName === "active-leaf-change") {
+            onActiveLeafChange = callback;
+          }
+          return { id: "event-ref" };
+        })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePayload();
+    payload.notes = [
+      { id: "a", path: "Folder/A.md", title: "A", tags: [], dates: {} },
+      { id: "b", path: "Folder/B.md", title: "B", tags: [], dates: {} },
+      { id: "new", path: "Folder/New.md", title: "New", tags: [], dates: {} }
+    ];
+    payload.vault.noteCount = payload.notes.length;
+
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    expect(bridge.sendNoteFocus).toHaveBeenLastCalledWith({
+      id: "a",
+      path: "Folder/A.md"
+    });
+
+    vaultCallbacks.create?.({ path: "Folder/New.md" });
+    onActiveLeafChange?.(activeLeafB);
+    vi.advanceTimersByTime(250);
+
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+    expect(bridge.sendNoteFocus).toHaveBeenLastCalledWith({
+      id: "b",
+      path: "Folder/B.md"
+    });
+  });
+
+  it("preserves focus on active note after rename commit", async () => {
+    vi.useFakeTimers();
+
+    const vaultCallbacks: {
+      rename?: (file: { path?: string }, oldPath: string) => void;
+    } = {};
+
+    const activeLeaf = {
+      view: {
+        getViewType: () => "markdown",
+        file: { path: "Folder/Old.md" }
+      }
+    };
+
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn((name: "create" | "delete" | "rename", callback: (...args: never[]) => void) => {
+          if (name === "rename") {
+            vaultCallbacks.rename = callback as (file: { path?: string }, oldPath: string) => void;
+          }
+          return { id: `vault-${name}` };
+        }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf,
+        getMostRecentLeaf: vi.fn().mockReturnValue(activeLeaf),
+        getLeavesOfType: vi.fn().mockReturnValue([activeLeaf]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payloadBefore = makePayload();
+    payloadBefore.notes = [
+      { id: "old_id", path: "Folder/Old.md", title: "Old", tags: [], dates: {} }
+    ];
+    payloadBefore.vault.noteCount = 1;
+
+    const payloadAfter = makePayload();
+    payloadAfter.notes = [
+      { id: "new_id", path: "Folder/New.md", title: "New", tags: [], dates: {} }
+    ];
+    payloadAfter.vault.noteCount = 1;
+
+    const buildGraph = vi
+      .fn()
+      .mockReturnValueOnce(payloadBefore)
+      .mockReturnValueOnce(payloadAfter);
+
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: buildGraph as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    expect(bridge.sendNoteFocus).toHaveBeenLastCalledWith({
+      id: "old_id",
+      path: "Folder/Old.md"
+    });
+
+    vaultCallbacks.rename?.({ path: "Folder/New.md" }, "Folder/Old.md");
+    vi.advanceTimersByTime(250);
+
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+    expect(bridge.sendNoteFocus).toHaveBeenLastCalledWith({
+      id: "new_id",
+      path: "Folder/New.md"
+    });
+  });
+
+  it("registers refresh subscriptions only once across reopen cycles", async () => {
+    const metadataCacheOn = vi.fn().mockReturnValue({ id: "metadata-event-ref" });
+    const vaultOn = vi.fn().mockReturnValue({ id: "vault-event-ref" });
+
+    const app = {
+      metadataCache: {
+        on: metadataCacheOn
+      },
+      vault: {
+        on: vaultOn,
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const bridge = {
+      attach: vi.fn(),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(makePayload()) as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    await view.onClose();
+    await view.onOpen();
+
+    expect(metadataCacheOn).toHaveBeenCalledTimes(2);
+    expect(vaultOn).toHaveBeenCalledTimes(3);
   });
 });

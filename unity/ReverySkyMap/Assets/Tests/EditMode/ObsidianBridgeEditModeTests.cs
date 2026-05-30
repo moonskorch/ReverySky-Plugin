@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
@@ -8,11 +9,13 @@ public class ObsidianBridgeEditModeTests
 {
   private GameObject bridgeObject;
   private ObsidianBridge bridge;
+  private GameObject cartographerObject;
 
   [SetUp]
   public void SetUp()
   {
     ResetRuntimeContext();
+    SetCartographerSingleton(null);
     bridgeObject = new GameObject("ObsidianBridgeEditModeTests");
     bridge = bridgeObject.AddComponent<ObsidianBridge>();
   }
@@ -20,6 +23,10 @@ public class ObsidianBridgeEditModeTests
   [TearDown]
   public void TearDown()
   {
+    SetCartographerSingleton(null);
+    if (cartographerObject != null)
+      Object.DestroyImmediate(cartographerObject);
+
     if (bridgeObject != null)
       Object.DestroyImmediate(bridgeObject);
   }
@@ -90,6 +97,45 @@ public class ObsidianBridgeEditModeTests
     Assert.That(MapRuntimeContext.Links, Has.Count.EqualTo(2));
   }
 
+  [Test]
+  public void OnNoteFocus_WithId_SetsCurrentNoteIdWhenCartographerIsPresent()
+  {
+    bridge.OnGraphSet(TestPayloads.RepeatApplyPayloadA);
+    EnsureCartographerSingleton();
+
+    Assert.That(MapRuntimeContext.CurrentNoteId, Is.EqualTo(string.Empty));
+
+    bridge.OnNoteFocus(TestPayloads.NoteFocusByIdPayload);
+
+    Assert.That(MapRuntimeContext.CurrentNoteId, Is.EqualTo("a2"));
+  }
+
+  [Test]
+  public void OnNoteFocus_WithPath_FallsBackToPathResolution()
+  {
+    bridge.OnGraphSet(TestPayloads.RepeatApplyPayloadA);
+    EnsureCartographerSingleton();
+
+    bridge.OnNoteFocus(TestPayloads.NoteFocusByPathPayload);
+
+    Assert.That(MapRuntimeContext.CurrentNoteId, Is.EqualTo("a2"));
+  }
+
+  [Test]
+  public void OnNoteFocus_EmptyAndInvalidPayload_AreHandledGracefully()
+  {
+    bridge.OnGraphSet(TestPayloads.RepeatApplyPayloadA);
+    EnsureCartographerSingleton();
+    MapRuntimeContext.CurrentNoteId = "a1";
+
+    bridge.OnNoteFocus(TestPayloads.NoteFocusEmptyPayload);
+    Assert.That(MapRuntimeContext.CurrentNoteId, Is.EqualTo("a1"));
+
+    LogAssert.Expect(LogType.Warning, new Regex("\\[ObsidianBridge\\] Invalid note:focus payload:"));
+    bridge.OnNoteFocus("{ invalid json");
+    Assert.That(MapRuntimeContext.CurrentNoteId, Is.EqualTo("a1"));
+  }
+
   private static void ResetRuntimeContext()
   {
     MapRuntimeContext.FilterRangeDays = 0;
@@ -99,6 +145,20 @@ public class ObsidianBridgeEditModeTests
     MapRuntimeContext.SetTagNames(new Dictionary<int, string>());
     MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>());
     MapRuntimeContext.SetNotes(new List<NoteData>());
+  }
+
+  private void EnsureCartographerSingleton()
+  {
+    cartographerObject = new GameObject("CartographerEditModeTests");
+    Cartographer cartographer = cartographerObject.AddComponent<Cartographer>();
+    SetCartographerSingleton(cartographer);
+  }
+
+  private static void SetCartographerSingleton(Cartographer value)
+  {
+    FieldInfo singletonBackingField =
+      typeof(Cartographer).GetField("<I>k__BackingField", BindingFlags.Static | BindingFlags.NonPublic);
+    singletonBackingField?.SetValue(null, value);
   }
 
   private static class TestPayloads
@@ -126,5 +186,14 @@ public class ObsidianBridgeEditModeTests
       "{\"protocolVersion\":\"1.0.0\",\"type\":\"graph:set\",\"payload\":{\"notes\":[" +
       "{\"id\":\"b1\",\"path\":\"y/b1.md\",\"title\":\"B1\",\"tags\":[\"solo\"],\"dates\":{\"created\":\"2025-02-01T00:00:00Z\"}}" +
       "],\"links\":[]}}";
+
+    public const string NoteFocusByIdPayload =
+      "{\"protocolVersion\":\"1.0.0\",\"type\":\"note:focus\",\"payload\":{\"id\":\"a2\"}}";
+
+    public const string NoteFocusByPathPayload =
+      "{\"protocolVersion\":\"1.0.0\",\"type\":\"note:focus\",\"payload\":{\"path\":\"X\\\\A2.md\"}}";
+
+    public const string NoteFocusEmptyPayload =
+      "{\"protocolVersion\":\"1.0.0\",\"type\":\"note:focus\",\"payload\":{}}";
   }
 }

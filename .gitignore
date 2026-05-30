@@ -25,6 +25,7 @@ unity/ReverySkyMap/[Mm]emoryCaptures/
 unity/ReverySkyMap/[Rr]ecordings/
 unity/ReverySkyMap/[Bb]uild/
 unity/ReverySkyMap/[Bb]uilds/
+unity/ReverySkyMap/artifacts/
 
 # Unity IDE/project generated files
 unity/ReverySkyMap/*.csproj

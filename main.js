@@ -184,6 +184,28 @@ var UnityIframeBridge = class {
     };
     this.iframeWindow.postMessage(message, "*");
   }
+  sendNoteFocus(payload) {
+    if (!this.iframeWindow) {
+      this.callbacks.onError?.("Bridge is not attached to iframe window.");
+      return;
+    }
+    const noteId = typeof payload.id === "string" ? payload.id.trim() : "";
+    const notePath = typeof payload.path === "string" ? payload.path.trim() : "";
+    if (!noteId && !notePath) {
+      this.callbacks.onError?.("Invalid note focus payload: id or path is required.");
+      return;
+    }
+    const message = {
+      protocolVersion: BRIDGE_PROTOCOL_VERSION,
+      type: "note:focus",
+      requestId: `req_${Date.now()}`,
+      payload: {
+        id: noteId || void 0,
+        path: notePath || void 0
+      }
+    };
+    this.iframeWindow.postMessage(message, "*");
+  }
   onMessage(event) {
     if (!this.iframeWindow || event.source !== this.iframeWindow) {
       return;
@@ -359,13 +381,30 @@ var VaultGraphBuilder = class _VaultGraphBuilder {
 
 // src/view/ReverySkyMapView.ts
 var REVERYSKY_MAP_VIEW_TYPE = "reverysky-map-view";
+var GRAPH_REFRESH_DEBOUNCE_MS = 250;
+var GRAPH_RESOLVE_BARRIER_FALLBACK_MS = 700;
 var ReverySkyMapView = class extends import_obsidian.ItemView {
   constructor(leaf, plugin, deps = {}) {
     super(leaf);
     this.plugin = plugin;
     this.navigation = false;
     this.lastGraphPayload = null;
+    this.pendingGraphPayload = null;
+    this.pendingFocusPayload = null;
     this.lastMarkdownLeaf = null;
+    this.activeMarkdownPath = "";
+    this.focusOrdinal = 0;
+    this.activeFocusOrdinal = 0;
+    this.pendingCreatedFocusOrdinal = 0;
+    this.pendingCreatedFocusPath = null;
+    this.lastDispatchedFocusKey = "";
+    this.semanticRefreshPending = false;
+    this.noteSignatureByPath = /* @__PURE__ */ new Map();
+    this.bridgeReady = false;
+    this.refreshTimer = null;
+    this.resolveBarrierFallbackTimer = null;
+    this.refreshSubscriptionsRegistered = false;
+    this.refreshActive = false;
     this.leafTrackingRegistered = false;
     this.bridge = deps.createBridge?.() ?? new UnityIframeBridge();
     this.buildGraph = deps.buildGraph ?? VaultGraphBuilder.build;
@@ -380,6 +419,17 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
   }
   async onOpen() {
     this.ensureLeafTracking();
+    this.ensureRefreshSubscriptions();
+    this.refreshActive = true;
+    this.bridgeReady = false;
+    this.pendingGraphPayload = null;
+    this.pendingFocusPayload = null;
+    this.lastDispatchedFocusKey = "";
+    this.pendingCreatedFocusPath = null;
+    this.pendingCreatedFocusOrdinal = 0;
+    this.semanticRefreshPending = false;
+    this.clearRefreshTimer();
+    this.clearResolveBarrierFallbackTimer();
     const container = this.contentEl;
     emptyElement(container);
     let iframeSrc;
@@ -407,9 +457,8 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
       }
       this.bridge.attach(iframe.contentWindow, {
         onReady: () => {
-          const payload = this.buildGraph(this.app);
-          this.lastGraphPayload = payload;
-          this.bridge.sendGraphSet(payload);
+          this.bridgeReady = true;
+          this.flushOrRefreshGraph();
         },
         onNoteOpen: (payload) => {
           void this.openRequestedNote(payload);
@@ -421,9 +470,270 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     });
   }
   async onClose() {
+    this.refreshActive = false;
+    this.clearRefreshTimer();
+    this.clearResolveBarrierFallbackTimer();
+    this.bridgeReady = false;
+    this.pendingGraphPayload = null;
+    this.pendingFocusPayload = null;
+    this.lastDispatchedFocusKey = "";
+    this.pendingCreatedFocusPath = null;
+    this.pendingCreatedFocusOrdinal = 0;
+    this.semanticRefreshPending = false;
     this.bridge.detach();
     this.lastGraphPayload = null;
     emptyElement(this.contentEl);
+  }
+  ensureRefreshSubscriptions() {
+    if (this.refreshSubscriptionsRegistered) {
+      return;
+    }
+    this.refreshSubscriptionsRegistered = true;
+    const metadataCache = this.app.metadataCache;
+    const vault = this.app.vault;
+    if (metadataCache?.on) {
+      this.registerEvent(
+        metadataCache.on("changed", (file, _data, cache) => {
+          if (!this.isGraphRelevantPath(file?.path)) {
+            return;
+          }
+          const path3 = this.normalizeVaultPath(file.path);
+          const nextSignature = this.buildGraphRelevantSignature(cache);
+          const previousSignature = this.noteSignatureByPath.get(path3) ?? "";
+          this.noteSignatureByPath.set(path3, nextSignature);
+          if (nextSignature === previousSignature) {
+            return;
+          }
+          this.markSemanticRefreshPending();
+        })
+      );
+      this.registerEvent(
+        metadataCache.on("resolved", () => {
+          if (!this.semanticRefreshPending) {
+            return;
+          }
+          this.semanticRefreshPending = false;
+          this.clearResolveBarrierFallbackTimer();
+          this.scheduleGraphRefresh();
+        })
+      );
+    }
+    if (vault?.on) {
+      this.registerEvent(
+        vault.on("create", (file) => {
+          if (!this.isGraphRelevantPath(file?.path)) {
+            return;
+          }
+          const normalizedPath = this.normalizeVaultPath(file.path);
+          this.pendingCreatedFocusPath = normalizedPath;
+          this.pendingCreatedFocusOrdinal = ++this.focusOrdinal;
+          this.scheduleGraphRefresh();
+        })
+      );
+      this.registerEvent(
+        vault.on("delete", (file) => {
+          if (!this.isGraphRelevantPath(file?.path)) {
+            return;
+          }
+          this.noteSignatureByPath.delete(this.normalizeVaultPath(file.path));
+          this.scheduleGraphRefresh();
+        })
+      );
+      this.registerEvent(
+        vault.on("rename", (file, oldPath) => {
+          if (!this.isGraphRelevantPath(file?.path) && !this.isGraphRelevantPath(oldPath)) {
+            return;
+          }
+          const normalizedOldPath = this.normalizeVaultPath(oldPath);
+          const normalizedNewPath = this.normalizeVaultPath(file?.path);
+          if (normalizedOldPath && this.normalizeVaultPath(this.activeMarkdownPath) === normalizedOldPath) {
+            this.activeMarkdownPath = normalizedNewPath;
+            this.activeFocusOrdinal = ++this.focusOrdinal;
+          }
+          if (this.pendingCreatedFocusPath && this.normalizeVaultPath(this.pendingCreatedFocusPath) === normalizedOldPath) {
+            this.pendingCreatedFocusPath = normalizedNewPath;
+          }
+          if (this.isGraphRelevantPath(oldPath)) {
+            this.noteSignatureByPath.delete(normalizedOldPath);
+          }
+          this.scheduleGraphRefresh();
+        })
+      );
+    }
+  }
+  markSemanticRefreshPending() {
+    if (!this.refreshActive) {
+      return;
+    }
+    this.semanticRefreshPending = true;
+    this.clearResolveBarrierFallbackTimer();
+    this.resolveBarrierFallbackTimer = setTimeout(() => {
+      this.resolveBarrierFallbackTimer = null;
+      if (!this.semanticRefreshPending) {
+        return;
+      }
+      this.semanticRefreshPending = false;
+      this.scheduleGraphRefresh();
+    }, GRAPH_RESOLVE_BARRIER_FALLBACK_MS);
+  }
+  scheduleGraphRefresh() {
+    if (!this.refreshActive) {
+      return;
+    }
+    this.clearRefreshTimer();
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTimer = null;
+      this.refreshGraphNow();
+    }, GRAPH_REFRESH_DEBOUNCE_MS);
+  }
+  refreshGraphNow() {
+    const payload = this.buildGraph(this.app);
+    this.lastGraphPayload = payload;
+    if (!this.bridgeReady) {
+      this.pendingGraphPayload = payload;
+      this.pendingFocusPayload = this.resolvePreferredFocusPayload(payload);
+      return;
+    }
+    this.pendingGraphPayload = null;
+    this.bridge.sendGraphSet(payload);
+    this.dispatchPreferredFocus(payload);
+  }
+  flushOrRefreshGraph() {
+    if (this.pendingGraphPayload) {
+      const payload = this.pendingGraphPayload;
+      this.pendingGraphPayload = null;
+      this.lastGraphPayload = payload;
+      this.bridge.sendGraphSet(payload);
+      if (this.pendingFocusPayload) {
+        this.bridge.sendNoteFocus(this.pendingFocusPayload);
+        this.lastDispatchedFocusKey = this.toFocusKey(this.pendingFocusPayload);
+        this.pendingFocusPayload = null;
+      } else {
+        this.dispatchPreferredFocus(payload);
+      }
+      return;
+    }
+    this.refreshGraphNow();
+  }
+  clearRefreshTimer() {
+    if (!this.refreshTimer) {
+      return;
+    }
+    clearTimeout(this.refreshTimer);
+    this.refreshTimer = null;
+  }
+  clearResolveBarrierFallbackTimer() {
+    if (!this.resolveBarrierFallbackTimer) {
+      return;
+    }
+    clearTimeout(this.resolveBarrierFallbackTimer);
+    this.resolveBarrierFallbackTimer = null;
+  }
+  dispatchPreferredFocus(payload) {
+    if (!this.bridgeReady) {
+      this.pendingFocusPayload = this.resolvePreferredFocusPayload(payload);
+      return;
+    }
+    const focusPayload = this.resolvePreferredFocusPayload(payload);
+    if (!focusPayload) {
+      return;
+    }
+    const focusKey = this.toFocusKey(focusPayload);
+    if (focusKey && focusKey === this.lastDispatchedFocusKey) {
+      return;
+    }
+    this.bridge.sendNoteFocus(focusPayload);
+    this.lastDispatchedFocusKey = focusKey;
+  }
+  resolvePreferredFocusPayload(payload) {
+    const preferredPath = this.getPreferredFocusPath();
+    if (!preferredPath) {
+      return null;
+    }
+    const normalizedPreferredPath = this.normalizeVaultPath(preferredPath);
+    const byPath = payload.notes.find((note) => this.normalizeVaultPath(note.path) === normalizedPreferredPath) ?? null;
+    if (this.pendingCreatedFocusPath) {
+      const createdPath = this.normalizeVaultPath(this.pendingCreatedFocusPath);
+      const activePath = this.normalizeVaultPath(this.activeMarkdownPath);
+      if (!activePath || this.activeFocusOrdinal >= this.pendingCreatedFocusOrdinal || activePath === createdPath) {
+        this.pendingCreatedFocusPath = null;
+        this.pendingCreatedFocusOrdinal = 0;
+      }
+    }
+    if (!byPath) {
+      return {
+        path: normalizedPreferredPath
+      };
+    }
+    return {
+      id: byPath.id,
+      path: byPath.path
+    };
+  }
+  getPreferredFocusPath() {
+    const activePath = this.normalizeVaultPath(this.activeMarkdownPath);
+    const createdPath = this.normalizeVaultPath(this.pendingCreatedFocusPath);
+    if (activePath && (!createdPath || this.activeFocusOrdinal >= this.pendingCreatedFocusOrdinal)) {
+      return activePath;
+    }
+    if (createdPath) {
+      return createdPath;
+    }
+    return activePath;
+  }
+  toFocusKey(payload) {
+    const id = typeof payload.id === "string" ? payload.id.trim() : "";
+    const path3 = typeof payload.path === "string" ? this.normalizeVaultPath(payload.path) : "";
+    return `${id}|${path3}`;
+  }
+  buildGraphRelevantSignature(cache) {
+    const inlineTags = (cache?.tags ?? []).map((tagEntry) => typeof tagEntry?.tag === "string" ? tagEntry.tag : "").filter((tag) => tag.length > 0);
+    const frontmatterTags = this.extractFrontmatterTags(cache?.frontmatter);
+    const tags = Array.from(
+      new Set(
+        [...inlineTags, ...frontmatterTags].map((tag) => tag.trim().replace(/^#/, "").toLowerCase()).filter((tag) => tag.length > 0)
+      )
+    ).sort();
+    const links = Array.from(
+      new Set(
+        (cache?.links ?? []).map((link) => this.normalizeLinkValue(link.link)).filter((link) => link.length > 0)
+      )
+    ).sort();
+    return JSON.stringify({
+      tags,
+      links
+    });
+  }
+  normalizeLinkValue(linkValue) {
+    if (typeof linkValue !== "string") {
+      return "";
+    }
+    return linkValue.trim().replace(/\\/g, "/").toLowerCase();
+  }
+  normalizeVaultPath(pathValue) {
+    if (typeof pathValue !== "string") {
+      return "";
+    }
+    return pathValue.trim().replace(/\\/g, "/");
+  }
+  extractFrontmatterTags(frontmatter) {
+    if (!frontmatter || typeof frontmatter !== "object") {
+      return [];
+    }
+    const tagsRaw = frontmatter.tags;
+    if (typeof tagsRaw === "string") {
+      return [tagsRaw];
+    }
+    if (Array.isArray(tagsRaw)) {
+      return tagsRaw.filter((tag) => typeof tag === "string");
+    }
+    return [];
+  }
+  isGraphRelevantPath(pathValue) {
+    if (typeof pathValue !== "string") {
+      return false;
+    }
+    return pathValue.toLowerCase().endsWith(".md");
   }
   async openRequestedNote(payload) {
     const resolvedPath = this.resolveRequestedPath(payload);
@@ -480,13 +790,20 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     const currentActiveLeaf = workspace.activeLeaf ?? null;
     if (this.isMarkdownLeaf(currentActiveLeaf)) {
       this.lastMarkdownLeaf = currentActiveLeaf;
+      this.activeMarkdownPath = this.getLeafSourcePath(currentActiveLeaf);
     } else {
       this.lastMarkdownLeaf = this.findAnyMarkdownLeaf();
+      this.activeMarkdownPath = this.getLeafSourcePath(this.lastMarkdownLeaf);
     }
     this.registerEvent(
       workspace.on("active-leaf-change", (leaf) => {
         if (this.isMarkdownLeaf(leaf)) {
           this.lastMarkdownLeaf = leaf;
+          this.activeFocusOrdinal = ++this.focusOrdinal;
+          this.activeMarkdownPath = this.getLeafSourcePath(leaf);
+          if (this.lastGraphPayload) {
+            this.dispatchPreferredFocus(this.lastGraphPayload);
+          }
         }
       })
     );
@@ -522,7 +839,7 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     return stateType === "markdown";
   }
   getLeafSourcePath(leaf) {
-    const view = leaf.view;
+    const view = leaf?.view ?? null;
     const path3 = view?.file?.path;
     return typeof path3 === "string" ? path3 : "";
   }

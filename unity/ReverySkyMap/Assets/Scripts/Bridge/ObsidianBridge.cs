@@ -131,6 +131,37 @@ public class ObsidianBridge : MonoBehaviour
     Debug.Log($"[ObsidianBridge] graph:set applied. notes={notes.Length}, links={links.Length}, runtimeNotes={runtimeNotes.Count}, tags={tagNameById.Count}");
   }
 
+  public void OnNoteFocus(string json)
+  {
+    MapRuntimeContext.EnableRuntimeMode();
+
+    if (string.IsNullOrWhiteSpace(json))
+      return;
+
+    NoteFocusEnvelope envelope;
+    try
+    {
+      envelope = JsonUtility.FromJson<NoteFocusEnvelope>(json);
+    }
+    catch (Exception ex)
+    {
+      Debug.LogWarning($"[ObsidianBridge] Invalid note:focus payload: {ex.Message}");
+      return;
+    }
+
+    var payload = envelope?.payload;
+    var noteId = payload?.id ?? string.Empty;
+    var notePath = payload?.path ?? string.Empty;
+    if (string.IsNullOrWhiteSpace(noteId) && string.IsNullOrWhiteSpace(notePath))
+      return;
+
+    var cartographer = Cartographer.I;
+    if (cartographer == null)
+      return;
+
+    cartographer.FocusRuntimeNote(noteId, notePath);
+  }
+
   private static void HandleOpenNoteRequested(string noteId, string notePath)
   {
     var safeId = noteId ?? string.Empty;
@@ -175,6 +206,19 @@ public class ObsidianBridge : MonoBehaviour
   private class GraphSetEnvelope
   {
     public GraphPayload payload;
+  }
+
+  [Serializable]
+  private class NoteFocusEnvelope
+  {
+    public NoteFocusPayload payload;
+  }
+
+  [Serializable]
+  private class NoteFocusPayload
+  {
+    public string id;
+    public string path;
   }
 
   [Serializable]

@@ -5,7 +5,8 @@
   "description": "ReverySky Map Obsidian plugin",
   "scripts": {
     "dev": "node esbuild.config.mjs",
-    "build": "tsc --noEmit --skipLibCheck && node esbuild.config.mjs production",
+    "check:unity-webgl": "node scripts/check-unity-webgl-artifacts.mjs",
+    "build": "npm run check:unity-webgl && tsc --noEmit --skipLibCheck && node esbuild.config.mjs production",
     "test": "vitest run",
     "test:watch": "vitest"
   },

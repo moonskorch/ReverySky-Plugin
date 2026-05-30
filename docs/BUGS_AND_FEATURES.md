@@ -9,6 +9,8 @@ Purpose:
 1. Star size is not affected by note length.
    - Expected: note length should influence star size based on runtime data received from Obsidian.
    - Current state: behavior does not match this expectation.
+   - Current limitation: text typing does not currently provide an automatic length-driven refresh/recalculation path, so length changes are not auto-applied in real time.
+   - Follow-up direction: add an explicit, controlled mechanism to recalculate length-dependent node sizing on text edits (to be implemented later).
 
 2. Importance filter behavior is inconsistent and unclear.
    - Expected: deterministic and understandable filtering behavior.
@@ -41,6 +43,6 @@ Purpose:
    - Note: old implementation via `SymbolRepository` was removed.
    - Follow-up direction: review reference project logic and selectively port only the relevant parts.
 
-3. Determine crystal type and sphere material from user-selected properties (instead of static/random mapping). Or it could be some general properties: for example, number of links (direct + reversal) to color (from 0 as black to max limit as ethernal).
+3. Determine crystal type and sphere material from user-selected properties (instead of static/random mapping). Or it could be some general properties: for example, number of links (direct + reversal) to color (from 0 as black to max limit as eternal).
    - Expected: visual mapping is configured by user-defined property bindings.
    - Current state: temporary behavior uses static/random fallback and needs replacement.

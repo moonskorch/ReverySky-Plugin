@@ -72,6 +72,18 @@ public static class MapRuntimeContext
     return Notes.FirstOrDefault(n => n != null && n.Id == noteId);
   }
 
+  public static NoteData FindNoteByPath(string notePath)
+  {
+    if (string.IsNullOrWhiteSpace(notePath))
+      return null;
+
+    var normalizedPath = notePath.Replace('\\', '/');
+    return Notes.FirstOrDefault(
+      n => n != null &&
+      !string.IsNullOrWhiteSpace(n.Path) &&
+      string.Equals(n.Path.Replace('\\', '/'), normalizedPath, StringComparison.OrdinalIgnoreCase));
+  }
+
   public static void RequestOpenNote(NoteData note)
   {
     if (note == null)

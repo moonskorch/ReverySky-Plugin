@@ -47,6 +47,37 @@ describe("UnityIframeBridge", () => {
     bridge.detach();
   });
 
+  it("sends note:focus when id or path is provided", () => {
+    const bridge = new UnityIframeBridge();
+    const postMessage = vi.fn();
+    const iframeWindow = { postMessage } as unknown as Window;
+
+    bridge.attach(iframeWindow, {});
+    bridge.sendNoteFocus({ path: "Folder/Note.md" });
+
+    expect(postMessage).toHaveBeenCalledTimes(1);
+    const [message, targetOrigin] = postMessage.mock.calls[0] as [Record<string, unknown>, string];
+    expect(targetOrigin).toBe("*");
+    expect(message.type).toBe("note:focus");
+    expect(message.protocolVersion).toBe(BRIDGE_PROTOCOL_VERSION);
+    bridge.detach();
+  });
+
+  it("reports error and does not send note:focus when payload is empty", () => {
+    const bridge = new UnityIframeBridge();
+    const postMessage = vi.fn();
+    const onError = vi.fn();
+    const iframeWindow = { postMessage } as unknown as Window;
+
+    bridge.attach(iframeWindow, { onError });
+    bridge.sendNoteFocus({});
+
+    expect(postMessage).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError.mock.calls[0]?.[0]).toContain("Invalid note focus payload");
+    bridge.detach();
+  });
+
   it("reports error and does not send when payload is invalid", () => {
     const bridge = new UnityIframeBridge();
     const postMessage = vi.fn();
