@@ -6,11 +6,10 @@ Purpose:
 
 ## Bugs
 
-1. Star size is not affected by note length.
-   - Expected: note length should influence star size based on runtime data received from Obsidian.
-   - Current state: behavior does not match this expectation.
-   - Current limitation: text typing does not currently provide an automatic length-driven refresh/recalculation path, so length changes are not auto-applied in real time.
-   - Follow-up direction: add an explicit, controlled mechanism to recalculate length-dependent node sizing on text edits (to be implemented later).
+1. Metadata-only updates for size/date do not auto-refresh graph.
+   - Expected: changes that affect `size` or `date` should be reflected in runtime graph without requiring unrelated graph-significant edits.
+   - Current state: refresh triggers are graph-significant (`tags`, `links`, `create/rename/delete`), so size/date-only updates can remain stale until next trigger.
+   - Follow-up direction: add a controlled refresh/recalculation path for size/date-affecting updates without returning to full rebuild on every text edit.
 
 2. Importance filter behavior is inconsistent and unclear.
    - Expected: deterministic and understandable filtering behavior.

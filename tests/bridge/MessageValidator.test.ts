@@ -15,7 +15,8 @@ function makeValidPayload(): GraphPayload {
         path: "Folder/Note.md",
         title: "Note",
         tags: ["tag"],
-        date: "2026-01-01T00:00:00.000Z"
+        date: "2026-01-01T00:00:00.000Z",
+        size: 128
       }
     ],
     links: [
@@ -41,12 +42,14 @@ describe("MessageValidator", () => {
     payload.vault.noteCount = 2;
     payload.links[0].weight = 0;
     payload.notes[0].id = "  ";
+    payload.notes[0].size = -1;
 
     const errors = MessageValidator.validateGraphPayload(payload);
     expect(errors).toContain("payload.generatedAt must be a valid ISO-like date string");
     expect(errors).toContain("payload.vault.noteCount must equal payload.notes.length");
     expect(errors).toContain("payload.links[0].weight must be a positive number when defined");
     expect(errors).toContain("payload.notes[0].id must be a non-empty string");
+    expect(errors).toContain("payload.notes[0].size must be a non-negative integer");
   });
 
   it("rejects incoming bridge:ready message with protocol mismatch", () => {

@@ -21,7 +21,8 @@ function makePayload(): GraphPayload {
         path: "Note.md",
         title: "Note",
         tags: [],
-        date: "2026-01-01T00:00:00.000Z"
+        date: "2026-01-01T00:00:00.000Z",
+        size: 64
       }
     ],
     links: []
@@ -588,9 +589,9 @@ describe("ReverySkyMapView bridge integration", () => {
 
     const payload = makePayload();
     payload.notes = [
-      { id: "a", path: "Folder/A.md", title: "A", tags: [], date: "2026-01-01T00:00:00.000Z" },
-      { id: "b", path: "Folder/B.md", title: "B", tags: [], date: "2026-01-02T00:00:00.000Z" },
-      { id: "new", path: "Folder/New.md", title: "New", tags: [], date: "2026-01-03T00:00:00.000Z" }
+      { id: "a", path: "Folder/A.md", title: "A", tags: [], date: "2026-01-01T00:00:00.000Z", size: 10 },
+      { id: "b", path: "Folder/B.md", title: "B", tags: [], date: "2026-01-02T00:00:00.000Z", size: 20 },
+      { id: "new", path: "Folder/New.md", title: "New", tags: [], date: "2026-01-03T00:00:00.000Z", size: 30 }
     ];
     payload.vault.noteCount = payload.notes.length;
 
@@ -681,13 +682,13 @@ describe("ReverySkyMapView bridge integration", () => {
 
     const payloadBefore = makePayload();
     payloadBefore.notes = [
-      { id: "old_id", path: "Folder/Old.md", title: "Old", tags: [], date: "2026-01-01T00:00:00.000Z" }
+      { id: "old_id", path: "Folder/Old.md", title: "Old", tags: [], date: "2026-01-01T00:00:00.000Z", size: 11 }
     ];
     payloadBefore.vault.noteCount = 1;
 
     const payloadAfter = makePayload();
     payloadAfter.notes = [
-      { id: "new_id", path: "Folder/New.md", title: "New", tags: [], date: "2026-01-02T00:00:00.000Z" }
+      { id: "new_id", path: "Folder/New.md", title: "New", tags: [], date: "2026-01-02T00:00:00.000Z", size: 12 }
     ];
     payloadAfter.vault.noteCount = 1;
 

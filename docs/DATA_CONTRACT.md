@@ -46,6 +46,7 @@ type GraphNoteNode = {
   title: string;
   tags: string[];
   date?: string;
+  size: number;
 };
 
 type GraphLink = {
@@ -60,6 +61,7 @@ type GraphLink = {
 - `path` must be vault-relative and use `/` separators.
 - `id` must be stable for the same note across sessions.
 - `date` must be a single canonical note date in ISO 8601 format when provided.
+- `size` must be a non-negative integer measured in bytes.
 - `vault.noteCount` must equal `notes.length`.
 - Unknown fields must be safely ignored by consumers.
 

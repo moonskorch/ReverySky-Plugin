@@ -98,6 +98,7 @@ public class ObsidianBridge : MonoBehaviour
         Name = string.IsNullOrWhiteSpace(note.title) ? (note.id ?? string.Empty) : note.title,
         Path = note.path,
         DateTime = ParseDate(note.date),
+        Length = Mathf.Max(0, note.size),
         CrystalType = CrystalType.Unknown,
         SphereType = SphereType.Unknown,
         TagIds = tagIds,
@@ -226,6 +227,7 @@ public class ObsidianBridge : MonoBehaviour
     public string title;
     public string[] tags;
     public string date;
+    public int size;
   }
 
   [Serializable]

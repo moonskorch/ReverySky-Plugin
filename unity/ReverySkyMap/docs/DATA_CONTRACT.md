@@ -50,11 +50,8 @@ type GraphNoteNode = {
   path: string;
   title: string;
   tags: string[];
-  dates: {
-    created?: string;
-    modified?: string;
-    noteDate?: string;
-  };
+  date?: string;
+  size: number;
 };
 
 type GraphLink = {

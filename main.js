@@ -72,6 +72,9 @@ var MessageValidator = class {
         if (!this.isNonEmptyString(note.path)) errors.push(`payload.notes[${i}].path must be a non-empty string`);
         if (!this.isNonEmptyString(note.title)) errors.push(`payload.notes[${i}].title must be a non-empty string`);
         if (!Array.isArray(note.tags)) errors.push(`payload.notes[${i}].tags must be an array`);
+        if (!Number.isInteger(note.size) || note.size < 0) {
+          errors.push(`payload.notes[${i}].size must be a non-negative integer`);
+        }
         if (note.date !== void 0 && !this.isValidDateString(note.date)) {
           errors.push(`payload.notes[${i}].date must be a valid ISO-like date string when defined`);
         }
@@ -329,6 +332,7 @@ var VaultGraphBuilder = class _VaultGraphBuilder {
       path: GraphNormalizer.normalizePath(file.path),
       title: file.basename,
       tags,
+      size: _VaultGraphBuilder.getNoteSizeBytes(file),
       ...date ? { date } : {}
     };
   }
@@ -372,6 +376,13 @@ var VaultGraphBuilder = class _VaultGraphBuilder {
       hash = Math.imul(hash, 16777619);
     }
     return `note_${(hash >>> 0).toString(16).padStart(8, "0")}`;
+  }
+  static getNoteSizeBytes(file) {
+    const rawSize = file?.stat?.size;
+    if (!Number.isFinite(rawSize)) {
+      return 0;
+    }
+    return Math.max(0, Math.trunc(rawSize));
   }
 };
 

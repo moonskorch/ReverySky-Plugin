@@ -37,6 +37,7 @@ export type GraphNoteNode = {
   title: string;
   tags: string[];
   date?: string;
+  size: number;
 };
 
 export type GraphLink = {

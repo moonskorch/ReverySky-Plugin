@@ -86,6 +86,7 @@ export class VaultGraphBuilder {
       path: GraphNormalizer.normalizePath(file.path),
       title: file.basename,
       tags,
+      size: VaultGraphBuilder.getNoteSizeBytes(file),
       ...(date ? { date } : {})
     };
   }
@@ -136,5 +137,14 @@ export class VaultGraphBuilder {
       hash = Math.imul(hash, 0x01000193);
     }
     return `note_${(hash >>> 0).toString(16).padStart(8, "0")}`;
+  }
+
+  private static getNoteSizeBytes(file: TFile): number {
+    const rawSize = file?.stat?.size;
+    if (!Number.isFinite(rawSize)) {
+      return 0;
+    }
+
+    return Math.max(0, Math.trunc(rawSize));
   }
 }
