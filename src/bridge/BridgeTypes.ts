@@ -1,4 +1,4 @@
-export const BRIDGE_PROTOCOL_VERSION = "1.0.0";
+export const BRIDGE_PROTOCOL_VERSION = "2.0.0";
 
 export type BridgeReadyMessage = {
   protocolVersion: string;

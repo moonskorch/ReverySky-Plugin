@@ -438,6 +438,234 @@ describe("ReverySkyMapView bridge integration", () => {
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
   });
 
+  it("does not refresh when only frontmatter date changes and tags/links stay stable", async () => {
+    vi.useFakeTimers();
+
+    const metadataCallbacks: {
+      changed?: (
+        file: { path?: string },
+        data: string,
+        cache: {
+          links?: Array<{ link: string }>;
+          tags?: Array<{ tag: string }>;
+          frontmatter?: { date?: string; tags?: unknown };
+        }
+      ) => void;
+      resolved?: () => void;
+    } = {};
+
+    const app = {
+      metadataCache: {
+        on: vi.fn((name: "changed" | "resolved", callback: (...args: never[]) => void) => {
+          if (name === "changed") {
+            metadataCallbacks.changed = callback as (
+              file: { path?: string },
+              data: string,
+              cache: {
+                links?: Array<{ link: string }>;
+                tags?: Array<{ tag: string }>;
+                frontmatter?: { date?: string; tags?: unknown };
+              }
+            ) => void;
+          } else {
+            metadataCallbacks.resolved = callback as () => void;
+          }
+          return { id: `metadata-${name}` };
+        })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePayload();
+    const buildGraph = vi.fn().mockReturnValue(payload);
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: buildGraph as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+
+    metadataCallbacks.changed?.(
+      { path: "Folder/Note.md" },
+      "content",
+      {
+        links: [{ link: "RefA" }],
+        tags: [{ tag: "#tag-a" }],
+        frontmatter: { date: "2026-01-01" }
+      }
+    );
+    metadataCallbacks.resolved?.();
+    vi.advanceTimersByTime(250);
+    expect(buildGraph).toHaveBeenCalledTimes(2);
+
+    metadataCallbacks.changed?.(
+      { path: "Folder/Note.md" },
+      "content",
+      {
+        links: [{ link: "RefA" }],
+        tags: [{ tag: "#tag-a" }],
+        frontmatter: { date: "2030-12-31" }
+      }
+    );
+    metadataCallbacks.resolved?.();
+    vi.advanceTimersByTime(250);
+
+    expect(buildGraph).toHaveBeenCalledTimes(2);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not refresh when only note size changes and graph signature stays stable", async () => {
+    vi.useFakeTimers();
+
+    const metadataCallbacks: {
+      changed?: (
+        file: { path?: string },
+        data: string,
+        cache: {
+          links?: Array<{ link: string }>;
+          tags?: Array<{ tag: string }>;
+          frontmatter?: { date?: string; tags?: unknown };
+        }
+      ) => void;
+      resolved?: () => void;
+    } = {};
+
+    const app = {
+      metadataCache: {
+        on: vi.fn((name: "changed" | "resolved", callback: (...args: never[]) => void) => {
+          if (name === "changed") {
+            metadataCallbacks.changed = callback as (
+              file: { path?: string },
+              data: string,
+              cache: {
+                links?: Array<{ link: string }>;
+                tags?: Array<{ tag: string }>;
+                frontmatter?: { date?: string; tags?: unknown };
+              }
+            ) => void;
+          } else {
+            metadataCallbacks.resolved = callback as () => void;
+          }
+          return { id: `metadata-${name}` };
+        })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePayload();
+    const buildGraph = vi.fn().mockReturnValue(payload);
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: buildGraph as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+
+    metadataCallbacks.changed?.(
+      { path: "Folder/Note.md" },
+      "size-prime",
+      {
+        links: [{ link: "RefA" }],
+        tags: [{ tag: "#tag-a" }],
+        frontmatter: { date: "2026-01-01" }
+      }
+    );
+    metadataCallbacks.resolved?.();
+    vi.advanceTimersByTime(250);
+    expect(buildGraph).toHaveBeenCalledTimes(2);
+
+    metadataCallbacks.changed?.(
+      { path: "Folder/Note.md" },
+      "size-prime and then much longer content to change file size only",
+      {
+        links: [{ link: "RefA" }],
+        tags: [{ tag: "#tag-a" }],
+        frontmatter: { date: "2026-01-01" }
+      }
+    );
+    metadataCallbacks.resolved?.();
+    vi.advanceTimersByTime(250);
+
+    expect(buildGraph).toHaveBeenCalledTimes(2);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+  });
+
   it("queues latest graph before bridge ready and flushes it on bridge:ready", async () => {
     vi.useFakeTimers();
 

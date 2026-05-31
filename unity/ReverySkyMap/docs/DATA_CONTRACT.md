@@ -17,7 +17,7 @@ Expected envelope:
 
 ```json
 {
-  "protocolVersion": "1.0.0",
+  "protocolVersion": "2.0.0",
   "type": "graph:set",
   "requestId": "req_optional",
   "payload": {}
@@ -63,11 +63,45 @@ type GraphLink = {
 ```
 
 ## Unity Ingestion Invariants
-- `vault.noteCount` equals `notes.length`.
+- `vault.noteCount` is informational for Unity ingest; runtime uses `notes` as the source of truth.
 - `id` is required and stable across updates.
 - `path` is vault-relative with `/` separators.
-- Links reference existing note ids.
+- Links with missing note ids are tolerated at ingest and dropped later during Forces edge resolution.
 - Unknown fields are ignored, not fatal.
+
+## Runtime Field Usage (Unity)
+Current runtime behavior snapshot for Unity ingestion and map interaction:
+
+- `notes[].id` -> node identity, lookup, focus/selection restore, open-note flow, and link endpoint matching.
+- `notes[].path` -> open-note payload path, focus fallback by path, stable visual seed source.
+- `notes[].title` -> star label text.
+  - fallback: empty/whitespace title maps to `GameSettings.DefaultTitle` (`"Untitled"`).
+- `notes[].tags[]` -> trimmed runtime tag-id mapping; per-note deduplication is applied later by Forces engine.
+  - derivation: trimmed tag string -> shared integer id mapping.
+- `notes[].date` -> static-25D date depth placement and date-range filtering.
+  - fallback: parse failure or missing date maps to `DateTime.MinValue`.
+- `notes[].size` -> star scale factor via runtime percentile statistics.
+  - fallback: negative size maps to `0`.
+- `links[].sourceId` and `links[].targetId` -> note-note edges in Forces engine.
+  - gate: empty ids and self-links are dropped during bridge mapping; missing runtime node ids are dropped by Forces edge resolution.
+- `links[].weight` -> Forces spring rest length (`idealEdgeLen / sqrt(weight)`).
+  - fallback: `weight <= 0` maps to `1`.
+
+### Runtime-Only Defaults And Derivations
+- `NoteData.CrystalType` is forced to `Unknown` at bridge mapping time.
+- `NoteData.SphereType` is forced to `Unknown` at bridge mapping time.
+- `NoteData.ScapeView` is initialized to `Planets` at bridge mapping time.
+- Runtime tag ids (`TagIds`) and `tagId -> name` dictionary are derived locally from incoming `tags[]`.
+
+### Temporary State
+- `NoteData.CrystalType = Unknown` for bridge-ingested notes is temporary.
+- Effect: importance filter currently does not provide meaningful runtime segmentation for real bridge data.
+
+## Ignored And Not Enforced In Runtime
+- Ignored fields: `requestId`, `payload.graphVersion`, `payload.generatedAt`, `payload.vault.noteCount`, `links[].kind`.
+- Not enforced on ingest:
+  - `vault.noteCount == notes.length` is documented but not validated in Unity ingest code.
+  - Link endpoint existence is not validated on ingest; missing ids are dropped later during Forces edge resolution.
 
 ## Error Handling Expectations
 - Invalid envelope or protocol mismatch must be rejected gracefully.

@@ -38,6 +38,10 @@ public class MapRuntimePlayModeTests
     Assert.That(MapRuntimeContext.IsRuntimeMode, Is.True);
     Assert.That(MapRuntimeContext.Notes, Has.Count.EqualTo(3));
     Assert.That(MapRuntimeContext.Links, Has.Count.EqualTo(2));
+    NoteData firstNote = MapRuntimeContext.FindNoteById("v1");
+    Assert.That(firstNote, Is.Not.Null);
+    Assert.That(firstNote.DateTime, Is.EqualTo(DateTime.Parse("2025-04-01T00:00:00Z", null, System.Globalization.DateTimeStyles.RoundtripKind)));
+    Assert.That(firstNote.Length, Is.EqualTo(111));
 
     Star[] stars = UnityEngine.Object.FindObjectsByType<Star>(FindObjectsSortMode.None);
     Assert.That(stars.Length, Is.EqualTo(3));
@@ -254,10 +258,10 @@ public class MapRuntimePlayModeTests
   }
 
   private const string DeterministicPayload =
-    "{\"protocolVersion\":\"1.0.0\",\"type\":\"graph:set\",\"payload\":{\"notes\":[" +
-    "{\"id\":\"v1\",\"path\":\"visual/v1.md\",\"title\":\"Visual 1\",\"tags\":[\"alpha\",\"focus\"],\"dates\":{\"created\":\"2025-04-01T00:00:00Z\"}}," +
-    "{\"id\":\"v2\",\"path\":\"visual/v2.md\",\"title\":\"Visual 2\",\"tags\":[\"focus\",\"beta\"],\"dates\":{\"created\":\"2025-04-03T00:00:00Z\"}}," +
-    "{\"id\":\"v3\",\"path\":\"visual/v3.md\",\"title\":\"Visual 3\",\"tags\":[\"beta\",\"gamma\"],\"dates\":{\"created\":\"2025-04-05T00:00:00Z\"}}" +
+    "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"notes\":[" +
+    "{\"id\":\"v1\",\"path\":\"visual/v1.md\",\"title\":\"Visual 1\",\"tags\":[\"alpha\",\"focus\"],\"date\":\"2025-04-01T00:00:00Z\",\"size\":111}," +
+    "{\"id\":\"v2\",\"path\":\"visual/v2.md\",\"title\":\"Visual 2\",\"tags\":[\"focus\",\"beta\"],\"date\":\"2025-04-03T00:00:00Z\",\"size\":222}," +
+    "{\"id\":\"v3\",\"path\":\"visual/v3.md\",\"title\":\"Visual 3\",\"tags\":[\"beta\",\"gamma\"],\"date\":\"2025-04-05T00:00:00Z\",\"size\":333}" +
     "],\"links\":[" +
     "{\"sourceId\":\"v1\",\"targetId\":\"v2\",\"weight\":1.0}," +
     "{\"sourceId\":\"v2\",\"targetId\":\"v3\",\"weight\":1.0}" +

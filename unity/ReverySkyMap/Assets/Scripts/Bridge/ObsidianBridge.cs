@@ -5,6 +5,10 @@ using UnityEngine;
 
 public class ObsidianBridge : MonoBehaviour
 {
+  private const string ExpectedProtocolVersion = "2.0.0";
+  private const string GraphSetMessageType = "graph:set";
+  private const string NoteFocusMessageType = "note:focus";
+
 #if UNITY_WEBGL && !UNITY_EDITOR
   [DllImport("__Internal")]
   private static extern void ReverySkyBridgePostNoteOpen(string noteId, string notePath);
@@ -57,6 +61,20 @@ public class ObsidianBridge : MonoBehaviour
     if (envelope?.payload == null)
       return;
 
+    if (!string.Equals(envelope.protocolVersion, ExpectedProtocolVersion, StringComparison.Ordinal))
+    {
+      Debug.LogWarning(
+        $"[ObsidianBridge] Ignoring graph:set due to protocolVersion mismatch. expected={ExpectedProtocolVersion}, got={envelope?.protocolVersion ?? "<null>"}");
+      return;
+    }
+
+    if (!string.Equals(envelope.type, GraphSetMessageType, StringComparison.Ordinal))
+    {
+      Debug.LogWarning(
+        $"[ObsidianBridge] Ignoring graph:set due to message type mismatch. expected={GraphSetMessageType}, got={envelope?.type ?? "<null>"}");
+      return;
+    }
+
     var notes = envelope.payload.notes ?? Array.Empty<GraphNote>();
     var links = envelope.payload.links ?? Array.Empty<GraphLink>();
 
@@ -95,7 +113,7 @@ public class ObsidianBridge : MonoBehaviour
       runtimeNotes.Add(new NoteData
       {
         Id = note.id ?? string.Empty,
-        Name = string.IsNullOrWhiteSpace(note.title) ? (note.id ?? string.Empty) : note.title,
+        Name = string.IsNullOrWhiteSpace(note.title) ? GameSettings.DefaultTitle : note.title,
         Path = note.path,
         DateTime = ParseDate(note.date),
         Length = Mathf.Max(0, note.size),
@@ -150,6 +168,20 @@ public class ObsidianBridge : MonoBehaviour
       return;
     }
 
+    if (!string.Equals(envelope.protocolVersion, ExpectedProtocolVersion, StringComparison.Ordinal))
+    {
+      Debug.LogWarning(
+        $"[ObsidianBridge] Ignoring note:focus due to protocolVersion mismatch. expected={ExpectedProtocolVersion}, got={envelope?.protocolVersion ?? "<null>"}");
+      return;
+    }
+
+    if (!string.Equals(envelope.type, NoteFocusMessageType, StringComparison.Ordinal))
+    {
+      Debug.LogWarning(
+        $"[ObsidianBridge] Ignoring note:focus due to message type mismatch. expected={NoteFocusMessageType}, got={envelope?.type ?? "<null>"}");
+      return;
+    }
+
     var payload = envelope?.payload;
     var noteId = payload?.id ?? string.Empty;
     var notePath = payload?.path ?? string.Empty;
@@ -196,12 +228,16 @@ public class ObsidianBridge : MonoBehaviour
   [Serializable]
   private class GraphSetEnvelope
   {
+    public string protocolVersion;
+    public string type;
     public GraphPayload payload;
   }
 
   [Serializable]
   private class NoteFocusEnvelope
   {
+    public string protocolVersion;
+    public string type;
     public NoteFocusPayload payload;
   }
 
