@@ -22,6 +22,7 @@
 - `unity-webgl/index.template.html`: tracked runtime host template.
 - `unity-webgl/index.html`, `unity-webgl/Build/*`, `unity-webgl/TemplateData/*`: generated local artifacts, not source.
 - `docs/`: architecture, data contract, risks, MVP plan, and operational runbooks.
+- `.local-notes/`: local private notes; may be checked during task execution for relevant documentation.
 - `reference/ReverySky`: reference-only workspace, never a restore baseline.
 
 ## Development Commands
@@ -60,6 +61,7 @@
 - Never create temporary test files in the repository.
 - If repository evidence and docs conflict, report the contradiction explicitly.
 - Before edits, define a compact task contract with: `Mode`, `Goal`, `Scope`, `Out of scope`, `Verification`, `Stop condition` (see `docs/AGENT_WORKFLOW.md`).
+- When working on a task, optionally check `.local-notes/` for relevant local documentation before making implementation decisions.
 
 ## Project Plan Workflow
 For substantial MVP work, treat `docs/MVP_PLAN.md` as canonical roadmap and follow the process in `docs/AGENT_WORKFLOW.md`.
