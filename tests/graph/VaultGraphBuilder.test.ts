@@ -132,4 +132,30 @@ describe("VaultGraphBuilder", () => {
     expect(payload.notes[0]?.size).toBe(0);
     expect(payload.notes[0]).not.toHaveProperty("date");
   });
+
+  it("falls back to created date when frontmatter date string is invalid", () => {
+    const ctime = Date.UTC(2026, 6, 10, 8, 0, 0);
+    const file = makeFile("Fallback/InvalidFrontmatterDate.md", {
+      ctime,
+      mtime: ctime,
+      size: 100
+    });
+
+    const app = {
+      vault: {
+        getMarkdownFiles: () => [file]
+      },
+      metadataCache: {
+        getFileCache: () => ({
+          frontmatter: {
+            date: "32/13/2026"
+          }
+        }),
+        resolvedLinks: {}
+      }
+    };
+
+    const payload = VaultGraphBuilder.build(app as never);
+    expect(payload.notes[0]?.date).toBe(new Date(ctime).toISOString());
+  });
 });

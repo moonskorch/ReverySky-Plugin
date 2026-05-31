@@ -39,7 +39,7 @@ var import_obsidian2 = require("obsidian");
 var import_obsidian = require("obsidian");
 
 // src/bridge/BridgeTypes.ts
-var BRIDGE_PROTOCOL_VERSION = "1.0.0";
+var BRIDGE_PROTOCOL_VERSION = "2.0.0";
 
 // src/bridge/MessageValidator.ts
 var MessageValidator = class {
@@ -358,7 +358,7 @@ var VaultGraphBuilder = class _VaultGraphBuilder {
         return void 0;
       }
       const d = new Date(trimmed);
-      return Number.isNaN(d.getTime()) ? trimmed : d.toISOString();
+      return Number.isNaN(d.getTime()) ? void 0 : d.toISOString();
     }
     if (value instanceof Date) {
       return value.toISOString();

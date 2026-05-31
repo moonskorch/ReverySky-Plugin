@@ -11,7 +11,7 @@ mergeInto(LibraryManager.library, {
     if (typeof window !== "undefined" && window.parent && typeof window.parent.postMessage === "function") {
       window.parent.postMessage(
         {
-          protocolVersion: "1.0.0",
+          protocolVersion: "2.0.0",
           type: "note:open",
           requestId: "evt_" + Date.now(),
           payload: {

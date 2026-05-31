@@ -118,7 +118,7 @@ export class VaultGraphBuilder {
         return undefined;
       }
       const d = new Date(trimmed);
-      return Number.isNaN(d.getTime()) ? trimmed : d.toISOString();
+      return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
     }
     if (value instanceof Date) {
       return value.toISOString();
