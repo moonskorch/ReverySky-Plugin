@@ -80,19 +80,14 @@ export class VaultGraphBuilder {
     ]);
 
     const created = Number.isFinite(file.stat.ctime) ? new Date(file.stat.ctime).toISOString() : undefined;
-    const modified = Number.isFinite(file.stat.mtime) ? new Date(file.stat.mtime).toISOString() : undefined;
-    const noteDate = VaultGraphBuilder.getFrontmatterDate(frontmatter?.date);
+    const date = VaultGraphBuilder.getFrontmatterDate(frontmatter?.date) ?? created;
 
     return {
       id: frontmatterId || VaultGraphBuilder.makeStableId(file.path),
       path: GraphNormalizer.normalizePath(file.path),
       title: file.basename,
       tags,
-      dates: {
-        ...(created ? { created } : {}),
-        ...(modified ? { modified } : {}),
-        ...(noteDate ? { noteDate } : {})
-      }
+      ...(date ? { date } : {})
     };
   }
 

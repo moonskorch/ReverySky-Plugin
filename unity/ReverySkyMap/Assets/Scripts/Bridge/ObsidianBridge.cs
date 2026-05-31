@@ -97,7 +97,7 @@ public class ObsidianBridge : MonoBehaviour
         Id = note.id ?? string.Empty,
         Name = string.IsNullOrWhiteSpace(note.title) ? (note.id ?? string.Empty) : note.title,
         Path = note.path,
-        DateTime = ParseDate(note.dates),
+        DateTime = ParseDate(note.date),
         CrystalType = CrystalType.Unknown,
         SphereType = SphereType.Unknown,
         TagIds = tagIds,
@@ -174,19 +174,9 @@ public class ObsidianBridge : MonoBehaviour
 #endif
   }
 
-  private static DateTime ParseDate(NoteDates dates)
+  private static DateTime ParseDate(string value)
   {
-    if (dates == null)
-      return DateTime.MinValue;
-
-    if (TryParseIso(dates.noteDate, out var dt))
-      return dt;
-    if (TryParseIso(dates.created, out dt))
-      return dt;
-    if (TryParseIso(dates.modified, out dt))
-      return dt;
-
-    return DateTime.MinValue;
+    return TryParseIso(value, out var dt) ? dt : DateTime.MinValue;
   }
 
   private static bool TryParseIso(string value, out DateTime dt)
@@ -235,15 +225,7 @@ public class ObsidianBridge : MonoBehaviour
     public string path;
     public string title;
     public string[] tags;
-    public NoteDates dates;
-  }
-
-  [Serializable]
-  private class NoteDates
-  {
-    public string created;
-    public string modified;
-    public string noteDate;
+    public string date;
   }
 
   [Serializable]

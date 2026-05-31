@@ -42,7 +42,9 @@ export class MessageValidator {
         if (!this.isNonEmptyString(note.path)) errors.push(`payload.notes[${i}].path must be a non-empty string`);
         if (!this.isNonEmptyString(note.title)) errors.push(`payload.notes[${i}].title must be a non-empty string`);
         if (!Array.isArray(note.tags)) errors.push(`payload.notes[${i}].tags must be an array`);
-        if (!note.dates || typeof note.dates !== "object") errors.push(`payload.notes[${i}].dates must be an object`);
+        if (note.date !== undefined && !this.isValidDateString(note.date)) {
+          errors.push(`payload.notes[${i}].date must be a valid ISO-like date string when defined`);
+        }
       }
     }
 

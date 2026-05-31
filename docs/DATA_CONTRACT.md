@@ -45,11 +45,7 @@ type GraphNoteNode = {
   path: string;
   title: string;
   tags: string[];
-  dates: {
-    created?: string;
-    modified?: string;
-    noteDate?: string;
-  };
+  date?: string;
 };
 
 type GraphLink = {
@@ -63,6 +59,7 @@ type GraphLink = {
 ## Normalization Rules
 - `path` must be vault-relative and use `/` separators.
 - `id` must be stable for the same note across sessions.
+- `date` must be a single canonical note date in ISO 8601 format when provided.
 - `vault.noteCount` must equal `notes.length`.
 - Unknown fields must be safely ignored by consumers.
 

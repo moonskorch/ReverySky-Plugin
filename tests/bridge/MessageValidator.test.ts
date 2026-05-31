@@ -15,9 +15,7 @@ function makeValidPayload(): GraphPayload {
         path: "Folder/Note.md",
         title: "Note",
         tags: ["tag"],
-        dates: {
-          created: "2026-01-01T00:00:00.000Z"
-        }
+        date: "2026-01-01T00:00:00.000Z"
       }
     ],
     links: [
