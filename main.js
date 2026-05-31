@@ -72,7 +72,9 @@ var MessageValidator = class {
         if (!this.isNonEmptyString(note.path)) errors.push(`payload.notes[${i}].path must be a non-empty string`);
         if (!this.isNonEmptyString(note.title)) errors.push(`payload.notes[${i}].title must be a non-empty string`);
         if (!Array.isArray(note.tags)) errors.push(`payload.notes[${i}].tags must be an array`);
-        if (!note.dates || typeof note.dates !== "object") errors.push(`payload.notes[${i}].dates must be an object`);
+        if (note.date !== void 0 && !this.isValidDateString(note.date)) {
+          errors.push(`payload.notes[${i}].date must be a valid ISO-like date string when defined`);
+        }
       }
     }
     if (Array.isArray(payload.links)) {
@@ -316,24 +318,18 @@ var VaultGraphBuilder = class _VaultGraphBuilder {
   static toNoteNode(app, file) {
     const cache = app.metadataCache.getFileCache(file);
     const frontmatter = cache?.frontmatter;
-    const frontmatterId = typeof frontmatter?.id === "string" ? frontmatter.id.trim() : "";
     const tags = GraphNormalizer.normalizeTags([
       ..._VaultGraphBuilder.getInlineTags(cache),
       ..._VaultGraphBuilder.getFrontmatterTags(frontmatter?.tags)
     ]);
     const created = Number.isFinite(file.stat.ctime) ? new Date(file.stat.ctime).toISOString() : void 0;
-    const modified = Number.isFinite(file.stat.mtime) ? new Date(file.stat.mtime).toISOString() : void 0;
-    const noteDate = _VaultGraphBuilder.getFrontmatterDate(frontmatter?.date);
+    const date = _VaultGraphBuilder.getFrontmatterDate(frontmatter?.date) ?? created;
     return {
-      id: frontmatterId || _VaultGraphBuilder.makeStableId(file.path),
+      id: _VaultGraphBuilder.makeStableId(file.path),
       path: GraphNormalizer.normalizePath(file.path),
       title: file.basename,
       tags,
-      dates: {
-        ...created ? { created } : {},
-        ...modified ? { modified } : {},
-        ...noteDate ? { noteDate } : {}
-      }
+      ...date ? { date } : {}
     };
   }
   static getInlineTags(cache) {

@@ -72,7 +72,6 @@ export class VaultGraphBuilder {
   private static toNoteNode(app: App, file: TFile): GraphNoteNode {
     const cache = app.metadataCache.getFileCache(file);
     const frontmatter = cache?.frontmatter;
-    const frontmatterId = typeof frontmatter?.id === "string" ? frontmatter.id.trim() : "";
 
     const tags = GraphNormalizer.normalizeTags([
       ...VaultGraphBuilder.getInlineTags(cache),
@@ -83,7 +82,7 @@ export class VaultGraphBuilder {
     const date = VaultGraphBuilder.getFrontmatterDate(frontmatter?.date) ?? created;
 
     return {
-      id: frontmatterId || VaultGraphBuilder.makeStableId(file.path),
+      id: VaultGraphBuilder.makeStableId(file.path),
       path: GraphNormalizer.normalizePath(file.path),
       title: file.basename,
       tags,
