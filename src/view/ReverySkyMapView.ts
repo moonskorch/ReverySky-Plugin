@@ -14,6 +14,8 @@ export const REVERYSKY_MAP_VIEW_TYPE = "reverysky-map-view";
 const GRAPH_REFRESH_DEBOUNCE_MS = 250;
 const GRAPH_RESOLVE_BARRIER_FALLBACK_MS = 700;
 const FILTER_INPUT_DEBOUNCE_MS = 250;
+const FILTER_SUGGESTIONS_HIDE_DELAY_MS = 120;
+const MAX_FOLDER_SUGGESTIONS = 80;
 
 type BridgePort = Pick<UnityIframeBridge, "attach" | "detach" | "sendGraphSet" | "sendNoteFocus">;
 type ObsidianHTMLElement = HTMLElement & {
@@ -24,6 +26,13 @@ type ObsidianHTMLElement = HTMLElement & {
 
 type ReverySkyMapViewState = {
   pathFilterQuery?: unknown;
+};
+
+type FolderPathSuggestion = {
+  path: string;
+  normalizedPath: string;
+  count: number;
+  depth: number;
 };
 
 export type ReverySkyMapViewDependencies = {
@@ -63,7 +72,10 @@ export class ReverySkyMapView extends ItemView {
   private pathFilterParseValid = true;
   private pathFilterMessage = "";
   private filterInputDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private filterSuggestionsHideTimer: ReturnType<typeof setTimeout> | null = null;
   private filterMessageEl: HTMLElement | null = null;
+  private filterSuggestionsEl: HTMLElement | null = null;
+  private folderPathSuggestions: FolderPathSuggestion[] = [];
   private searchComponent: SearchComponent | null = null;
 
   constructor(
@@ -168,8 +180,10 @@ export class ReverySkyMapView extends ItemView {
     this.clearRefreshTimer();
     this.clearResolveBarrierFallbackTimer();
     this.clearFilterInputDebounceTimer();
+    this.clearFilterSuggestionsHideTimer();
     this.bridgeReady = false;
     this.sourceGraphPayload = null;
+    this.folderPathSuggestions = [];
     this.pendingGraphPayload = null;
     this.pendingFocusPayload = null;
     this.lastDispatchedFocusKey = "";
@@ -180,6 +194,7 @@ export class ReverySkyMapView extends ItemView {
     this.lastGraphPayload = null;
     this.searchComponent = null;
     this.filterMessageEl = null;
+    this.filterSuggestionsEl = null;
     emptyElement(this.contentEl as ObsidianHTMLElement);
   }
 
@@ -302,6 +317,7 @@ export class ReverySkyMapView extends ItemView {
 
   private refreshGraphNow(): void {
     this.sourceGraphPayload = this.buildGraph(this.app);
+    this.folderPathSuggestions = this.buildFolderPathSuggestions(this.sourceGraphPayload);
     this.emitGraphFromSource();
   }
 
@@ -334,6 +350,7 @@ export class ReverySkyMapView extends ItemView {
     this.pendingGraphPayload = null;
     this.bridge.sendGraphSet(outgoingPayload);
     this.dispatchPreferredFocus(outgoingPayload);
+    this.refreshFilterSuggestions();
   }
 
   private applyActivePathFilter(payload: GraphPayload): GraphPayload {
@@ -391,6 +408,15 @@ export class ReverySkyMapView extends ItemView {
     this.filterInputDebounceTimer = null;
   }
 
+  private clearFilterSuggestionsHideTimer(): void {
+    if (!this.filterSuggestionsHideTimer) {
+      return;
+    }
+
+    clearTimeout(this.filterSuggestionsHideTimer);
+    this.filterSuggestionsHideTimer = null;
+  }
+
   private renderViewLayout(container: ObsidianHTMLElement): ObsidianHTMLElement {
     const root = createChild(container, "div") as ObsidianHTMLElement;
     root.style.display = "flex";
@@ -400,6 +426,7 @@ export class ReverySkyMapView extends ItemView {
 
     const filterContainer = createChild(root, "div");
     filterContainer.className = "reverysky-map-filter-panel";
+    filterContainer.style.position = "relative";
     filterContainer.style.padding = "8px 10px 10px";
     filterContainer.style.borderBottom = "1px solid var(--background-modifier-border)";
     filterContainer.style.display = "grid";
@@ -418,6 +445,15 @@ export class ReverySkyMapView extends ItemView {
       this.onPathFilterInputChanged(value);
     });
     this.searchComponent.inputEl.setAttribute("aria-label", "Search files filter");
+    this.searchComponent.inputEl.addEventListener("focus", () => {
+      this.showFilterSuggestions();
+    });
+    this.searchComponent.inputEl.addEventListener("click", () => {
+      this.showFilterSuggestions();
+    });
+    this.searchComponent.inputEl.addEventListener("blur", () => {
+      this.scheduleHideFilterSuggestions();
+    });
     this.searchComponent.inputEl.addEventListener("keydown", (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -425,8 +461,25 @@ export class ReverySkyMapView extends ItemView {
           this.searchComponent.setValue("");
         }
         this.onPathFilterInputChanged("");
+        this.hideFilterSuggestions();
       }
     });
+
+    this.filterSuggestionsEl = createChild(filterContainer as ObsidianHTMLElement, "div");
+    this.filterSuggestionsEl.className = "reverysky-map-filter-suggestions";
+    this.filterSuggestionsEl.style.display = "none";
+    this.filterSuggestionsEl.style.position = "absolute";
+    this.filterSuggestionsEl.style.left = "10px";
+    this.filterSuggestionsEl.style.right = "10px";
+    this.filterSuggestionsEl.style.top = "calc(100% + 2px)";
+    this.filterSuggestionsEl.style.background = "var(--background-primary)";
+    this.filterSuggestionsEl.style.border = "1px solid var(--background-modifier-border)";
+    this.filterSuggestionsEl.style.borderRadius = "10px";
+    this.filterSuggestionsEl.style.padding = "10px 10px 8px";
+    this.filterSuggestionsEl.style.boxShadow = "none";
+    this.filterSuggestionsEl.style.zIndex = "30";
+    this.filterSuggestionsEl.style.maxHeight = "52vh";
+    this.filterSuggestionsEl.style.overflowY = "auto";
 
     this.filterMessageEl = createChild(filterContainer as ObsidianHTMLElement, "div");
     this.filterMessageEl.className = "reverysky-map-filter-message";
@@ -445,12 +498,326 @@ export class ReverySkyMapView extends ItemView {
     const parseResult = GraphPathFilter.parsePathQuery(this.pathFilterQuery);
     this.applyParsedFilterResult(parseResult);
     this.refreshFilterMessage();
+    this.refreshFilterSuggestions();
 
     if (!parseResult.isValid) {
       return;
     }
 
     this.scheduleFilterRefresh();
+  }
+
+  private showFilterSuggestions(): void {
+    if (!this.filterSuggestionsEl || !this.searchComponent) {
+      return;
+    }
+
+    this.refreshFilterSuggestions();
+    this.clearFilterSuggestionsHideTimer();
+    this.filterSuggestionsEl.style.display = "block";
+  }
+
+  private scheduleHideFilterSuggestions(): void {
+    this.clearFilterSuggestionsHideTimer();
+    this.filterSuggestionsHideTimer = setTimeout(() => {
+      this.filterSuggestionsHideTimer = null;
+      this.hideFilterSuggestions();
+    }, FILTER_SUGGESTIONS_HIDE_DELAY_MS);
+  }
+
+  private hideFilterSuggestions(): void {
+    if (!this.filterSuggestionsEl) {
+      return;
+    }
+
+    this.filterSuggestionsEl.style.display = "none";
+  }
+
+  private applyPathSuggestionOperator(): void {
+    if (!this.searchComponent) {
+      return;
+    }
+
+    const currentValue = this.searchComponent.getValue();
+    const trimmedCurrent = currentValue.trim();
+    const alreadyContainsPathOperator = /(^|\s)-?path:/i.test(trimmedCurrent);
+    const nextValue = alreadyContainsPathOperator
+      ? currentValue
+      : trimmedCurrent.length === 0
+        ? "path:"
+        : `${currentValue}${/\s$/.test(currentValue) ? "" : " "}path:`;
+
+    this.searchComponent.setValue(nextValue);
+    this.onPathFilterInputChanged(nextValue);
+    this.showFilterSuggestions();
+    this.searchComponent.inputEl.focus();
+    const caretPosition = nextValue.length;
+    this.searchComponent.inputEl.setSelectionRange(caretPosition, caretPosition);
+  }
+
+  private applyPathValueSuggestion(folderPath: string): void {
+    if (!this.searchComponent) {
+      return;
+    }
+
+    const term = this.formatPathFilterTerm(folderPath);
+    const currentValue = this.searchComponent.getValue();
+    const replaceActivePathTermPattern = /(^|\s)(-?path:)(?:"[^"]*"|[^\s]*)$/i;
+
+    let nextValue: string;
+    if (replaceActivePathTermPattern.test(currentValue)) {
+      nextValue = currentValue.replace(
+        replaceActivePathTermPattern,
+        (_match, prefix: string, operator: string) => `${prefix}${operator}${term}`
+      );
+    } else if (/(^|\s)-?path:/i.test(currentValue)) {
+      nextValue = `${currentValue}${/\s$/.test(currentValue) ? "" : " "}path:${term}`;
+    } else {
+      nextValue = `path:${term}`;
+    }
+
+    this.searchComponent.setValue(nextValue);
+    this.onPathFilterInputChanged(nextValue);
+    this.hideFilterSuggestions();
+    this.searchComponent.inputEl.focus();
+    const caretPosition = nextValue.length;
+    this.searchComponent.inputEl.setSelectionRange(caretPosition, caretPosition);
+  }
+
+  private refreshFilterSuggestions(): void {
+    if (!this.filterSuggestionsEl) {
+      return;
+    }
+
+    this.filterSuggestionsEl.replaceChildren();
+    const currentQuery = this.searchComponent?.getValue() ?? this.pathFilterQuery;
+    if (this.shouldShowPathValueSuggestions(currentQuery)) {
+      this.renderFolderSuggestions(this.filterSuggestionsEl, currentQuery);
+      return;
+    }
+
+    this.renderOperatorSuggestions(this.filterSuggestionsEl);
+  }
+
+  private renderOperatorSuggestions(host: HTMLElement): void {
+    const suggestionsTitle = createChild(host as ObsidianHTMLElement, "div");
+    suggestionsTitle.textContent = "Search settings";
+    suggestionsTitle.style.fontSize = "13px";
+    suggestionsTitle.style.fontWeight = "600";
+    suggestionsTitle.style.color = "var(--text-muted)";
+    suggestionsTitle.style.marginBottom = "8px";
+
+    const pathOption = createChild(host as ObsidianHTMLElement, "div");
+    pathOption.className = "reverysky-map-filter-suggestion-option";
+    pathOption.setAttribute("role", "button");
+    pathOption.style.display = "block";
+    pathOption.style.width = "100%";
+    pathOption.style.textAlign = "left";
+    pathOption.style.padding = "8px 10px";
+    pathOption.style.border = "0";
+    pathOption.style.borderRadius = "7px";
+    pathOption.style.background = "var(--background-secondary-alt)";
+    pathOption.style.color = "var(--text-normal)";
+    pathOption.style.cursor = "pointer";
+    pathOption.style.fontSize = "14px";
+    pathOption.style.lineHeight = "1.25";
+    pathOption.style.font = "inherit";
+    this.attachSuggestionHoverStyle(pathOption, "var(--background-secondary-alt)");
+
+    const strong = createChild(pathOption as ObsidianHTMLElement, "span");
+    strong.textContent = "path:";
+    strong.style.color = "var(--text-normal)";
+    strong.style.marginRight = "4px";
+
+    const desc = createChild(pathOption as ObsidianHTMLElement, "span");
+    desc.textContent = " match in file path";
+    desc.style.color = "var(--text-muted)";
+
+    pathOption.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      this.applyPathSuggestionOperator();
+    });
+  }
+
+  private renderFolderSuggestions(host: HTMLElement, query: string): void {
+    this.ensureFolderSuggestionsReady();
+
+    const suggestionsTitle = createChild(host as ObsidianHTMLElement, "div");
+    suggestionsTitle.textContent = "Folders";
+    suggestionsTitle.style.fontSize = "13px";
+    suggestionsTitle.style.fontWeight = "600";
+    suggestionsTitle.style.color = "var(--text-muted)";
+    suggestionsTitle.style.marginBottom = "8px";
+
+    const activePathValue = this.extractActivePathFilterTermValue(query);
+    const normalizedActive = this.normalizeSearchTerm(activePathValue);
+
+    const ranked = this.folderPathSuggestions
+      .filter((item) => {
+        if (!normalizedActive) {
+          return true;
+        }
+        return item.normalizedPath.includes(normalizedActive);
+      })
+      .sort((a, b) => {
+        if (normalizedActive) {
+          const aStarts = a.normalizedPath.startsWith(normalizedActive) ? 1 : 0;
+          const bStarts = b.normalizedPath.startsWith(normalizedActive) ? 1 : 0;
+          if (aStarts !== bStarts) {
+            return bStarts - aStarts;
+          }
+        }
+        if (a.depth !== b.depth) {
+          return a.depth - b.depth;
+        }
+        if (a.count !== b.count) {
+          return b.count - a.count;
+        }
+        return a.path.localeCompare(b.path, "en", { sensitivity: "base" });
+      })
+      .slice(0, MAX_FOLDER_SUGGESTIONS);
+
+    if (!ranked.length) {
+      const emptyHint = createChild(host as ObsidianHTMLElement, "div");
+      emptyHint.textContent = "No folders found";
+      emptyHint.style.color = "var(--text-muted)";
+      emptyHint.style.fontSize = "13px";
+      return;
+    }
+
+    for (const suggestion of ranked) {
+      const option = createChild(host as ObsidianHTMLElement, "div");
+      option.className = "reverysky-map-folder-suggestion-option";
+      option.setAttribute("role", "button");
+      option.textContent = suggestion.path;
+      option.style.display = "block";
+      option.style.width = "100%";
+      option.style.textAlign = "left";
+      option.style.padding = "8px 10px";
+      option.style.border = "1px solid transparent";
+      option.style.borderRadius = "7px";
+      option.style.background = "transparent";
+      option.style.color = "var(--text-normal)";
+      option.style.cursor = "pointer";
+      option.style.font = "inherit";
+      option.style.fontSize = "14px";
+      option.style.lineHeight = "1.2";
+      option.style.marginBottom = "1px";
+      this.attachSuggestionHoverStyle(option, "transparent");
+      option.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        this.applyPathValueSuggestion(suggestion.path);
+      });
+    }
+  }
+
+  private attachSuggestionHoverStyle(
+    element: HTMLElement,
+    baseBackground: string
+  ): void {
+    const hoverBackground = "var(--background-modifier-hover)";
+    element.style.background = baseBackground;
+    element.addEventListener("mouseenter", () => {
+      element.style.background = hoverBackground;
+    });
+    element.addEventListener("mouseleave", () => {
+      element.style.background = baseBackground;
+    });
+  }
+
+  private shouldShowPathValueSuggestions(query: string): boolean {
+    return /(^|\s)-?path:/i.test(query.trim());
+  }
+
+  private ensureFolderSuggestionsReady(): void {
+    if (this.folderPathSuggestions.length > 0) {
+      return;
+    }
+
+    if (!this.sourceGraphPayload) {
+      this.sourceGraphPayload = this.buildGraph(this.app);
+    }
+
+    if (!this.sourceGraphPayload) {
+      return;
+    }
+
+    this.folderPathSuggestions = this.buildFolderPathSuggestions(this.sourceGraphPayload);
+  }
+
+  private buildFolderPathSuggestions(payload: GraphPayload): FolderPathSuggestion[] {
+    const counts = new Map<string, number>();
+
+    for (const note of payload.notes) {
+      const normalizedPath = this.normalizeVaultPath(note.path);
+      const folderPrefixes = this.extractFolderPrefixes(normalizedPath);
+      for (const prefix of folderPrefixes) {
+        counts.set(prefix, (counts.get(prefix) ?? 0) + 1);
+      }
+    }
+
+    const suggestions: FolderPathSuggestion[] = [];
+    for (const [folderPath, count] of counts.entries()) {
+      const normalizedFolder = this.normalizeSearchTerm(folderPath);
+      suggestions.push({
+        path: folderPath,
+        normalizedPath: normalizedFolder,
+        count,
+        depth: folderPath.split("/").length
+      });
+    }
+
+    return suggestions.sort((a, b) => {
+      if (a.depth !== b.depth) {
+        return a.depth - b.depth;
+      }
+      if (a.count !== b.count) {
+        return b.count - a.count;
+      }
+      return a.path.localeCompare(b.path, "en", { sensitivity: "base" });
+    });
+  }
+
+  private extractFolderPrefixes(normalizedNotePath: string): string[] {
+    const slashIndex = normalizedNotePath.lastIndexOf("/");
+    if (slashIndex < 1) {
+      return [];
+    }
+
+    const folderPath = normalizedNotePath.slice(0, slashIndex);
+    const parts = folderPath.split("/").filter((part) => part.length > 0);
+    const prefixes: string[] = [];
+
+    let current = "";
+    for (const part of parts) {
+      current = current ? `${current}/${part}` : part;
+      prefixes.push(current);
+    }
+
+    return prefixes;
+  }
+
+  private extractActivePathFilterTermValue(query: string): string {
+    const activePattern = /(^|\s)-?path:(?:"([^"]*)"|([^\s]*))$/i;
+    const match = query.match(activePattern);
+    if (!match) {
+      return "";
+    }
+
+    const quotedValue = typeof match[2] === "string" ? match[2] : "";
+    const plainValue = typeof match[3] === "string" ? match[3] : "";
+    const rawValue = quotedValue || plainValue;
+    return rawValue.replace(/\\"/g, "\"").replace(/\\\\/g, "\\");
+  }
+
+  private formatPathFilterTerm(folderPath: string): string {
+    const needsQuotes = /\s/.test(folderPath) || /["]/.test(folderPath);
+    const escaped = folderPath.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
+    return needsQuotes ? `"${escaped}"` : escaped;
+  }
+
+  private normalizeSearchTerm(value: string): string {
+    return value.trim().replace(/\\/g, "/").toLowerCase();
   }
 
   private applyParsedFilterResult(parseResult: PathFilterParseResult): void {
@@ -485,7 +852,8 @@ export class ReverySkyMapView extends ItemView {
     }
 
     const hasCustomMessage = this.pathFilterMessage.trim().length > 0;
-    this.filterMessageEl.textContent = hasCustomMessage ? this.pathFilterMessage : "path: matches note path";
+    this.filterMessageEl.textContent = hasCustomMessage ? this.pathFilterMessage : "";
+    this.filterMessageEl.style.display = hasCustomMessage ? "block" : "none";
     this.filterMessageEl.style.color = this.pathFilterParseValid
       ? "var(--text-muted)"
       : "var(--text-error)";

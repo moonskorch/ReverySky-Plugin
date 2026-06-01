@@ -3,6 +3,8 @@ import type { GraphLink, GraphNoteNode, GraphPayload } from "../bridge/BridgeTyp
 export type ParsedPathFilter = {
   includeTerms: string[];
   excludeTerms: string[];
+  includeRegexes: RegExp[];
+  excludeRegexes: RegExp[];
   unsupportedTokens: string[];
 };
 
@@ -15,6 +17,8 @@ export type PathFilterParseResult = {
 };
 
 export class GraphPathFilter {
+  private static readonly NO_MATCH_SENTINEL = "\u0000__empty_path_term__";
+
   static parsePathQuery(query: string): PathFilterParseResult {
     const rawQuery = typeof query === "string" ? query.trim() : "";
     if (!rawQuery) {
@@ -39,6 +43,8 @@ export class GraphPathFilter {
 
     const includeTerms: string[] = [];
     const excludeTerms: string[] = [];
+    const includeRegexes: RegExp[] = [];
+    const excludeRegexes: RegExp[] = [];
     const unsupportedTokens: string[] = [];
 
     for (const token of tokenized.tokens) {
@@ -56,24 +62,39 @@ export class GraphPathFilter {
 
       const rawTerm = body.slice("path:".length).trim();
       if (!rawTerm) {
+        if (isNegated) {
+          continue;
+        }
+        includeTerms.push(GraphPathFilter.NO_MATCH_SENTINEL);
+        continue;
+      }
+
+      const regexTerm = GraphPathFilter.tryParseRegexLiteral(rawTerm);
+      if (regexTerm.kind === "invalid") {
         return {
           isValid: false,
           parsed: null,
           hasPathTerms: false,
           hasUnsupportedTokens: unsupportedTokens.length > 0,
-          reason: "Empty path operator value."
+          reason: regexTerm.reason
         };
+      }
+      if (regexTerm.kind === "regex") {
+        if (isNegated) {
+          excludeRegexes.push(regexTerm.value);
+        } else {
+          includeRegexes.push(regexTerm.value);
+        }
+        continue;
       }
 
       const normalizedTerm = GraphPathFilter.normalizeMatchValue(rawTerm);
       if (!normalizedTerm) {
-        return {
-          isValid: false,
-          parsed: null,
-          hasPathTerms: false,
-          hasUnsupportedTokens: unsupportedTokens.length > 0,
-          reason: "Empty path operator value."
-        };
+        if (isNegated) {
+          continue;
+        }
+        includeTerms.push(GraphPathFilter.NO_MATCH_SENTINEL);
+        continue;
       }
 
       if (isNegated) {
@@ -84,23 +105,32 @@ export class GraphPathFilter {
     }
 
     const hasPathTerms = includeTerms.length > 0 || excludeTerms.length > 0;
+    const hasRegexTerms = includeRegexes.length > 0 || excludeRegexes.length > 0;
 
     return {
       isValid: true,
-      parsed: hasPathTerms
+      parsed: hasPathTerms || hasRegexTerms
         ? {
             includeTerms,
             excludeTerms,
+            includeRegexes,
+            excludeRegexes,
             unsupportedTokens
           }
         : null,
-      hasPathTerms,
+      hasPathTerms: hasPathTerms || hasRegexTerms,
       hasUnsupportedTokens: unsupportedTokens.length > 0
     };
   }
 
   static applyPathFilter(payload: GraphPayload, parsed: ParsedPathFilter | null): GraphPayload {
-    if (!parsed || (!parsed.includeTerms.length && !parsed.excludeTerms.length)) {
+    if (
+      !parsed ||
+      (!parsed.includeTerms.length &&
+        !parsed.excludeTerms.length &&
+        !parsed.includeRegexes.length &&
+        !parsed.excludeRegexes.length)
+    ) {
       return payload;
     }
 
@@ -129,9 +159,19 @@ export class GraphPathFilter {
         return false;
       }
     }
+    for (const excludeRegex of parsed.excludeRegexes) {
+      if (excludeRegex.test(normalizedPath)) {
+        return false;
+      }
+    }
 
     for (const include of parsed.includeTerms) {
       if (!normalizedPath.includes(include)) {
+        return false;
+      }
+    }
+    for (const includeRegex of parsed.includeRegexes) {
+      if (!includeRegex.test(normalizedPath)) {
         return false;
       }
     }
@@ -141,6 +181,40 @@ export class GraphPathFilter {
 
   private static normalizeMatchValue(value: string): string {
     return value.trim().replace(/\\/g, "/").toLowerCase();
+  }
+
+  private static tryParseRegexLiteral(
+    term: string
+  ):
+    | { kind: "not_regex" }
+    | { kind: "regex"; value: RegExp }
+    | { kind: "invalid"; reason: string } {
+    if (!term.startsWith("/")) {
+      return { kind: "not_regex" };
+    }
+
+    const regexLiteralMatch = term.match(/^\/((?:\\.|[^\\/])*)\/([dgimsuvy]*)$/);
+    if (!regexLiteralMatch) {
+      return {
+        kind: "invalid",
+        reason: "Invalid regex in path filter."
+      };
+    }
+
+    const pattern = regexLiteralMatch[1] ?? "";
+    const rawFlags = regexLiteralMatch[2] ?? "";
+    const flags = rawFlags.replace(/g/g, "");
+    try {
+      return {
+        kind: "regex",
+        value: new RegExp(pattern, flags)
+      };
+    } catch {
+      return {
+        kind: "invalid",
+        reason: "Invalid regex in path filter."
+      };
+    }
   }
 
   private static tokenize(query: string): { ok: true; tokens: string[] } | { ok: false; reason: string } {

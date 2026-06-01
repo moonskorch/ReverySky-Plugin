@@ -1067,6 +1067,238 @@ describe("ReverySkyMapView bridge integration", () => {
     expect(filteredPayload.notes.map((note) => note.id)).toEqual(["daily"]);
   });
 
+  it("shows path filter suggestions on focus and applies path operator on option click", async () => {
+    vi.useFakeTimers();
+
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePathPayload();
+    payload.notes.push({
+      id: "dream",
+      path: "Dream Notes/One.md",
+      title: "Dream",
+      tags: [],
+      size: 5
+    });
+    payload.vault.noteCount = payload.notes.length;
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
+    const suggestions = view.contentEl.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
+    expect(suggestions).not.toBeNull();
+    expect(suggestions.style.display).toBe("none");
+
+    searchInput.dispatchEvent(new Event("focus"));
+    expect(suggestions.style.display).toBe("block");
+    expect(suggestions.textContent).toContain("Search settings");
+    expect(suggestions.textContent).toContain("path: match in file path");
+
+    const pathOption = view.contentEl.querySelector(
+      ".reverysky-map-filter-suggestion-option"
+    ) as HTMLElement;
+    pathOption.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+    expect(searchInput.value).toBe("path:");
+    expect(suggestions.style.display).toBe("block");
+    expect(suggestions.textContent).toContain("Folders");
+    expect(suggestions.textContent).toContain("Notes");
+    expect(suggestions.textContent).toContain("Dream Notes");
+
+    const dreamOption = Array.from(
+      view.contentEl.querySelectorAll(".reverysky-map-folder-suggestion-option")
+    ).find((el) => el.textContent === "Dream Notes") as HTMLButtonElement | undefined;
+    expect(dreamOption).toBeDefined();
+    dreamOption?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    expect(searchInput.value).toBe("path:\"Dream Notes\"");
+    expect(suggestions.style.display).toBe("none");
+
+    searchInput.value = "path:Notes";
+    searchInput.dispatchEvent(new Event("input"));
+    vi.advanceTimersByTime(250);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+  });
+
+  it("applies unquoted folder term for simple path suggestion", async () => {
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePathPayload();
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
+    searchInput.dispatchEvent(new Event("focus"));
+    const pathOption = view.contentEl.querySelector(
+      ".reverysky-map-filter-suggestion-option"
+    ) as HTMLElement;
+    pathOption.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    expect(
+      view.contentEl.querySelectorAll(".reverysky-map-folder-suggestion-option").length
+    ).toBeGreaterThan(0);
+
+    const notesOption = Array.from(
+      view.contentEl.querySelectorAll(".reverysky-map-folder-suggestion-option")
+    ).find((el) => el.textContent === "Notes") as HTMLButtonElement | undefined;
+    expect(notesOption).toBeDefined();
+    notesOption?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+    expect(searchInput.value).toBe("path:Notes");
+  });
+
+  it("hides path filter suggestions after input blur delay", async () => {
+    vi.useFakeTimers();
+
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePathPayload();
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
+    const suggestions = view.contentEl.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
+    searchInput.dispatchEvent(new Event("focus"));
+    expect(suggestions.style.display).toBe("block");
+
+    searchInput.dispatchEvent(new Event("blur"));
+    vi.advanceTimersByTime(120);
+    expect(suggestions.style.display).toBe("none");
+  });
+
   it("does not emit broken payload when path query is invalid", async () => {
     vi.useFakeTimers();
 

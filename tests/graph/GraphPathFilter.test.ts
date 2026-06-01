@@ -66,6 +66,22 @@ describe("GraphPathFilter", () => {
     expect(filtered.links.map((l) => `${l.sourceId}->${l.targetId}`)).toEqual(["a->b"]);
   });
 
+  it("supports regex path filter terms", () => {
+    const parse = GraphPathFilter.parsePathQuery("path:/notes\\/daily\\/[0-9]{4}/i");
+    expect(parse.isValid).toBe(true);
+
+    const filtered = GraphPathFilter.applyPathFilter(makePayload(), parse.parsed);
+    expect(filtered.notes.map((n) => n.id)).toEqual(["a"]);
+  });
+
+  it("supports regex exclusion path terms", () => {
+    const parse = GraphPathFilter.parsePathQuery("-path:/archive\\//i");
+    expect(parse.isValid).toBe(true);
+
+    const filtered = GraphPathFilter.applyPathFilter(makePayload(), parse.parsed);
+    expect(filtered.notes.map((n) => n.id)).toEqual(["a", "b"]);
+  });
+
   it("applies multiple include path terms as AND", () => {
     const parse = GraphPathFilter.parsePathQuery("path:projects path:spec");
     expect(parse.isValid).toBe(true);
@@ -97,6 +113,34 @@ describe("GraphPathFilter", () => {
     const parse = GraphPathFilter.parsePathQuery("path:\"daily");
     expect(parse.isValid).toBe(false);
     expect(parse.parsed).toBeNull();
+  });
+
+  it("returns invalid result for malformed path regex", () => {
+    const parse = GraphPathFilter.parsePathQuery("path:/[broken/");
+    expect(parse.isValid).toBe(false);
+    expect(parse.parsed).toBeNull();
+  });
+
+  it("treats empty path term as valid filter with no matches", () => {
+    const parse = GraphPathFilter.parsePathQuery("path:");
+    expect(parse.isValid).toBe(true);
+    expect(parse.hasPathTerms).toBe(true);
+
+    const filtered = GraphPathFilter.applyPathFilter(makePayload(), parse.parsed);
+    expect(filtered.notes).toHaveLength(0);
+    expect(filtered.links).toHaveLength(0);
+    expect(filtered.vault.noteCount).toBe(0);
+  });
+
+  it("treats empty quoted path term as valid filter with no matches", () => {
+    const parse = GraphPathFilter.parsePathQuery("path:\"\"");
+    expect(parse.isValid).toBe(true);
+    expect(parse.hasPathTerms).toBe(true);
+
+    const filtered = GraphPathFilter.applyPathFilter(makePayload(), parse.parsed);
+    expect(filtered.notes).toHaveLength(0);
+    expect(filtered.links).toHaveLength(0);
+    expect(filtered.vault.noteCount).toBe(0);
   });
 
   it("returns original payload when no path terms are present", () => {
