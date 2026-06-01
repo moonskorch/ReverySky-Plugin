@@ -588,6 +588,10 @@ var _GraphPathFilter = class _GraphPathFilter {
   }
   static matchesDateClause(noteDay, clause) {
     switch (clause.comparator) {
+      case "lte":
+        return noteDay <= clause.day;
+      case "gte":
+        return noteDay >= clause.day;
       case "lt":
         return noteDay < clause.day;
       case "gt":
@@ -627,11 +631,11 @@ var _GraphPathFilter = class _GraphPathFilter {
     if (!trimmed) {
       return { kind: "empty" };
     }
-    const dateMatch = trimmed.match(/^([<>=]?)(\d{4}-\d{2}-\d{2})$/);
+    const dateMatch = trimmed.match(/^((?:<=|>=|<|>|=)?)(\d{4}-\d{2}-\d{2})$/);
     if (!dateMatch) {
       return {
         kind: "invalid",
-        reason: "Invalid date in date filter. Use date:YYYY-MM-DD, date:>YYYY-MM-DD, or date:<YYYY-MM-DD."
+        reason: "Invalid date in date filter. Use date:YYYY-MM-DD, date:>YYYY-MM-DD, date:<YYYY-MM-DD, date:>=YYYY-MM-DD, or date:<=YYYY-MM-DD."
       };
     }
     const operator = dateMatch[1] ?? "";
@@ -642,7 +646,7 @@ var _GraphPathFilter = class _GraphPathFilter {
         reason: "Invalid calendar date in date filter."
       };
     }
-    const comparator = operator === ">" ? "gt" : operator === "<" ? "lt" : "eq";
+    const comparator = operator === ">=" ? "gte" : operator === "<=" ? "lte" : operator === ">" ? "gt" : operator === "<" ? "lt" : "eq";
     return {
       kind: "clause",
       value: {
@@ -1557,19 +1561,19 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
         description: "Matches notes dated today."
       },
       {
-        label: "> one week ago",
-        suffix: `>${weekAgo}`,
-        description: "Matches notes newer than one week ago."
+        label: ">= one week ago",
+        suffix: `>=${weekAgo}`,
+        description: "Matches notes on or newer than one week ago."
       },
       {
-        label: "> one month ago",
-        suffix: `>${monthAgo}`,
-        description: "Matches notes newer than one month ago."
+        label: ">= one month ago",
+        suffix: `>=${monthAgo}`,
+        description: "Matches notes on or newer than one month ago."
       },
       {
-        label: "> one year ago",
-        suffix: `>${yearAgo}`,
-        description: "Matches notes newer than one year ago."
+        label: ">= one year ago",
+        suffix: `>=${yearAgo}`,
+        description: "Matches notes on or newer than one year ago."
       }
     ];
   }

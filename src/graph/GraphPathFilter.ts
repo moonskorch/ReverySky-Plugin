@@ -10,7 +10,7 @@ export type ParsedPathFilter = {
   unsupportedTokens: string[];
 };
 
-type DateFilterComparator = "eq" | "lt" | "gt";
+type DateFilterComparator = "eq" | "lt" | "gt" | "lte" | "gte";
 
 type ParsedDateClause = {
   comparator: DateFilterComparator;
@@ -265,6 +265,10 @@ export class GraphPathFilter {
 
   private static matchesDateClause(noteDay: string, clause: ParsedDateClause): boolean {
     switch (clause.comparator) {
+      case "lte":
+        return noteDay <= clause.day;
+      case "gte":
+        return noteDay >= clause.day;
       case "lt":
         return noteDay < clause.day;
       case "gt":
@@ -319,11 +323,11 @@ export class GraphPathFilter {
       return { kind: "empty" };
     }
 
-    const dateMatch = trimmed.match(/^([<>=]?)(\d{4}-\d{2}-\d{2})$/);
+    const dateMatch = trimmed.match(/^((?:<=|>=|<|>|=)?)(\d{4}-\d{2}-\d{2})$/);
     if (!dateMatch) {
       return {
         kind: "invalid",
-        reason: "Invalid date in date filter. Use date:YYYY-MM-DD, date:>YYYY-MM-DD, or date:<YYYY-MM-DD."
+        reason: "Invalid date in date filter. Use date:YYYY-MM-DD, date:>YYYY-MM-DD, date:<YYYY-MM-DD, date:>=YYYY-MM-DD, or date:<=YYYY-MM-DD."
       };
     }
 
@@ -336,11 +340,15 @@ export class GraphPathFilter {
       };
     }
 
-    const comparator: DateFilterComparator = operator === ">"
-      ? "gt"
-      : operator === "<"
-        ? "lt"
-        : "eq";
+    const comparator: DateFilterComparator = operator === ">="
+      ? "gte"
+      : operator === "<="
+        ? "lte"
+        : operator === ">"
+          ? "gt"
+          : operator === "<"
+            ? "lt"
+            : "eq";
 
     return {
       kind: "clause",

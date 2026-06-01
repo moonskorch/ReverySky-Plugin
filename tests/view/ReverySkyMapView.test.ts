@@ -1382,9 +1382,9 @@ describe("ReverySkyMapView bridge integration", () => {
     const suggestions = view.contentEl.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
     expect(suggestions.textContent).toContain("Date presets");
     expect(suggestions.textContent).toContain("date:2026-01-31");
-    expect(suggestions.textContent).toContain("date:>2026-01-24");
-    expect(suggestions.textContent).toContain("date:>2025-12-31");
-    expect(suggestions.textContent).toContain("date:>2025-01-31");
+    expect(suggestions.textContent).toContain("date:>=2026-01-24");
+    expect(suggestions.textContent).toContain("date:>=2025-12-31");
+    expect(suggestions.textContent).toContain("date:>=2025-01-31");
     const firstDatePreset = view.contentEl.querySelector(
       ".reverysky-map-date-suggestion-option"
     ) as HTMLElement;
@@ -1394,11 +1394,11 @@ describe("ReverySkyMapView bridge integration", () => {
 
     const weekPreset = Array.from(
       view.contentEl.querySelectorAll(".reverysky-map-date-suggestion-option")
-    ).find((el) => el.textContent?.includes("date:>2026-01-24")) as HTMLElement | undefined;
+    ).find((el) => el.textContent?.includes("date:>=2026-01-24")) as HTMLElement | undefined;
     expect(weekPreset).toBeDefined();
     weekPreset?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
-    expect(searchInput.value).toBe("date:>2026-01-24");
+    expect(searchInput.value).toBe("date:>=2026-01-24");
     expect(suggestions.style.display).toBe("none");
 
     searchInput.dispatchEvent(new Event("click"));
@@ -1474,8 +1474,8 @@ describe("ReverySkyMapView bridge integration", () => {
     dateOption?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
     const suggestions = view.contentEl.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
-    expect(suggestions.textContent).toContain("date:>2026-02-28");
-    expect(suggestions.textContent).not.toContain("date:>2026-03-03");
+    expect(suggestions.textContent).toContain("date:>=2026-02-28");
+    expect(suggestions.textContent).not.toContain("date:>=2026-03-03");
   });
 
   it("keeps second-level suggestions bound to clicked operator in mixed query", async () => {

@@ -1017,19 +1017,19 @@ export class ReverySkyMapView extends ItemView {
         description: "Matches notes dated today."
       },
       {
-        label: "> one week ago",
-        suffix: `>${weekAgo}`,
-        description: "Matches notes newer than one week ago."
+        label: ">= one week ago",
+        suffix: `>=${weekAgo}`,
+        description: "Matches notes on or newer than one week ago."
       },
       {
-        label: "> one month ago",
-        suffix: `>${monthAgo}`,
-        description: "Matches notes newer than one month ago."
+        label: ">= one month ago",
+        suffix: `>=${monthAgo}`,
+        description: "Matches notes on or newer than one month ago."
       },
       {
-        label: "> one year ago",
-        suffix: `>${yearAgo}`,
-        description: "Matches notes newer than one year ago."
+        label: ">= one year ago",
+        suffix: `>=${yearAgo}`,
+        description: "Matches notes on or newer than one year ago."
       }
     ];
   }

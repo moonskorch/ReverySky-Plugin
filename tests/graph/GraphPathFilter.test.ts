@@ -112,6 +112,14 @@ describe("GraphPathFilter", () => {
     expect(filtered.notes.map((n) => n.id)).toEqual(["b"]);
   });
 
+  it("supports inclusive date ranges with >= and <=", () => {
+    const parse = GraphPathFilter.parsePathQuery("date:>=2026-01-01 date:<=2026-01-31");
+    expect(parse.isValid).toBe(true);
+
+    const filtered = GraphPathFilter.applyPathFilter(makePayload(), parse.parsed);
+    expect(filtered.notes.map((n) => n.id)).toEqual(["a", "b"]);
+  });
+
   it("supports negated date filters", () => {
     const parse = GraphPathFilter.parsePathQuery("-date:<2026-01-15");
     expect(parse.isValid).toBe(true);
