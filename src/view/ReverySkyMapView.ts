@@ -1,4 +1,4 @@
-import { ItemView, Notice, SearchComponent, WorkspaceLeaf } from "obsidian";
+import { ItemView, Notice, SearchComponent, WorkspaceLeaf, setIcon } from "obsidian";
 import type { App, CachedMetadata, TAbstractFile, TFile } from "obsidian";
 import type { GraphPayload, NoteFocusPayload, NoteOpenPayload } from "../bridge/BridgeTypes";
 import { UnityIframeBridge } from "../bridge/UnityIframeBridge";
@@ -75,8 +75,11 @@ export class ReverySkyMapView extends ItemView {
   private filterSuggestionsHideTimer: ReturnType<typeof setTimeout> | null = null;
   private filterMessageEl: HTMLElement | null = null;
   private filterSuggestionsEl: HTMLElement | null = null;
+  private filterPanelEl: HTMLElement | null = null;
+  private filterToggleButtonEl: HTMLButtonElement | null = null;
   private folderPathSuggestions: FolderPathSuggestion[] = [];
   private searchComponent: SearchComponent | null = null;
+  private filterPanelOpen = false;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -195,6 +198,8 @@ export class ReverySkyMapView extends ItemView {
     this.searchComponent = null;
     this.filterMessageEl = null;
     this.filterSuggestionsEl = null;
+    this.filterPanelEl = null;
+    this.filterToggleButtonEl = null;
     emptyElement(this.contentEl as ObsidianHTMLElement);
   }
 
@@ -419,24 +424,145 @@ export class ReverySkyMapView extends ItemView {
 
   private renderViewLayout(container: ObsidianHTMLElement): ObsidianHTMLElement {
     const root = createChild(container, "div") as ObsidianHTMLElement;
-    root.style.display = "flex";
-    root.style.flexDirection = "column";
+    root.style.position = "relative";
     root.style.height = "100%";
-    root.style.minHeight = "0";
+    root.style.width = "100%";
+    root.style.overflow = "hidden";
+
+    const iframeHost = createChild(root, "div") as ObsidianHTMLElement;
+    iframeHost.style.height = "100%";
+    iframeHost.style.width = "100%";
+    iframeHost.style.position = "relative";
+    iframeHost.style.zIndex = "1";
+
+    const overlayControls = createChild(root, "div");
+    overlayControls.className = "reverysky-map-overlay-controls";
+    overlayControls.style.position = "absolute";
+    overlayControls.style.top = "8px";
+    overlayControls.style.right = "10px";
+    overlayControls.style.zIndex = "40";
+    overlayControls.style.pointerEvents = "auto";
+
+    const settingsToggleButton = createChild(overlayControls as ObsidianHTMLElement, "button");
+    const gearBaseBackground = "var(--background-secondary)";
+    const gearHoverBackground = "color-mix(in srgb, var(--background-secondary) 82%, #000 18%)";
+    settingsToggleButton.type = "button";
+    settingsToggleButton.className = "reverysky-map-filter-toggle";
+    this.filterToggleButtonEl = settingsToggleButton;
+    settingsToggleButton.setAttribute("aria-label", "Open filters");
+    settingsToggleButton.style.width = "36px";
+    settingsToggleButton.style.height = "36px";
+    settingsToggleButton.style.border = "1px solid var(--background-modifier-border)";
+    settingsToggleButton.style.borderRadius = "10px";
+    settingsToggleButton.style.background = gearBaseBackground;
+    settingsToggleButton.style.color = "var(--text-muted)";
+    settingsToggleButton.style.padding = "0";
+    settingsToggleButton.style.cursor = "pointer";
+    settingsToggleButton.style.display = "inline-flex";
+    settingsToggleButton.style.alignItems = "center";
+    settingsToggleButton.style.justifyContent = "center";
+    settingsToggleButton.style.boxShadow = "none";
+    settingsToggleButton.style.opacity = "1";
+    settingsToggleButton.style.transition = "background-color 120ms ease, border-color 120ms ease";
+    setIcon(settingsToggleButton, "settings");
+    const toggleFilterPanel = () => {
+      const nextOpen = !this.filterPanelOpen;
+      this.setFilterPanelOpen(nextOpen);
+      if (nextOpen) {
+        this.syncSearchComponentValue();
+        this.refreshFilterMessage();
+      }
+    };
+    settingsToggleButton.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      toggleFilterPanel();
+    });
+    settingsToggleButton.addEventListener("click", (event) => {
+      const mouseEvent = event as MouseEvent;
+      if (mouseEvent.detail !== 0) {
+        return;
+      }
+      event.preventDefault();
+      toggleFilterPanel();
+    });
+    settingsToggleButton.addEventListener("mouseenter", () => {
+      settingsToggleButton.style.background = gearHoverBackground;
+    });
+    settingsToggleButton.addEventListener("mouseleave", () => {
+      settingsToggleButton.style.background = gearBaseBackground;
+    });
 
     const filterContainer = createChild(root, "div");
     filterContainer.className = "reverysky-map-filter-panel";
-    filterContainer.style.position = "relative";
-    filterContainer.style.padding = "8px 10px 10px";
-    filterContainer.style.borderBottom = "1px solid var(--background-modifier-border)";
+    this.filterPanelEl = filterContainer;
+    filterContainer.style.position = "absolute";
+    filterContainer.style.top = "8px";
+    filterContainer.style.right = "10px";
+    filterContainer.style.width = "min(380px, calc(100% - 20px))";
+    filterContainer.style.maxHeight = "min(520px, calc(100% - 64px))";
+    filterContainer.style.overflow = "visible";
+    filterContainer.style.background = "var(--background-primary)";
+    filterContainer.style.border = "1px solid var(--background-modifier-border)";
+    filterContainer.style.borderRadius = "12px";
+    filterContainer.style.boxShadow = "0 4px 18px rgba(0, 0, 0, 0.16)";
+    filterContainer.style.padding = "10px";
     filterContainer.style.display = "grid";
     filterContainer.style.gap = "6px";
+    filterContainer.style.zIndex = "120";
 
-    const filterTitle = createChild(filterContainer as ObsidianHTMLElement, "div");
+    const panelHeader = createChild(filterContainer as ObsidianHTMLElement, "div");
+    panelHeader.style.display = "flex";
+    panelHeader.style.alignItems = "center";
+    panelHeader.style.justifyContent = "space-between";
+    panelHeader.style.marginBottom = "4px";
+
+    const filterTitle = createChild(panelHeader as ObsidianHTMLElement, "div");
     filterTitle.textContent = "Filters";
-    filterTitle.style.fontSize = "12px";
+    filterTitle.style.fontSize = "14px";
     filterTitle.style.fontWeight = "600";
-    filterTitle.style.opacity = "0.8";
+    filterTitle.style.color = "var(--text-normal)";
+
+    const panelCloseButton = createChild(panelHeader as ObsidianHTMLElement, "button");
+    panelCloseButton.type = "button";
+    panelCloseButton.className = "reverysky-map-filter-close";
+    panelCloseButton.setAttribute("aria-label", "Close filters");
+    panelCloseButton.style.width = "22px";
+    panelCloseButton.style.height = "22px";
+    panelCloseButton.style.border = "0";
+    panelCloseButton.style.borderRadius = "5px";
+    panelCloseButton.style.background = "transparent";
+    panelCloseButton.style.color = "var(--text-muted)";
+    panelCloseButton.style.padding = "0";
+    panelCloseButton.style.cursor = "pointer";
+    panelCloseButton.style.boxShadow = "none";
+    panelCloseButton.style.display = "inline-flex";
+    panelCloseButton.style.alignItems = "center";
+    panelCloseButton.style.justifyContent = "center";
+    panelCloseButton.style.transition = "background-color 120ms ease";
+    panelCloseButton.style.setProperty("appearance", "none");
+    setIcon(panelCloseButton, "x");
+    for (const icon of Array.from(panelCloseButton.querySelectorAll("svg"))) {
+      icon.style.width = "13px";
+      icon.style.height = "13px";
+    }
+    panelCloseButton.addEventListener("mouseenter", () => {
+      panelCloseButton.style.background = "var(--background-modifier-hover)";
+      panelCloseButton.style.color = "var(--text-normal)";
+    });
+    panelCloseButton.addEventListener("mouseleave", () => {
+      panelCloseButton.style.background = "transparent";
+      panelCloseButton.style.color = "var(--text-muted)";
+    });
+    const closeFilterPanel = (event?: Event) => {
+      event?.preventDefault();
+      this.setFilterPanelOpen(false);
+    };
+    panelCloseButton.addEventListener("mousedown", (event) => {
+      closeFilterPanel(event);
+    });
+    panelCloseButton.addEventListener("click", (event) => {
+      closeFilterPanel(event);
+    });
 
     const searchHost = createChild(filterContainer as ObsidianHTMLElement, "div");
     this.searchComponent = new SearchComponent(searchHost);
@@ -485,12 +611,24 @@ export class ReverySkyMapView extends ItemView {
     this.filterMessageEl.className = "reverysky-map-filter-message";
     this.filterMessageEl.style.fontSize = "12px";
     this.filterMessageEl.style.opacity = "0.85";
-
-    const iframeHost = createChild(root, "div") as ObsidianHTMLElement;
-    iframeHost.style.flex = "1";
-    iframeHost.style.minHeight = "0";
+    this.setFilterPanelOpen(false);
 
     return iframeHost;
+  }
+
+  private setFilterPanelOpen(isOpen: boolean): void {
+    this.filterPanelOpen = isOpen;
+    if (!this.filterPanelEl || !this.filterToggleButtonEl) {
+      return;
+    }
+
+    this.filterPanelEl.style.display = isOpen ? "grid" : "none";
+    this.filterPanelEl.style.pointerEvents = isOpen ? "auto" : "none";
+    this.filterToggleButtonEl.style.display = isOpen ? "none" : "inline-flex";
+    this.filterToggleButtonEl.style.pointerEvents = isOpen ? "none" : "auto";
+    if (!isOpen) {
+      this.hideFilterSuggestions();
+    }
   }
 
   private onPathFilterInputChanged(nextQuery: string): void {
@@ -512,6 +650,7 @@ export class ReverySkyMapView extends ItemView {
       return;
     }
 
+    this.setFilterPanelOpen(true);
     this.refreshFilterSuggestions();
     this.clearFilterSuggestionsHideTimer();
     this.filterSuggestionsEl.style.display = "block";
@@ -716,12 +855,20 @@ export class ReverySkyMapView extends ItemView {
     baseBackground: string
   ): void {
     const hoverBackground = "var(--background-modifier-hover)";
+    const baseBorderColor = element.style.borderColor || "transparent";
+    const hoverBorderColor = "var(--background-modifier-border-hover)";
     element.style.background = baseBackground;
+    element.style.opacity = "1";
+    element.style.transition = "background-color 120ms ease, border-color 120ms ease";
     element.addEventListener("mouseenter", () => {
       element.style.background = hoverBackground;
+      element.style.borderColor = hoverBorderColor;
+      element.style.opacity = "1";
     });
     element.addEventListener("mouseleave", () => {
       element.style.background = baseBackground;
+      element.style.borderColor = baseBorderColor;
+      element.style.opacity = "1";
     });
   }
 
@@ -824,7 +971,7 @@ export class ReverySkyMapView extends ItemView {
     this.pathFilterParseValid = parseResult.isValid;
 
     if (!parseResult.isValid) {
-      this.pathFilterMessage = parseResult.reason ?? "Invalid path query.";
+      this.pathFilterMessage = "";
       return;
     }
 

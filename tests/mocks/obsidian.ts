@@ -22,6 +22,10 @@ export class Notice {
 
 export class WorkspaceLeaf {}
 
+export function setIcon(parent: HTMLElement, iconId: string): void {
+  parent.setAttribute("data-icon", iconId);
+}
+
 export class SearchComponent {
   public inputEl: HTMLInputElement;
   public clearButtonEl: HTMLElement;

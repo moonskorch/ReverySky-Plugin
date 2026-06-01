@@ -1065,6 +1065,150 @@ describe("ReverySkyMapView bridge integration", () => {
     const filteredPayload = bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload;
     expect(filteredPayload.vault.noteCount).toBe(1);
     expect(filteredPayload.notes.map((note) => note.id)).toEqual(["daily"]);
+
+    const filterMessage = view.contentEl.querySelector(
+      ".reverysky-map-filter-message"
+    ) as HTMLElement;
+    expect(filterMessage.style.display).toBe("none");
+
+    searchInput.value = 'path:"';
+    searchInput.dispatchEvent(new Event("input"));
+    vi.advanceTimersByTime(250);
+
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+    expect(filterMessage.style.display).toBe("none");
+  });
+
+  it("opens filter panel by gear button and closes it by close button", async () => {
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePathPayload();
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    const panel = view.contentEl.querySelector(".reverysky-map-filter-panel") as HTMLElement;
+    expect(panel.style.display).toBe("none");
+
+    const gear = view.contentEl.querySelector(".reverysky-map-filter-toggle") as HTMLButtonElement;
+    gear.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    expect(panel.style.display).toBe("grid");
+
+    const closeButton = view.contentEl.querySelector(
+      ".reverysky-map-filter-close"
+    ) as HTMLButtonElement;
+    closeButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(panel.style.display).toBe("none");
+  });
+
+  it("opens and closes filter panel with keyboard activation on focused gear button", async () => {
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePathPayload();
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    const panel = view.contentEl.querySelector(".reverysky-map-filter-panel") as HTMLElement;
+    expect(panel.style.display).toBe("none");
+
+    const gear = view.contentEl.querySelector(".reverysky-map-filter-toggle") as HTMLButtonElement;
+    gear.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
+    expect(panel.style.display).toBe("grid");
+
+    const closeButton = view.contentEl.querySelector(
+      ".reverysky-map-filter-close"
+    ) as HTMLButtonElement;
+    closeButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(panel.style.display).toBe("none");
   });
 
   it("shows path filter suggestions on focus and applies path operator on option click", async () => {
