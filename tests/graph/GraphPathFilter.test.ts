@@ -13,6 +13,7 @@ function makePayload(): GraphPayload {
         path: "Notes/Daily/2026-01-01.md",
         title: "A",
         tags: [],
+        date: "2026-01-01T09:00:00.000Z",
         size: 1
       },
       {
@@ -20,6 +21,7 @@ function makePayload(): GraphPayload {
         path: "Projects/ReverySky/Spec.md",
         title: "B",
         tags: [],
+        date: "2026-01-31T23:59:59.000Z",
         size: 1
       },
       {
@@ -27,6 +29,7 @@ function makePayload(): GraphPayload {
         path: "Archive/Old.md",
         title: "C",
         tags: [],
+        date: "2025-12-15T00:00:00.000Z",
         size: 1
       }
     ],
@@ -82,6 +85,49 @@ describe("GraphPathFilter", () => {
     expect(filtered.notes.map((n) => n.id)).toEqual(["a", "b"]);
   });
 
+  it("matches notes by exact date day", () => {
+    const parse = GraphPathFilter.parsePathQuery("date:2026-01-01");
+    expect(parse.isValid).toBe(true);
+
+    const filtered = GraphPathFilter.applyPathFilter(makePayload(), parse.parsed);
+    expect(filtered.notes.map((n) => n.id)).toEqual(["a"]);
+  });
+
+  it("uses leading calendar day from datetime strings with timezone offset", () => {
+    const payload = makePayload();
+    payload.notes[0].date = "2026-01-01T00:30:00+03:00";
+
+    const parse = GraphPathFilter.parsePathQuery("date:2026-01-01");
+    expect(parse.isValid).toBe(true);
+
+    const filtered = GraphPathFilter.applyPathFilter(payload, parse.parsed);
+    expect(filtered.notes.map((n) => n.id)).toEqual(["a"]);
+  });
+
+  it("supports date ranges with < and >", () => {
+    const parse = GraphPathFilter.parsePathQuery("date:>2026-01-01 date:<2026-02-01");
+    expect(parse.isValid).toBe(true);
+
+    const filtered = GraphPathFilter.applyPathFilter(makePayload(), parse.parsed);
+    expect(filtered.notes.map((n) => n.id)).toEqual(["b"]);
+  });
+
+  it("supports negated date filters", () => {
+    const parse = GraphPathFilter.parsePathQuery("-date:<2026-01-15");
+    expect(parse.isValid).toBe(true);
+
+    const filtered = GraphPathFilter.applyPathFilter(makePayload(), parse.parsed);
+    expect(filtered.notes.map((n) => n.id)).toEqual(["b"]);
+  });
+
+  it("combines path and date terms as AND", () => {
+    const parse = GraphPathFilter.parsePathQuery("path:projects date:2026-01-31");
+    expect(parse.isValid).toBe(true);
+
+    const filtered = GraphPathFilter.applyPathFilter(makePayload(), parse.parsed);
+    expect(filtered.notes.map((n) => n.id)).toEqual(["b"]);
+  });
+
   it("applies multiple include path terms as AND", () => {
     const parse = GraphPathFilter.parsePathQuery("path:projects path:spec");
     expect(parse.isValid).toBe(true);
@@ -121,6 +167,18 @@ describe("GraphPathFilter", () => {
     expect(parse.parsed).toBeNull();
   });
 
+  it("returns invalid result for malformed date clause", () => {
+    const parse = GraphPathFilter.parsePathQuery("date:2026/01/01");
+    expect(parse.isValid).toBe(false);
+    expect(parse.parsed).toBeNull();
+  });
+
+  it("returns invalid result for impossible calendar date", () => {
+    const parse = GraphPathFilter.parsePathQuery("date:2026-02-30");
+    expect(parse.isValid).toBe(false);
+    expect(parse.parsed).toBeNull();
+  });
+
   it("treats empty path term as valid filter with no matches", () => {
     const parse = GraphPathFilter.parsePathQuery("path:");
     expect(parse.isValid).toBe(true);
@@ -151,5 +209,16 @@ describe("GraphPathFilter", () => {
 
     const filtered = GraphPathFilter.applyPathFilter(payload, parse.parsed);
     expect(filtered).toBe(payload);
+  });
+
+  it("does not match include date terms when note has no date", () => {
+    const payload = makePayload();
+    delete payload.notes[2].date;
+
+    const parse = GraphPathFilter.parsePathQuery("date:<2026-01-01");
+    expect(parse.isValid).toBe(true);
+
+    const filtered = GraphPathFilter.applyPathFilter(payload, parse.parsed);
+    expect(filtered.notes).toHaveLength(0);
   });
 });

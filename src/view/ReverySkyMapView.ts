@@ -35,6 +35,14 @@ type FolderPathSuggestion = {
   depth: number;
 };
 
+type DateFilterPresetSuggestion = {
+  label: string;
+  suffix: string;
+  description: string;
+};
+
+type FilterSuggestionMode = 0 | 1 | 2;
+
 export type ReverySkyMapViewDependencies = {
   createBridge?: () => BridgePort;
   buildGraph?: (app: App) => GraphPayload;
@@ -77,6 +85,7 @@ export class ReverySkyMapView extends ItemView {
   private filterSuggestionsEl: HTMLElement | null = null;
   private filterPanelEl: HTMLElement | null = null;
   private filterToggleButtonEl: HTMLButtonElement | null = null;
+  private filterSuggestionMode: FilterSuggestionMode = 0;
   private folderPathSuggestions: FolderPathSuggestion[] = [];
   private searchComponent: SearchComponent | null = null;
   private filterPanelOpen = false;
@@ -200,6 +209,7 @@ export class ReverySkyMapView extends ItemView {
     this.filterSuggestionsEl = null;
     this.filterPanelEl = null;
     this.filterToggleButtonEl = null;
+    this.filterSuggestionMode = 0;
     emptyElement(this.contentEl as ObsidianHTMLElement);
   }
 
@@ -572,10 +582,10 @@ export class ReverySkyMapView extends ItemView {
     });
     this.searchComponent.inputEl.setAttribute("aria-label", "Search files filter");
     this.searchComponent.inputEl.addEventListener("focus", () => {
-      this.showFilterSuggestions();
+      this.showFilterSuggestions(0);
     });
     this.searchComponent.inputEl.addEventListener("click", () => {
-      this.showFilterSuggestions();
+      this.showFilterSuggestions(0);
     });
     this.searchComponent.inputEl.addEventListener("blur", () => {
       this.scheduleHideFilterSuggestions();
@@ -601,10 +611,10 @@ export class ReverySkyMapView extends ItemView {
     this.filterSuggestionsEl.style.background = "var(--background-primary)";
     this.filterSuggestionsEl.style.border = "1px solid var(--background-modifier-border)";
     this.filterSuggestionsEl.style.borderRadius = "10px";
-    this.filterSuggestionsEl.style.padding = "10px 10px 8px";
+    this.filterSuggestionsEl.style.padding = "8px";
     this.filterSuggestionsEl.style.boxShadow = "none";
     this.filterSuggestionsEl.style.zIndex = "30";
-    this.filterSuggestionsEl.style.maxHeight = "52vh";
+    this.filterSuggestionsEl.style.maxHeight = "44vh";
     this.filterSuggestionsEl.style.overflowY = "auto";
 
     this.filterMessageEl = createChild(filterContainer as ObsidianHTMLElement, "div");
@@ -645,11 +655,12 @@ export class ReverySkyMapView extends ItemView {
     this.scheduleFilterRefresh();
   }
 
-  private showFilterSuggestions(): void {
+  private showFilterSuggestions(mode: FilterSuggestionMode): void {
     if (!this.filterSuggestionsEl || !this.searchComponent) {
       return;
     }
 
+    this.filterSuggestionMode = mode;
     this.setFilterPanelOpen(true);
     this.refreshFilterSuggestions();
     this.clearFilterSuggestionsHideTimer();
@@ -669,6 +680,7 @@ export class ReverySkyMapView extends ItemView {
       return;
     }
 
+    this.filterSuggestionMode = 0;
     this.filterSuggestionsEl.style.display = "none";
   }
 
@@ -688,10 +700,51 @@ export class ReverySkyMapView extends ItemView {
 
     this.searchComponent.setValue(nextValue);
     this.onPathFilterInputChanged(nextValue);
-    this.showFilterSuggestions();
-    this.searchComponent.inputEl.focus();
-    const caretPosition = nextValue.length;
-    this.searchComponent.inputEl.setSelectionRange(caretPosition, caretPosition);
+    this.showFilterSuggestions(1);
+  }
+
+  private applyDateSuggestionOperator(): void {
+    if (!this.searchComponent) {
+      return;
+    }
+
+    const currentValue = this.searchComponent.getValue();
+    const trimmedCurrent = currentValue.trim();
+    const alreadyContainsDateOperator = /(^|\s)-?date:/i.test(trimmedCurrent);
+    const nextValue = alreadyContainsDateOperator
+      ? currentValue
+      : trimmedCurrent.length === 0
+        ? "date:"
+        : `${currentValue}${/\s$/.test(currentValue) ? "" : " "}date:`;
+
+    this.searchComponent.setValue(nextValue);
+    this.onPathFilterInputChanged(nextValue);
+    this.showFilterSuggestions(2);
+  }
+
+  private applyDateValueSuggestion(suffix: string): void {
+    if (!this.searchComponent) {
+      return;
+    }
+
+    const currentValue = this.searchComponent.getValue();
+    const replaceActiveDateTermPattern = /(^|\s)(-?date:)[^\s]*$/i;
+
+    let nextValue: string;
+    if (replaceActiveDateTermPattern.test(currentValue)) {
+      nextValue = currentValue.replace(
+        replaceActiveDateTermPattern,
+        (_match, prefix: string, operator: string) => `${prefix}${operator}${suffix}`
+      );
+    } else if (/(^|\s)-?date:/i.test(currentValue)) {
+      nextValue = `${currentValue}${/\s$/.test(currentValue) ? "" : " "}date:${suffix}`;
+    } else {
+      nextValue = `date:${suffix}`;
+    }
+
+    this.searchComponent.setValue(nextValue);
+    this.onPathFilterInputChanged(nextValue);
+    this.hideFilterSuggestions();
   }
 
   private applyPathValueSuggestion(folderPath: string): void {
@@ -718,9 +771,6 @@ export class ReverySkyMapView extends ItemView {
     this.searchComponent.setValue(nextValue);
     this.onPathFilterInputChanged(nextValue);
     this.hideFilterSuggestions();
-    this.searchComponent.inputEl.focus();
-    const caretPosition = nextValue.length;
-    this.searchComponent.inputEl.setSelectionRange(caretPosition, caretPosition);
   }
 
   private refreshFilterSuggestions(): void {
@@ -729,9 +779,13 @@ export class ReverySkyMapView extends ItemView {
     }
 
     this.filterSuggestionsEl.replaceChildren();
-    const currentQuery = this.searchComponent?.getValue() ?? this.pathFilterQuery;
-    if (this.shouldShowPathValueSuggestions(currentQuery)) {
+    if (this.filterSuggestionMode === 1) {
+      const currentQuery = this.searchComponent?.getValue() ?? this.pathFilterQuery;
       this.renderFolderSuggestions(this.filterSuggestionsEl, currentQuery);
+      return;
+    }
+    if (this.filterSuggestionMode === 2) {
+      this.renderDateSuggestions(this.filterSuggestionsEl);
       return;
     }
 
@@ -744,7 +798,7 @@ export class ReverySkyMapView extends ItemView {
     suggestionsTitle.style.fontSize = "13px";
     suggestionsTitle.style.fontWeight = "600";
     suggestionsTitle.style.color = "var(--text-muted)";
-    suggestionsTitle.style.marginBottom = "8px";
+    suggestionsTitle.style.marginBottom = "6px";
 
     const pathOption = createChild(host as ObsidianHTMLElement, "div");
     pathOption.className = "reverysky-map-filter-suggestion-option";
@@ -752,14 +806,14 @@ export class ReverySkyMapView extends ItemView {
     pathOption.style.display = "block";
     pathOption.style.width = "100%";
     pathOption.style.textAlign = "left";
-    pathOption.style.padding = "8px 10px";
+    pathOption.style.padding = "6px 8px";
     pathOption.style.border = "0";
-    pathOption.style.borderRadius = "7px";
+    pathOption.style.borderRadius = "6px";
     pathOption.style.background = "var(--background-secondary-alt)";
     pathOption.style.color = "var(--text-normal)";
     pathOption.style.cursor = "pointer";
-    pathOption.style.fontSize = "14px";
-    pathOption.style.lineHeight = "1.25";
+    pathOption.style.fontSize = "13px";
+    pathOption.style.lineHeight = "1.2";
     pathOption.style.font = "inherit";
     this.attachSuggestionHoverStyle(pathOption, "var(--background-secondary-alt)");
 
@@ -776,6 +830,84 @@ export class ReverySkyMapView extends ItemView {
       event.preventDefault();
       this.applyPathSuggestionOperator();
     });
+
+    const dateOption = createChild(host as ObsidianHTMLElement, "div");
+    dateOption.className = "reverysky-map-filter-suggestion-option";
+    dateOption.setAttribute("role", "button");
+    dateOption.style.display = "block";
+    dateOption.style.width = "100%";
+    dateOption.style.textAlign = "left";
+    dateOption.style.padding = "6px 8px";
+    dateOption.style.border = "0";
+    dateOption.style.borderRadius = "6px";
+    dateOption.style.background = "var(--background-secondary-alt)";
+    dateOption.style.color = "var(--text-normal)";
+    dateOption.style.cursor = "pointer";
+    dateOption.style.fontSize = "13px";
+    dateOption.style.lineHeight = "1.2";
+    dateOption.style.font = "inherit";
+    dateOption.style.marginTop = "4px";
+    this.attachSuggestionHoverStyle(dateOption, "var(--background-secondary-alt)");
+
+    const dateStrong = createChild(dateOption as ObsidianHTMLElement, "span");
+    dateStrong.textContent = "date:";
+    dateStrong.style.color = "var(--text-normal)";
+    dateStrong.style.marginRight = "4px";
+
+    const dateDesc = createChild(dateOption as ObsidianHTMLElement, "span");
+    dateDesc.textContent = " match note date";
+    dateDesc.style.color = "var(--text-muted)";
+
+    dateOption.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      this.applyDateSuggestionOperator();
+    });
+  }
+
+  private renderDateSuggestions(host: HTMLElement): void {
+    const suggestionsTitle = createChild(host as ObsidianHTMLElement, "div");
+    suggestionsTitle.textContent = "Date presets";
+    suggestionsTitle.style.fontSize = "13px";
+    suggestionsTitle.style.fontWeight = "600";
+    suggestionsTitle.style.color = "var(--text-muted)";
+    suggestionsTitle.style.marginBottom = "6px";
+
+    const presets = this.buildDateFilterPresetSuggestions();
+    for (const suggestion of presets) {
+      const option = createChild(host as ObsidianHTMLElement, "div");
+      option.className = "reverysky-map-date-suggestion-option";
+      option.setAttribute("role", "button");
+      option.style.display = "block";
+      option.style.width = "100%";
+      option.style.textAlign = "left";
+      option.style.padding = "6px 8px";
+      option.style.border = "1px solid transparent";
+      option.style.borderRadius = "6px";
+      option.style.background = "transparent";
+      option.style.color = "var(--text-normal)";
+      option.style.cursor = "pointer";
+      option.style.fontSize = "13px";
+      option.style.lineHeight = "1.2";
+      option.style.font = "inherit";
+      option.style.marginBottom = "0";
+      this.attachSuggestionHoverStyle(option, "transparent");
+
+      const valuePart = createChild(option as ObsidianHTMLElement, "span");
+      valuePart.textContent = `date:${suggestion.suffix}`;
+      valuePart.style.color = "var(--text-normal)";
+
+      const labelPart = createChild(option as ObsidianHTMLElement, "span");
+      labelPart.textContent = `  ${suggestion.label}`;
+      labelPart.style.color = "var(--text-muted)";
+      labelPart.style.fontSize = "12px";
+      labelPart.style.marginLeft = "6px";
+
+      option.title = suggestion.description;
+      option.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        this.applyDateValueSuggestion(suggestion.suffix);
+      });
+    }
   }
 
   private renderFolderSuggestions(host: HTMLElement, query: string): void {
@@ -786,7 +918,7 @@ export class ReverySkyMapView extends ItemView {
     suggestionsTitle.style.fontSize = "13px";
     suggestionsTitle.style.fontWeight = "600";
     suggestionsTitle.style.color = "var(--text-muted)";
-    suggestionsTitle.style.marginBottom = "8px";
+    suggestionsTitle.style.marginBottom = "6px";
 
     const activePathValue = this.extractActivePathFilterTermValue(query);
     const normalizedActive = this.normalizeSearchTerm(activePathValue);
@@ -832,16 +964,16 @@ export class ReverySkyMapView extends ItemView {
       option.style.display = "block";
       option.style.width = "100%";
       option.style.textAlign = "left";
-      option.style.padding = "8px 10px";
+      option.style.padding = "6px 8px";
       option.style.border = "1px solid transparent";
-      option.style.borderRadius = "7px";
+      option.style.borderRadius = "6px";
       option.style.background = "transparent";
       option.style.color = "var(--text-normal)";
       option.style.cursor = "pointer";
       option.style.font = "inherit";
-      option.style.fontSize = "14px";
+      option.style.fontSize = "13px";
       option.style.lineHeight = "1.2";
-      option.style.marginBottom = "1px";
+      option.style.marginBottom = "0";
       this.attachSuggestionHoverStyle(option, "transparent");
       option.addEventListener("mousedown", (event) => {
         event.preventDefault();
@@ -872,8 +1004,66 @@ export class ReverySkyMapView extends ItemView {
     });
   }
 
-  private shouldShowPathValueSuggestions(query: string): boolean {
-    return /(^|\s)-?path:/i.test(query.trim());
+  private buildDateFilterPresetSuggestions(): DateFilterPresetSuggestion[] {
+    const today = this.utcDayFromNowOffset({ days: 0 });
+    const weekAgo = this.utcDayFromNowOffset({ days: -7 });
+    const monthAgo = this.utcDayFromNowOffset({ months: -1 });
+    const yearAgo = this.utcDayFromNowOffset({ years: -1 });
+
+    return [
+      {
+        label: "= today",
+        suffix: today,
+        description: "Matches notes dated today."
+      },
+      {
+        label: "> one week ago",
+        suffix: `>${weekAgo}`,
+        description: "Matches notes newer than one week ago."
+      },
+      {
+        label: "> one month ago",
+        suffix: `>${monthAgo}`,
+        description: "Matches notes newer than one month ago."
+      },
+      {
+        label: "> one year ago",
+        suffix: `>${yearAgo}`,
+        description: "Matches notes newer than one year ago."
+      }
+    ];
+  }
+
+  private utcDayFromNowOffset(offset: { days?: number; months?: number; years?: number }): string {
+    const base = new Date(this.now());
+    const baseYear = base.getUTCFullYear();
+    const baseMonth = base.getUTCMonth();
+    const baseDay = base.getUTCDate();
+    const yearShift = offset.years ?? 0;
+    const monthShift = offset.months ?? 0;
+    const dayShift = offset.days ?? 0;
+    const shifted = this.createClampedUtcDate(baseYear, baseMonth, baseDay, yearShift, monthShift);
+
+    if (dayShift !== 0) {
+      shifted.setUTCDate(shifted.getUTCDate() + dayShift);
+    }
+
+    return shifted.toISOString().slice(0, 10);
+  }
+
+  private createClampedUtcDate(
+    baseYear: number,
+    baseMonth: number,
+    baseDay: number,
+    yearShift: number,
+    monthShift: number
+  ): Date {
+    const monthShiftedStart = new Date(Date.UTC(baseYear + yearShift, baseMonth + monthShift, 1));
+    const targetYear = monthShiftedStart.getUTCFullYear();
+    const targetMonth = monthShiftedStart.getUTCMonth();
+    const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+    const clampedDay = Math.min(baseDay, daysInTargetMonth);
+    return new Date(Date.UTC(targetYear, targetMonth, clampedDay));
   }
 
   private ensureFolderSuggestionsReady(): void {
@@ -976,7 +1166,7 @@ export class ReverySkyMapView extends ItemView {
     }
 
     this.pathFilterMessage = parseResult.hasUnsupportedTokens
-      ? "Only path: terms are applied in this view."
+      ? "Only path: and date: terms are applied in this view."
       : "";
     this.activePathFilter = parseResult.hasPathTerms ? parseResult.parsed : null;
   }

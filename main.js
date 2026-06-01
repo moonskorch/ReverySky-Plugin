@@ -412,6 +412,8 @@ var _GraphPathFilter = class _GraphPathFilter {
     const excludeTerms = [];
     const includeRegexes = [];
     const excludeRegexes = [];
+    const includeDateClauses = [];
+    const excludeDateClauses = [];
     const unsupportedTokens = [];
     for (const token of tokenized.tokens) {
       const trimmed = token.trim();
@@ -421,7 +423,36 @@ var _GraphPathFilter = class _GraphPathFilter {
       const isNegated = trimmed.startsWith("-");
       const body = isNegated ? trimmed.slice(1) : trimmed;
       if (!body.toLowerCase().startsWith("path:")) {
-        unsupportedTokens.push(trimmed);
+        if (!body.toLowerCase().startsWith("date:")) {
+          unsupportedTokens.push(trimmed);
+          continue;
+        }
+        const rawDateTerm = body.slice("date:".length).trim();
+        const dateClause = _GraphPathFilter.tryParseDateClause(rawDateTerm);
+        if (dateClause.kind === "invalid") {
+          return {
+            isValid: false,
+            parsed: null,
+            hasPathTerms: false,
+            hasUnsupportedTokens: unsupportedTokens.length > 0,
+            reason: dateClause.reason
+          };
+        }
+        if (dateClause.kind === "empty") {
+          if (isNegated) {
+            continue;
+          }
+          includeDateClauses.push({
+            comparator: "eq",
+            day: _GraphPathFilter.NO_MATCH_DATE_SENTINEL
+          });
+          continue;
+        }
+        if (isNegated) {
+          excludeDateClauses.push(dateClause.value);
+        } else {
+          includeDateClauses.push(dateClause.value);
+        }
         continue;
       }
       const rawTerm = body.slice("path:".length).trim();
@@ -466,21 +497,25 @@ var _GraphPathFilter = class _GraphPathFilter {
     }
     const hasPathTerms = includeTerms.length > 0 || excludeTerms.length > 0;
     const hasRegexTerms = includeRegexes.length > 0 || excludeRegexes.length > 0;
+    const hasDateTerms = includeDateClauses.length > 0 || excludeDateClauses.length > 0;
+    const hasSupportedTerms = hasPathTerms || hasRegexTerms || hasDateTerms;
     return {
       isValid: true,
-      parsed: hasPathTerms || hasRegexTerms ? {
+      parsed: hasSupportedTerms ? {
         includeTerms,
         excludeTerms,
         includeRegexes,
         excludeRegexes,
+        includeDateClauses,
+        excludeDateClauses,
         unsupportedTokens
       } : null,
-      hasPathTerms: hasPathTerms || hasRegexTerms,
+      hasPathTerms: hasSupportedTerms,
       hasUnsupportedTokens: unsupportedTokens.length > 0
     };
   }
   static applyPathFilter(payload, parsed) {
-    if (!parsed || !parsed.includeTerms.length && !parsed.excludeTerms.length && !parsed.includeRegexes.length && !parsed.excludeRegexes.length) {
+    if (!parsed || !parsed.includeTerms.length && !parsed.excludeTerms.length && !parsed.includeRegexes.length && !parsed.excludeRegexes.length && !parsed.includeDateClauses.length && !parsed.excludeDateClauses.length) {
       return payload;
     }
     const notes = payload.notes.filter((note) => _GraphPathFilter.matchesNote(note, parsed));
@@ -500,6 +535,7 @@ var _GraphPathFilter = class _GraphPathFilter {
   }
   static matchesNote(note, parsed) {
     const normalizedPath = _GraphPathFilter.normalizeMatchValue(note.path);
+    const noteDay = _GraphPathFilter.toIsoDayKey(note.date);
     for (const exclude of parsed.excludeTerms) {
       if (normalizedPath.includes(exclude)) {
         return false;
@@ -507,6 +543,11 @@ var _GraphPathFilter = class _GraphPathFilter {
     }
     for (const excludeRegex of parsed.excludeRegexes) {
       if (excludeRegex.test(normalizedPath)) {
+        return false;
+      }
+    }
+    for (const excludeDate of parsed.excludeDateClauses) {
+      if (noteDay && _GraphPathFilter.matchesDateClause(noteDay, excludeDate)) {
         return false;
       }
     }
@@ -520,10 +561,40 @@ var _GraphPathFilter = class _GraphPathFilter {
         return false;
       }
     }
+    for (const includeDate of parsed.includeDateClauses) {
+      if (!noteDay || !_GraphPathFilter.matchesDateClause(noteDay, includeDate)) {
+        return false;
+      }
+    }
     return true;
   }
   static normalizeMatchValue(value) {
     return value.trim().replace(/\\/g, "/").toLowerCase();
+  }
+  static toIsoDayKey(value) {
+    if (typeof value !== "string" || !value.trim()) {
+      return null;
+    }
+    const trimmed = value.trim();
+    const leadingDayMatch = trimmed.match(/^(\d{4}-\d{2}-\d{2})(?:$|[Tt\s].*)/);
+    if (leadingDayMatch?.[1] && _GraphPathFilter.isValidCalendarDay(leadingDayMatch[1])) {
+      return leadingDayMatch[1];
+    }
+    const parsedDate = new Date(trimmed);
+    if (Number.isNaN(parsedDate.getTime())) {
+      return null;
+    }
+    return parsedDate.toISOString().slice(0, 10);
+  }
+  static matchesDateClause(noteDay, clause) {
+    switch (clause.comparator) {
+      case "lt":
+        return noteDay < clause.day;
+      case "gt":
+        return noteDay > clause.day;
+      default:
+        return noteDay === clause.day;
+    }
   }
   static tryParseRegexLiteral(term) {
     if (!term.startsWith("/")) {
@@ -550,6 +621,46 @@ var _GraphPathFilter = class _GraphPathFilter {
         reason: "Invalid regex in path filter."
       };
     }
+  }
+  static tryParseDateClause(term) {
+    const trimmed = term.trim();
+    if (!trimmed) {
+      return { kind: "empty" };
+    }
+    const dateMatch = trimmed.match(/^([<>=]?)(\d{4}-\d{2}-\d{2})$/);
+    if (!dateMatch) {
+      return {
+        kind: "invalid",
+        reason: "Invalid date in date filter. Use date:YYYY-MM-DD, date:>YYYY-MM-DD, or date:<YYYY-MM-DD."
+      };
+    }
+    const operator = dateMatch[1] ?? "";
+    const day = dateMatch[2] ?? "";
+    if (!_GraphPathFilter.isValidCalendarDay(day)) {
+      return {
+        kind: "invalid",
+        reason: "Invalid calendar date in date filter."
+      };
+    }
+    const comparator = operator === ">" ? "gt" : operator === "<" ? "lt" : "eq";
+    return {
+      kind: "clause",
+      value: {
+        comparator,
+        day
+      }
+    };
+  }
+  static isValidCalendarDay(day) {
+    const [rawYear, rawMonth, rawDate] = day.split("-");
+    const year = Number(rawYear);
+    const month = Number(rawMonth);
+    const date = Number(rawDate);
+    if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(date) || month < 1 || month > 12 || date < 1 || date > 31) {
+      return false;
+    }
+    const utc = new Date(Date.UTC(year, month - 1, date));
+    return utc.getUTCFullYear() === year && utc.getUTCMonth() + 1 === month && utc.getUTCDate() === date;
   }
   static tokenize(query) {
     const tokens = [];
@@ -599,6 +710,7 @@ var _GraphPathFilter = class _GraphPathFilter {
   }
 };
 _GraphPathFilter.NO_MATCH_SENTINEL = "\0__empty_path_term__";
+_GraphPathFilter.NO_MATCH_DATE_SENTINEL = "\0__empty_date_term__";
 var GraphPathFilter = _GraphPathFilter;
 
 // src/view/ReverySkyMapView.ts
@@ -642,6 +754,7 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     this.filterSuggestionsEl = null;
     this.filterPanelEl = null;
     this.filterToggleButtonEl = null;
+    this.filterSuggestionMode = 0;
     this.folderPathSuggestions = [];
     this.searchComponent = null;
     this.filterPanelOpen = false;
@@ -746,6 +859,7 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     this.filterSuggestionsEl = null;
     this.filterPanelEl = null;
     this.filterToggleButtonEl = null;
+    this.filterSuggestionMode = 0;
     emptyElement(this.contentEl);
   }
   ensureRefreshSubscriptions() {
@@ -1075,10 +1189,10 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     });
     this.searchComponent.inputEl.setAttribute("aria-label", "Search files filter");
     this.searchComponent.inputEl.addEventListener("focus", () => {
-      this.showFilterSuggestions();
+      this.showFilterSuggestions(0);
     });
     this.searchComponent.inputEl.addEventListener("click", () => {
-      this.showFilterSuggestions();
+      this.showFilterSuggestions(0);
     });
     this.searchComponent.inputEl.addEventListener("blur", () => {
       this.scheduleHideFilterSuggestions();
@@ -1103,10 +1217,10 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     this.filterSuggestionsEl.style.background = "var(--background-primary)";
     this.filterSuggestionsEl.style.border = "1px solid var(--background-modifier-border)";
     this.filterSuggestionsEl.style.borderRadius = "10px";
-    this.filterSuggestionsEl.style.padding = "10px 10px 8px";
+    this.filterSuggestionsEl.style.padding = "8px";
     this.filterSuggestionsEl.style.boxShadow = "none";
     this.filterSuggestionsEl.style.zIndex = "30";
-    this.filterSuggestionsEl.style.maxHeight = "52vh";
+    this.filterSuggestionsEl.style.maxHeight = "44vh";
     this.filterSuggestionsEl.style.overflowY = "auto";
     this.filterMessageEl = createChild(filterContainer, "div");
     this.filterMessageEl.className = "reverysky-map-filter-message";
@@ -1139,10 +1253,11 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     }
     this.scheduleFilterRefresh();
   }
-  showFilterSuggestions() {
+  showFilterSuggestions(mode) {
     if (!this.filterSuggestionsEl || !this.searchComponent) {
       return;
     }
+    this.filterSuggestionMode = mode;
     this.setFilterPanelOpen(true);
     this.refreshFilterSuggestions();
     this.clearFilterSuggestionsHideTimer();
@@ -1159,6 +1274,7 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     if (!this.filterSuggestionsEl) {
       return;
     }
+    this.filterSuggestionMode = 0;
     this.filterSuggestionsEl.style.display = "none";
   }
   applyPathSuggestionOperator() {
@@ -1171,10 +1287,40 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     const nextValue = alreadyContainsPathOperator ? currentValue : trimmedCurrent.length === 0 ? "path:" : `${currentValue}${/\s$/.test(currentValue) ? "" : " "}path:`;
     this.searchComponent.setValue(nextValue);
     this.onPathFilterInputChanged(nextValue);
-    this.showFilterSuggestions();
-    this.searchComponent.inputEl.focus();
-    const caretPosition = nextValue.length;
-    this.searchComponent.inputEl.setSelectionRange(caretPosition, caretPosition);
+    this.showFilterSuggestions(1);
+  }
+  applyDateSuggestionOperator() {
+    if (!this.searchComponent) {
+      return;
+    }
+    const currentValue = this.searchComponent.getValue();
+    const trimmedCurrent = currentValue.trim();
+    const alreadyContainsDateOperator = /(^|\s)-?date:/i.test(trimmedCurrent);
+    const nextValue = alreadyContainsDateOperator ? currentValue : trimmedCurrent.length === 0 ? "date:" : `${currentValue}${/\s$/.test(currentValue) ? "" : " "}date:`;
+    this.searchComponent.setValue(nextValue);
+    this.onPathFilterInputChanged(nextValue);
+    this.showFilterSuggestions(2);
+  }
+  applyDateValueSuggestion(suffix) {
+    if (!this.searchComponent) {
+      return;
+    }
+    const currentValue = this.searchComponent.getValue();
+    const replaceActiveDateTermPattern = /(^|\s)(-?date:)[^\s]*$/i;
+    let nextValue;
+    if (replaceActiveDateTermPattern.test(currentValue)) {
+      nextValue = currentValue.replace(
+        replaceActiveDateTermPattern,
+        (_match, prefix, operator) => `${prefix}${operator}${suffix}`
+      );
+    } else if (/(^|\s)-?date:/i.test(currentValue)) {
+      nextValue = `${currentValue}${/\s$/.test(currentValue) ? "" : " "}date:${suffix}`;
+    } else {
+      nextValue = `date:${suffix}`;
+    }
+    this.searchComponent.setValue(nextValue);
+    this.onPathFilterInputChanged(nextValue);
+    this.hideFilterSuggestions();
   }
   applyPathValueSuggestion(folderPath) {
     if (!this.searchComponent) {
@@ -1197,18 +1343,19 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     this.searchComponent.setValue(nextValue);
     this.onPathFilterInputChanged(nextValue);
     this.hideFilterSuggestions();
-    this.searchComponent.inputEl.focus();
-    const caretPosition = nextValue.length;
-    this.searchComponent.inputEl.setSelectionRange(caretPosition, caretPosition);
   }
   refreshFilterSuggestions() {
     if (!this.filterSuggestionsEl) {
       return;
     }
     this.filterSuggestionsEl.replaceChildren();
-    const currentQuery = this.searchComponent?.getValue() ?? this.pathFilterQuery;
-    if (this.shouldShowPathValueSuggestions(currentQuery)) {
+    if (this.filterSuggestionMode === 1) {
+      const currentQuery = this.searchComponent?.getValue() ?? this.pathFilterQuery;
       this.renderFolderSuggestions(this.filterSuggestionsEl, currentQuery);
+      return;
+    }
+    if (this.filterSuggestionMode === 2) {
+      this.renderDateSuggestions(this.filterSuggestionsEl);
       return;
     }
     this.renderOperatorSuggestions(this.filterSuggestionsEl);
@@ -1219,21 +1366,21 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     suggestionsTitle.style.fontSize = "13px";
     suggestionsTitle.style.fontWeight = "600";
     suggestionsTitle.style.color = "var(--text-muted)";
-    suggestionsTitle.style.marginBottom = "8px";
+    suggestionsTitle.style.marginBottom = "6px";
     const pathOption = createChild(host, "div");
     pathOption.className = "reverysky-map-filter-suggestion-option";
     pathOption.setAttribute("role", "button");
     pathOption.style.display = "block";
     pathOption.style.width = "100%";
     pathOption.style.textAlign = "left";
-    pathOption.style.padding = "8px 10px";
+    pathOption.style.padding = "6px 8px";
     pathOption.style.border = "0";
-    pathOption.style.borderRadius = "7px";
+    pathOption.style.borderRadius = "6px";
     pathOption.style.background = "var(--background-secondary-alt)";
     pathOption.style.color = "var(--text-normal)";
     pathOption.style.cursor = "pointer";
-    pathOption.style.fontSize = "14px";
-    pathOption.style.lineHeight = "1.25";
+    pathOption.style.fontSize = "13px";
+    pathOption.style.lineHeight = "1.2";
     pathOption.style.font = "inherit";
     this.attachSuggestionHoverStyle(pathOption, "var(--background-secondary-alt)");
     const strong = createChild(pathOption, "span");
@@ -1247,6 +1394,75 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
       event.preventDefault();
       this.applyPathSuggestionOperator();
     });
+    const dateOption = createChild(host, "div");
+    dateOption.className = "reverysky-map-filter-suggestion-option";
+    dateOption.setAttribute("role", "button");
+    dateOption.style.display = "block";
+    dateOption.style.width = "100%";
+    dateOption.style.textAlign = "left";
+    dateOption.style.padding = "6px 8px";
+    dateOption.style.border = "0";
+    dateOption.style.borderRadius = "6px";
+    dateOption.style.background = "var(--background-secondary-alt)";
+    dateOption.style.color = "var(--text-normal)";
+    dateOption.style.cursor = "pointer";
+    dateOption.style.fontSize = "13px";
+    dateOption.style.lineHeight = "1.2";
+    dateOption.style.font = "inherit";
+    dateOption.style.marginTop = "4px";
+    this.attachSuggestionHoverStyle(dateOption, "var(--background-secondary-alt)");
+    const dateStrong = createChild(dateOption, "span");
+    dateStrong.textContent = "date:";
+    dateStrong.style.color = "var(--text-normal)";
+    dateStrong.style.marginRight = "4px";
+    const dateDesc = createChild(dateOption, "span");
+    dateDesc.textContent = " match note date";
+    dateDesc.style.color = "var(--text-muted)";
+    dateOption.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      this.applyDateSuggestionOperator();
+    });
+  }
+  renderDateSuggestions(host) {
+    const suggestionsTitle = createChild(host, "div");
+    suggestionsTitle.textContent = "Date presets";
+    suggestionsTitle.style.fontSize = "13px";
+    suggestionsTitle.style.fontWeight = "600";
+    suggestionsTitle.style.color = "var(--text-muted)";
+    suggestionsTitle.style.marginBottom = "6px";
+    const presets = this.buildDateFilterPresetSuggestions();
+    for (const suggestion of presets) {
+      const option = createChild(host, "div");
+      option.className = "reverysky-map-date-suggestion-option";
+      option.setAttribute("role", "button");
+      option.style.display = "block";
+      option.style.width = "100%";
+      option.style.textAlign = "left";
+      option.style.padding = "6px 8px";
+      option.style.border = "1px solid transparent";
+      option.style.borderRadius = "6px";
+      option.style.background = "transparent";
+      option.style.color = "var(--text-normal)";
+      option.style.cursor = "pointer";
+      option.style.fontSize = "13px";
+      option.style.lineHeight = "1.2";
+      option.style.font = "inherit";
+      option.style.marginBottom = "0";
+      this.attachSuggestionHoverStyle(option, "transparent");
+      const valuePart = createChild(option, "span");
+      valuePart.textContent = `date:${suggestion.suffix}`;
+      valuePart.style.color = "var(--text-normal)";
+      const labelPart = createChild(option, "span");
+      labelPart.textContent = `  ${suggestion.label}`;
+      labelPart.style.color = "var(--text-muted)";
+      labelPart.style.fontSize = "12px";
+      labelPart.style.marginLeft = "6px";
+      option.title = suggestion.description;
+      option.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        this.applyDateValueSuggestion(suggestion.suffix);
+      });
+    }
   }
   renderFolderSuggestions(host, query) {
     this.ensureFolderSuggestionsReady();
@@ -1255,7 +1471,7 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     suggestionsTitle.style.fontSize = "13px";
     suggestionsTitle.style.fontWeight = "600";
     suggestionsTitle.style.color = "var(--text-muted)";
-    suggestionsTitle.style.marginBottom = "8px";
+    suggestionsTitle.style.marginBottom = "6px";
     const activePathValue = this.extractActivePathFilterTermValue(query);
     const normalizedActive = this.normalizeSearchTerm(activePathValue);
     const ranked = this.folderPathSuggestions.filter((item) => {
@@ -1294,16 +1510,16 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
       option.style.display = "block";
       option.style.width = "100%";
       option.style.textAlign = "left";
-      option.style.padding = "8px 10px";
+      option.style.padding = "6px 8px";
       option.style.border = "1px solid transparent";
-      option.style.borderRadius = "7px";
+      option.style.borderRadius = "6px";
       option.style.background = "transparent";
       option.style.color = "var(--text-normal)";
       option.style.cursor = "pointer";
       option.style.font = "inherit";
-      option.style.fontSize = "14px";
+      option.style.fontSize = "13px";
       option.style.lineHeight = "1.2";
-      option.style.marginBottom = "1px";
+      option.style.marginBottom = "0";
       this.attachSuggestionHoverStyle(option, "transparent");
       option.addEventListener("mousedown", (event) => {
         event.preventDefault();
@@ -1329,8 +1545,55 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
       element.style.opacity = "1";
     });
   }
-  shouldShowPathValueSuggestions(query) {
-    return /(^|\s)-?path:/i.test(query.trim());
+  buildDateFilterPresetSuggestions() {
+    const today = this.utcDayFromNowOffset({ days: 0 });
+    const weekAgo = this.utcDayFromNowOffset({ days: -7 });
+    const monthAgo = this.utcDayFromNowOffset({ months: -1 });
+    const yearAgo = this.utcDayFromNowOffset({ years: -1 });
+    return [
+      {
+        label: "= today",
+        suffix: today,
+        description: "Matches notes dated today."
+      },
+      {
+        label: "> one week ago",
+        suffix: `>${weekAgo}`,
+        description: "Matches notes newer than one week ago."
+      },
+      {
+        label: "> one month ago",
+        suffix: `>${monthAgo}`,
+        description: "Matches notes newer than one month ago."
+      },
+      {
+        label: "> one year ago",
+        suffix: `>${yearAgo}`,
+        description: "Matches notes newer than one year ago."
+      }
+    ];
+  }
+  utcDayFromNowOffset(offset) {
+    const base = new Date(this.now());
+    const baseYear = base.getUTCFullYear();
+    const baseMonth = base.getUTCMonth();
+    const baseDay = base.getUTCDate();
+    const yearShift = offset.years ?? 0;
+    const monthShift = offset.months ?? 0;
+    const dayShift = offset.days ?? 0;
+    const shifted = this.createClampedUtcDate(baseYear, baseMonth, baseDay, yearShift, monthShift);
+    if (dayShift !== 0) {
+      shifted.setUTCDate(shifted.getUTCDate() + dayShift);
+    }
+    return shifted.toISOString().slice(0, 10);
+  }
+  createClampedUtcDate(baseYear, baseMonth, baseDay, yearShift, monthShift) {
+    const monthShiftedStart = new Date(Date.UTC(baseYear + yearShift, baseMonth + monthShift, 1));
+    const targetYear = monthShiftedStart.getUTCFullYear();
+    const targetMonth = monthShiftedStart.getUTCMonth();
+    const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+    const clampedDay = Math.min(baseDay, daysInTargetMonth);
+    return new Date(Date.UTC(targetYear, targetMonth, clampedDay));
   }
   ensureFolderSuggestionsReady() {
     if (this.folderPathSuggestions.length > 0) {
@@ -1413,7 +1676,7 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
       this.pathFilterMessage = "";
       return;
     }
-    this.pathFilterMessage = parseResult.hasUnsupportedTokens ? "Only path: terms are applied in this view." : "";
+    this.pathFilterMessage = parseResult.hasUnsupportedTokens ? "Only path: and date: terms are applied in this view." : "";
     this.activePathFilter = parseResult.hasPathTerms ? parseResult.parsed : null;
   }
   syncSearchComponentValue() {
