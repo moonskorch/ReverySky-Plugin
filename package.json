@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "check:unity-webgl": "node scripts/check-unity-webgl-artifacts.mjs",
-    "build": "npm run check:unity-webgl && tsc --noEmit --skipLibCheck && node esbuild.config.mjs production",
+    "check:plugin-release": "node scripts/check-plugin-release-artifacts.mjs",
+    "build": "npm run check:unity-webgl && tsc --noEmit --skipLibCheck && node esbuild.config.mjs production && npm run check:plugin-release",
     "test": "vitest run",
     "test:watch": "vitest"
   },

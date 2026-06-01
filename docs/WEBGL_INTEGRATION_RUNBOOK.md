@@ -71,6 +71,7 @@ npm run build
 
 Output:
 - `main.js` (distribution artifact for Obsidian plugin installation).
+- `styles.css` (plugin UI styles; must be present in installed plugin folder).
 
 If PowerShell blocks npm wrapper:
 
@@ -87,6 +88,7 @@ Copy files to:
 Copy these artifacts:
 - `manifest.json`
 - `main.js`
+- `styles.css`
 - `unity-webgl\` (generated `index.html`, `Build`, optional `TemplateData`)
 
 ### 6) Verify runtime in Obsidian
