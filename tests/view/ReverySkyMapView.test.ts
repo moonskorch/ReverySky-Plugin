@@ -1079,6 +1079,98 @@ describe("ReverySkyMapView bridge integration", () => {
     expect(filterMessage.style.display).toBe("none");
   });
 
+  it("toggles tags visibility in outgoing graph payload without rebuilding source graph", async () => {
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePathPayload();
+    payload.notes[0].tags = ["daily", "journal"];
+    payload.notes[1].tags = ["project"];
+    payload.notes[2].tags = ["archive"];
+    const buildGraph = vi.fn().mockReturnValue(payload);
+
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: buildGraph as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+    const initialPayload = bridge.sendGraphSet.mock.calls[0]?.[0] as GraphPayload;
+    expect(initialPayload.notes.map((note) => note.tags)).toEqual([
+      ["daily", "journal"],
+      ["project"],
+      ["archive"]
+    ]);
+
+    const tagsToggle = view.contentEl.querySelector(
+      ".reverysky-map-tags-toggle"
+    ) as HTMLButtonElement;
+    expect(tagsToggle.getAttribute("aria-checked")).toBe("true");
+
+    tagsToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+    const tagsHiddenPayload = bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload;
+    expect(tagsHiddenPayload.notes.every((note) => note.tags.length === 0)).toBe(true);
+    expect(tagsHiddenPayload.links).toEqual(initialPayload.links);
+    expect(tagsHiddenPayload.vault.noteCount).toBe(initialPayload.vault.noteCount);
+    expect(tagsToggle.getAttribute("aria-checked")).toBe("false");
+
+    tagsToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(3);
+    const tagsVisibleAgainPayload = bridge.sendGraphSet.mock.calls[2]?.[0] as GraphPayload;
+    expect(tagsVisibleAgainPayload.notes.map((note) => note.tags)).toEqual([
+      ["daily", "journal"],
+      ["project"],
+      ["archive"]
+    ]);
+    expect(tagsToggle.getAttribute("aria-checked")).toBe("true");
+  });
+
   it("opens filter panel by gear button and closes it by close button", async () => {
     const app = {
       metadataCache: {
@@ -1703,6 +1795,96 @@ describe("ReverySkyMapView bridge integration", () => {
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
     const filteredPayload = bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload;
     expect(filteredPayload.notes.map((note) => note.id)).toEqual(["project"]);
+  });
+
+  it("restores showTags state and keeps tag hiding for date queries from cached source graph", async () => {
+    vi.useFakeTimers();
+
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePathPayload();
+    payload.notes[0].date = "2026-01-01T00:00:00.000Z";
+    payload.notes[1].date = "2026-01-15T00:00:00.000Z";
+    payload.notes[2].date = "2026-02-01T00:00:00.000Z";
+    payload.notes[0].tags = ["daily"];
+    payload.notes[1].tags = ["project"];
+    payload.notes[2].tags = ["archive"];
+    const buildGraph = vi.fn().mockReturnValue(payload);
+
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: buildGraph as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.setState({
+      pathFilterQuery: "date:>2026-01-01 date:<2026-02-01",
+      showTags: false
+    });
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+    const restoredPayload = bridge.sendGraphSet.mock.calls[0]?.[0] as GraphPayload;
+    expect(restoredPayload.notes.map((note) => note.id)).toEqual(["project"]);
+    expect(restoredPayload.notes.every((note) => note.tags.length === 0)).toBe(true);
+
+    const tagsToggle = view.contentEl.querySelector(
+      ".reverysky-map-tags-toggle"
+    ) as HTMLButtonElement;
+    expect(tagsToggle.getAttribute("aria-checked")).toBe("false");
+
+    const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
+    searchInput.value = "date:>=2026-01-01 date:<2026-02-01";
+    searchInput.dispatchEvent(new Event("input"));
+    vi.advanceTimersByTime(250);
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+    const updatedPayload = bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload;
+    expect(updatedPayload.notes.map((note) => note.id)).toEqual(["daily", "project"]);
+    expect(updatedPayload.notes.every((note) => note.tags.length === 0)).toBe(true);
   });
 
   it("applies unquoted folder term for simple path suggestion", async () => {

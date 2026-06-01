@@ -749,6 +749,7 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     this.refreshActive = false;
     this.leafTrackingRegistered = false;
     this.pathFilterQuery = "";
+    this.showTags = true;
     this.activePathFilter = null;
     this.pathFilterParseValid = true;
     this.pathFilterMessage = "";
@@ -758,6 +759,8 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     this.filterSuggestionsEl = null;
     this.filterPanelEl = null;
     this.filterToggleButtonEl = null;
+    this.tagsToggleButtonEl = null;
+    this.tagsToggleThumbEl = null;
     this.filterSuggestionMode = 0;
     this.folderPathSuggestions = [];
     this.searchComponent = null;
@@ -775,13 +778,16 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
   }
   getState() {
     return {
-      pathFilterQuery: this.pathFilterQuery
+      pathFilterQuery: this.pathFilterQuery,
+      showTags: this.showTags
     };
   }
   async setState(state) {
     const nextState = state ?? {};
     const nextQuery = typeof nextState.pathFilterQuery === "string" ? nextState.pathFilterQuery : "";
+    const nextShowTags = typeof nextState.showTags === "boolean" ? nextState.showTags : true;
     this.pathFilterQuery = nextQuery;
+    this.setShowTags(nextShowTags, { emit: false });
     this.applyParsedFilterResult(GraphPathFilter.parsePathQuery(nextQuery));
     this.syncSearchComponentValue();
     this.refreshFilterMessage();
@@ -863,6 +869,8 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     this.filterSuggestionsEl = null;
     this.filterPanelEl = null;
     this.filterToggleButtonEl = null;
+    this.tagsToggleButtonEl = null;
+    this.tagsToggleThumbEl = null;
     this.filterSuggestionMode = 0;
     emptyElement(this.contentEl);
   }
@@ -987,7 +995,7 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     if (!this.sourceGraphPayload) {
       return;
     }
-    const outgoingPayload = this.applyActivePathFilter(this.sourceGraphPayload);
+    const outgoingPayload = this.applyActiveFilters(this.sourceGraphPayload);
     this.lastGraphPayload = outgoingPayload;
     if (!this.bridgeReady) {
       this.pendingGraphPayload = outgoingPayload;
@@ -999,8 +1007,21 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     this.dispatchPreferredFocus(outgoingPayload);
     this.refreshFilterSuggestions();
   }
-  applyActivePathFilter(payload) {
-    return GraphPathFilter.applyPathFilter(payload, this.activePathFilter);
+  applyActiveFilters(payload) {
+    const pathFiltered = GraphPathFilter.applyPathFilter(payload, this.activePathFilter);
+    return this.applyTagsVisibilityFilter(pathFiltered);
+  }
+  applyTagsVisibilityFilter(payload) {
+    if (this.showTags) {
+      return payload;
+    }
+    return {
+      ...payload,
+      notes: payload.notes.map((note) => ({
+        ...note,
+        tags: []
+      }))
+    };
   }
   flushOrRefreshGraph() {
     if (this.pendingGraphPayload) {
@@ -1211,6 +1232,58 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
         this.hideFilterSuggestions();
       }
     });
+    const tagsToggleRow = createChild(filterContainer, "div");
+    tagsToggleRow.className = "reverysky-map-tags-toggle-row";
+    tagsToggleRow.style.display = "flex";
+    tagsToggleRow.style.alignItems = "center";
+    tagsToggleRow.style.justifyContent = "space-between";
+    tagsToggleRow.style.padding = "2px 0 0";
+    const tagsLabel = createChild(tagsToggleRow, "div");
+    tagsLabel.textContent = "Tags";
+    tagsLabel.style.fontSize = "var(--font-ui-small, 14px)";
+    tagsLabel.style.lineHeight = "1.25";
+    tagsLabel.style.fontWeight = "400";
+    tagsLabel.style.color = "var(--text-normal)";
+    tagsLabel.style.letterSpacing = "0";
+    const tagsToggleButton = createChild(tagsToggleRow, "button");
+    tagsToggleButton.type = "button";
+    tagsToggleButton.className = "reverysky-map-tags-toggle";
+    tagsToggleButton.setAttribute("aria-label", "Toggle tags");
+    tagsToggleButton.style.width = "38px";
+    tagsToggleButton.style.height = "22px";
+    tagsToggleButton.style.borderRadius = "999px";
+    tagsToggleButton.style.border = "1px solid transparent";
+    tagsToggleButton.style.padding = "2px";
+    tagsToggleButton.style.cursor = "pointer";
+    tagsToggleButton.style.display = "flex";
+    tagsToggleButton.style.alignItems = "center";
+    tagsToggleButton.style.justifyContent = "flex-end";
+    tagsToggleButton.style.transition = "background-color 120ms ease";
+    tagsToggleButton.style.boxShadow = "none";
+    tagsToggleButton.style.setProperty("appearance", "none");
+    this.tagsToggleButtonEl = tagsToggleButton;
+    const tagsToggleThumb = createChild(tagsToggleButton, "span");
+    tagsToggleThumb.className = "reverysky-map-tags-toggle-thumb";
+    tagsToggleThumb.style.width = "16px";
+    tagsToggleThumb.style.height = "16px";
+    tagsToggleThumb.style.borderRadius = "999px";
+    tagsToggleThumb.style.background = "var(--text-on-accent, #ffffff)";
+    tagsToggleThumb.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.24)";
+    tagsToggleThumb.style.transition = "transform 120ms ease";
+    this.tagsToggleThumbEl = tagsToggleThumb;
+    const toggleTags = (event) => {
+      event.preventDefault();
+      this.setShowTags(!this.showTags, { emit: true });
+    };
+    tagsToggleButton.addEventListener("mousedown", toggleTags);
+    tagsToggleButton.addEventListener("click", (event) => {
+      const mouseEvent = event;
+      if (mouseEvent.detail !== 0) {
+        return;
+      }
+      toggleTags(event);
+    });
+    this.refreshTagsToggleUi();
     this.filterSuggestionsEl = createChild(filterContainer, "div");
     this.filterSuggestionsEl.className = "reverysky-map-filter-suggestions";
     this.filterSuggestionsEl.style.display = "none";
@@ -1700,6 +1773,24 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     this.filterMessageEl.textContent = hasCustomMessage ? this.pathFilterMessage : "";
     this.filterMessageEl.style.display = hasCustomMessage ? "block" : "none";
     this.filterMessageEl.style.color = this.pathFilterParseValid ? "var(--text-muted)" : "var(--text-error)";
+  }
+  setShowTags(showTags, options) {
+    this.showTags = showTags;
+    this.refreshTagsToggleUi();
+    if (!options.emit) {
+      return;
+    }
+    this.emitGraphFromSource();
+  }
+  refreshTagsToggleUi() {
+    if (!this.tagsToggleButtonEl || !this.tagsToggleThumbEl) {
+      return;
+    }
+    this.tagsToggleButtonEl.setAttribute("role", "switch");
+    this.tagsToggleButtonEl.setAttribute("aria-checked", this.showTags ? "true" : "false");
+    this.tagsToggleButtonEl.style.background = this.showTags ? "var(--interactive-accent)" : "var(--background-modifier-border)";
+    this.tagsToggleButtonEl.style.justifyContent = this.showTags ? "flex-end" : "flex-start";
+    this.tagsToggleThumbEl.style.background = this.showTags ? "var(--text-on-accent, #ffffff)" : "var(--text-normal)";
   }
   dispatchPreferredFocus(payload) {
     if (!this.bridgeReady) {

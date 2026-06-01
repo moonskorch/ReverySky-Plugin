@@ -26,6 +26,7 @@ type ObsidianHTMLElement = HTMLElement & {
 
 type ReverySkyMapViewState = {
   pathFilterQuery?: unknown;
+  showTags?: unknown;
 };
 
 type FolderPathSuggestion = {
@@ -76,6 +77,7 @@ export class ReverySkyMapView extends ItemView {
   private refreshActive = false;
   private leafTrackingRegistered = false;
   private pathFilterQuery = "";
+  private showTags = true;
   private activePathFilter: ParsedPathFilter | null = null;
   private pathFilterParseValid = true;
   private pathFilterMessage = "";
@@ -85,6 +87,8 @@ export class ReverySkyMapView extends ItemView {
   private filterSuggestionsEl: HTMLElement | null = null;
   private filterPanelEl: HTMLElement | null = null;
   private filterToggleButtonEl: HTMLButtonElement | null = null;
+  private tagsToggleButtonEl: HTMLButtonElement | null = null;
+  private tagsToggleThumbEl: HTMLElement | null = null;
   private filterSuggestionMode: FilterSuggestionMode = 0;
   private folderPathSuggestions: FolderPathSuggestion[] = [];
   private searchComponent: SearchComponent | null = null;
@@ -112,7 +116,8 @@ export class ReverySkyMapView extends ItemView {
 
   getState(): Record<string, unknown> {
     return {
-      pathFilterQuery: this.pathFilterQuery
+      pathFilterQuery: this.pathFilterQuery,
+      showTags: this.showTags
     };
   }
 
@@ -120,7 +125,9 @@ export class ReverySkyMapView extends ItemView {
     const nextState = (state ?? {}) as ReverySkyMapViewState;
     const nextQuery =
       typeof nextState.pathFilterQuery === "string" ? nextState.pathFilterQuery : "";
+    const nextShowTags = typeof nextState.showTags === "boolean" ? nextState.showTags : true;
     this.pathFilterQuery = nextQuery;
+    this.setShowTags(nextShowTags, { emit: false });
     this.applyParsedFilterResult(GraphPathFilter.parsePathQuery(nextQuery));
     this.syncSearchComponentValue();
     this.refreshFilterMessage();
@@ -209,6 +216,8 @@ export class ReverySkyMapView extends ItemView {
     this.filterSuggestionsEl = null;
     this.filterPanelEl = null;
     this.filterToggleButtonEl = null;
+    this.tagsToggleButtonEl = null;
+    this.tagsToggleThumbEl = null;
     this.filterSuggestionMode = 0;
     emptyElement(this.contentEl as ObsidianHTMLElement);
   }
@@ -353,7 +362,7 @@ export class ReverySkyMapView extends ItemView {
       return;
     }
 
-    const outgoingPayload = this.applyActivePathFilter(this.sourceGraphPayload);
+    const outgoingPayload = this.applyActiveFilters(this.sourceGraphPayload);
     this.lastGraphPayload = outgoingPayload;
 
     if (!this.bridgeReady) {
@@ -368,8 +377,23 @@ export class ReverySkyMapView extends ItemView {
     this.refreshFilterSuggestions();
   }
 
-  private applyActivePathFilter(payload: GraphPayload): GraphPayload {
-    return GraphPathFilter.applyPathFilter(payload, this.activePathFilter);
+  private applyActiveFilters(payload: GraphPayload): GraphPayload {
+    const pathFiltered = GraphPathFilter.applyPathFilter(payload, this.activePathFilter);
+    return this.applyTagsVisibilityFilter(pathFiltered);
+  }
+
+  private applyTagsVisibilityFilter(payload: GraphPayload): GraphPayload {
+    if (this.showTags) {
+      return payload;
+    }
+
+    return {
+      ...payload,
+      notes: payload.notes.map((note) => ({
+        ...note,
+        tags: []
+      }))
+    };
   }
 
   private flushOrRefreshGraph(): void {
@@ -600,6 +624,63 @@ export class ReverySkyMapView extends ItemView {
         this.hideFilterSuggestions();
       }
     });
+
+    const tagsToggleRow = createChild(filterContainer as ObsidianHTMLElement, "div");
+    tagsToggleRow.className = "reverysky-map-tags-toggle-row";
+    tagsToggleRow.style.display = "flex";
+    tagsToggleRow.style.alignItems = "center";
+    tagsToggleRow.style.justifyContent = "space-between";
+    tagsToggleRow.style.padding = "2px 0 0";
+
+    const tagsLabel = createChild(tagsToggleRow as ObsidianHTMLElement, "div");
+    tagsLabel.textContent = "Tags";
+    tagsLabel.style.fontSize = "var(--font-ui-small, 14px)";
+    tagsLabel.style.lineHeight = "1.25";
+    tagsLabel.style.fontWeight = "400";
+    tagsLabel.style.color = "var(--text-normal)";
+    tagsLabel.style.letterSpacing = "0";
+
+    const tagsToggleButton = createChild(tagsToggleRow as ObsidianHTMLElement, "button");
+    tagsToggleButton.type = "button";
+    tagsToggleButton.className = "reverysky-map-tags-toggle";
+    tagsToggleButton.setAttribute("aria-label", "Toggle tags");
+    tagsToggleButton.style.width = "38px";
+    tagsToggleButton.style.height = "22px";
+    tagsToggleButton.style.borderRadius = "999px";
+    tagsToggleButton.style.border = "1px solid transparent";
+    tagsToggleButton.style.padding = "2px";
+    tagsToggleButton.style.cursor = "pointer";
+    tagsToggleButton.style.display = "flex";
+    tagsToggleButton.style.alignItems = "center";
+    tagsToggleButton.style.justifyContent = "flex-end";
+    tagsToggleButton.style.transition = "background-color 120ms ease";
+    tagsToggleButton.style.boxShadow = "none";
+    tagsToggleButton.style.setProperty("appearance", "none");
+    this.tagsToggleButtonEl = tagsToggleButton;
+
+    const tagsToggleThumb = createChild(tagsToggleButton as ObsidianHTMLElement, "span");
+    tagsToggleThumb.className = "reverysky-map-tags-toggle-thumb";
+    tagsToggleThumb.style.width = "16px";
+    tagsToggleThumb.style.height = "16px";
+    tagsToggleThumb.style.borderRadius = "999px";
+    tagsToggleThumb.style.background = "var(--text-on-accent, #ffffff)";
+    tagsToggleThumb.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.24)";
+    tagsToggleThumb.style.transition = "transform 120ms ease";
+    this.tagsToggleThumbEl = tagsToggleThumb;
+
+    const toggleTags = (event: Event) => {
+      event.preventDefault();
+      this.setShowTags(!this.showTags, { emit: true });
+    };
+    tagsToggleButton.addEventListener("mousedown", toggleTags);
+    tagsToggleButton.addEventListener("click", (event) => {
+      const mouseEvent = event as MouseEvent;
+      if (mouseEvent.detail !== 0) {
+        return;
+      }
+      toggleTags(event);
+    });
+    this.refreshTagsToggleUi();
 
     this.filterSuggestionsEl = createChild(filterContainer as ObsidianHTMLElement, "div");
     this.filterSuggestionsEl.className = "reverysky-map-filter-suggestions";
@@ -1194,6 +1275,31 @@ export class ReverySkyMapView extends ItemView {
     this.filterMessageEl.style.color = this.pathFilterParseValid
       ? "var(--text-muted)"
       : "var(--text-error)";
+  }
+
+  private setShowTags(showTags: boolean, options: { emit: boolean }): void {
+    this.showTags = showTags;
+    this.refreshTagsToggleUi();
+    if (!options.emit) {
+      return;
+    }
+    this.emitGraphFromSource();
+  }
+
+  private refreshTagsToggleUi(): void {
+    if (!this.tagsToggleButtonEl || !this.tagsToggleThumbEl) {
+      return;
+    }
+
+    this.tagsToggleButtonEl.setAttribute("role", "switch");
+    this.tagsToggleButtonEl.setAttribute("aria-checked", this.showTags ? "true" : "false");
+    this.tagsToggleButtonEl.style.background = this.showTags
+      ? "var(--interactive-accent)"
+      : "var(--background-modifier-border)";
+    this.tagsToggleButtonEl.style.justifyContent = this.showTags ? "flex-end" : "flex-start";
+    this.tagsToggleThumbEl.style.background = this.showTags
+      ? "var(--text-on-accent, #ffffff)"
+      : "var(--text-normal)";
   }
 
   private dispatchPreferredFocus(payload: GraphPayload): void {
