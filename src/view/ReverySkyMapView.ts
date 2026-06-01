@@ -1,19 +1,29 @@
-import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
+import { ItemView, Notice, SearchComponent, WorkspaceLeaf } from "obsidian";
 import type { App, CachedMetadata, TAbstractFile, TFile } from "obsidian";
 import type { GraphPayload, NoteFocusPayload, NoteOpenPayload } from "../bridge/BridgeTypes";
 import { UnityIframeBridge } from "../bridge/UnityIframeBridge";
 import { VaultGraphBuilder } from "../graph/VaultGraphBuilder";
+import {
+  GraphPathFilter,
+  type ParsedPathFilter,
+  type PathFilterParseResult
+} from "../graph/GraphPathFilter";
 import type ReverySkyMapPlugin from "../main";
 
 export const REVERYSKY_MAP_VIEW_TYPE = "reverysky-map-view";
 const GRAPH_REFRESH_DEBOUNCE_MS = 250;
 const GRAPH_RESOLVE_BARRIER_FALLBACK_MS = 700;
+const FILTER_INPUT_DEBOUNCE_MS = 250;
 
 type BridgePort = Pick<UnityIframeBridge, "attach" | "detach" | "sendGraphSet" | "sendNoteFocus">;
 type ObsidianHTMLElement = HTMLElement & {
   empty?: () => void;
   createEl?: <K extends keyof HTMLElementTagNameMap>(tagName: K) => HTMLElementTagNameMap[K];
   setAttr?: (name: string, value: string) => void;
+};
+
+type ReverySkyMapViewState = {
+  pathFilterQuery?: unknown;
 };
 
 export type ReverySkyMapViewDependencies = {
@@ -29,6 +39,7 @@ export class ReverySkyMapView extends ItemView {
   private readonly buildGraph: (app: App) => GraphPayload;
   private readonly notify: (message: string) => void;
   private readonly now: () => number;
+  private sourceGraphPayload: GraphPayload | null = null;
   private lastGraphPayload: GraphPayload | null = null;
   private pendingGraphPayload: GraphPayload | null = null;
   private pendingFocusPayload: NoteFocusPayload | null = null;
@@ -47,6 +58,13 @@ export class ReverySkyMapView extends ItemView {
   private refreshSubscriptionsRegistered = false;
   private refreshActive = false;
   private leafTrackingRegistered = false;
+  private pathFilterQuery = "";
+  private activePathFilter: ParsedPathFilter | null = null;
+  private pathFilterParseValid = true;
+  private pathFilterMessage = "";
+  private filterInputDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private filterMessageEl: HTMLElement | null = null;
+  private searchComponent: SearchComponent | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -68,6 +86,22 @@ export class ReverySkyMapView extends ItemView {
     return "ReverySky Map";
   }
 
+  getState(): Record<string, unknown> {
+    return {
+      pathFilterQuery: this.pathFilterQuery
+    };
+  }
+
+  async setState(state: unknown): Promise<void> {
+    const nextState = (state ?? {}) as ReverySkyMapViewState;
+    const nextQuery =
+      typeof nextState.pathFilterQuery === "string" ? nextState.pathFilterQuery : "";
+    this.pathFilterQuery = nextQuery;
+    this.applyParsedFilterResult(GraphPathFilter.parsePathQuery(nextQuery));
+    this.syncSearchComponentValue();
+    this.refreshFilterMessage();
+  }
+
   async onOpen(): Promise<void> {
     this.ensureLeafTracking();
     this.ensureRefreshSubscriptions();
@@ -84,6 +118,9 @@ export class ReverySkyMapView extends ItemView {
 
     const container = this.contentEl as ObsidianHTMLElement;
     emptyElement(container);
+    const iframeHost = this.renderViewLayout(container);
+    this.syncSearchComponentValue();
+    this.refreshFilterMessage();
 
     let iframeSrc: string;
     try {
@@ -93,7 +130,7 @@ export class ReverySkyMapView extends ItemView {
       return;
     }
 
-    const iframe = createChild(container, "iframe");
+    const iframe = createChild(iframeHost, "iframe");
     iframe.src = `${iframeSrc}?t=${this.now()}`;
     iframe.style.width = "100%";
     iframe.style.height = "100%";
@@ -130,7 +167,9 @@ export class ReverySkyMapView extends ItemView {
     this.refreshActive = false;
     this.clearRefreshTimer();
     this.clearResolveBarrierFallbackTimer();
+    this.clearFilterInputDebounceTimer();
     this.bridgeReady = false;
+    this.sourceGraphPayload = null;
     this.pendingGraphPayload = null;
     this.pendingFocusPayload = null;
     this.lastDispatchedFocusKey = "";
@@ -139,6 +178,8 @@ export class ReverySkyMapView extends ItemView {
     this.semanticRefreshPending = false;
     this.bridge.detach();
     this.lastGraphPayload = null;
+    this.searchComponent = null;
+    this.filterMessageEl = null;
     emptyElement(this.contentEl as ObsidianHTMLElement);
   }
 
@@ -260,17 +301,43 @@ export class ReverySkyMapView extends ItemView {
   }
 
   private refreshGraphNow(): void {
-    const payload = this.buildGraph(this.app);
-    this.lastGraphPayload = payload;
+    this.sourceGraphPayload = this.buildGraph(this.app);
+    this.emitGraphFromSource();
+  }
+
+  private scheduleFilterRefresh(): void {
+    if (!this.refreshActive) {
+      return;
+    }
+
+    this.clearFilterInputDebounceTimer();
+    this.filterInputDebounceTimer = setTimeout(() => {
+      this.filterInputDebounceTimer = null;
+      this.emitGraphFromSource();
+    }, FILTER_INPUT_DEBOUNCE_MS);
+  }
+
+  private emitGraphFromSource(): void {
+    if (!this.sourceGraphPayload) {
+      return;
+    }
+
+    const outgoingPayload = this.applyActivePathFilter(this.sourceGraphPayload);
+    this.lastGraphPayload = outgoingPayload;
+
     if (!this.bridgeReady) {
-      this.pendingGraphPayload = payload;
-      this.pendingFocusPayload = this.resolvePreferredFocusPayload(payload);
+      this.pendingGraphPayload = outgoingPayload;
+      this.pendingFocusPayload = this.resolvePreferredFocusPayload(outgoingPayload);
       return;
     }
 
     this.pendingGraphPayload = null;
-    this.bridge.sendGraphSet(payload);
-    this.dispatchPreferredFocus(payload);
+    this.bridge.sendGraphSet(outgoingPayload);
+    this.dispatchPreferredFocus(outgoingPayload);
+  }
+
+  private applyActivePathFilter(payload: GraphPayload): GraphPayload {
+    return GraphPathFilter.applyPathFilter(payload, this.activePathFilter);
   }
 
   private flushOrRefreshGraph(): void {
@@ -286,6 +353,11 @@ export class ReverySkyMapView extends ItemView {
       } else {
         this.dispatchPreferredFocus(payload);
       }
+      return;
+    }
+
+    if (this.sourceGraphPayload) {
+      this.emitGraphFromSource();
       return;
     }
 
@@ -308,6 +380,115 @@ export class ReverySkyMapView extends ItemView {
 
     clearTimeout(this.resolveBarrierFallbackTimer);
     this.resolveBarrierFallbackTimer = null;
+  }
+
+  private clearFilterInputDebounceTimer(): void {
+    if (!this.filterInputDebounceTimer) {
+      return;
+    }
+
+    clearTimeout(this.filterInputDebounceTimer);
+    this.filterInputDebounceTimer = null;
+  }
+
+  private renderViewLayout(container: ObsidianHTMLElement): ObsidianHTMLElement {
+    const root = createChild(container, "div") as ObsidianHTMLElement;
+    root.style.display = "flex";
+    root.style.flexDirection = "column";
+    root.style.height = "100%";
+    root.style.minHeight = "0";
+
+    const filterContainer = createChild(root, "div");
+    filterContainer.className = "reverysky-map-filter-panel";
+    filterContainer.style.padding = "8px 10px 10px";
+    filterContainer.style.borderBottom = "1px solid var(--background-modifier-border)";
+    filterContainer.style.display = "grid";
+    filterContainer.style.gap = "6px";
+
+    const filterTitle = createChild(filterContainer as ObsidianHTMLElement, "div");
+    filterTitle.textContent = "Filters";
+    filterTitle.style.fontSize = "12px";
+    filterTitle.style.fontWeight = "600";
+    filterTitle.style.opacity = "0.8";
+
+    const searchHost = createChild(filterContainer as ObsidianHTMLElement, "div");
+    this.searchComponent = new SearchComponent(searchHost);
+    this.searchComponent.setPlaceholder("Search files...");
+    this.searchComponent.onChange((value) => {
+      this.onPathFilterInputChanged(value);
+    });
+    this.searchComponent.inputEl.setAttribute("aria-label", "Search files filter");
+    this.searchComponent.inputEl.addEventListener("keydown", (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (this.searchComponent) {
+          this.searchComponent.setValue("");
+        }
+        this.onPathFilterInputChanged("");
+      }
+    });
+
+    this.filterMessageEl = createChild(filterContainer as ObsidianHTMLElement, "div");
+    this.filterMessageEl.className = "reverysky-map-filter-message";
+    this.filterMessageEl.style.fontSize = "12px";
+    this.filterMessageEl.style.opacity = "0.85";
+
+    const iframeHost = createChild(root, "div") as ObsidianHTMLElement;
+    iframeHost.style.flex = "1";
+    iframeHost.style.minHeight = "0";
+
+    return iframeHost;
+  }
+
+  private onPathFilterInputChanged(nextQuery: string): void {
+    this.pathFilterQuery = typeof nextQuery === "string" ? nextQuery : "";
+    const parseResult = GraphPathFilter.parsePathQuery(this.pathFilterQuery);
+    this.applyParsedFilterResult(parseResult);
+    this.refreshFilterMessage();
+
+    if (!parseResult.isValid) {
+      return;
+    }
+
+    this.scheduleFilterRefresh();
+  }
+
+  private applyParsedFilterResult(parseResult: PathFilterParseResult): void {
+    this.pathFilterParseValid = parseResult.isValid;
+
+    if (!parseResult.isValid) {
+      this.pathFilterMessage = parseResult.reason ?? "Invalid path query.";
+      return;
+    }
+
+    this.pathFilterMessage = parseResult.hasUnsupportedTokens
+      ? "Only path: terms are applied in this view."
+      : "";
+    this.activePathFilter = parseResult.hasPathTerms ? parseResult.parsed : null;
+  }
+
+  private syncSearchComponentValue(): void {
+    if (!this.searchComponent) {
+      return;
+    }
+
+    if (this.searchComponent.getValue() === this.pathFilterQuery) {
+      return;
+    }
+
+    this.searchComponent.setValue(this.pathFilterQuery);
+  }
+
+  private refreshFilterMessage(): void {
+    if (!this.filterMessageEl) {
+      return;
+    }
+
+    const hasCustomMessage = this.pathFilterMessage.trim().length > 0;
+    this.filterMessageEl.textContent = hasCustomMessage ? this.pathFilterMessage : "path: matches note path";
+    this.filterMessageEl.style.color = this.pathFilterParseValid
+      ? "var(--text-muted)"
+      : "var(--text-error)";
   }
 
   private dispatchPreferredFocus(payload: GraphPayload): void {
@@ -351,9 +532,7 @@ export class ReverySkyMapView extends ItemView {
     }
 
     if (!byPath) {
-      return {
-        path: normalizedPreferredPath
-      };
+      return null;
     }
 
     return {

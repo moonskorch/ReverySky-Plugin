@@ -386,15 +386,175 @@ var VaultGraphBuilder = class _VaultGraphBuilder {
   }
 };
 
+// src/graph/GraphPathFilter.ts
+var GraphPathFilter = class _GraphPathFilter {
+  static parsePathQuery(query) {
+    const rawQuery = typeof query === "string" ? query.trim() : "";
+    if (!rawQuery) {
+      return {
+        isValid: true,
+        parsed: null,
+        hasPathTerms: false,
+        hasUnsupportedTokens: false
+      };
+    }
+    const tokenized = _GraphPathFilter.tokenize(rawQuery);
+    if (!tokenized.ok) {
+      return {
+        isValid: false,
+        parsed: null,
+        hasPathTerms: false,
+        hasUnsupportedTokens: false,
+        reason: tokenized.reason
+      };
+    }
+    const includeTerms = [];
+    const excludeTerms = [];
+    const unsupportedTokens = [];
+    for (const token of tokenized.tokens) {
+      const trimmed = token.trim();
+      if (!trimmed) {
+        continue;
+      }
+      const isNegated = trimmed.startsWith("-");
+      const body = isNegated ? trimmed.slice(1) : trimmed;
+      if (!body.toLowerCase().startsWith("path:")) {
+        unsupportedTokens.push(trimmed);
+        continue;
+      }
+      const rawTerm = body.slice("path:".length).trim();
+      if (!rawTerm) {
+        return {
+          isValid: false,
+          parsed: null,
+          hasPathTerms: false,
+          hasUnsupportedTokens: unsupportedTokens.length > 0,
+          reason: "Empty path operator value."
+        };
+      }
+      const normalizedTerm = _GraphPathFilter.normalizeMatchValue(rawTerm);
+      if (!normalizedTerm) {
+        return {
+          isValid: false,
+          parsed: null,
+          hasPathTerms: false,
+          hasUnsupportedTokens: unsupportedTokens.length > 0,
+          reason: "Empty path operator value."
+        };
+      }
+      if (isNegated) {
+        excludeTerms.push(normalizedTerm);
+      } else {
+        includeTerms.push(normalizedTerm);
+      }
+    }
+    const hasPathTerms = includeTerms.length > 0 || excludeTerms.length > 0;
+    return {
+      isValid: true,
+      parsed: hasPathTerms ? {
+        includeTerms,
+        excludeTerms,
+        unsupportedTokens
+      } : null,
+      hasPathTerms,
+      hasUnsupportedTokens: unsupportedTokens.length > 0
+    };
+  }
+  static applyPathFilter(payload, parsed) {
+    if (!parsed || !parsed.includeTerms.length && !parsed.excludeTerms.length) {
+      return payload;
+    }
+    const notes = payload.notes.filter((note) => _GraphPathFilter.matchesNote(note, parsed));
+    const keepIds = new Set(notes.map((note) => note.id));
+    const links = payload.links.filter(
+      (link) => keepIds.has(link.sourceId) && keepIds.has(link.targetId)
+    );
+    return {
+      ...payload,
+      vault: {
+        ...payload.vault,
+        noteCount: notes.length
+      },
+      notes,
+      links
+    };
+  }
+  static matchesNote(note, parsed) {
+    const normalizedPath = _GraphPathFilter.normalizeMatchValue(note.path);
+    for (const exclude of parsed.excludeTerms) {
+      if (normalizedPath.includes(exclude)) {
+        return false;
+      }
+    }
+    for (const include of parsed.includeTerms) {
+      if (!normalizedPath.includes(include)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  static normalizeMatchValue(value) {
+    return value.trim().replace(/\\/g, "/").toLowerCase();
+  }
+  static tokenize(query) {
+    const tokens = [];
+    let current = "";
+    let inQuote = false;
+    let escaped = false;
+    for (let i = 0; i < query.length; i++) {
+      const ch = query[i];
+      if (escaped) {
+        current += ch;
+        escaped = false;
+        continue;
+      }
+      if (inQuote && ch === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (ch === '"') {
+        inQuote = !inQuote;
+        continue;
+      }
+      if (!inQuote && /\s/.test(ch)) {
+        if (current.length > 0) {
+          tokens.push(current);
+          current = "";
+        }
+        continue;
+      }
+      current += ch;
+    }
+    if (escaped) {
+      current += "\\";
+    }
+    if (inQuote) {
+      return {
+        ok: false,
+        reason: "Unclosed quote in query."
+      };
+    }
+    if (current.length > 0) {
+      tokens.push(current);
+    }
+    return {
+      ok: true,
+      tokens
+    };
+  }
+};
+
 // src/view/ReverySkyMapView.ts
 var REVERYSKY_MAP_VIEW_TYPE = "reverysky-map-view";
 var GRAPH_REFRESH_DEBOUNCE_MS = 250;
 var GRAPH_RESOLVE_BARRIER_FALLBACK_MS = 700;
+var FILTER_INPUT_DEBOUNCE_MS = 250;
 var ReverySkyMapView = class extends import_obsidian.ItemView {
   constructor(leaf, plugin, deps = {}) {
     super(leaf);
     this.plugin = plugin;
     this.navigation = false;
+    this.sourceGraphPayload = null;
     this.lastGraphPayload = null;
     this.pendingGraphPayload = null;
     this.pendingFocusPayload = null;
@@ -413,6 +573,13 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     this.refreshSubscriptionsRegistered = false;
     this.refreshActive = false;
     this.leafTrackingRegistered = false;
+    this.pathFilterQuery = "";
+    this.activePathFilter = null;
+    this.pathFilterParseValid = true;
+    this.pathFilterMessage = "";
+    this.filterInputDebounceTimer = null;
+    this.filterMessageEl = null;
+    this.searchComponent = null;
     this.bridge = deps.createBridge?.() ?? new UnityIframeBridge();
     this.buildGraph = deps.buildGraph ?? VaultGraphBuilder.build;
     this.notify = deps.notify ?? ((message) => new import_obsidian.Notice(message));
@@ -423,6 +590,19 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
   }
   getDisplayText() {
     return "ReverySky Map";
+  }
+  getState() {
+    return {
+      pathFilterQuery: this.pathFilterQuery
+    };
+  }
+  async setState(state) {
+    const nextState = state ?? {};
+    const nextQuery = typeof nextState.pathFilterQuery === "string" ? nextState.pathFilterQuery : "";
+    this.pathFilterQuery = nextQuery;
+    this.applyParsedFilterResult(GraphPathFilter.parsePathQuery(nextQuery));
+    this.syncSearchComponentValue();
+    this.refreshFilterMessage();
   }
   async onOpen() {
     this.ensureLeafTracking();
@@ -439,6 +619,9 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     this.clearResolveBarrierFallbackTimer();
     const container = this.contentEl;
     emptyElement(container);
+    const iframeHost = this.renderViewLayout(container);
+    this.syncSearchComponentValue();
+    this.refreshFilterMessage();
     let iframeSrc;
     try {
       iframeSrc = await this.plugin.getUnityRuntimeUrl();
@@ -446,7 +629,7 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
       this.notify(`Failed to start Unity runtime server: ${String(error)}`);
       return;
     }
-    const iframe = createChild(container, "iframe");
+    const iframe = createChild(iframeHost, "iframe");
     iframe.src = `${iframeSrc}?t=${this.now()}`;
     iframe.style.width = "100%";
     iframe.style.height = "100%";
@@ -480,7 +663,9 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     this.refreshActive = false;
     this.clearRefreshTimer();
     this.clearResolveBarrierFallbackTimer();
+    this.clearFilterInputDebounceTimer();
     this.bridgeReady = false;
+    this.sourceGraphPayload = null;
     this.pendingGraphPayload = null;
     this.pendingFocusPayload = null;
     this.lastDispatchedFocusKey = "";
@@ -489,6 +674,8 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     this.semanticRefreshPending = false;
     this.bridge.detach();
     this.lastGraphPayload = null;
+    this.searchComponent = null;
+    this.filterMessageEl = null;
     emptyElement(this.contentEl);
   }
   ensureRefreshSubscriptions() {
@@ -594,16 +781,36 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     }, GRAPH_REFRESH_DEBOUNCE_MS);
   }
   refreshGraphNow() {
-    const payload = this.buildGraph(this.app);
-    this.lastGraphPayload = payload;
+    this.sourceGraphPayload = this.buildGraph(this.app);
+    this.emitGraphFromSource();
+  }
+  scheduleFilterRefresh() {
+    if (!this.refreshActive) {
+      return;
+    }
+    this.clearFilterInputDebounceTimer();
+    this.filterInputDebounceTimer = setTimeout(() => {
+      this.filterInputDebounceTimer = null;
+      this.emitGraphFromSource();
+    }, FILTER_INPUT_DEBOUNCE_MS);
+  }
+  emitGraphFromSource() {
+    if (!this.sourceGraphPayload) {
+      return;
+    }
+    const outgoingPayload = this.applyActivePathFilter(this.sourceGraphPayload);
+    this.lastGraphPayload = outgoingPayload;
     if (!this.bridgeReady) {
-      this.pendingGraphPayload = payload;
-      this.pendingFocusPayload = this.resolvePreferredFocusPayload(payload);
+      this.pendingGraphPayload = outgoingPayload;
+      this.pendingFocusPayload = this.resolvePreferredFocusPayload(outgoingPayload);
       return;
     }
     this.pendingGraphPayload = null;
-    this.bridge.sendGraphSet(payload);
-    this.dispatchPreferredFocus(payload);
+    this.bridge.sendGraphSet(outgoingPayload);
+    this.dispatchPreferredFocus(outgoingPayload);
+  }
+  applyActivePathFilter(payload) {
+    return GraphPathFilter.applyPathFilter(payload, this.activePathFilter);
   }
   flushOrRefreshGraph() {
     if (this.pendingGraphPayload) {
@@ -618,6 +825,10 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
       } else {
         this.dispatchPreferredFocus(payload);
       }
+      return;
+    }
+    if (this.sourceGraphPayload) {
+      this.emitGraphFromSource();
       return;
     }
     this.refreshGraphNow();
@@ -635,6 +846,91 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     }
     clearTimeout(this.resolveBarrierFallbackTimer);
     this.resolveBarrierFallbackTimer = null;
+  }
+  clearFilterInputDebounceTimer() {
+    if (!this.filterInputDebounceTimer) {
+      return;
+    }
+    clearTimeout(this.filterInputDebounceTimer);
+    this.filterInputDebounceTimer = null;
+  }
+  renderViewLayout(container) {
+    const root = createChild(container, "div");
+    root.style.display = "flex";
+    root.style.flexDirection = "column";
+    root.style.height = "100%";
+    root.style.minHeight = "0";
+    const filterContainer = createChild(root, "div");
+    filterContainer.className = "reverysky-map-filter-panel";
+    filterContainer.style.padding = "8px 10px 10px";
+    filterContainer.style.borderBottom = "1px solid var(--background-modifier-border)";
+    filterContainer.style.display = "grid";
+    filterContainer.style.gap = "6px";
+    const filterTitle = createChild(filterContainer, "div");
+    filterTitle.textContent = "Filters";
+    filterTitle.style.fontSize = "12px";
+    filterTitle.style.fontWeight = "600";
+    filterTitle.style.opacity = "0.8";
+    const searchHost = createChild(filterContainer, "div");
+    this.searchComponent = new import_obsidian.SearchComponent(searchHost);
+    this.searchComponent.setPlaceholder("Search files...");
+    this.searchComponent.onChange((value) => {
+      this.onPathFilterInputChanged(value);
+    });
+    this.searchComponent.inputEl.setAttribute("aria-label", "Search files filter");
+    this.searchComponent.inputEl.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (this.searchComponent) {
+          this.searchComponent.setValue("");
+        }
+        this.onPathFilterInputChanged("");
+      }
+    });
+    this.filterMessageEl = createChild(filterContainer, "div");
+    this.filterMessageEl.className = "reverysky-map-filter-message";
+    this.filterMessageEl.style.fontSize = "12px";
+    this.filterMessageEl.style.opacity = "0.85";
+    const iframeHost = createChild(root, "div");
+    iframeHost.style.flex = "1";
+    iframeHost.style.minHeight = "0";
+    return iframeHost;
+  }
+  onPathFilterInputChanged(nextQuery) {
+    this.pathFilterQuery = typeof nextQuery === "string" ? nextQuery : "";
+    const parseResult = GraphPathFilter.parsePathQuery(this.pathFilterQuery);
+    this.applyParsedFilterResult(parseResult);
+    this.refreshFilterMessage();
+    if (!parseResult.isValid) {
+      return;
+    }
+    this.scheduleFilterRefresh();
+  }
+  applyParsedFilterResult(parseResult) {
+    this.pathFilterParseValid = parseResult.isValid;
+    if (!parseResult.isValid) {
+      this.pathFilterMessage = parseResult.reason ?? "Invalid path query.";
+      return;
+    }
+    this.pathFilterMessage = parseResult.hasUnsupportedTokens ? "Only path: terms are applied in this view." : "";
+    this.activePathFilter = parseResult.hasPathTerms ? parseResult.parsed : null;
+  }
+  syncSearchComponentValue() {
+    if (!this.searchComponent) {
+      return;
+    }
+    if (this.searchComponent.getValue() === this.pathFilterQuery) {
+      return;
+    }
+    this.searchComponent.setValue(this.pathFilterQuery);
+  }
+  refreshFilterMessage() {
+    if (!this.filterMessageEl) {
+      return;
+    }
+    const hasCustomMessage = this.pathFilterMessage.trim().length > 0;
+    this.filterMessageEl.textContent = hasCustomMessage ? this.pathFilterMessage : "path: matches note path";
+    this.filterMessageEl.style.color = this.pathFilterParseValid ? "var(--text-muted)" : "var(--text-error)";
   }
   dispatchPreferredFocus(payload) {
     if (!this.bridgeReady) {
@@ -668,9 +964,7 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
       }
     }
     if (!byPath) {
-      return {
-        path: normalizedPreferredPath
-      };
+      return null;
     }
     return {
       id: byPath.id,

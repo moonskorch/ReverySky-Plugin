@@ -29,6 +29,41 @@ function makePayload(): GraphPayload {
   };
 }
 
+function makePathPayload(): GraphPayload {
+  return {
+    graphVersion: "0.0.1",
+    generatedAt: "2026-01-01T00:00:00.000Z",
+    vault: { noteCount: 3 },
+    notes: [
+      {
+        id: "daily",
+        path: "Notes/Daily/2026-01-01.md",
+        title: "Daily",
+        tags: [],
+        size: 20
+      },
+      {
+        id: "project",
+        path: "Projects/ReverySky/Spec.md",
+        title: "Spec",
+        tags: [],
+        size: 21
+      },
+      {
+        id: "archive",
+        path: "Archive/Old.md",
+        title: "Old",
+        tags: [],
+        size: 22
+      }
+    ],
+    links: [
+      { sourceId: "daily", targetId: "project", kind: "resolved" },
+      { sourceId: "project", targetId: "archive", kind: "resolved" }
+    ]
+  };
+}
+
 describe("ReverySkyMapView bridge integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -958,6 +993,207 @@ describe("ReverySkyMapView bridge integration", () => {
       id: "new_id",
       path: "Folder/New.md"
     });
+  });
+
+  it("filters graph:set by path query without rebuilding source graph", async () => {
+    vi.useFakeTimers();
+
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePathPayload();
+    const buildGraph = vi.fn().mockReturnValue(payload);
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: buildGraph as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+    const initialPayload = bridge.sendGraphSet.mock.calls[0]?.[0] as GraphPayload;
+    expect(initialPayload.vault.noteCount).toBe(3);
+
+    const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
+    searchInput.value = "path:daily";
+    searchInput.dispatchEvent(new Event("input"));
+    vi.advanceTimersByTime(250);
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+    const filteredPayload = bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload;
+    expect(filteredPayload.vault.noteCount).toBe(1);
+    expect(filteredPayload.notes.map((note) => note.id)).toEqual(["daily"]);
+  });
+
+  it("does not emit broken payload when path query is invalid", async () => {
+    vi.useFakeTimers();
+
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePathPayload();
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+
+    const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
+    searchInput.value = "path:\"daily";
+    searchInput.dispatchEvent(new Event("input"));
+    vi.advanceTimersByTime(250);
+
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores path filter query from view state", async () => {
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePathPayload();
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.setState({
+      pathFilterQuery: "path:archive"
+    });
+    expect(view.getState()).toMatchObject({
+      pathFilterQuery: "path:archive"
+    });
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+    const outgoingPayload = bridge.sendGraphSet.mock.calls[0]?.[0] as GraphPayload;
+    expect(outgoingPayload.notes.map((note) => note.id)).toEqual(["archive"]);
+    const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
+    expect(searchInput.value).toBe("path:archive");
   });
 
   it("registers refresh subscriptions only once across reopen cycles", async () => {
