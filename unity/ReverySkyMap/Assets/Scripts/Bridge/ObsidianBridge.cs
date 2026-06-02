@@ -75,6 +75,8 @@ public class ObsidianBridge : MonoBehaviour
       return;
     }
 
+    MapRuntimeContext.FilterEngine = ParseEnginePreference(envelope.payload.enginePreference);
+
     var notes = envelope.payload.notes ?? Array.Empty<GraphNote>();
     var links = envelope.payload.links ?? Array.Empty<GraphLink>();
 
@@ -212,6 +214,17 @@ public class ObsidianBridge : MonoBehaviour
     return TryParseIso(value, out var dt) ? dt : DateTime.MinValue;
   }
 
+  private static CartographerEngine ParseEnginePreference(string value)
+  {
+    if (string.Equals(value, "forces", StringComparison.OrdinalIgnoreCase))
+      return CartographerEngine.Forces;
+
+    if (string.Equals(value, "static25d", StringComparison.OrdinalIgnoreCase))
+      return CartographerEngine.Static25D;
+
+    return CartographerEngine.Auto;
+  }
+
   private static bool TryParseIso(string value, out DateTime dt)
   {
     dt = DateTime.MinValue;
@@ -253,6 +266,7 @@ public class ObsidianBridge : MonoBehaviour
   {
     public GraphNote[] notes;
     public GraphLink[] links;
+    public string enginePreference;
   }
 
   [Serializable]

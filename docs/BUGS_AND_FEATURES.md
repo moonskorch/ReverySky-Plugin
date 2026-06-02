@@ -24,12 +24,7 @@ Purpose:
    - Expected: `Star` data fields are consistently populated from the intended runtime bridge source.
    - Current state: data origin/mapping path for `Star` fields (with focus on `Id`) must be validated.
 
-5. Unity bridge contract drift: `graph:set` envelope version/type are not validated during ingestion.
-   - Expected: runtime rejects envelope when `protocolVersion` mismatches or `type` is not `graph:set`, according to documented contract.
-   - Current state: runtime maps payload without enforcing envelope-level `protocolVersion`/`type` checks, so mismatched envelope metadata can be accepted.
-   - Follow-up direction: align Unity ingestion validation with `docs/DATA_CONTRACT.md` and `unity/ReverySkyMap/docs/DATA_CONTRACT.md`.
-
-6. Repository baseline docs are incomplete (`README` and `LICENSE` are missing).
+5. Repository baseline docs are incomplete (`README` and `LICENSE` are missing).
    - Expected: public repository has minimal onboarding and licensing files at root.
    - Current state: initial commit preparation still needs `README` and `LICENSE`.
 
@@ -45,3 +40,8 @@ Purpose:
 3. Determine crystal type and sphere material from user-selected properties (instead of static/random mapping). Or it could be some general properties: for example, number of links (direct + reversal) to color (from 0 as black to max limit as eternal).
    - Expected: visual mapping is configured by user-defined property bindings.
    - Current state: temporary behavior uses static/random fallback and needs replacement.
+
+4. Optimize engine-only switching across the bridge.
+   - Expected: changing only the preferred engine should not require resending the full `graph:set` payload with all notes and links.
+   - Current state: plugin-side engine filter updates reuse cached source graph, but still redispatch the entire effective graph payload when only `enginePreference` changes.
+   - Follow-up direction: consider a lightweight bridge message such as `engine:set` (or similar) so engine-only changes can trigger runtime rebuild without retransmitting the full graph payload.

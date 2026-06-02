@@ -22,6 +22,16 @@ Before starting a new substantial work block:
 When executing a numbered MVP step, use the step text as the source of scope.
 Do not expand the task beyond that step unless the plan is updated first.
 
+## Self-contained implementation and cross-layer changes
+
+Do not present a partial implementation as a completed feature.
+
+Before editing, identify whether the requested behavior crosses a boundary between subsystems, such as plugin ↔ Unity, runtime ↔ serialized scene state, or code ↔ documented contract.
+
+If a required change conflicts with an owner instruction or appears to be intentionally deferred, stop before editing and ask for clarification. Do not silently choose a narrower interpretation that leaves the requested behavior incomplete.
+
+A preparatory patch is allowed only when the owner explicitly approves it as a separate stage. In that case, report clearly that the user-facing behavior is not yet implemented end-to-end.
+
 ## Task modes
 
 Before starting a task, choose the safest execution mode.
@@ -48,6 +58,12 @@ Before implementation, write a short task contract that answers six questions:
 
 Keep it compact (typically 6-10 lines).  
 For tiny low-risk edits, a one-paragraph compact contract is acceptable if all six fields are still explicit.
+
+### UI styling
+
+For UI styling changes, reuse existing project patterns and native controls where practical.
+Do not add custom icons, inline SVG data URIs, or decorative behavior unless required by the task or already established in the codebase.
+Call out any non-obvious styling technique in the final report.
 
 ## 1. Define the task
 

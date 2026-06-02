@@ -36,15 +36,18 @@ describe("UnityIframeBridge", () => {
     const bridge = new UnityIframeBridge();
     const postMessage = vi.fn();
     const iframeWindow = { postMessage } as unknown as Window;
+    const payload = makeValidPayload();
+    payload.enginePreference = "forces";
 
     bridge.attach(iframeWindow, {});
-    bridge.sendGraphSet(makeValidPayload());
+    bridge.sendGraphSet(payload);
 
     expect(postMessage).toHaveBeenCalledTimes(1);
     const [message, targetOrigin] = postMessage.mock.calls[0] as [Record<string, unknown>, string];
     expect(targetOrigin).toBe("*");
     expect(message.type).toBe("graph:set");
     expect(message.protocolVersion).toBe(BRIDGE_PROTOCOL_VERSION);
+    expect((message.payload as GraphPayload).enginePreference).toBe("forces");
     bridge.detach();
   });
 

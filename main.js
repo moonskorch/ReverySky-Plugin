@@ -93,6 +93,9 @@ var MessageValidator = class {
     if (Array.isArray(payload.notes) && payload.vault && payload.notes.length !== payload.vault.noteCount) {
       errors.push("payload.vault.noteCount must equal payload.notes.length");
     }
+    if (payload.enginePreference !== void 0 && !this.isGraphEnginePreference(payload.enginePreference)) {
+      errors.push("payload.enginePreference must be one of: auto, forces, static25d");
+    }
     return errors;
   }
   static validateIncomingReadyMessage(data) {
@@ -142,6 +145,9 @@ var MessageValidator = class {
       return false;
     }
     return !Number.isNaN(new Date(value).getTime());
+  }
+  static isGraphEnginePreference(value) {
+    return value === "auto" || value === "forces" || value === "static25d";
   }
 };
 
@@ -774,6 +780,21 @@ var FILTER_INPUT_DEBOUNCE_MS = 250;
 var FILTER_SUGGESTIONS_HIDE_DELAY_MS = 120;
 var MAX_FOLDER_SUGGESTIONS = 80;
 var MAX_TAG_SUGGESTIONS = 200;
+var DEFAULT_ENGINE_PREFERENCE = "auto";
+var ENGINE_PREFERENCE_OPTIONS = [
+  {
+    value: "auto",
+    label: "Auto"
+  },
+  {
+    value: "forces",
+    label: "Map of links (<200 notes)"
+  },
+  {
+    value: "static25d",
+    label: "Map of dates"
+  }
+];
 var ReverySkyMapView = class extends import_obsidian.ItemView {
   constructor(leaf, plugin, deps = {}) {
     super(leaf);
@@ -800,6 +821,7 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     this.leafTrackingRegistered = false;
     this.pathFilterQuery = "";
     this.showTags = true;
+    this.enginePreference = DEFAULT_ENGINE_PREFERENCE;
     this.activePathFilter = null;
     this.pathFilterParseValid = true;
     this.pathFilterMessage = "";
@@ -810,6 +832,7 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     this.filterPanelEl = null;
     this.filterToggleButtonEl = null;
     this.tagsToggleButtonEl = null;
+    this.engineDropdownEl = null;
     this.filterSuggestionMode = 0;
     this.folderPathSuggestions = [];
     this.tagSuggestions = [];
@@ -829,15 +852,18 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
   getState() {
     return {
       pathFilterQuery: this.pathFilterQuery,
-      showTags: this.showTags
+      showTags: this.showTags,
+      enginePreference: this.enginePreference
     };
   }
   async setState(state) {
     const nextState = state ?? {};
     const nextQuery = typeof nextState.pathFilterQuery === "string" ? nextState.pathFilterQuery : "";
     const nextShowTags = typeof nextState.showTags === "boolean" ? nextState.showTags : true;
+    const nextEnginePreference = this.normalizeEnginePreference(nextState.enginePreference);
     this.pathFilterQuery = nextQuery;
     this.setShowTags(nextShowTags, { emit: false });
+    this.setEnginePreference(nextEnginePreference, { emit: false });
     this.applyParsedFilterResult(GraphPathFilter.parsePathQuery(nextQuery));
     this.syncSearchComponentValue();
     this.refreshFilterMessage();
@@ -921,6 +947,7 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     this.filterPanelEl = null;
     this.filterToggleButtonEl = null;
     this.tagsToggleButtonEl = null;
+    this.engineDropdownEl = null;
     this.filterSuggestionMode = 0;
     emptyElement(this.contentEl);
   }
@@ -1060,7 +1087,11 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
   }
   applyActiveFilters(payload) {
     const pathFiltered = GraphPathFilter.applyPathFilter(payload, this.activePathFilter);
-    return this.applyTagsVisibilityFilter(pathFiltered);
+    const tagsFiltered = this.applyTagsVisibilityFilter(pathFiltered);
+    return {
+      ...tagsFiltered,
+      enginePreference: this.enginePreference
+    };
   }
   applyTagsVisibilityFilter(payload) {
     if (this.showTags) {
@@ -1159,12 +1190,14 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     const filterContainer = createChild(root, "div");
     filterContainer.className = "reverysky-map-filter-panel";
     this.filterPanelEl = filterContainer;
-    const panelHeader = createChild(filterContainer, "div");
-    panelHeader.className = "reverysky-map-filter-header";
-    const filterTitle = createChild(panelHeader, "div");
-    filterTitle.className = "reverysky-map-filter-title";
-    filterTitle.textContent = "Filters";
-    const panelCloseButton = createChild(panelHeader, "button");
+    const filterSection = createChild(filterContainer, "div");
+    filterSection.className = "reverysky-map-filter-section";
+    const filterSectionHeader = createChild(filterSection, "div");
+    filterSectionHeader.className = "reverysky-map-filter-header";
+    const filterSectionTitle = createChild(filterSectionHeader, "div");
+    filterSectionTitle.className = "reverysky-map-filter-title";
+    filterSectionTitle.textContent = "Settings";
+    const panelCloseButton = createChild(filterSectionHeader, "button");
     panelCloseButton.type = "button";
     panelCloseButton.className = "reverysky-map-filter-close";
     panelCloseButton.setAttribute("aria-label", "Close filters");
@@ -1179,7 +1212,12 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     panelCloseButton.addEventListener("click", (event) => {
       closeFilterPanel(event);
     });
-    const searchHost = createChild(filterContainer, "div");
+    const filterSearchArea = createChild(filterSection, "div");
+    filterSearchArea.className = "reverysky-map-filter-search-area";
+    const filterSearchLabel = createChild(filterSearchArea, "div");
+    filterSearchLabel.className = "reverysky-map-filter-field-label";
+    filterSearchLabel.textContent = "Filter";
+    const searchHost = createChild(filterSearchArea, "div");
     this.searchComponent = new import_obsidian.SearchComponent(searchHost);
     this.searchComponent.setPlaceholder("Search in...");
     this.searchComponent.onChange((value) => {
@@ -1205,10 +1243,15 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
         this.hideFilterSuggestions();
       }
     });
-    const tagsToggleRow = createChild(filterContainer, "div");
+    this.filterSuggestionsEl = createChild(filterSearchArea, "div");
+    this.filterSuggestionsEl.className = "reverysky-map-filter-suggestions";
+    this.filterSuggestionsEl.style.display = "none";
+    this.filterMessageEl = createChild(filterSection, "div");
+    this.filterMessageEl.className = "reverysky-map-filter-message";
+    const tagsToggleRow = createChild(filterSection, "div");
     tagsToggleRow.className = "reverysky-map-tags-toggle-row";
     const tagsLabel = createChild(tagsToggleRow, "div");
-    tagsLabel.className = "reverysky-map-tags-label";
+    tagsLabel.className = "reverysky-map-filter-field-label";
     tagsLabel.textContent = "Tags";
     const tagsToggleButton = createChild(tagsToggleRow, "button");
     tagsToggleButton.type = "button";
@@ -1230,11 +1273,26 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
       toggleTags(event);
     });
     this.refreshTagsToggleUi();
-    this.filterSuggestionsEl = createChild(filterContainer, "div");
-    this.filterSuggestionsEl.className = "reverysky-map-filter-suggestions";
-    this.filterSuggestionsEl.style.display = "none";
-    this.filterMessageEl = createChild(filterContainer, "div");
-    this.filterMessageEl.className = "reverysky-map-filter-message";
+    const engineSection = createChild(filterContainer, "div");
+    engineSection.className = "reverysky-map-filter-section reverysky-map-filter-control-group";
+    const engineSectionTitle = createChild(engineSection, "div");
+    engineSectionTitle.className = "reverysky-map-filter-field-label";
+    engineSectionTitle.textContent = "Engine";
+    const engineSelectHost = createChild(engineSection, "div");
+    engineSelectHost.className = "reverysky-map-engine-select-host";
+    const engineDropdown = createChild(engineSelectHost, "select");
+    this.engineDropdownEl = engineDropdown;
+    for (const option of ENGINE_PREFERENCE_OPTIONS) {
+      const optionEl = createChild(engineDropdown, "option");
+      optionEl.value = option.value;
+      optionEl.textContent = option.label;
+    }
+    engineDropdown.classList.add("reverysky-map-engine-select");
+    engineDropdown.setAttribute("aria-label", "Select engine");
+    engineDropdown.addEventListener("change", () => {
+      this.setEnginePreference(this.normalizeEnginePreference(engineDropdown.value), { emit: true });
+    });
+    this.refreshEngineDropdownUi();
     this.setFilterPanelOpen(false);
     return iframeHost;
   }
@@ -1773,12 +1831,32 @@ var ReverySkyMapView = class extends import_obsidian.ItemView {
     }
     this.emitGraphFromSource();
   }
+  setEnginePreference(enginePreference, options) {
+    this.enginePreference = enginePreference;
+    this.refreshEngineDropdownUi();
+    if (!options.emit) {
+      return;
+    }
+    this.emitGraphFromSource();
+  }
   refreshTagsToggleUi() {
     if (!this.tagsToggleButtonEl) {
       return;
     }
     this.tagsToggleButtonEl.setAttribute("role", "switch");
     this.tagsToggleButtonEl.setAttribute("aria-checked", this.showTags ? "true" : "false");
+  }
+  refreshEngineDropdownUi() {
+    if (!this.engineDropdownEl) {
+      return;
+    }
+    if (this.engineDropdownEl.value === this.enginePreference) {
+      return;
+    }
+    this.engineDropdownEl.value = this.enginePreference;
+  }
+  normalizeEnginePreference(value) {
+    return value === "forces" || value === "static25d" || value === "auto" ? value : DEFAULT_ENGINE_PREFERENCE;
   }
   dispatchPreferredFocus(payload) {
     if (!this.bridgeReady) {

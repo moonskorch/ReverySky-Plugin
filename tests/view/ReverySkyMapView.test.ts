@@ -25,7 +25,8 @@ function makePayload(): GraphPayload {
         size: 64
       }
     ],
-    links: []
+    links: [],
+    enginePreference: "auto"
   };
 }
 
@@ -60,7 +61,8 @@ function makePathPayload(): GraphPayload {
     links: [
       { sourceId: "daily", targetId: "project", kind: "resolved" },
       { sourceId: "project", targetId: "archive", kind: "resolved" }
-    ]
+    ],
+    enginePreference: "auto"
   };
 }
 
@@ -1169,6 +1171,86 @@ describe("ReverySkyMapView bridge integration", () => {
       ["archive"]
     ]);
     expect(tagsToggle.getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("updates engine preference in outgoing graph payload without rebuilding source graph", async () => {
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePathPayload();
+    const buildGraph = vi.fn().mockReturnValue(payload);
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: buildGraph as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+    const initialPayload = bridge.sendGraphSet.mock.calls[0]?.[0] as GraphPayload;
+    expect(initialPayload.enginePreference).toBe("auto");
+
+    const engineSelect = view.contentEl.querySelector(
+      ".reverysky-map-engine-select"
+    ) as HTMLSelectElement;
+    expect(engineSelect.value).toBe("auto");
+
+    engineSelect.value = "forces";
+    engineSelect.dispatchEvent(new Event("change"));
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+    const linksPayload = bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload;
+    expect(linksPayload.enginePreference).toBe("forces");
+    expect(engineSelect.value).toBe("forces");
+
+    engineSelect.value = "static25d";
+    engineSelect.dispatchEvent(new Event("change"));
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(3);
+    const datesPayload = bridge.sendGraphSet.mock.calls[2]?.[0] as GraphPayload;
+    expect(datesPayload.enginePreference).toBe("static25d");
+    expect(engineSelect.value).toBe("static25d");
   });
 
   it("opens filter panel by gear button and closes it by close button", async () => {
@@ -2550,6 +2632,74 @@ describe("ReverySkyMapView bridge integration", () => {
     expect(outgoingPayload.notes.map((note) => note.id)).toEqual(["archive"]);
     const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
     expect(searchInput.value).toBe("path:archive");
+  });
+
+  it("restores engine preference from view state", async () => {
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePathPayload();
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.setState({
+      enginePreference: "static25d"
+    });
+    expect(view.getState()).toMatchObject({
+      enginePreference: "static25d"
+    });
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+    const outgoingPayload = bridge.sendGraphSet.mock.calls[0]?.[0] as GraphPayload;
+    expect(outgoingPayload.enginePreference).toBe("static25d");
+    const engineSelect = view.contentEl.querySelector(
+      ".reverysky-map-engine-select"
+    ) as HTMLSelectElement;
+    expect(engineSelect.value).toBe("static25d");
   });
 
   it("restores tag filter query from view state", async () => {

@@ -1,5 +1,6 @@
 import {
   BRIDGE_PROTOCOL_VERSION,
+  type GraphEnginePreference,
   GraphPayload,
   IncomingBridgeMessage,
   NoteOpenMessage
@@ -66,6 +67,13 @@ export class MessageValidator {
       errors.push("payload.vault.noteCount must equal payload.notes.length");
     }
 
+    if (
+      payload.enginePreference !== undefined &&
+      !this.isGraphEnginePreference(payload.enginePreference)
+    ) {
+      errors.push("payload.enginePreference must be one of: auto, forces, static25d");
+    }
+
     return errors;
   }
 
@@ -129,5 +137,9 @@ export class MessageValidator {
       return false;
     }
     return !Number.isNaN(new Date(value).getTime());
+  }
+
+  private static isGraphEnginePreference(value: unknown): value is GraphEnginePreference {
+    return value === "auto" || value === "forces" || value === "static25d";
   }
 }

@@ -38,7 +38,10 @@ type GraphPayload = {
   };
   notes: GraphNoteNode[];
   links: GraphLink[];
+  enginePreference?: GraphEnginePreference;
 };
+
+type GraphEnginePreference = "auto" | "forces" | "static25d";
 
 type GraphNoteNode = {
   id: string;
@@ -62,6 +65,7 @@ type GraphLink = {
 - `id` must be stable for the same note across sessions.
 - `date` must be a single canonical note date in ISO 8601 format when provided.
 - `size` must be a non-negative integer measured in bytes.
+- `enginePreference`, when provided, must be one of: `auto`, `forces`, `static25d`.
 - Producer rule: `vault.noteCount` should equal `notes.length` for every emitted payload.
 - Unknown fields must be safely ignored by consumers.
 
@@ -71,6 +75,7 @@ type GraphLink = {
 - Invalid envelopes are rejected with explicit, non-fatal error reporting.
 - Unity runtime ingest is fail-soft: it treats `vault.noteCount` as informational (uses `notes` as source of truth).
 - Unity runtime ingest is fail-soft for unresolved links: missing endpoints are tolerated at ingest and dropped later during edge resolution.
+- `enginePreference` is optional and controls the preferred runtime map engine selection when the consumer supports it.
 
 ## Unity Runtime Usage Reference
 - Unity-side field-to-behavior mapping, runtime defaults, and ingestion-specific fallbacks are documented in `unity/ReverySkyMap/docs/DATA_CONTRACT.md` under `Runtime Field Usage (Unity)`.

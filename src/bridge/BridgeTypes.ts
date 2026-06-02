@@ -47,6 +47,8 @@ export type GraphLink = {
   kind?: "resolved";
 };
 
+export type GraphEnginePreference = "auto" | "forces" | "static25d";
+
 export type GraphPayload = {
   graphVersion: string;
   generatedAt: string;
@@ -55,6 +57,7 @@ export type GraphPayload = {
   };
   notes: GraphNoteNode[];
   links: GraphLink[];
+  enginePreference?: GraphEnginePreference;
 };
 
 export type GraphSetMessage = {

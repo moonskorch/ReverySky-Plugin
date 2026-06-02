@@ -82,6 +82,19 @@ public class ObsidianBridgeEditModeTests
   }
 
   [Test]
+  public void OnGraphSet_EnginePreference_MapsToRuntimeFilterEngine()
+  {
+    bridge.OnGraphSet(TestPayloads.EnginePreferenceForcesPayload);
+    Assert.That(MapRuntimeContext.FilterEngine, Is.EqualTo(CartographerEngine.Forces));
+
+    bridge.OnGraphSet(TestPayloads.EnginePreferenceStatic25DPayload);
+    Assert.That(MapRuntimeContext.FilterEngine, Is.EqualTo(CartographerEngine.Static25D));
+
+    bridge.OnGraphSet(TestPayloads.EnginePreferenceInvalidPayload);
+    Assert.That(MapRuntimeContext.FilterEngine, Is.EqualTo(CartographerEngine.Auto));
+  }
+
+  [Test]
   public void OnGraphSet_RepeatApply_ReplacesPreviousStateWithoutStaleData()
   {
     bridge.OnGraphSet(TestPayloads.RepeatApplyPayloadA);
@@ -267,6 +280,21 @@ public class ObsidianBridgeEditModeTests
       "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"notes\":[" +
       "{\"id\":\"f1\",\"path\":\"fallback/f1.md\",\"title\":\"   \",\"tags\":[],\"date\":\"not-an-iso-date\",\"size\":-11}," +
       "{\"id\":\"f2\",\"path\":\"fallback/f2.md\",\"tags\":[\"solo\"],\"size\":5}" +
+      "],\"links\":[]}}";
+
+    public const string EnginePreferenceForcesPayload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"enginePreference\":\"forces\",\"notes\":[" +
+      "{\"id\":\"e1\",\"path\":\"engine/forces.md\",\"title\":\"Forces\",\"tags\":[],\"date\":\"2025-01-01T00:00:00Z\",\"size\":1}" +
+      "],\"links\":[]}}";
+
+    public const string EnginePreferenceStatic25DPayload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"enginePreference\":\"static25d\",\"notes\":[" +
+      "{\"id\":\"e2\",\"path\":\"engine/static25d.md\",\"title\":\"Static25D\",\"tags\":[],\"date\":\"2025-01-01T00:00:00Z\",\"size\":1}" +
+      "],\"links\":[]}}";
+
+    public const string EnginePreferenceInvalidPayload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"enginePreference\":\"unsupported\",\"notes\":[" +
+      "{\"id\":\"e3\",\"path\":\"engine/auto.md\",\"title\":\"Auto\",\"tags\":[],\"date\":\"2025-01-01T00:00:00Z\",\"size\":1}" +
       "],\"links\":[]}}";
 
     public const string NoteFocusByIdPayload =

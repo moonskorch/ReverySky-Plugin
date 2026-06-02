@@ -109,6 +109,23 @@ Manual smoke check:
 6. Confirm graph appears.
 7. Check console for errors.
 
+## Bridge and cross-layer contract changes
+
+When a task changes data or behavior across a subsystem boundary, verify the complete path rather than only the edited side.
+
+For plugin ↔ Unity bridge changes, review as applicable:
+
+* producer sends the expected payload;
+* types and validation match the payload;
+* canonical and mirrored contract docs are updated;
+* consumer reads and applies the new value;
+* the requested behavior works end-to-end, or the remaining stage is explicitly reported as deferred.
+
+A build or passing plugin-side tests do not prove completion of a cross-layer feature.
+
+If the consumer is intentionally left unchanged, classify the result as a preparatory patch and state that the feature is not yet functional end-to-end.
+
+
 ## Cleanup / deletion
 
 For execution mode, batching, and repair loop, follow `docs/AGENT_WORKFLOW.md`.

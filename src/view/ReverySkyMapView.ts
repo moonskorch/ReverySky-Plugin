@@ -1,6 +1,11 @@
 import { ItemView, Notice, SearchComponent, WorkspaceLeaf, setIcon } from "obsidian";
 import type { App, CachedMetadata, TAbstractFile, TFile } from "obsidian";
-import type { GraphPayload, NoteFocusPayload, NoteOpenPayload } from "../bridge/BridgeTypes";
+import type {
+  GraphEnginePreference,
+  GraphPayload,
+  NoteFocusPayload,
+  NoteOpenPayload
+} from "../bridge/BridgeTypes";
 import { UnityIframeBridge } from "../bridge/UnityIframeBridge";
 import { VaultGraphBuilder } from "../graph/VaultGraphBuilder";
 import {
@@ -17,6 +22,24 @@ const FILTER_INPUT_DEBOUNCE_MS = 250;
 const FILTER_SUGGESTIONS_HIDE_DELAY_MS = 120;
 const MAX_FOLDER_SUGGESTIONS = 80;
 const MAX_TAG_SUGGESTIONS = 200;
+const DEFAULT_ENGINE_PREFERENCE: GraphEnginePreference = "auto";
+const ENGINE_PREFERENCE_OPTIONS: ReadonlyArray<{
+  value: GraphEnginePreference;
+  label: string;
+}> = [
+  {
+    value: "auto",
+    label: "Auto"
+  },
+  {
+    value: "forces",
+    label: "Map of links (<200 notes)"
+  },
+  {
+    value: "static25d",
+    label: "Map of dates"
+  }
+] as const;
 
 type BridgePort = Pick<UnityIframeBridge, "attach" | "detach" | "sendGraphSet" | "sendNoteFocus">;
 type ObsidianHTMLElement = HTMLElement & {
@@ -28,6 +51,7 @@ type ObsidianHTMLElement = HTMLElement & {
 type ReverySkyMapViewState = {
   pathFilterQuery?: unknown;
   showTags?: unknown;
+  enginePreference?: unknown;
 };
 
 type FolderPathSuggestion = {
@@ -85,6 +109,7 @@ export class ReverySkyMapView extends ItemView {
   private leafTrackingRegistered = false;
   private pathFilterQuery = "";
   private showTags = true;
+  private enginePreference: GraphEnginePreference = DEFAULT_ENGINE_PREFERENCE;
   private activePathFilter: ParsedPathFilter | null = null;
   private pathFilterParseValid = true;
   private pathFilterMessage = "";
@@ -95,6 +120,7 @@ export class ReverySkyMapView extends ItemView {
   private filterPanelEl: HTMLElement | null = null;
   private filterToggleButtonEl: HTMLButtonElement | null = null;
   private tagsToggleButtonEl: HTMLButtonElement | null = null;
+  private engineDropdownEl: HTMLSelectElement | null = null;
   private filterSuggestionMode: FilterSuggestionMode = 0;
   private folderPathSuggestions: FolderPathSuggestion[] = [];
   private tagSuggestions: TagSuggestion[] = [];
@@ -124,7 +150,8 @@ export class ReverySkyMapView extends ItemView {
   getState(): Record<string, unknown> {
     return {
       pathFilterQuery: this.pathFilterQuery,
-      showTags: this.showTags
+      showTags: this.showTags,
+      enginePreference: this.enginePreference
     };
   }
 
@@ -133,8 +160,10 @@ export class ReverySkyMapView extends ItemView {
     const nextQuery =
       typeof nextState.pathFilterQuery === "string" ? nextState.pathFilterQuery : "";
     const nextShowTags = typeof nextState.showTags === "boolean" ? nextState.showTags : true;
+    const nextEnginePreference = this.normalizeEnginePreference(nextState.enginePreference);
     this.pathFilterQuery = nextQuery;
     this.setShowTags(nextShowTags, { emit: false });
+    this.setEnginePreference(nextEnginePreference, { emit: false });
     this.applyParsedFilterResult(GraphPathFilter.parsePathQuery(nextQuery));
     this.syncSearchComponentValue();
     this.refreshFilterMessage();
@@ -225,6 +254,7 @@ export class ReverySkyMapView extends ItemView {
     this.filterPanelEl = null;
     this.filterToggleButtonEl = null;
     this.tagsToggleButtonEl = null;
+    this.engineDropdownEl = null;
     this.filterSuggestionMode = 0;
     emptyElement(this.contentEl as ObsidianHTMLElement);
   }
@@ -387,7 +417,11 @@ export class ReverySkyMapView extends ItemView {
 
   private applyActiveFilters(payload: GraphPayload): GraphPayload {
     const pathFiltered = GraphPathFilter.applyPathFilter(payload, this.activePathFilter);
-    return this.applyTagsVisibilityFilter(pathFiltered);
+    const tagsFiltered = this.applyTagsVisibilityFilter(pathFiltered);
+    return {
+      ...tagsFiltered,
+      enginePreference: this.enginePreference
+    };
   }
 
   private applyTagsVisibilityFilter(payload: GraphPayload): GraphPayload {
@@ -505,14 +539,17 @@ export class ReverySkyMapView extends ItemView {
     filterContainer.className = "reverysky-map-filter-panel";
     this.filterPanelEl = filterContainer;
 
-    const panelHeader = createChild(filterContainer as ObsidianHTMLElement, "div");
-    panelHeader.className = "reverysky-map-filter-header";
+    const filterSection = createChild(filterContainer as ObsidianHTMLElement, "div");
+    filterSection.className = "reverysky-map-filter-section";
 
-    const filterTitle = createChild(panelHeader as ObsidianHTMLElement, "div");
-    filterTitle.className = "reverysky-map-filter-title";
-    filterTitle.textContent = "Filters";
+    const filterSectionHeader = createChild(filterSection as ObsidianHTMLElement, "div");
+    filterSectionHeader.className = "reverysky-map-filter-header";
 
-    const panelCloseButton = createChild(panelHeader as ObsidianHTMLElement, "button");
+    const filterSectionTitle = createChild(filterSectionHeader as ObsidianHTMLElement, "div");
+    filterSectionTitle.className = "reverysky-map-filter-title";
+    filterSectionTitle.textContent = "Settings";
+
+    const panelCloseButton = createChild(filterSectionHeader as ObsidianHTMLElement, "button");
     panelCloseButton.type = "button";
     panelCloseButton.className = "reverysky-map-filter-close";
     panelCloseButton.setAttribute("aria-label", "Close filters");
@@ -528,7 +565,14 @@ export class ReverySkyMapView extends ItemView {
       closeFilterPanel(event);
     });
 
-    const searchHost = createChild(filterContainer as ObsidianHTMLElement, "div");
+    const filterSearchArea = createChild(filterSection as ObsidianHTMLElement, "div");
+    filterSearchArea.className = "reverysky-map-filter-search-area";
+
+    const filterSearchLabel = createChild(filterSearchArea as ObsidianHTMLElement, "div");
+    filterSearchLabel.className = "reverysky-map-filter-field-label";
+    filterSearchLabel.textContent = "Filter";
+
+    const searchHost = createChild(filterSearchArea as ObsidianHTMLElement, "div");
     this.searchComponent = new SearchComponent(searchHost);
     this.searchComponent.setPlaceholder("Search in...");
     this.searchComponent.onChange((value) => {
@@ -555,11 +599,18 @@ export class ReverySkyMapView extends ItemView {
       }
     });
 
-    const tagsToggleRow = createChild(filterContainer as ObsidianHTMLElement, "div");
+    this.filterSuggestionsEl = createChild(filterSearchArea as ObsidianHTMLElement, "div");
+    this.filterSuggestionsEl.className = "reverysky-map-filter-suggestions";
+    this.filterSuggestionsEl.style.display = "none";
+
+    this.filterMessageEl = createChild(filterSection as ObsidianHTMLElement, "div");
+    this.filterMessageEl.className = "reverysky-map-filter-message";
+
+    const tagsToggleRow = createChild(filterSection as ObsidianHTMLElement, "div");
     tagsToggleRow.className = "reverysky-map-tags-toggle-row";
 
     const tagsLabel = createChild(tagsToggleRow as ObsidianHTMLElement, "div");
-    tagsLabel.className = "reverysky-map-tags-label";
+    tagsLabel.className = "reverysky-map-filter-field-label";
     tagsLabel.textContent = "Tags";
 
     const tagsToggleButton = createChild(tagsToggleRow as ObsidianHTMLElement, "button");
@@ -585,12 +636,28 @@ export class ReverySkyMapView extends ItemView {
     });
     this.refreshTagsToggleUi();
 
-    this.filterSuggestionsEl = createChild(filterContainer as ObsidianHTMLElement, "div");
-    this.filterSuggestionsEl.className = "reverysky-map-filter-suggestions";
-    this.filterSuggestionsEl.style.display = "none";
+    const engineSection = createChild(filterContainer as ObsidianHTMLElement, "div");
+    engineSection.className = "reverysky-map-filter-section reverysky-map-filter-control-group";
 
-    this.filterMessageEl = createChild(filterContainer as ObsidianHTMLElement, "div");
-    this.filterMessageEl.className = "reverysky-map-filter-message";
+    const engineSectionTitle = createChild(engineSection as ObsidianHTMLElement, "div");
+    engineSectionTitle.className = "reverysky-map-filter-field-label";
+    engineSectionTitle.textContent = "Engine";
+
+    const engineSelectHost = createChild(engineSection as ObsidianHTMLElement, "div");
+    engineSelectHost.className = "reverysky-map-engine-select-host";
+    const engineDropdown = createChild(engineSelectHost as ObsidianHTMLElement, "select");
+    this.engineDropdownEl = engineDropdown;
+    for (const option of ENGINE_PREFERENCE_OPTIONS) {
+      const optionEl = createChild(engineDropdown as ObsidianHTMLElement, "option");
+      optionEl.value = option.value;
+      optionEl.textContent = option.label;
+    }
+    engineDropdown.classList.add("reverysky-map-engine-select");
+    engineDropdown.setAttribute("aria-label", "Select engine");
+    engineDropdown.addEventListener("change", () => {
+      this.setEnginePreference(this.normalizeEnginePreference(engineDropdown.value), { emit: true });
+    });
+    this.refreshEngineDropdownUi();
     this.setFilterPanelOpen(false);
 
     return iframeHost;
@@ -1268,6 +1335,18 @@ export class ReverySkyMapView extends ItemView {
     this.emitGraphFromSource();
   }
 
+  private setEnginePreference(
+    enginePreference: GraphEnginePreference,
+    options: { emit: boolean }
+  ): void {
+    this.enginePreference = enginePreference;
+    this.refreshEngineDropdownUi();
+    if (!options.emit) {
+      return;
+    }
+    this.emitGraphFromSource();
+  }
+
   private refreshTagsToggleUi(): void {
     if (!this.tagsToggleButtonEl) {
       return;
@@ -1275,6 +1354,24 @@ export class ReverySkyMapView extends ItemView {
 
     this.tagsToggleButtonEl.setAttribute("role", "switch");
     this.tagsToggleButtonEl.setAttribute("aria-checked", this.showTags ? "true" : "false");
+  }
+
+  private refreshEngineDropdownUi(): void {
+    if (!this.engineDropdownEl) {
+      return;
+    }
+
+    if (this.engineDropdownEl.value === this.enginePreference) {
+      return;
+    }
+
+    this.engineDropdownEl.value = this.enginePreference;
+  }
+
+  private normalizeEnginePreference(value: unknown): GraphEnginePreference {
+    return value === "forces" || value === "static25d" || value === "auto"
+      ? value
+      : DEFAULT_ENGINE_PREFERENCE;
   }
 
   private dispatchPreferredFocus(payload: GraphPayload): void {

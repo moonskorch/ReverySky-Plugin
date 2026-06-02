@@ -51,6 +51,36 @@ public class MapRuntimePlayModeTests
   }
 
   [UnityTest]
+  public IEnumerator RuntimeGraphSet_EnginePreferenceSwitchesActiveCartographerEngine()
+  {
+    using var logProbe = new RuntimeLogProbe();
+    yield return LoadTargetScene();
+
+    Cartographer cartographer = UnityEngine.Object.FindFirstObjectByType<Cartographer>();
+    Assert.That(cartographer, Is.Not.Null);
+
+    var bridgeObject = new GameObject("ObsidianBridgeEnginePreferencePlayModeTest");
+    var bridge = bridgeObject.AddComponent<ObsidianBridge>();
+
+    bridge.OnGraphSet(ForcesEnginePreferencePayload);
+    yield return WaitFrames(4);
+    Assert.That(MapRuntimeContext.FilterEngine, Is.EqualTo(CartographerEngine.Forces));
+    Assert.That(cartographer.ActiveEngine, Is.Not.Null);
+    Assert.That(cartographer.ActiveEngine.EngineType, Is.EqualTo(CartographerEngine.Forces));
+
+    bridge.OnGraphSet(Static25DEnginePreferencePayload);
+    yield return WaitFrames(4);
+    Assert.That(MapRuntimeContext.FilterEngine, Is.EqualTo(CartographerEngine.Static25D));
+    Assert.That(cartographer.ActiveEngine, Is.Not.Null);
+    Assert.That(cartographer.ActiveEngine.EngineType, Is.EqualTo(CartographerEngine.Static25D));
+
+    UnityEngine.Object.Destroy(bridgeObject);
+
+    List<string> criticalLogs = logProbe.GetCriticalLogs();
+    Assert.That(criticalLogs, Is.Empty, string.Join(Environment.NewLine, criticalLogs));
+  }
+
+  [UnityTest]
   public IEnumerator VisualGuard_SnapshotAndStructuralInvariants_AreStable()
   {
     yield return LoadTargetScene();
@@ -265,5 +295,25 @@ public class MapRuntimePlayModeTests
     "],\"links\":[" +
     "{\"sourceId\":\"v1\",\"targetId\":\"v2\",\"weight\":1.0}," +
     "{\"sourceId\":\"v2\",\"targetId\":\"v3\",\"weight\":1.0}" +
+    "]}}";
+
+  private const string ForcesEnginePreferencePayload =
+    "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"enginePreference\":\"forces\",\"notes\":[" +
+    "{\"id\":\"e1\",\"path\":\"engine/e1.md\",\"title\":\"Engine 1\",\"tags\":[\"engine\"],\"date\":\"2025-04-01T00:00:00Z\",\"size\":111}," +
+    "{\"id\":\"e2\",\"path\":\"engine/e2.md\",\"title\":\"Engine 2\",\"tags\":[\"engine\"],\"date\":\"2025-04-03T00:00:00Z\",\"size\":222}," +
+    "{\"id\":\"e3\",\"path\":\"engine/e3.md\",\"title\":\"Engine 3\",\"tags\":[\"engine\"],\"date\":\"2025-04-05T00:00:00Z\",\"size\":333}" +
+    "],\"links\":[" +
+    "{\"sourceId\":\"e1\",\"targetId\":\"e2\",\"weight\":1.0}," +
+    "{\"sourceId\":\"e2\",\"targetId\":\"e3\",\"weight\":1.0}" +
+    "]}}";
+
+  private const string Static25DEnginePreferencePayload =
+    "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"enginePreference\":\"static25d\",\"notes\":[" +
+    "{\"id\":\"e1\",\"path\":\"engine/e1.md\",\"title\":\"Engine 1\",\"tags\":[\"engine\"],\"date\":\"2025-04-01T00:00:00Z\",\"size\":111}," +
+    "{\"id\":\"e2\",\"path\":\"engine/e2.md\",\"title\":\"Engine 2\",\"tags\":[\"engine\"],\"date\":\"2025-04-03T00:00:00Z\",\"size\":222}," +
+    "{\"id\":\"e3\",\"path\":\"engine/e3.md\",\"title\":\"Engine 3\",\"tags\":[\"engine\"],\"date\":\"2025-04-05T00:00:00Z\",\"size\":333}" +
+    "],\"links\":[" +
+    "{\"sourceId\":\"e1\",\"targetId\":\"e2\",\"weight\":1.0}," +
+    "{\"sourceId\":\"e2\",\"targetId\":\"e3\",\"weight\":1.0}" +
     "]}}";
 }

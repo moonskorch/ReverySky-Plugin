@@ -86,6 +86,8 @@ For detailed workflow and reporting rules, see `docs/AGENT_WORKFLOW.md`.
 - For every non-documentation task, run relevant automated checks first; manual checks are additional, not a replacement.
 - For bridge/runtime changes, verify end-to-end `bridge:ready` -> `graph:set` flow.
 - Every final report must state checks run, results, skipped checks with reasons, and manual checks.
+- For cross-layer or contract changes, follow the self-contained implementation rule in `docs/AGENT_WORKFLOW.md` and the bridge verification gate in `docs/VERIFICATION.md`. Do not report a feature as complete while a required producer or consumer step is still deferred.
+
 
 ## Context and Token Discipline
 - Never load or paste large generated artifacts into chat context when metadata is sufficient.

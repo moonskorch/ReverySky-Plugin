@@ -32,7 +32,9 @@ function makeValidPayload(): GraphPayload {
 
 describe("MessageValidator", () => {
   it("accepts a valid graph payload", () => {
-    const errors = MessageValidator.validateGraphPayload(makeValidPayload());
+    const payload = makeValidPayload();
+    payload.enginePreference = "auto";
+    const errors = MessageValidator.validateGraphPayload(payload);
     expect(errors).toEqual([]);
   });
 
@@ -43,6 +45,7 @@ describe("MessageValidator", () => {
     payload.links[0].weight = 0;
     payload.notes[0].id = "  ";
     payload.notes[0].size = -1;
+    payload.enginePreference = "invalid" as GraphPayload["enginePreference"];
 
     const errors = MessageValidator.validateGraphPayload(payload);
     expect(errors).toContain("payload.generatedAt must be a valid ISO-like date string");
@@ -50,6 +53,7 @@ describe("MessageValidator", () => {
     expect(errors).toContain("payload.links[0].weight must be a positive number when defined");
     expect(errors).toContain("payload.notes[0].id must be a non-empty string");
     expect(errors).toContain("payload.notes[0].size must be a non-negative integer");
+    expect(errors).toContain("payload.enginePreference must be one of: auto, forces, static25d");
   });
 
   it("rejects incoming bridge:ready message with protocol mismatch", () => {
