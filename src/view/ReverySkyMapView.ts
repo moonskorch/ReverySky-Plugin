@@ -16,6 +16,7 @@ const GRAPH_RESOLVE_BARRIER_FALLBACK_MS = 700;
 const FILTER_INPUT_DEBOUNCE_MS = 250;
 const FILTER_SUGGESTIONS_HIDE_DELAY_MS = 120;
 const MAX_FOLDER_SUGGESTIONS = 80;
+const MAX_TAG_SUGGESTIONS = 200;
 
 type BridgePort = Pick<UnityIframeBridge, "attach" | "detach" | "sendGraphSet" | "sendNoteFocus">;
 type ObsidianHTMLElement = HTMLElement & {
@@ -42,7 +43,13 @@ type DateFilterPresetSuggestion = {
   description: string;
 };
 
-type FilterSuggestionMode = 0 | 1 | 2;
+type TagSuggestion = {
+  tag: string;
+  normalizedTag: string;
+  displayTag: string;
+};
+
+type FilterSuggestionMode = 0 | 1 | 2 | 3;
 
 export type ReverySkyMapViewDependencies = {
   createBridge?: () => BridgePort;
@@ -90,6 +97,7 @@ export class ReverySkyMapView extends ItemView {
   private tagsToggleButtonEl: HTMLButtonElement | null = null;
   private filterSuggestionMode: FilterSuggestionMode = 0;
   private folderPathSuggestions: FolderPathSuggestion[] = [];
+  private tagSuggestions: TagSuggestion[] = [];
   private searchComponent: SearchComponent | null = null;
   private filterPanelOpen = false;
 
@@ -202,6 +210,7 @@ export class ReverySkyMapView extends ItemView {
     this.bridgeReady = false;
     this.sourceGraphPayload = null;
     this.folderPathSuggestions = [];
+    this.tagSuggestions = [];
     this.pendingGraphPayload = null;
     this.pendingFocusPayload = null;
     this.lastDispatchedFocusKey = "";
@@ -340,6 +349,7 @@ export class ReverySkyMapView extends ItemView {
   private refreshGraphNow(): void {
     this.sourceGraphPayload = this.buildGraph(this.app);
     this.folderPathSuggestions = this.buildFolderPathSuggestions(this.sourceGraphPayload);
+    this.tagSuggestions = this.buildTagSuggestions(this.sourceGraphPayload);
     this.emitGraphFromSource();
   }
 
@@ -520,16 +530,16 @@ export class ReverySkyMapView extends ItemView {
 
     const searchHost = createChild(filterContainer as ObsidianHTMLElement, "div");
     this.searchComponent = new SearchComponent(searchHost);
-    this.searchComponent.setPlaceholder("Search files...");
+    this.searchComponent.setPlaceholder("Search in...");
     this.searchComponent.onChange((value) => {
       this.onPathFilterInputChanged(value);
     });
-    this.searchComponent.inputEl.setAttribute("aria-label", "Search files filter");
+    this.searchComponent.inputEl.setAttribute("aria-label", "Search in filter");
     this.searchComponent.inputEl.addEventListener("focus", () => {
-      this.showFilterSuggestions(0);
+      this.showFilterSuggestions(this.resolveAutoSuggestionMode());
     });
     this.searchComponent.inputEl.addEventListener("click", () => {
-      this.showFilterSuggestions(0);
+      this.showFilterSuggestions(this.resolveAutoSuggestionMode());
     });
     this.searchComponent.inputEl.addEventListener("blur", () => {
       this.scheduleHideFilterSuggestions();
@@ -627,6 +637,23 @@ export class ReverySkyMapView extends ItemView {
     this.filterSuggestionsEl.style.display = "block";
   }
 
+  private resolveAutoSuggestionMode(): FilterSuggestionMode {
+    const currentQuery = this.searchComponent?.inputEl?.value ?? this.searchComponent?.getValue() ?? this.pathFilterQuery;
+    if (/\s$/.test(currentQuery)) {
+      return 0;
+    }
+    if (/(^|\s)-?path:(?:"[^"]*"|[^\s]*)$/i.test(currentQuery)) {
+      return 1;
+    }
+    if (/(^|\s)-?date:[^\s]*$/i.test(currentQuery)) {
+      return 2;
+    }
+    if (/(^|\s)-?tag:(?:"[^"]*"|[^\s]*)$/i.test(currentQuery)) {
+      return 3;
+    }
+    return 0;
+  }
+
   private scheduleHideFilterSuggestions(): void {
     this.clearFilterSuggestionsHideTimer();
     this.filterSuggestionsHideTimer = setTimeout(() => {
@@ -682,6 +709,25 @@ export class ReverySkyMapView extends ItemView {
     this.showFilterSuggestions(2);
   }
 
+  private applyTagSuggestionOperator(): void {
+    if (!this.searchComponent) {
+      return;
+    }
+
+    const currentValue = this.searchComponent.getValue();
+    const trimmedCurrent = currentValue.trim();
+    const hasActiveTrailingTagOperator = /(^|\s)-?tag:(?:"[^"]*"|[^\s]*)$/i.test(currentValue);
+    const nextValue = hasActiveTrailingTagOperator
+      ? currentValue
+      : trimmedCurrent.length === 0
+        ? "tag:"
+        : `${currentValue}${/\s$/.test(currentValue) ? "" : " "}tag:`;
+
+    this.searchComponent.setValue(nextValue);
+    this.onPathFilterInputChanged(nextValue);
+    this.showFilterSuggestions(3);
+  }
+
   private applyDateValueSuggestion(suffix: string): void {
     if (!this.searchComponent) {
       return;
@@ -733,6 +779,30 @@ export class ReverySkyMapView extends ItemView {
     this.hideFilterSuggestions();
   }
 
+  private applyTagValueSuggestion(tag: string): void {
+    if (!this.searchComponent) {
+      return;
+    }
+
+    const currentValue = this.searchComponent.getValue();
+    const term = this.formatTagFilterTerm(tag);
+    const replaceActiveTagTermPattern = /(^|\s)(-?tag:)(?:"[^"]*"|[^\s]*)$/i;
+
+    let nextValue: string;
+    if (replaceActiveTagTermPattern.test(currentValue)) {
+      nextValue = currentValue.replace(
+        replaceActiveTagTermPattern,
+        (_match, prefix: string, operator: string) => `${prefix}${operator}${term}`
+      );
+    } else {
+      nextValue = `${currentValue}${/\s$/.test(currentValue) || currentValue.length === 0 ? "" : " "}tag:${term}`;
+    }
+
+    this.searchComponent.setValue(nextValue);
+    this.onPathFilterInputChanged(nextValue);
+    this.hideFilterSuggestions();
+  }
+
   private refreshFilterSuggestions(): void {
     if (!this.filterSuggestionsEl) {
       return;
@@ -748,43 +818,31 @@ export class ReverySkyMapView extends ItemView {
       this.renderDateSuggestions(this.filterSuggestionsEl);
       return;
     }
+    if (this.filterSuggestionMode === 3) {
+      const currentQuery = this.searchComponent?.getValue() ?? this.pathFilterQuery;
+      this.renderTagSuggestions(this.filterSuggestionsEl, currentQuery);
+      return;
+    }
 
     this.renderOperatorSuggestions(this.filterSuggestionsEl);
   }
 
   private renderOperatorSuggestions(host: HTMLElement): void {
     const suggestionsTitle = createChild(host as ObsidianHTMLElement, "div");
+    suggestionsTitle.className = "reverysky-map-suggestion-title";
     suggestionsTitle.textContent = "Search settings";
-    suggestionsTitle.style.fontSize = "13px";
-    suggestionsTitle.style.fontWeight = "600";
-    suggestionsTitle.style.color = "var(--text-muted)";
-    suggestionsTitle.style.marginBottom = "6px";
 
     const pathOption = createChild(host as ObsidianHTMLElement, "div");
     pathOption.className = "reverysky-map-filter-suggestion-option";
     pathOption.setAttribute("role", "button");
-    pathOption.style.display = "block";
-    pathOption.style.width = "100%";
-    pathOption.style.textAlign = "left";
-    pathOption.style.padding = "6px 8px";
-    pathOption.style.border = "0";
-    pathOption.style.borderRadius = "6px";
-    pathOption.style.background = "var(--background-secondary-alt)";
-    pathOption.style.color = "var(--text-normal)";
-    pathOption.style.cursor = "pointer";
-    pathOption.style.fontSize = "13px";
-    pathOption.style.lineHeight = "1.2";
-    pathOption.style.font = "inherit";
-    this.attachSuggestionHoverStyle(pathOption, "var(--background-secondary-alt)");
 
     const strong = createChild(pathOption as ObsidianHTMLElement, "span");
+    strong.className = "reverysky-map-suggestion-key";
     strong.textContent = "path:";
-    strong.style.color = "var(--text-normal)";
-    strong.style.marginRight = "4px";
 
     const desc = createChild(pathOption as ObsidianHTMLElement, "span");
+    desc.className = "reverysky-map-suggestion-desc";
     desc.textContent = " match in file path";
-    desc.style.color = "var(--text-muted)";
 
     pathOption.addEventListener("mousedown", (event) => {
       event.preventDefault();
@@ -792,75 +850,58 @@ export class ReverySkyMapView extends ItemView {
     });
 
     const dateOption = createChild(host as ObsidianHTMLElement, "div");
-    dateOption.className = "reverysky-map-filter-suggestion-option";
+    dateOption.className = "reverysky-map-filter-suggestion-option reverysky-map-filter-suggestion-option--stacked";
     dateOption.setAttribute("role", "button");
-    dateOption.style.display = "block";
-    dateOption.style.width = "100%";
-    dateOption.style.textAlign = "left";
-    dateOption.style.padding = "6px 8px";
-    dateOption.style.border = "0";
-    dateOption.style.borderRadius = "6px";
-    dateOption.style.background = "var(--background-secondary-alt)";
-    dateOption.style.color = "var(--text-normal)";
-    dateOption.style.cursor = "pointer";
-    dateOption.style.fontSize = "13px";
-    dateOption.style.lineHeight = "1.2";
-    dateOption.style.font = "inherit";
-    dateOption.style.marginTop = "4px";
-    this.attachSuggestionHoverStyle(dateOption, "var(--background-secondary-alt)");
 
     const dateStrong = createChild(dateOption as ObsidianHTMLElement, "span");
+    dateStrong.className = "reverysky-map-suggestion-key";
     dateStrong.textContent = "date:";
-    dateStrong.style.color = "var(--text-normal)";
-    dateStrong.style.marginRight = "4px";
 
     const dateDesc = createChild(dateOption as ObsidianHTMLElement, "span");
+    dateDesc.className = "reverysky-map-suggestion-desc";
     dateDesc.textContent = " match note date";
-    dateDesc.style.color = "var(--text-muted)";
 
     dateOption.addEventListener("mousedown", (event) => {
       event.preventDefault();
       this.applyDateSuggestionOperator();
     });
+
+    const tagOption = createChild(host as ObsidianHTMLElement, "div");
+    tagOption.className = "reverysky-map-filter-suggestion-option reverysky-map-filter-suggestion-option--stacked";
+    tagOption.setAttribute("role", "button");
+
+    const tagStrong = createChild(tagOption as ObsidianHTMLElement, "span");
+    tagStrong.className = "reverysky-map-suggestion-key";
+    tagStrong.textContent = "tag:";
+
+    const tagDesc = createChild(tagOption as ObsidianHTMLElement, "span");
+    tagDesc.className = "reverysky-map-suggestion-desc";
+    tagDesc.textContent = " match note tag";
+
+    tagOption.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      this.applyTagSuggestionOperator();
+    });
   }
 
   private renderDateSuggestions(host: HTMLElement): void {
     const suggestionsTitle = createChild(host as ObsidianHTMLElement, "div");
+    suggestionsTitle.className = "reverysky-map-suggestion-title";
     suggestionsTitle.textContent = "Date presets";
-    suggestionsTitle.style.fontSize = "13px";
-    suggestionsTitle.style.fontWeight = "600";
-    suggestionsTitle.style.color = "var(--text-muted)";
-    suggestionsTitle.style.marginBottom = "6px";
 
     const presets = this.buildDateFilterPresetSuggestions();
     for (const suggestion of presets) {
       const option = createChild(host as ObsidianHTMLElement, "div");
       option.className = "reverysky-map-date-suggestion-option";
       option.setAttribute("role", "button");
-      option.style.display = "block";
-      option.style.width = "100%";
-      option.style.textAlign = "left";
-      option.style.padding = "6px 8px";
-      option.style.border = "1px solid transparent";
-      option.style.borderRadius = "6px";
-      option.style.background = "transparent";
-      option.style.color = "var(--text-normal)";
-      option.style.cursor = "pointer";
-      option.style.fontSize = "13px";
-      option.style.lineHeight = "1.2";
-      option.style.font = "inherit";
-      option.style.marginBottom = "0";
-      this.attachSuggestionHoverStyle(option, "transparent");
 
       const valuePart = createChild(option as ObsidianHTMLElement, "span");
+      valuePart.className = "reverysky-map-date-suggestion-value";
       valuePart.textContent = `date:${suggestion.suffix}`;
-      valuePart.style.color = "var(--text-normal)";
 
       const labelPart = createChild(option as ObsidianHTMLElement, "span");
+      labelPart.className = "reverysky-map-date-suggestion-label";
       labelPart.textContent = `  ${suggestion.label}`;
-      labelPart.style.color = "var(--text-muted)";
-      labelPart.style.fontSize = "12px";
-      labelPart.style.marginLeft = "6px";
 
       option.title = suggestion.description;
       option.addEventListener("mousedown", (event) => {
@@ -874,11 +915,8 @@ export class ReverySkyMapView extends ItemView {
     this.ensureFolderSuggestionsReady();
 
     const suggestionsTitle = createChild(host as ObsidianHTMLElement, "div");
+    suggestionsTitle.className = "reverysky-map-suggestion-title";
     suggestionsTitle.textContent = "Folders";
-    suggestionsTitle.style.fontSize = "13px";
-    suggestionsTitle.style.fontWeight = "600";
-    suggestionsTitle.style.color = "var(--text-muted)";
-    suggestionsTitle.style.marginBottom = "6px";
 
     const activePathValue = this.extractActivePathFilterTermValue(query);
     const normalizedActive = this.normalizeSearchTerm(activePathValue);
@@ -910,9 +948,8 @@ export class ReverySkyMapView extends ItemView {
 
     if (!ranked.length) {
       const emptyHint = createChild(host as ObsidianHTMLElement, "div");
+      emptyHint.className = "reverysky-map-suggestion-empty";
       emptyHint.textContent = "No folders found";
-      emptyHint.style.color = "var(--text-muted)";
-      emptyHint.style.fontSize = "13px";
       return;
     }
 
@@ -921,20 +958,6 @@ export class ReverySkyMapView extends ItemView {
       option.className = "reverysky-map-folder-suggestion-option";
       option.setAttribute("role", "button");
       option.textContent = suggestion.path;
-      option.style.display = "block";
-      option.style.width = "100%";
-      option.style.textAlign = "left";
-      option.style.padding = "6px 8px";
-      option.style.border = "1px solid transparent";
-      option.style.borderRadius = "6px";
-      option.style.background = "transparent";
-      option.style.color = "var(--text-normal)";
-      option.style.cursor = "pointer";
-      option.style.font = "inherit";
-      option.style.fontSize = "13px";
-      option.style.lineHeight = "1.2";
-      option.style.marginBottom = "0";
-      this.attachSuggestionHoverStyle(option, "transparent");
       option.addEventListener("mousedown", (event) => {
         event.preventDefault();
         this.applyPathValueSuggestion(suggestion.path);
@@ -942,26 +965,46 @@ export class ReverySkyMapView extends ItemView {
     }
   }
 
-  private attachSuggestionHoverStyle(
-    element: HTMLElement,
-    baseBackground: string
-  ): void {
-    const hoverBackground = "var(--background-modifier-hover)";
-    const baseBorderColor = element.style.borderColor || "transparent";
-    const hoverBorderColor = "var(--background-modifier-border-hover)";
-    element.style.background = baseBackground;
-    element.style.opacity = "1";
-    element.style.transition = "background-color 120ms ease, border-color 120ms ease";
-    element.addEventListener("mouseenter", () => {
-      element.style.background = hoverBackground;
-      element.style.borderColor = hoverBorderColor;
-      element.style.opacity = "1";
-    });
-    element.addEventListener("mouseleave", () => {
-      element.style.background = baseBackground;
-      element.style.borderColor = baseBorderColor;
-      element.style.opacity = "1";
-    });
+  private renderTagSuggestions(host: HTMLElement, query: string): void {
+    this.ensureTagSuggestionsReady();
+
+    const suggestionsTitle = createChild(host as ObsidianHTMLElement, "div");
+    suggestionsTitle.className = "reverysky-map-suggestion-title";
+    suggestionsTitle.textContent = "Tags";
+
+    const activeTagValue = this.extractActiveTagFilterTermValue(query);
+    const normalizedActive = this.normalizeTagSuggestionSearchTerm(activeTagValue);
+    const ranked = this.tagSuggestions
+      .filter((item) => !normalizedActive || item.normalizedTag.includes(normalizedActive))
+      .sort((a, b) => {
+        if (normalizedActive) {
+          const aStarts = a.normalizedTag.startsWith(normalizedActive) ? 1 : 0;
+          const bStarts = b.normalizedTag.startsWith(normalizedActive) ? 1 : 0;
+          if (aStarts !== bStarts) {
+            return bStarts - aStarts;
+          }
+        }
+        return a.displayTag.localeCompare(b.displayTag, undefined, { sensitivity: "base" });
+      })
+      .slice(0, MAX_TAG_SUGGESTIONS);
+
+    if (!ranked.length) {
+      const emptyHint = createChild(host as ObsidianHTMLElement, "div");
+      emptyHint.className = "reverysky-map-suggestion-empty";
+      emptyHint.textContent = "No tags found";
+      return;
+    }
+
+    for (const suggestion of ranked) {
+      const option = createChild(host as ObsidianHTMLElement, "div");
+      option.className = "reverysky-map-folder-suggestion-option reverysky-map-tag-suggestion-option";
+      option.setAttribute("role", "button");
+      option.textContent = suggestion.displayTag;
+      option.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        this.applyTagValueSuggestion(suggestion.tag);
+      });
+    }
   }
 
   private buildDateFilterPresetSuggestions(): DateFilterPresetSuggestion[] {
@@ -1042,6 +1085,22 @@ export class ReverySkyMapView extends ItemView {
     this.folderPathSuggestions = this.buildFolderPathSuggestions(this.sourceGraphPayload);
   }
 
+  private ensureTagSuggestionsReady(): void {
+    if (this.tagSuggestions.length > 0) {
+      return;
+    }
+
+    if (!this.sourceGraphPayload) {
+      this.sourceGraphPayload = this.buildGraph(this.app);
+    }
+
+    if (!this.sourceGraphPayload) {
+      return;
+    }
+
+    this.tagSuggestions = this.buildTagSuggestions(this.sourceGraphPayload);
+  }
+
   private buildFolderPathSuggestions(payload: GraphPayload): FolderPathSuggestion[] {
     const counts = new Map<string, number>();
 
@@ -1073,6 +1132,29 @@ export class ReverySkyMapView extends ItemView {
       }
       return a.path.localeCompare(b.path, "en", { sensitivity: "base" });
     });
+  }
+
+  private buildTagSuggestions(payload: GraphPayload): TagSuggestion[] {
+    const uniqueTags = new Map<string, string>();
+
+    for (const note of payload.notes) {
+      for (const tag of note.tags) {
+        const normalizedTag = this.normalizeTagSuggestionSearchTerm(tag);
+        if (!normalizedTag || uniqueTags.has(normalizedTag)) {
+          continue;
+        }
+
+        uniqueTags.set(normalizedTag, tag.trim().replace(/^#/, ""));
+      }
+    }
+
+    return Array.from(uniqueTags.entries())
+      .map(([normalizedTag, tag]) => ({
+        tag,
+        normalizedTag,
+        displayTag: `#${tag}`
+      }))
+      .sort((a, b) => a.displayTag.localeCompare(b.displayTag, undefined, { sensitivity: "base" }));
   }
 
   private extractFolderPrefixes(normalizedNotePath: string): string[] {
@@ -1107,14 +1189,35 @@ export class ReverySkyMapView extends ItemView {
     return rawValue.replace(/\\"/g, "\"").replace(/\\\\/g, "\\");
   }
 
+  private extractActiveTagFilterTermValue(query: string): string {
+    const activePattern = /(^|\s)-?tag:(?:"([^"]*)"|([^\s]*))$/i;
+    const match = query.match(activePattern);
+    if (!match) {
+      return "";
+    }
+
+    const quotedValue = typeof match[2] === "string" ? match[2] : "";
+    const plainValue = typeof match[3] === "string" ? match[3] : "";
+    const rawValue = quotedValue || plainValue;
+    return rawValue.replace(/\\"/g, "\"").replace(/\\\\/g, "\\");
+  }
+
   private formatPathFilterTerm(folderPath: string): string {
     const needsQuotes = /\s/.test(folderPath) || /["]/.test(folderPath);
     const escaped = folderPath.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
     return needsQuotes ? `"${escaped}"` : escaped;
   }
 
+  private formatTagFilterTerm(tag: string): string {
+    return `#${tag.trim().replace(/^#/, "")}`;
+  }
+
   private normalizeSearchTerm(value: string): string {
     return value.trim().replace(/\\/g, "/").toLowerCase();
+  }
+
+  private normalizeTagSuggestionSearchTerm(value: string): string {
+    return value.trim().replace(/^#/, "").toLowerCase();
   }
 
   private applyParsedFilterResult(parseResult: PathFilterParseResult): void {
@@ -1126,7 +1229,7 @@ export class ReverySkyMapView extends ItemView {
     }
 
     this.pathFilterMessage = parseResult.hasUnsupportedTokens
-      ? "Only path: and date: terms are applied in this view."
+      ? "Only path:, date:, and tag: terms are applied in this view."
       : "";
     this.activePathFilter = parseResult.hasPathTerms ? parseResult.parsed : null;
   }

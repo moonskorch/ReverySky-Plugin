@@ -39,21 +39,21 @@ function makePathPayload(): GraphPayload {
         id: "daily",
         path: "Notes/Daily/2026-01-01.md",
         title: "Daily",
-        tags: [],
+        tags: ["daily", "journal/daily"],
         size: 20
       },
       {
         id: "project",
         path: "Projects/ReverySky/Spec.md",
         title: "Spec",
-        tags: [],
+        tags: ["work/subtag", "project"],
         size: 21
       },
       {
         id: "archive",
         path: "Archive/Old.md",
         title: "Old",
-        tags: [],
+        tags: ["archive"],
         size: 22
       }
     ],
@@ -1375,6 +1375,7 @@ describe("ReverySkyMapView bridge integration", () => {
     expect(suggestions.textContent).toContain("Search settings");
     expect(suggestions.textContent).toContain("path: match in file path");
     expect(suggestions.textContent).toContain("date: match note date");
+    expect(suggestions.textContent).toContain("tag: match note tag");
 
     const pathOption = view.contentEl.querySelector(
       ".reverysky-map-filter-suggestion-option"
@@ -1399,6 +1400,180 @@ describe("ReverySkyMapView bridge integration", () => {
     searchInput.dispatchEvent(new Event("input"));
     vi.advanceTimersByTime(250);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows tag suggestions and applies tag filter on option click", async () => {
+    vi.useFakeTimers();
+
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePathPayload();
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
+    searchInput.dispatchEvent(new Event("focus"));
+
+    const tagOption = Array.from(
+      view.contentEl.querySelectorAll(".reverysky-map-filter-suggestion-option")
+    ).find((el) => el.textContent?.includes("tag:")) as HTMLElement | undefined;
+    expect(tagOption).toBeDefined();
+    tagOption?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+    const suggestions = view.contentEl.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
+    expect(suggestions.textContent).toContain("Tags");
+    expect(suggestions.textContent).toContain("#archive");
+    expect(suggestions.textContent).toContain("#daily");
+    expect(suggestions.textContent).toContain("#work/subtag");
+
+    const workOption = Array.from(
+      view.contentEl.querySelectorAll(".reverysky-map-tag-suggestion-option")
+    ).find((el) => el.textContent === "#work/subtag") as HTMLButtonElement | undefined;
+    expect(workOption).toBeDefined();
+    workOption?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+    expect(searchInput.value).toBe("tag:#work/subtag");
+    expect(suggestions.style.display).toBe("none");
+
+    vi.advanceTimersByTime(250);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+    const filteredPayload = bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload;
+    expect(filteredPayload.notes.map((note) => note.id)).toEqual(["project"]);
+  });
+
+  it("adds a second tag filter of the same type through suggestions", async () => {
+    vi.useFakeTimers();
+
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePathPayload();
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
+    searchInput.value = "tag:#work";
+    searchInput.dispatchEvent(new Event("input"));
+    vi.advanceTimersByTime(250);
+
+    searchInput.value = `${searchInput.value} `;
+    searchInput.dispatchEvent(new Event("input"));
+    searchInput.dispatchEvent(new Event("click"));
+
+    let suggestions = view.contentEl.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
+    expect(suggestions.textContent).toContain("Search settings");
+
+    const tagOption = Array.from(
+      view.contentEl.querySelectorAll(".reverysky-map-filter-suggestion-option")
+    ).find((el) => el.textContent?.includes("tag:")) as HTMLElement | undefined;
+    expect(tagOption).toBeDefined();
+    tagOption?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+    suggestions = view.contentEl.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
+    expect(suggestions.textContent).toContain("Tags");
+
+    const projectOption = Array.from(
+      view.contentEl.querySelectorAll(".reverysky-map-tag-suggestion-option")
+    ).find((el) => el.textContent === "#project") as HTMLButtonElement | undefined;
+    expect(projectOption).toBeDefined();
+    projectOption?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+    expect(searchInput.value).toBe("tag:#work tag:#project");
+    expect(suggestions.style.display).toBe("none");
+
+    vi.advanceTimersByTime(250);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(3);
+    const filteredPayload = bridge.sendGraphSet.mock.calls[2]?.[0] as GraphPayload;
+    expect(filteredPayload.notes.map((note) => note.id)).toEqual(["project"]);
   });
 
   it("shows date presets and applies date filter on preset click", async () => {
@@ -1495,8 +1670,8 @@ describe("ReverySkyMapView bridge integration", () => {
 
     searchInput.dispatchEvent(new Event("click"));
     expect(suggestions.style.display).toBe("block");
-    expect(suggestions.textContent).toContain("Search settings");
-    expect(suggestions.textContent).not.toContain("Date presets");
+    expect(suggestions.textContent).toContain("Date presets");
+    expect(suggestions.textContent).not.toContain("Search settings");
   });
 
   it("builds one-month preset with end-of-month clamping", async () => {
@@ -1634,6 +1809,12 @@ describe("ReverySkyMapView bridge integration", () => {
 
     searchInput.dispatchEvent(new Event("click"));
     const suggestions = view.contentEl.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
+    expect(suggestions.textContent).toContain("Folders");
+
+    searchInput.value = `${searchInput.value} `;
+    searchInput.dispatchEvent(new Event("input"));
+    vi.advanceTimersByTime(250);
+    searchInput.dispatchEvent(new Event("click"));
     expect(suggestions.textContent).toContain("Search settings");
 
     const dateOption = Array.from(
@@ -1647,6 +1828,140 @@ describe("ReverySkyMapView bridge integration", () => {
     searchInput.dispatchEvent(new Event("focus"));
     expect(suggestions.textContent).toContain("Search settings");
     expect(suggestions.textContent).not.toContain("Date presets");
+  });
+
+  it("reopens tag suggestions when tag operator is already active in the input", async () => {
+    vi.useFakeTimers();
+
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePathPayload();
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
+    searchInput.value = "tag:#wo";
+    searchInput.dispatchEvent(new Event("input"));
+    vi.advanceTimersByTime(250);
+
+    searchInput.dispatchEvent(new Event("click"));
+    const suggestions = view.contentEl.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
+    expect(suggestions.textContent).toContain("Tags");
+    expect(suggestions.textContent).toContain("#work/subtag");
+    expect(suggestions.textContent).not.toContain("Search settings");
+  });
+
+  it("filters tag suggestions against the active trailing tag term in mixed query", async () => {
+    vi.useFakeTimers();
+
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePathPayload();
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
+    searchInput.value = "path:Projects tag:#wo";
+    searchInput.dispatchEvent(new Event("input"));
+    vi.advanceTimersByTime(250);
+
+    searchInput.dispatchEvent(new Event("click"));
+    const suggestions = view.contentEl.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
+    expect(searchInput.value).toBe("path:Projects tag:#wo");
+    expect(suggestions.textContent).toContain("Tags");
+    expect(suggestions.textContent).toContain("#work/subtag");
+    expect(suggestions.textContent).not.toContain("#archive");
+    expect(suggestions.textContent).not.toContain("#daily");
   });
 
   it("keeps base filter-type suggestions when query has trailing space", async () => {
@@ -1713,12 +2028,13 @@ describe("ReverySkyMapView bridge integration", () => {
 
     searchInput.dispatchEvent(new Event("click"));
     let suggestions = view.contentEl.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
-    expect(suggestions.textContent).toContain("Search settings");
-    expect(suggestions.textContent).not.toContain("Date presets");
+    expect(suggestions.textContent).toContain("Date presets");
+    expect(suggestions.textContent).not.toContain("Search settings");
 
     searchInput.value = "date:>2026-04-01 ";
     searchInput.dispatchEvent(new Event("input"));
     vi.advanceTimersByTime(250);
+    searchInput.dispatchEvent(new Event("click"));
 
     suggestions = view.contentEl.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
     expect(suggestions.textContent).toContain("Search settings");
@@ -1884,6 +2200,91 @@ describe("ReverySkyMapView bridge integration", () => {
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
     const updatedPayload = bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload;
     expect(updatedPayload.notes.map((note) => note.id)).toEqual(["daily", "project"]);
+    expect(updatedPayload.notes.every((note) => note.tags.length === 0)).toBe(true);
+  });
+
+  it("restores showTags state and keeps tag filtering from cached source graph", async () => {
+    vi.useFakeTimers();
+
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePathPayload();
+    const buildGraph = vi.fn().mockReturnValue(payload);
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: buildGraph as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.setState({
+      pathFilterQuery: "tag:#project",
+      showTags: false
+    });
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+    const restoredPayload = bridge.sendGraphSet.mock.calls[0]?.[0] as GraphPayload;
+    expect(restoredPayload.notes.map((note) => note.id)).toEqual(["project"]);
+    expect(restoredPayload.notes.every((note) => note.tags.length === 0)).toBe(true);
+
+    const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
+    expect(searchInput.value).toBe("tag:#project");
+
+    const tagsToggle = view.contentEl.querySelector(
+      ".reverysky-map-tags-toggle"
+    ) as HTMLButtonElement;
+    expect(tagsToggle.getAttribute("aria-checked")).toBe("false");
+
+    searchInput.value = "tag:#daily";
+    searchInput.dispatchEvent(new Event("input"));
+    vi.advanceTimersByTime(250);
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+    const updatedPayload = bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload;
+    expect(updatedPayload.notes.map((note) => note.id)).toEqual(["daily"]);
     expect(updatedPayload.notes.every((note) => note.tags.length === 0)).toBe(true);
   });
 
@@ -2149,6 +2550,72 @@ describe("ReverySkyMapView bridge integration", () => {
     expect(outgoingPayload.notes.map((note) => note.id)).toEqual(["archive"]);
     const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
     expect(searchInput.value).toBe("path:archive");
+  });
+
+  it("restores tag filter query from view state", async () => {
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const payload = makePathPayload();
+    const view = new ReverySkyMapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.setState({
+      pathFilterQuery: "tag:#project"
+    });
+    expect(view.getState()).toMatchObject({
+      pathFilterQuery: "tag:#project"
+    });
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+    const outgoingPayload = bridge.sendGraphSet.mock.calls[0]?.[0] as GraphPayload;
+    expect(outgoingPayload.notes.map((note) => note.id)).toEqual(["project"]);
+    const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
+    expect(searchInput.value).toBe("tag:#project");
   });
 
   it("registers refresh subscriptions only once across reopen cycles", async () => {

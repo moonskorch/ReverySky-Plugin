@@ -12,7 +12,7 @@ function makePayload(): GraphPayload {
         id: "a",
         path: "Notes/Daily/2026-01-01.md",
         title: "A",
-        tags: [],
+        tags: ["work", "daily"],
         date: "2026-01-01T09:00:00.000Z",
         size: 1
       },
@@ -20,7 +20,7 @@ function makePayload(): GraphPayload {
         id: "b",
         path: "Projects/ReverySky/Spec.md",
         title: "B",
-        tags: [],
+        tags: ["work/subtag", "project"],
         date: "2026-01-31T23:59:59.000Z",
         size: 1
       },
@@ -28,7 +28,7 @@ function makePayload(): GraphPayload {
         id: "c",
         path: "Archive/Old.md",
         title: "C",
-        tags: [],
+        tags: ["archive"],
         date: "2025-12-15T00:00:00.000Z",
         size: 1
       }
@@ -136,6 +136,54 @@ describe("GraphPathFilter", () => {
     expect(filtered.notes.map((n) => n.id)).toEqual(["b"]);
   });
 
+  it("matches notes by tag operator with hash prefix", () => {
+    const parse = GraphPathFilter.parsePathQuery("tag:#work");
+    expect(parse.isValid).toBe(true);
+
+    const filtered = GraphPathFilter.applyPathFilter(makePayload(), parse.parsed);
+    expect(filtered.notes.map((n) => n.id)).toEqual(["a", "b"]);
+  });
+
+  it("matches nested tag branches in an Obsidian-friendly way", () => {
+    const parse = GraphPathFilter.parsePathQuery("tag:work");
+    expect(parse.isValid).toBe(true);
+
+    const filtered = GraphPathFilter.applyPathFilter(makePayload(), parse.parsed);
+    expect(filtered.notes.map((n) => n.id)).toEqual(["a", "b"]);
+  });
+
+  it("supports negated tag filters", () => {
+    const parse = GraphPathFilter.parsePathQuery("-tag:#archive");
+    expect(parse.isValid).toBe(true);
+
+    const filtered = GraphPathFilter.applyPathFilter(makePayload(), parse.parsed);
+    expect(filtered.notes.map((n) => n.id)).toEqual(["a", "b"]);
+  });
+
+  it("applies multiple include tag terms as AND", () => {
+    const parse = GraphPathFilter.parsePathQuery("tag:work tag:project");
+    expect(parse.isValid).toBe(true);
+
+    const filtered = GraphPathFilter.applyPathFilter(makePayload(), parse.parsed);
+    expect(filtered.notes.map((n) => n.id)).toEqual(["b"]);
+  });
+
+  it("combines include and exclude tag terms", () => {
+    const parse = GraphPathFilter.parsePathQuery("tag:work -tag:daily");
+    expect(parse.isValid).toBe(true);
+
+    const filtered = GraphPathFilter.applyPathFilter(makePayload(), parse.parsed);
+    expect(filtered.notes.map((n) => n.id)).toEqual(["b"]);
+  });
+
+  it("combines path, date, and tag terms as AND", () => {
+    const parse = GraphPathFilter.parsePathQuery("path:projects date:2026-01-31 tag:#work");
+    expect(parse.isValid).toBe(true);
+
+    const filtered = GraphPathFilter.applyPathFilter(makePayload(), parse.parsed);
+    expect(filtered.notes.map((n) => n.id)).toEqual(["b"]);
+  });
+
   it("applies multiple include path terms as AND", () => {
     const parse = GraphPathFilter.parsePathQuery("path:projects path:spec");
     expect(parse.isValid).toBe(true);
@@ -153,11 +201,19 @@ describe("GraphPathFilter", () => {
     expect(filtered.notes.map((n) => n.id)).toEqual(["b"]);
   });
 
+  it("matches tags case-insensitively", () => {
+    const parse = GraphPathFilter.parsePathQuery("tag:#WORK");
+    expect(parse.isValid).toBe(true);
+
+    const filtered = GraphPathFilter.applyPathFilter(makePayload(), parse.parsed);
+    expect(filtered.notes.map((n) => n.id)).toEqual(["a", "b"]);
+  });
+
   it("marks unsupported tokens without failing the query", () => {
-    const parse = GraphPathFilter.parsePathQuery("path:daily tag:x file:y");
+    const parse = GraphPathFilter.parsePathQuery("path:daily tag:work file:y");
     expect(parse.isValid).toBe(true);
     expect(parse.hasUnsupportedTokens).toBe(true);
-    expect(parse.parsed?.unsupportedTokens).toEqual(["tag:x", "file:y"]);
+    expect(parse.parsed?.unsupportedTokens).toEqual(["file:y"]);
 
     const filtered = GraphPathFilter.applyPathFilter(makePayload(), parse.parsed);
     expect(filtered.notes.map((n) => n.id)).toEqual(["a"]);
@@ -209,9 +265,20 @@ describe("GraphPathFilter", () => {
     expect(filtered.vault.noteCount).toBe(0);
   });
 
-  it("returns original payload when no path terms are present", () => {
+  it("treats empty tag term as valid filter with no matches", () => {
+    const parse = GraphPathFilter.parsePathQuery("tag:");
+    expect(parse.isValid).toBe(true);
+    expect(parse.hasPathTerms).toBe(true);
+
+    const filtered = GraphPathFilter.applyPathFilter(makePayload(), parse.parsed);
+    expect(filtered.notes).toHaveLength(0);
+    expect(filtered.links).toHaveLength(0);
+    expect(filtered.vault.noteCount).toBe(0);
+  });
+
+  it("returns original payload when no supported terms are present", () => {
     const payload = makePayload();
-    const parse = GraphPathFilter.parsePathQuery("tag:x");
+    const parse = GraphPathFilter.parsePathQuery("file:y");
     expect(parse.isValid).toBe(true);
     expect(parse.hasPathTerms).toBe(false);
 

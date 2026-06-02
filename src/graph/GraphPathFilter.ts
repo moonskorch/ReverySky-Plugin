@@ -7,6 +7,8 @@ export type ParsedPathFilter = {
   excludeRegexes: RegExp[];
   includeDateClauses: ParsedDateClause[];
   excludeDateClauses: ParsedDateClause[];
+  includeTagTerms: string[];
+  excludeTagTerms: string[];
   unsupportedTokens: string[];
 };
 
@@ -28,6 +30,7 @@ export type PathFilterParseResult = {
 export class GraphPathFilter {
   private static readonly NO_MATCH_SENTINEL = "\u0000__empty_path_term__";
   private static readonly NO_MATCH_DATE_SENTINEL = "\u0000__empty_date_term__";
+  private static readonly NO_MATCH_TAG_SENTINEL = "\u0000__empty_tag_term__";
 
   static parsePathQuery(query: string): PathFilterParseResult {
     const rawQuery = typeof query === "string" ? query.trim() : "";
@@ -57,6 +60,8 @@ export class GraphPathFilter {
     const excludeRegexes: RegExp[] = [];
     const includeDateClauses: ParsedDateClause[] = [];
     const excludeDateClauses: ParsedDateClause[] = [];
+    const includeTagTerms: string[] = [];
+    const excludeTagTerms: string[] = [];
     const unsupportedTokens: string[] = [];
 
     for (const token of tokenized.tokens) {
@@ -68,39 +73,68 @@ export class GraphPathFilter {
       const isNegated = trimmed.startsWith("-");
       const body = isNegated ? trimmed.slice(1) : trimmed;
       if (!body.toLowerCase().startsWith("path:")) {
-        if (!body.toLowerCase().startsWith("date:")) {
-          unsupportedTokens.push(trimmed);
-          continue;
-        }
+        if (body.toLowerCase().startsWith("date:")) {
+          const rawDateTerm = body.slice("date:".length).trim();
+          const dateClause = GraphPathFilter.tryParseDateClause(rawDateTerm);
+          if (dateClause.kind === "invalid") {
+            return {
+              isValid: false,
+              parsed: null,
+              hasPathTerms: false,
+              hasUnsupportedTokens: unsupportedTokens.length > 0,
+              reason: dateClause.reason
+            };
+          }
+          if (dateClause.kind === "empty") {
+            if (isNegated) {
+              continue;
+            }
 
-        const rawDateTerm = body.slice("date:".length).trim();
-        const dateClause = GraphPathFilter.tryParseDateClause(rawDateTerm);
-        if (dateClause.kind === "invalid") {
-          return {
-            isValid: false,
-            parsed: null,
-            hasPathTerms: false,
-            hasUnsupportedTokens: unsupportedTokens.length > 0,
-            reason: dateClause.reason
-          };
-        }
-        if (dateClause.kind === "empty") {
-          if (isNegated) {
+            includeDateClauses.push({
+              comparator: "eq",
+              day: GraphPathFilter.NO_MATCH_DATE_SENTINEL
+            });
             continue;
           }
 
-          includeDateClauses.push({
-            comparator: "eq",
-            day: GraphPathFilter.NO_MATCH_DATE_SENTINEL
-          });
+          if (isNegated) {
+            excludeDateClauses.push(dateClause.value);
+          } else {
+            includeDateClauses.push(dateClause.value);
+          }
           continue;
         }
 
-        if (isNegated) {
-          excludeDateClauses.push(dateClause.value);
-        } else {
-          includeDateClauses.push(dateClause.value);
+        if (body.toLowerCase().startsWith("tag:")) {
+          const rawTagTerm = body.slice("tag:".length).trim();
+          if (!rawTagTerm) {
+            if (isNegated) {
+              continue;
+            }
+
+            includeTagTerms.push(GraphPathFilter.NO_MATCH_TAG_SENTINEL);
+            continue;
+          }
+
+          const normalizedTagTerm = GraphPathFilter.normalizeTagMatchValue(rawTagTerm);
+          if (!normalizedTagTerm) {
+            if (isNegated) {
+              continue;
+            }
+
+            includeTagTerms.push(GraphPathFilter.NO_MATCH_TAG_SENTINEL);
+            continue;
+          }
+
+          if (isNegated) {
+            excludeTagTerms.push(normalizedTagTerm);
+          } else {
+            includeTagTerms.push(normalizedTagTerm);
+          }
+          continue;
         }
+
+        unsupportedTokens.push(trimmed);
         continue;
       }
 
@@ -151,7 +185,8 @@ export class GraphPathFilter {
     const hasPathTerms = includeTerms.length > 0 || excludeTerms.length > 0;
     const hasRegexTerms = includeRegexes.length > 0 || excludeRegexes.length > 0;
     const hasDateTerms = includeDateClauses.length > 0 || excludeDateClauses.length > 0;
-    const hasSupportedTerms = hasPathTerms || hasRegexTerms || hasDateTerms;
+    const hasTagTerms = includeTagTerms.length > 0 || excludeTagTerms.length > 0;
+    const hasSupportedTerms = hasPathTerms || hasRegexTerms || hasDateTerms || hasTagTerms;
 
     return {
       isValid: true,
@@ -163,6 +198,8 @@ export class GraphPathFilter {
             excludeRegexes,
             includeDateClauses,
             excludeDateClauses,
+            includeTagTerms,
+            excludeTagTerms,
             unsupportedTokens
           }
         : null,
@@ -179,7 +216,9 @@ export class GraphPathFilter {
         !parsed.includeRegexes.length &&
         !parsed.excludeRegexes.length &&
         !parsed.includeDateClauses.length &&
-        !parsed.excludeDateClauses.length)
+        !parsed.excludeDateClauses.length &&
+        !parsed.includeTagTerms.length &&
+        !parsed.excludeTagTerms.length)
     ) {
       return payload;
     }
@@ -220,6 +259,11 @@ export class GraphPathFilter {
         return false;
       }
     }
+    for (const excludeTag of parsed.excludeTagTerms) {
+      if (GraphPathFilter.noteHasMatchingTag(note, excludeTag)) {
+        return false;
+      }
+    }
 
     for (const include of parsed.includeTerms) {
       if (!normalizedPath.includes(include)) {
@@ -236,12 +280,28 @@ export class GraphPathFilter {
         return false;
       }
     }
+    for (const includeTag of parsed.includeTagTerms) {
+      if (!GraphPathFilter.noteHasMatchingTag(note, includeTag)) {
+        return false;
+      }
+    }
 
     return true;
   }
 
   private static normalizeMatchValue(value: string): string {
     return value.trim().replace(/\\/g, "/").toLowerCase();
+  }
+
+  private static normalizeTagMatchValue(value: string): string {
+    return value.trim().replace(/^#/, "").toLowerCase();
+  }
+
+  private static noteHasMatchingTag(note: GraphNoteNode, queryTag: string): boolean {
+    return note.tags.some((tag) => {
+      const normalizedTag = GraphPathFilter.normalizeTagMatchValue(tag);
+      return normalizedTag === queryTag || normalizedTag.startsWith(`${queryTag}/`);
+    });
   }
 
   private static toIsoDayKey(value: string | undefined): string | null {
