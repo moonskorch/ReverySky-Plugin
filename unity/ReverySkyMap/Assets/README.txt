@@ -10,14 +10,6 @@ Excluded assets (not tracked in this repository):
    - Assets/_Visuals/Textures/electric_texture_bw_big_contrast.jpg
    - Source: https://www.textures4photoshop.com/
 
-3) Freepik-derived icons (subset)
-   - Assets/_Visuals/Sprites/importance_icons/stars_thin_1.png
-   - Assets/_Visuals/Sprites/importance_icons/stars_thin_2.png
-   - Assets/_Visuals/Sprites/importance_icons/stars_thin_3.png
-   - Assets/_Visuals/Sprites/importance_icons/stars_thin_4.png
-   - Assets/_Visuals/Sprites/importance_icons/stars_thin_5.png
-   - Source attribution: see Assets/ThirdPartyNotices.txt
-
 Post-clone setup:
 1) Place the missing files into the exact paths listed above.
 2) Open Unity and let asset import finish.
@@ -25,7 +17,6 @@ Post-clone setup:
 4) For skybox: assign Nebula_03_Cubemap.exr to Assets/_Visuals/Materials/Skybox_Nebula.mat.
 
 Notes:
-- Assets/_Visuals/Sprites/importance_icons/question.png stays tracked in Git.
 - Assets/_Visuals/Sprites/nav_menu/arrow_rotate_left.png stays tracked in Git.
 - Assets/_Visuals/Sprites/nav_menu/arrow_rotate_right.png stays tracked in Git.
 - Tag textures in Assets/_Visuals/Textures/Tags/* are project-owned and remain tracked.
