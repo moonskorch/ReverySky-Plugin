@@ -1,6 +1,8 @@
 ﻿# Core
 node_modules/
 reference/
+test-results/
+playwright-report/
 
 # Generated Unity WebGL runtime artifacts
 unity-webgl/index.html

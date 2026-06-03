@@ -152,3 +152,6 @@ For detailed workflow and reporting rules, see `docs/AGENT_WORKFLOW.md`.
 - CI is currently not defined in repository configuration.
 - TS automated baseline exists, but comprehensive coverage is not yet established; add/extend targeted automated checks as part of risky or behavior-changing tasks.
 - Runtime integration quality depends on local Unity WebGL export freshness and correct import via `scripts/import-unity-webgl.ps1`.
+
+## UI Changes
+- For plugin-side visual changes, styling fixes, layout issues, and UI regressions, use the `ui-polish` skill.

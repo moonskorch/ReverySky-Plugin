@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Engine Dropdown Preview</title>
+    <link rel="stylesheet" href="../../styles.css" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --background-primary: Canvas;
+        --background-secondary: color-mix(in srgb, Canvas 92%, CanvasText 8%);
+        --background-modifier-border: color-mix(in srgb, CanvasText 18%, Canvas 82%);
+        --background-modifier-border-hover: color-mix(in srgb, CanvasText 32%, Canvas 68%);
+        --text-normal: CanvasText;
+        --text-muted: color-mix(in srgb, CanvasText 60%, Canvas 40%);
+        --font-ui-small: 0.875rem;
+        --font-ui-medium: 1rem;
+        --size-2-3: 0.5rem;
+        --size-4-3: 0.875rem;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      body {
+        display: grid;
+        place-items: start;
+        padding: 24px;
+        box-sizing: border-box;
+        background: Canvas;
+        font-family: system-ui, sans-serif;
+        color: CanvasText;
+      }
+
+      .visual-stage {
+        position: relative;
+        width: 420px;
+        height: 320px;
+        overflow: visible;
+      }
+
+      .visual-panel-shell {
+        position: absolute;
+        inset: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="visual-stage" data-visual-stage>
+      <div class="reverysky-map-root visual-panel-shell">
+        <div class="reverysky-map-filter-panel">
+          <div class="reverysky-map-filter-section reverysky-map-filter-control-group">
+            <div class="reverysky-map-filter-field-label">Engine</div>
+            <div class="reverysky-map-engine-select-host">
+              <select class="reverysky-map-engine-select" aria-label="Select engine">
+                <option value="auto" selected>Auto</option>
+                <option value="forces">Map of links (&lt;200 notes)</option>
+                <option value="static25d">Map of dates</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -9,9 +9,13 @@
     "check:plugin-release": "node scripts/check-plugin-release-artifacts.mjs",
     "build": "npm run check:unity-webgl && tsc --noEmit --skipLibCheck && node esbuild.config.mjs production && npm run check:plugin-release",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:ui-visual": "playwright test tests/visual",
+    "test:ui-visual:update": "playwright test tests/visual --update-snapshots",
+    "test:ui-visual:report": "playwright show-report"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/node": "^20.16.5",
     "esbuild": "^0.28.0",
     "jsdom": "^26.1.0",
