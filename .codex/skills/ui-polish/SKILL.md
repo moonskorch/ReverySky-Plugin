@@ -37,6 +37,25 @@ If no visual harness exists for the target state:
 * request one targeted owner screenshot or confirmation;
 * do not stack speculative patches.
 
+## Reference-driven visual loop
+
+When the owner attaches a target screenshot:
+
+1. Treat the attached screenshot as the visual target.
+2. Render the narrowest relevant harness scenario.
+3. Save and inspect the current candidate screenshot.
+4. Compare the candidate screenshot with the attached target.
+5. Apply one smallest local CSS repair.
+6. Rerun the scenario and inspect the new candidate screenshot.
+7. Repeat for at most three local CSS iterations.
+8. Report remaining visible mismatches and request owner confirmation.
+
+Do not update approved snapshots during visual matching.
+
+Update snapshots only after explicit owner approval of the rendered result.
+
+If the target cannot be reached without structural changes, new interaction logic, or a custom component, stop and report the limitation.
+
 ## Scope limits
 
 UI polish may adjust:
