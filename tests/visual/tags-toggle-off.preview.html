@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tags Toggle Off Preview</title>
+    <link rel="stylesheet" href="../../styles.css" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --background-primary: Canvas;
+        --background-secondary: color-mix(in srgb, Canvas 92%, CanvasText 8%);
+        --background-modifier-border: color-mix(in srgb, CanvasText 18%, Canvas 82%);
+        --background-modifier-border-hover: color-mix(in srgb, CanvasText 32%, Canvas 68%);
+        --background-modifier-hover: color-mix(in srgb, CanvasText 10%, Canvas 90%);
+        --text-normal: CanvasText;
+        --text-muted: color-mix(in srgb, CanvasText 60%, Canvas 40%);
+        --interactive-accent: #4f7cff;
+        --font-ui-small: 0.875rem;
+        --font-ui-medium: 1rem;
+        --input-height: 1.5rem;
+        --size-2-3: 0.5rem;
+        --size-4-3: 0.875rem;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      body {
+        display: grid;
+        place-items: start;
+        padding: 24px;
+        box-sizing: border-box;
+        background: Canvas;
+        font-family: system-ui, sans-serif;
+        color: CanvasText;
+      }
+
+      .visual-stage {
+        position: relative;
+        width: 120px;
+        height: 80px;
+        display: grid;
+        place-items: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="visual-stage" data-visual-stage>
+      <button
+        class="reverysky-map-tags-toggle"
+        type="button"
+        aria-label="Toggle tags"
+        aria-checked="false"
+        role="switch"
+      >
+        <span class="reverysky-map-tags-toggle-thumb"></span>
+      </button>
+    </div>
+  </body>
+</html>

@@ -154,4 +154,4 @@ For detailed workflow and reporting rules, see `docs/AGENT_WORKFLOW.md`.
 - Runtime integration quality depends on local Unity WebGL export freshness and correct import via `scripts/import-unity-webgl.ps1`.
 
 ## UI Changes
-- For plugin-side visual changes, styling fixes, layout issues, and UI regressions, use the `ui-polish` skill.
+- For plugin-side UI implementation, screenshot matching, visual polish, and visual regressions, use the `ui-polish` skill.
