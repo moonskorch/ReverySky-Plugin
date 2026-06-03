@@ -82,16 +82,16 @@ public class ObsidianBridgeEditModeTests
   }
 
   [Test]
-  public void OnGraphSet_EnginePreference_MapsToRuntimeFilterEngine()
+  public void OnGraphSet_EnginePreference_MapsToRuntimeEnginePreference()
   {
     bridge.OnGraphSet(TestPayloads.EnginePreferenceForcesPayload);
-    Assert.That(MapRuntimeContext.FilterEngine, Is.EqualTo(CartographerEngine.Forces));
+    Assert.That(MapRuntimeContext.EnginePreference, Is.EqualTo(CartographerEngine.Forces));
 
     bridge.OnGraphSet(TestPayloads.EnginePreferenceStatic25DPayload);
-    Assert.That(MapRuntimeContext.FilterEngine, Is.EqualTo(CartographerEngine.Static25D));
+    Assert.That(MapRuntimeContext.EnginePreference, Is.EqualTo(CartographerEngine.Static25D));
 
     bridge.OnGraphSet(TestPayloads.EnginePreferenceInvalidPayload);
-    Assert.That(MapRuntimeContext.FilterEngine, Is.EqualTo(CartographerEngine.Auto));
+    Assert.That(MapRuntimeContext.EnginePreference, Is.EqualTo(CartographerEngine.Auto));
   }
 
   [Test]
@@ -226,9 +226,7 @@ public class ObsidianBridgeEditModeTests
 
   private static void ResetRuntimeContext()
   {
-    MapRuntimeContext.FilterRangeDays = 0;
-    MapRuntimeContext.FilterImportance = CrystalType.Unknown;
-    MapRuntimeContext.FilterEngine = CartographerEngine.Auto;
+    MapRuntimeContext.EnginePreference = CartographerEngine.Auto;
     MapRuntimeContext.CurrentNoteId = string.Empty;
     MapRuntimeContext.SetTagNames(new Dictionary<int, string>());
     MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>());

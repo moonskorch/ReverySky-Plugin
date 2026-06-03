@@ -9,8 +9,6 @@ public class Cartographer : MonoBehaviour
 {
   public static Cartographer I { get; private set; }
 
-  [Header("Filter")]
-  [SerializeField] private OptionsForm optionsForm;
   [SerializeField] private FocusNode focusNode;
 
   [Header("Engines")]
@@ -67,15 +65,9 @@ public class Cartographer : MonoBehaviour
   private void Start()
   {
     TryInjectSampleDataIfNeeded();
-
-    BuildGraphRange(
-      MapRuntimeContext.FilterRangeDays,
-      MapRuntimeContext.FilterImportance,
-      MapRuntimeContext.FilterEngine);
+    RebuildGraph(MapRuntimeContext.EnginePreference);
 
     MapRuntimeContext.OnNotesChanged += HandleRuntimeNotesChanged;
-    if (optionsForm != null)
-      optionsForm.OnFilterApplied += BuildGraphRange;
     if (changeViewControl != null)
       changeViewControl.OnChangeScapeView += CycleView;
 
@@ -226,8 +218,6 @@ public class Cartographer : MonoBehaviour
   private void OnDestroy()
   {
     MapRuntimeContext.OnNotesChanged -= HandleRuntimeNotesChanged;
-    if (optionsForm != null)
-      optionsForm.OnFilterApplied -= BuildGraphRange;
     if (changeViewControl != null)
       changeViewControl.OnChangeScapeView -= CycleView;
   }
@@ -238,22 +228,9 @@ public class Cartographer : MonoBehaviour
       _activeEngine.Tick(Time.deltaTime);
   }
 
-  private void BuildGraphRange(int fromDaysAgo, CrystalType importance, CartographerEngine enginePreferred)
+  private void RebuildGraph(CartographerEngine enginePreferred)
   {
-    var sourceNotes = MapRuntimeContext.Notes ?? new List<NoteData>();
-
-    var notesFiltered = sourceNotes.AsEnumerable();
-
-    if (importance != CrystalType.Unknown)
-      notesFiltered = notesFiltered.Where(x => (int)x.CrystalType >= (int)importance);
-
-    if (fromDaysAgo > 0)
-    {
-      var threshold = DateTime.Today.AddDays(-fromDaysAgo);
-      notesFiltered = notesFiltered.Where(x => x.DateTime >= threshold);
-    }
-
-    var noteList = notesFiltered.ToList();
+    var noteList = MapRuntimeContext.Notes ?? new List<NoteData>();
 
     var noEntriesMessage = GameSettings.NotificationNoStars;
 
@@ -408,9 +385,6 @@ public class Cartographer : MonoBehaviour
 
   private void HandleRuntimeNotesChanged()
   {
-    BuildGraphRange(
-      MapRuntimeContext.FilterRangeDays,
-      MapRuntimeContext.FilterImportance,
-      MapRuntimeContext.FilterEngine);
+    RebuildGraph(MapRuntimeContext.EnginePreference);
   }
 }

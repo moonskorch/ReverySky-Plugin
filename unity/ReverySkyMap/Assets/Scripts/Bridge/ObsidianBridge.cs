@@ -75,7 +75,7 @@ public class ObsidianBridge : MonoBehaviour
       return;
     }
 
-    MapRuntimeContext.FilterEngine = ParseEnginePreference(envelope.payload.enginePreference);
+    MapRuntimeContext.EnginePreference = ParseEnginePreference(envelope.payload.enginePreference);
 
     var notes = envelope.payload.notes ?? Array.Empty<GraphNote>();
     var links = envelope.payload.links ?? Array.Empty<GraphLink>();

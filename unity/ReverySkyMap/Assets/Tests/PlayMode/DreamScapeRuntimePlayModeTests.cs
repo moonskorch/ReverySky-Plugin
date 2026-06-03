@@ -64,13 +64,13 @@ public class MapRuntimePlayModeTests
 
     bridge.OnGraphSet(ForcesEnginePreferencePayload);
     yield return WaitFrames(4);
-    Assert.That(MapRuntimeContext.FilterEngine, Is.EqualTo(CartographerEngine.Forces));
+    Assert.That(MapRuntimeContext.EnginePreference, Is.EqualTo(CartographerEngine.Forces));
     Assert.That(cartographer.ActiveEngine, Is.Not.Null);
     Assert.That(cartographer.ActiveEngine.EngineType, Is.EqualTo(CartographerEngine.Forces));
 
     bridge.OnGraphSet(Static25DEnginePreferencePayload);
     yield return WaitFrames(4);
-    Assert.That(MapRuntimeContext.FilterEngine, Is.EqualTo(CartographerEngine.Static25D));
+    Assert.That(MapRuntimeContext.EnginePreference, Is.EqualTo(CartographerEngine.Static25D));
     Assert.That(cartographer.ActiveEngine, Is.Not.Null);
     Assert.That(cartographer.ActiveEngine.EngineType, Is.EqualTo(CartographerEngine.Static25D));
 
@@ -121,9 +121,7 @@ public class MapRuntimePlayModeTests
 
   private static IEnumerator PrepareRuntimeWithDeterministicPayload()
   {
-    MapRuntimeContext.FilterRangeDays = 0;
-    MapRuntimeContext.FilterImportance = CrystalType.Unknown;
-    MapRuntimeContext.FilterEngine = CartographerEngine.Static25D;
+    MapRuntimeContext.EnginePreference = CartographerEngine.Static25D;
     MapRuntimeContext.SetTagNames(new Dictionary<int, string>());
     MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>());
     MapRuntimeContext.SetNotes(new List<NoteData>());

@@ -24,9 +24,7 @@ public static class MapRuntimeContext
 
   public static string CurrentNoteId { get; set; } = string.Empty;
 
-  public static int FilterRangeDays { get; set; } = 0;
-  public static CrystalType FilterImportance { get; set; } = CrystalType.Unknown;
-  public static CartographerEngine FilterEngine { get; set; } = CartographerEngine.Auto;
+  public static CartographerEngine EnginePreference { get; set; } = CartographerEngine.Auto;
 
   public static event Action<string, string> OnOpenNoteRequested;
   public static event Action OnNotesChanged;

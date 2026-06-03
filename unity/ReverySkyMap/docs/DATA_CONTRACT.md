@@ -82,7 +82,7 @@ Current runtime behavior snapshot for Unity ingestion and map interaction:
   - fallback: empty/whitespace title maps to `GameSettings.DefaultTitle` (`"Untitled"`).
 - `notes[].tags[]` -> trimmed runtime tag-id mapping; per-note deduplication is applied later by Forces engine.
   - derivation: trimmed tag string -> shared integer id mapping.
-- `notes[].date` -> static-25D date depth placement and date-range filtering.
+- `notes[].date` -> static-25D date depth placement.
   - fallback: parse failure or missing date maps to `DateTime.MinValue`.
 - `notes[].size` -> star scale factor via runtime percentile statistics.
   - fallback: negative size maps to `0`.
@@ -100,8 +100,7 @@ Current runtime behavior snapshot for Unity ingestion and map interaction:
 - Runtime tag ids (`TagIds`) and `tagId -> name` dictionary are derived locally from incoming `tags[]`.
 
 ### Temporary State
-- `NoteData.CrystalType = Unknown` for bridge-ingested notes is temporary.
-- Effect: importance filter currently does not provide meaningful runtime segmentation for real bridge data.
+- `NoteData.CrystalType = Unknown` for bridge-ingested notes is currently retained for legacy visual compatibility only.
 
 ## Ignored And Not Enforced In Runtime
 - Ignored fields: `requestId`, `payload.graphVersion`, `payload.generatedAt`, `payload.vault.noteCount`, `links[].kind`.
