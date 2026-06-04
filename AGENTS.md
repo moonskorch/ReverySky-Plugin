@@ -31,6 +31,9 @@
 - Plugin production build: `npm run build`
 - TS automated tests (single run): `npm run test`
 - TS automated tests (watch mode): `npm run test:watch`
+- UI visual regression tests: `npm run test:ui-visual`
+- UI visual baseline update: `npm run test:ui-visual:update`
+- UI visual report: `npm run test:ui-visual:report`
 - Unity export import:
   - `powershell -ExecutionPolicy Bypass -File .\scripts\import-unity-webgl.ps1 -ExportRoot "<UnityWebGLExportRoot>"`
 - Full workflow for clean setup and manual validation: `docs/WEBGL_INTEGRATION_RUNBOOK.md`.
@@ -50,7 +53,7 @@
 
 ## Canonical Process Docs
 - `docs/AGENT_WORKFLOW.md`: canonical workflow, task modes, task contract, and repair loop.
-- `docs/VERIFICATION.md`: canonical verification policy, command matrix, and scope-based check selection.
+- `docs/VERIFICATION.md`: canonical verification policy, command matrix, visual regression checks, and scope-based check selection.
 - `docs/MVP_PLAN.md`: canonical roadmap, active-step scope, freeze rule, and step-specific execution exceptions.
 - Keep this file compact: include mandatory guardrails and pointers, not full repeated procedures.
 
@@ -64,8 +67,7 @@
 - When working on a task, optionally check `.local-notes/` for relevant local documentation before making implementation decisions.
 
 ## Project Plan Workflow
-For substantial MVP work, treat `docs/MVP_PLAN.md` as canonical roadmap and follow the process in `docs/AGENT_WORKFLOW.md`.
-Keep step-specific scope in the plan; do not invent tasks outside the active step unless the plan is updated first.
+For substantial MVP work, treat `docs/MVP_PLAN.md` as the roadmap and keep work inside the active step unless the plan is updated first.
 
 ## Final Response Format
 Every completed task response must include:
@@ -82,11 +84,11 @@ For detailed workflow and reporting rules, see `docs/AGENT_WORKFLOW.md`.
 - Do not silently reshape milestone intent during unrelated tasks.
 
 ## Verification
-- Use `docs/VERIFICATION.md` as canonical verification policy (order, command matrix, and scope-specific requirements).
+- Use `docs/VERIFICATION.md` as the canonical verification policy and command matrix.
 - For every non-documentation task, run relevant automated checks first; manual checks are additional, not a replacement.
 - For bridge/runtime changes, verify end-to-end `bridge:ready` -> `graph:set` flow.
 - Every final report must state checks run, results, skipped checks with reasons, and manual checks.
-- For cross-layer or contract changes, follow the self-contained implementation rule in `docs/AGENT_WORKFLOW.md` and the bridge verification gate in `docs/VERIFICATION.md`. Do not report a feature as complete while a required producer or consumer step is still deferred.
+- For cross-layer or contract changes, follow the self-contained implementation rule in `docs/AGENT_WORKFLOW.md` and the bridge verification gate in `docs/VERIFICATION.md`; do not report a feature as complete while a required producer or consumer step is still deferred.
 
 
 ## Context and Token Discipline

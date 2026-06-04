@@ -22,6 +22,9 @@ Core commands:
 - `npm run build` - TypeScript compile check + production bundle build (`esbuild`).
 - `npm run test` - Vitest single-run suite for TS baseline tests.
 - `npm run test:watch` - Vitest watch mode for local iteration.
+- `npm run test:ui-visual` - Playwright visual regression run for `tests/visual`.
+- `npm run test:ui-visual:update` - refresh screenshot baselines when the UI change is intentional.
+- `npm run test:ui-visual:report` - open the latest Playwright report.
 
 Current TS baseline test suites:
 - `tests/bridge/MessageValidator.test.ts`
@@ -42,6 +45,12 @@ Current TS baseline test suites:
   - validates handshake flow `bridge:ready` -> graph build -> `graph:set`;
   - validates `detach()` and container cleanup on `onClose`.
 
+Current visual regression suites:
+- `tests/visual/engine-dropdown.spec.ts`
+  - validates the engine dropdown focused state in the preview harness.
+- `tests/visual/tags-toggle-off.spec.ts`
+  - validates the tags toggle off state in the preview harness.
+
 ## Documentation-only changes
 
 Automated checks are usually not required.
@@ -59,6 +68,7 @@ Required automated checks:
 
 Additional automated checks when available:
 - targeted Vitest runs (by file or name filter) for touched modules
+- Playwright visual regression runs (`npm run test:ui-visual`) for touched rendered UI, styles, or screenshot baselines.
 
 Manual checks:
 - Load plugin in Obsidian dev vault.
@@ -92,12 +102,13 @@ Manual checks:
 - Enter Play mode.
 - Confirm no missing scripts or runtime errors.
 
-## Obsidian ↔ Unity integration
+## Obsidian <-> Unity integration
 
 Required checks when relevant:
 - plugin build;
 - targeted or full automated tests for touched TS/Unity areas, when available;
 - Unity/WebGL build if runtime changed;
+- Playwright visual regression runs if the plugin-facing UI or rendered bridge state changed;
 - manual end-to-end smoke check in Obsidian.
 
 Manual smoke check:
@@ -113,7 +124,7 @@ Manual smoke check:
 
 When a task changes data or behavior across a subsystem boundary, verify the complete path rather than only the edited side.
 
-For plugin ↔ Unity bridge changes, review as applicable:
+For plugin <-> Unity bridge changes, review as applicable:
 
 * producer sends the expected payload;
 * types and validation match the payload;
@@ -124,7 +135,6 @@ For plugin ↔ Unity bridge changes, review as applicable:
 A build or passing plugin-side tests do not prove completion of a cross-layer feature.
 
 If the consumer is intentionally left unchanged, classify the result as a preparatory patch and state that the feature is not yet functional end-to-end.
-
 
 ## Cleanup / deletion
 

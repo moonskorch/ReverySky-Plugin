@@ -1,9 +1,42 @@
-Texture: "Electric Power Lightning Texture Seamless" (Textures4Photoshop) https://www.textures4photoshop.com/
-Skybox: "Nebula Skyboxes" (Unity Asset Store, Standard EULA) https://assetstore.unity.com/packages/2d/textures-materials/sky/nebula-skyboxes-219924
+Third-party visual assets
+
+The MIT License in the repository root applies only to the original project code
+and materials owned by MoonSkorch Studio.
+
+The following third-party visual assets are intentionally excluded from Git.
+They are used only as embedded components of the built product and remain
+subject to their respective terms.
+
+1. Electric Power Lightning Texture Seamless
+   Provider: Textures4Photoshop
+   Source:
+   https://www.textures4photoshop.com/tex/bokeh-and-light/electric-power-lightning-texture-seamless.aspx
+
+   Used under the Textures4Photoshop attribution terms.
+   The raw texture file is not distributed in this repository.
+
+2. Nebula Skyboxes
+   Provider: RG Road Turtle Games
+   Source:
+   https://assetstore.unity.com/packages/2d/textures-materials/sky/nebula-skyboxes-219924
+
+   Licensed under the Standard Unity Asset Store EULA.
+   The raw asset files are not distributed in this repository.
+
+3. TextMesh Pro bundled resources
+
+   The Unity project includes TextMesh Pro resource files imported with Unity.
+
+   Included notices:
+   - Assets/TextMesh Pro/Fonts/LiberationSans - OFL.txt
+   - Assets/TextMesh Pro/Sprites/EmojiOne Attribution.txt
+
+   These resources remain subject to their respective terms.
+
+
 Vector graphics: "Decorative start collections" designed by Davidzydd (Freepik) http://www.freepik.com
 Icons: Google Fonts Icons (Google) https://fonts.google.com/icons
 Font: Exo (SIL Open Font License) https://fonts.google.com/specimen/Exo
 
 Libraries:
 Simple File Browser (MIT) github.com/yasirkula/UnitySimpleFileBrowser
-MCP Unity Editor (MIT) github.com/codergamester/mcp-unity

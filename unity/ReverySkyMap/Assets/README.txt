@@ -15,26 +15,3 @@ Post-clone setup:
 2) Open Unity and let asset import finish.
 3) Reassign missing references in prefabs/materials if Unity shows missing sprites/textures.
 4) For skybox: assign Nebula_03_Cubemap.exr to Assets/_Visuals/Materials/Skybox_Nebula.mat.
-
-Notes:
-- Assets/_Visuals/Sprites/nav_menu/arrow_rotate_left.png stays tracked in Git.
-- Assets/_Visuals/Sprites/nav_menu/arrow_rotate_right.png stays tracked in Git.
-- Tag textures in Assets/_Visuals/Textures/Tags/* are project-owned and remain tracked.
-
-ReverySkyMap_RPAsset -> Upscaling Filter tests
-1) FidelityFX Super Resolution (FSR) + Render Scale 0.8
-Empty skybox scene: ~27 FPS
-Simple spheres: ~25 FPS
-Complex shaders + VFX (movement, distortion, halo): ~21 FPS
-
-2) Bilinear + Render Scale 0.85
-Empty skybox scene: up to 60 FPS
-Simple spheres: ~45 FPS
-Complex shaders + VFX: ~37 FPS
-
-3) Bilinear + Render Scale 0.9
-Better visual - still decent FPS
-
-Visual notes
-Simple spheres look noticeably worse with Bilinear (more aliasing/jaggies).
-On complex shaders/VFX, motion, distortion, and glow largely mask the reduced image quality, and the scene looks smoother overall thanks to the higher FPS.
