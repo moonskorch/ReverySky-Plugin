@@ -16,7 +16,7 @@ public class StarVisual : MonoBehaviour
   [SerializeField] private GameObject sphere;
   [SerializeField] private GameObject crystal;
 
-  private const CrystalType FixedCoreImportance = CrystalType.Value3;
+  private const CrystalType FixedCrystalType = CrystalType.Value3;
 
   private void Start()
   {
@@ -83,9 +83,9 @@ public class StarVisual : MonoBehaviour
     crystal.SetActive(show);
     if (!show) return;
 
-    var hasFixedCore = crystalTypeVisualMap.Any(x => x.crystalType == FixedCoreImportance);
+    var hasFixedCore = crystalTypeVisualMap.Any(x => x.crystalType == FixedCrystalType);
     var selectedCore = hasFixedCore
-      ? FixedCoreImportance
+      ? FixedCrystalType
       : crystalTypeVisualMap.FirstOrDefault()?.crystalType ?? CrystalType.Unknown;
 
     foreach (var crystalPair in crystalTypeVisualMap)

@@ -2483,11 +2483,11 @@ MonoBehaviour:
   viewIconSimple: {fileID: 21300000, guid: e619271fbe5ff854fa1c4e701befe7c5, type: 3}
   notification: {fileID: 1893426638}
   injectSampleData: 0
-  sampleNoteCount: 320
-  sampleTagPoolSize: 24
-  sampleDateSpanDays: 720
-  sampleMaxTagsPerNote: 3
-  sampleExtraLinks: 480
+  sampleNoteCount: 30
+  sampleTagPoolSize: 12
+  sampleDateSpanDays: 20
+  sampleMaxTagsPerNote: 4
+  sampleExtraLinks: 25
 --- !u!4 &1780593169
 Transform:
   m_ObjectHideFlags: 0

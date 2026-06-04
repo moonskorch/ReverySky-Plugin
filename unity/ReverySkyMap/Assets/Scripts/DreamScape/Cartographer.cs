@@ -136,7 +136,7 @@ public class Cartographer : MonoBehaviour
         Name = $"{number} Sample Note",
         Path = $"Sample/{number:0000}.md",
         DateTime = now.AddDays(-daysAgo),
-        CrystalType = (CrystalType)rng.Next((int)CrystalType.Value1, (int)CrystalType.Value4 + 1),
+        CrystalType = CrystalType.Unknown,
         SphereType = spheres[rng.Next(0, spheres.Length)],
         TagIds = tagSet.ToList()
       });
