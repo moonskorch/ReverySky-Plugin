@@ -32,8 +32,3 @@ subject to their respective terms.
    - Assets/TextMesh Pro/Sprites/EmojiOne Attribution.txt
 
    These resources remain subject to their respective terms.
-
-
-Vector graphics: "Decorative start collections" designed by Davidzydd (Freepik) http://www.freepik.com
-Icons: Google Fonts Icons (Google) https://fonts.google.com/icons
-Font: Exo (SIL Open Font License) https://fonts.google.com/specimen/Exo
