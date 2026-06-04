@@ -118,7 +118,7 @@ $config = [ordered]@{
   frameworkFile = $frameworkAliasName
   codeFile = $codeAliasName
   streamingAssetsUrl = "StreamingAssets"
-  companyName = "ReverySky"
+  companyName = "MoonSkorch Studio"
   productName = "ReverySky Map"
   productVersion = "0.0.1"
 }
