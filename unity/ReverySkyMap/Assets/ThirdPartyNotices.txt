@@ -37,6 +37,3 @@ subject to their respective terms.
 Vector graphics: "Decorative start collections" designed by Davidzydd (Freepik) http://www.freepik.com
 Icons: Google Fonts Icons (Google) https://fonts.google.com/icons
 Font: Exo (SIL Open Font License) https://fonts.google.com/specimen/Exo
-
-Libraries:
-Simple File Browser (MIT) github.com/yasirkula/UnitySimpleFileBrowser

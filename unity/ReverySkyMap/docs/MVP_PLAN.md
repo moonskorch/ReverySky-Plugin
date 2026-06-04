@@ -252,10 +252,6 @@ Step-specific policy (keep):
 - Do not rename completed historical batch IDs in docs; keep them aligned with original commit IDs.
 - For new batches after `batch-11`, use one batch = one next integer (`12`, `13`, ...) with no letter suffixes.
 
-Deferred keep rules:
-1. Keep `FolderPicker` and related folder-selection flow (`rootFolderPath` / `saveNewFolderPath`) until subfolder-filter feature design is finalized.
-2. Keep `DbMigrator` until explicit `GameDb` removal decision; treat it as post-DB cleanup artifact, not as standalone orphan (resolved in Batch 7d).
-
 Batch ledger (append-only):
 - Authoritative file: `docs/CLEANUP_BATCH_LEDGER.md`.
 
