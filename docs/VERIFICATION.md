@@ -102,6 +102,8 @@ Manual checks:
 - Enter Play mode.
 - Confirm no missing scripts or runtime errors.
 
+If Unity source files or assets changed, existing packaged WebGL files must be treated as stale until Unity WebGL is rebuilt and copied into the plugin package.
+
 ## Obsidian <-> Unity integration
 
 Required checks when relevant:

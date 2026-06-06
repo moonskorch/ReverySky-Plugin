@@ -66,6 +66,7 @@ type GraphLink = {
 ```
 
 ## Unity Ingestion Invariants
+- Incoming `graph:set` payloads are already the plugin's effective filtered graph; Unity does not own query parsing or source-graph derivation.
 - `vault.noteCount` is informational for Unity ingest; runtime uses `notes` as the source of truth.
 - `id` is required and stable across updates.
 - `path` is vault-relative with `/` separators.

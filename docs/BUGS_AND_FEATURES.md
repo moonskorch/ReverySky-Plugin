@@ -11,40 +11,34 @@ Purpose:
    - Current state: refresh triggers are graph-significant (`tags`, `links`, `create/rename/delete`), so size/date-only updates can remain stale until next trigger.
    - Follow-up direction: add a controlled refresh/recalculation path for size/date-affecting updates without returning to full rebuild on every text edit.
 
-2. Importance filter behavior is inconsistent and unclear.
-   - Expected: deterministic and understandable filtering behavior.
-   - Current state: results appear unreliable.
-
-3. Input system technical debt warning (`Input Manager` deprecation).
+2. Input system technical debt warning (`Input Manager` deprecation).
    - Current state: Unity warns that legacy Input Manager is deprecated.
    - Impact: no immediate runtime break, but migration debt and potential future compatibility risk.
    - Follow-up direction: plan a dedicated migration task to `Input System` (or `Both`) with input regression checks.
 
-4. Verify star model data source and mapping (especially `Id`). It shouldn't rely on frontmatter custom fields.
-   - Expected: `Star` data fields are consistently populated from the intended runtime bridge source.
-   - Current state: data origin/mapping path for `Star` fields (with focus on `Id`) must be validated.
-
-5. Repository baseline docs are incomplete (`README` and `LICENSE` are missing).
-   - Expected: public repository has minimal onboarding and licensing files at root.
-   - Current state: initial commit preparation still needs `README` and `LICENSE`.
+3. Repository baseline docs are incomplete (`README` is still only a starter).
+    - Expected: public repository has minimal onboarding docs that explain install, run, and build.
+    - Current state: `LICENSE.md` is present, but `README.md` still needs proper project-oriented content instead of a thin placeholder.
 
 ## Features
 
-1. Add folder-based filtering.
-   - Note: do not remove existing folder-selection scaffolding from the project.
+1. Add tag icons.
+    - Note: old implementation via `SymbolRepository` was removed.
+    - Follow-up direction: review reference project logic and selectively port only the relevant parts.
 
-2. Add tag icons.
-   - Note: old implementation via `SymbolRepository` was removed.
-   - Follow-up direction: review reference project logic and selectively port only the relevant parts.
+2. Determine crystal type and sphere material from user-selected properties (instead of static/random mapping). Or it could be some general properties: for example, number of links (direct + reversal) to color (from 0 as black to max limit as eternal).
+    - Expected: visual mapping is configured by user-defined property bindings.
+    - Current state: temporary behavior uses static/random fallback and needs replacement.
 
-3. Determine crystal type and sphere material from user-selected properties (instead of static/random mapping). Or it could be some general properties: for example, number of links (direct + reversal) to color (from 0 as black to max limit as eternal).
-   - Expected: visual mapping is configured by user-defined property bindings.
-   - Current state: temporary behavior uses static/random fallback and needs replacement.
-
-4. Optimize engine-only switching across the bridge.
+3. Optimize engine-only switching across the bridge.
     - Expected: changing only the preferred engine should not require resending the full `graph:set` payload with all notes and links.
     - Current state: plugin-side engine filter updates reuse cached source graph, but still redispatch the entire effective graph payload when only `enginePreference` changes.
     - Follow-up direction: consider a lightweight bridge message such as `engine:set` (or similar) so engine-only changes can trigger runtime rebuild without retransmitting the full graph payload.
+
+4. Expand filter parameters to better match native Obsidian Graph behavior.
+    - Expected: the filter UI can grow beyond `path:`, `date:`, and `tag:` with additional operator-style parameters similar to native Graph affordances.
+    - Current state: the plugin-side filter pipeline already owns filtering, so new parameters can be added without moving ownership into Unity.
+    - Follow-up direction: add operators incrementally, starting with the highest-value native-style parameters such as `file:`, `line:`, `section:`, and `[property]`.
 
 5. Release zip packaging should include `LICENSE.md` and the relevant third-party notices.
     - Follow-up direction: define the minimal public release bundle so the downloadable zip carries the root MIT license and the Unity-side notices needed for redistributed assets.

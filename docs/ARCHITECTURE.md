@@ -48,3 +48,16 @@ Out of scope for this repository stage:
 - `reference/ReverySky` is a reference/inspiration workspace, not a restore baseline.
 - Do not rollback, reset, or bulk-copy from `reference/ReverySky` into `unity/ReverySkyMap`.
 - `reference/ReverySky` may be used only for targeted comparison or selective fragment-level adaptation.
+
+## Graph Ownership
+- The plugin builds a source graph from vault data, then derives the effective `graph:set` payload in the view before sending it to Unity.
+- Query parsing and filtering live on the plugin side in `src/view/ReverySkyMapView.ts` and `src/graph/GraphPathFilter.ts`.
+- Current supported filter slices are `path:`, `date:`, and `tag:`; unsupported terms stay plugin-side and are surfaced as view guidance.
+- `Tags` visibility and `enginePreference` are view state, not Unity-owned state.
+- Unity consumes the already-filtered payload and does not own filter parsing or source-graph derivation.
+
+## Current Graph Model
+- Graph notes carry `id`, `path`, `title`, `tags`, optional canonical `date`, and `size` in bytes.
+- `date` is produced from note metadata with frontmatter date preferred and file creation time as fallback.
+- `tags` are merged from inline tags and frontmatter tags, then normalized and deduplicated before emission.
+- `enginePreference` is an optional payload hint that travels with the effective graph when the view has a selected runtime engine.
