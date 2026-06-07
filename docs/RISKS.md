@@ -29,8 +29,8 @@ Risk:
 - Large runtime assets can degrade repository usability and distribution.
 
 Mitigation:
-- Keep generated `unity-webgl/index.html` out of Git.
-- Keep `unity-webgl/Build/*` and `unity-webgl/TemplateData/*` as local generated artifacts.
+- Keep generated outputs out of Git.
+- Keep `unity-webgl/index.html`, `unity-webgl/Build/*`, and `unity-webgl/TemplateData/*` as local generated artifacts.
 - Exclude optional large skybox source textures from commits as documented in `unity/ReverySkyMap/Assets/README.txt`.
 - Keep runtime generation script-driven and reproducible.
 

@@ -2,6 +2,9 @@ import type { App, CachedMetadata, TFile } from "obsidian";
 import { GraphLink, GraphNoteNode, GraphPayload } from "../bridge/BridgeTypes";
 import { GraphNormalizer } from "./GraphNormalizer";
 
+/**
+ * Build the graph payload from the current vault snapshot for the Unity runtime.
+ */
 export class VaultGraphBuilder {
   static build(app: App): GraphPayload {
     const files = app.vault.getMarkdownFiles();
@@ -21,6 +24,9 @@ export class VaultGraphBuilder {
     };
   }
 
+  /**
+   * Translate Obsidian resolvedLinks into the bridge format and keep only note targets.
+   */
   private static buildLinks(app: App, notes: GraphNoteNode[]): GraphLink[] {
     const noteIdByPath = new Map<string, string>();
     for (const note of notes) {
@@ -69,6 +75,9 @@ export class VaultGraphBuilder {
     return links;
   }
 
+  /**
+   * Merge frontmatter, inline tags, and file metadata into the compact node shape Unity needs.
+   */
   private static toNoteNode(app: App, file: TFile): GraphNoteNode {
     const cache = app.metadataCache.getFileCache(file);
     const frontmatter = cache?.frontmatter;
@@ -130,6 +139,9 @@ export class VaultGraphBuilder {
     return undefined;
   }
 
+  /**
+   * Use a deterministic hash so ids stay stable even if note order changes.
+   */
   private static makeStableId(path: string): string {
     let hash = 0x811c9dc5;
     for (let i = 0; i < path.length; i++) {
@@ -139,6 +151,9 @@ export class VaultGraphBuilder {
     return `note_${(hash >>> 0).toString(16).padStart(8, "0")}`;
   }
 
+  /**
+   * Clamp invalid file sizes to zero so the payload stays validator-friendly.
+   */
   private static getNoteSizeBytes(file: TFile): number {
     const rawSize = file?.stat?.size;
     if (!Number.isFinite(rawSize)) {

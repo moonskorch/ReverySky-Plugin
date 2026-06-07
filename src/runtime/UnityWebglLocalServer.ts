@@ -14,6 +14,9 @@ const CONTENT_TYPES: Record<string, string> = {
   ".wasm": "application/wasm"
 };
 
+/**
+ * Serve the generated Unity WebGL export from localhost for the iframe runtime.
+ */
 export class UnityWebglLocalServer {
   private server: Server | null = null;
   private baseUrl: string | null = null;
@@ -24,6 +27,9 @@ export class UnityWebglLocalServer {
     this.rootDirResolved = path.resolve(rootDir);
   }
 
+  /**
+   * Start the server once and reuse the same address for all iframe loads.
+   */
   async getBaseUrl(): Promise<string> {
     if (this.baseUrl) {
       return this.baseUrl;
@@ -55,6 +61,9 @@ export class UnityWebglLocalServer {
     });
   }
 
+  /**
+   * Bind to 127.0.0.1 on a random port to avoid collisions with other services.
+   */
   private startServer(): Promise<string> {
     return new Promise((resolve, reject) => {
       const server = createServer((req, res) => {
@@ -78,6 +87,9 @@ export class UnityWebglLocalServer {
     });
   }
 
+  /**
+   * Keep the host locked down to GET/HEAD and map requests to the export root.
+   */
   private async handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
       if (req.method !== "GET" && req.method !== "HEAD") {
@@ -126,6 +138,9 @@ export class UnityWebglLocalServer {
     }
   }
 
+  /**
+   * Normalize and validate the path to block traversal outside the export directory.
+   */
   private resolveRequestPath(pathnameRaw: string): string | null {
     const pathname = pathnameRaw === "/" ? "/index.html" : pathnameRaw;
     const decoded = decodeURIComponent(pathname);

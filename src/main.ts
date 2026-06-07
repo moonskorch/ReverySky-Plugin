@@ -3,6 +3,10 @@ import { REVERYSKY_MAP_VIEW_TYPE, ReverySkyMapView } from "./view/ReverySkyMapVi
 import { UnityWebglLocalServer } from "./runtime/UnityWebglLocalServer";
 import path from "node:path";
 
+/**
+ * Obsidian plugin entry point.
+ * Registers the custom view, user actions, and the local WebGL runtime host.
+ */
 export default class ReverySkyMapPlugin extends Plugin {
   private unityWebglServer: UnityWebglLocalServer | null = null;
 
@@ -33,6 +37,9 @@ export default class ReverySkyMapPlugin extends Plugin {
     }
   }
 
+  /**
+   * Start the WebGL host lazily and reuse it for every iframe load.
+   */
   async getUnityRuntimeUrl(): Promise<string> {
     if (!this.unityWebglServer) {
       const pluginDir = this.resolvePluginDirectory();
@@ -73,6 +80,9 @@ export default class ReverySkyMapPlugin extends Plugin {
     await this.activateMapView();
   }
 
+  /**
+   * Resolve the installed plugin folder so the bundled WebGL export can be served from disk.
+   */
   private resolvePluginDirectory(): string {
     const adapter = this.app.vault.adapter as { getBasePath?: () => string };
     if (!adapter.getBasePath) {

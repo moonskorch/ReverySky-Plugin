@@ -191,7 +191,7 @@ Main repository surfaces:
   Type: generated
 
 Build and import flow:
-1. `npm run build` validates TypeScript, builds `main.js`, and checks expected release artifacts.
+1. `npm run build` validates TypeScript and writes `main.js`.
 2. Unity exports WebGL from `unity/ReverySkyMap`.
 3. `scripts/import-unity-webgl.ps1` copies the export into `unity-webgl/` and regenerates runtime files used by the plugin.
 4. At runtime the plugin starts `UnityWebglLocalServer`, and the iframe loads the served `index.html`.

@@ -6,6 +6,9 @@ import {
   NoteOpenMessage
 } from "./BridgeTypes";
 
+/**
+ * Validate bridge messages at the boundary so malformed payloads fail fast.
+ */
 export class MessageValidator {
   static validateGraphPayload(payload: GraphPayload): string[] {
     const errors: string[] = [];

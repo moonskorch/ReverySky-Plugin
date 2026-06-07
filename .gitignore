@@ -3,6 +3,7 @@ node_modules/
 reference/
 test-results/
 playwright-report/
+main.js
 
 # Generated Unity WebGL runtime artifacts
 unity-webgl/index.html

@@ -15,12 +15,19 @@ type BridgeCallbacks = {
   onError?: (message: string) => void;
 };
 
+/**
+ * Thin postMessage transport for the Unity iframe.
+ * It owns attachment, validation, and routing of incoming bridge events.
+ */
 export class UnityIframeBridge {
   private iframeWindow: Window | null = null;
   private attached = false;
   private callbacks: BridgeCallbacks = {};
   private readonly onMessageRef = (event: MessageEvent) => this.onMessage(event);
 
+  /**
+   * Replace any previous iframe listener so only one runtime is active.
+   */
   attach(iframeWindow: Window, callbacks: BridgeCallbacks): void {
     if (this.attached) {
       this.detach();
@@ -91,6 +98,9 @@ export class UnityIframeBridge {
     this.iframeWindow.postMessage(message, "*");
   }
 
+  /**
+   * Only accept messages from the attached iframe and route known bridge events.
+   */
   private onMessage(event: MessageEvent): void {
     if (!this.iframeWindow || event.source !== this.iframeWindow) {
       return;

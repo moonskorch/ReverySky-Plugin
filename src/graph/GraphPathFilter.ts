@@ -27,11 +27,17 @@ export type PathFilterParseResult = {
   reason?: string;
 };
 
+/**
+ * Parse and apply the view's path filter syntax without mutating the source graph.
+ */
 export class GraphPathFilter {
   private static readonly NO_MATCH_SENTINEL = "\u0000__empty_path_term__";
   private static readonly NO_MATCH_DATE_SENTINEL = "\u0000__empty_date_term__";
   private static readonly NO_MATCH_TAG_SENTINEL = "\u0000__empty_tag_term__";
 
+  /**
+   * Convert the free-form search box text into structured include/exclude filters.
+   */
   static parsePathQuery(query: string): PathFilterParseResult {
     const rawQuery = typeof query === "string" ? query.trim() : "";
     if (!rawQuery) {
@@ -86,6 +92,7 @@ export class GraphPathFilter {
             };
           }
           if (dateClause.kind === "empty") {
+            // Empty date filters intentionally match nothing instead of being ignored.
             if (isNegated) {
               continue;
             }
@@ -108,6 +115,7 @@ export class GraphPathFilter {
         if (body.toLowerCase().startsWith("tag:")) {
           const rawTagTerm = body.slice("tag:".length).trim();
           if (!rawTagTerm) {
+            // Empty tag filters intentionally match nothing instead of being ignored.
             if (isNegated) {
               continue;
             }
@@ -118,6 +126,7 @@ export class GraphPathFilter {
 
           const normalizedTagTerm = GraphPathFilter.normalizeTagMatchValue(rawTagTerm);
           if (!normalizedTagTerm) {
+            // Empty tag filters intentionally match nothing instead of being ignored.
             if (isNegated) {
               continue;
             }
@@ -140,6 +149,7 @@ export class GraphPathFilter {
 
       const rawTerm = body.slice("path:".length).trim();
       if (!rawTerm) {
+        // Empty path filters intentionally match nothing instead of broadening the query.
         if (isNegated) {
           continue;
         }
@@ -208,6 +218,9 @@ export class GraphPathFilter {
     };
   }
 
+  /**
+   * Keep the no-filter fast path as a no-op; clone only when filtering changes the payload.
+   */
   static applyPathFilter(payload: GraphPayload, parsed: ParsedPathFilter | null): GraphPayload {
     if (
       !parsed ||

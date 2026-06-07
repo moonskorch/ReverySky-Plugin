@@ -5,16 +5,16 @@ This runbook defines a reproducible workflow to generate runtime artifacts from 
 
 ## Scope
 - Source repository contains plugin source code, Unity project source, and runtime template.
-- Generated runtime artifacts are local build outputs and are intentionally excluded from Git.
+- Generated outputs are local build artifacts.
 
-## Source and Generated Assets
+## Source and Generated Outputs
 Tracked source files:
 - `src/*`
 - `unity/ReverySkyMap/*` (Unity project source)
 - `unity-webgl/index.template.html`
 - `scripts/import-unity-webgl.ps1`
 
-Generated local artifacts (not tracked):
+Generated local artifacts:
 - `unity-webgl/index.html`
 - `unity-webgl/Build/*`
 - `unity-webgl/TemplateData/*`
@@ -70,7 +70,7 @@ npm run build
 ```
 
 Output:
-- `main.js` (distribution artifact for Obsidian plugin installation).
+- `main.js` (generated plugin bundle).
 - `styles.css` (plugin UI styles; must be present in installed plugin folder).
 
 If PowerShell blocks npm wrapper:
@@ -99,7 +99,7 @@ Copy these artifacts:
 ## Regeneration Rules
 - Re-run Unity export + import script whenever Unity content changes.
 - Re-run `npm run build` whenever TypeScript/plugin code changes.
-- Do not commit generated runtime artifacts.
+- Do not commit generated outputs.
 
 ## External Visual Assets Note
 - Some third-party visual source files are intentionally excluded from Git.

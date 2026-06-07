@@ -2,108 +2,7 @@
 
 This document defines the required workflow for AI-assisted development tasks in this repository.
 
-Goal: keep every task traceable, verifiable, and easy to review.
-
-## Project-level workflow
-
-For ongoing MVP work, do not start meaningful implementation tasks directly from memory.
-
-Before starting a new substantial work block:
-
-1. Read `MVP_PLAN.md` and current task notes.
-2. Compare the plan with the current repository state.
-3. Check whether the next planned step is still the right next step.
-4. If project reality changed, update the plan first.
-5. Move blocking cleanup, stabilization, or risk-reduction work earlier when it affects future implementation.
-6. Convert the selected plan item into a concrete task with scope, done criteria, verification, and manual checks.
-7. Then follow the task workflow loop.
-
-`MVP_PLAN.md` is the roadmap. Individual tasks are execution units derived from it.
-When executing a numbered MVP step, use the step text as the source of scope.
-Do not expand the task beyond that step unless the plan is updated first.
-
-## Self-contained implementation and cross-layer changes
-
-Do not present a partial implementation as a completed feature.
-
-Before editing, identify whether the requested behavior crosses a boundary between subsystems, such as plugin ↔ Unity, runtime ↔ serialized scene state, or code ↔ documented contract.
-
-If a required change conflicts with an owner instruction or appears to be intentionally deferred, stop before editing and ask for clarification. Do not silently choose a narrower interpretation that leaves the requested behavior incomplete.
-
-A preparatory patch is allowed only when the owner explicitly approves it as a separate stage. In that case, report clearly that the user-facing behavior is not yet implemented end-to-end.
-
-## Task modes
-
-Before starting a task, choose the safest execution mode.
-
-- **Direct edit:** use for small, low-risk changes with clear scope.
-- **Plan-first:** use for broad, risky, architectural, integration, dependency, CI/CD, or multi-module changes.
-- **Audit-only:** use when the task is to inspect, classify, understand, or assess. Do not modify code in this mode.
-- **Staged execution:** use for risky cleanup, deletion, migration, or work that previously caused breakage. Start with audit-only, then execute small approved batches with verification after each batch.
-- **Repair loop:** use when checks fail. Diagnose the root cause, fix it, and re-run the relevant checks.
-
-If the mode is unclear, choose the safer mode.
-For cleanup or deletion, never start with broad edits.
-
-## Task contract (required before edits)
-
-Before implementation, write a short task contract that answers six questions:
-
-- Mode: how to execute (`audit-only`, `direct edit`, `staged cleanup`, or another explicit mode from this workflow)
-- Goal: expected outcome
-- Scope: what may be changed
-- Out of scope: what must not be changed
-- Verification: checks that prove the result
-- Stop condition: exact condition when the agent must stop and report
-
-Keep it compact (typically 6-10 lines).  
-For tiny low-risk edits, a one-paragraph compact contract is acceptable if all six fields are still explicit.
-
-## UI styling
-
-For UI styling changes, reuse existing project patterns and native controls where practical.
-Do not add custom icons, inline SVG data URIs, or decorative behavior unless required by the task or already established in the codebase.
-Call out any non-obvious styling technique in the final report.
-
-## Simplification pass
-
-Before reporting completion, review your own diff for unnecessary complexity.
-
-Simplify where safe:
-- keep one source of truth for each rule;
-- reuse existing project patterns;
-- remove speculative abstractions and unused extension points;
-- avoid fallback branches without a concrete failure mode;
-- avoid helpers and wrappers that do not improve clarity;
-- remove comments that merely restate the code;
-- keep the change localized to the smallest reasonable area.
-
-If non-obvious complexity remains, explain why it is necessary.
-Do not expand scope while simplifying.
-
-## Preserve non-obvious decisions
-
-During implementation, record non-obvious decisions while the context is fresh.
-
-Use the narrowest appropriate place:
-
-- Inline comment or JSDoc:
-  local intent, external constraint, invariant, or deliberate trade-off
-  that is not obvious from the code.
-
-- `docs/ARCHITECTURE.md`:
-  subsystem responsibility, state ownership, dependency direction,
-  or cross-layer design decision.
-
-- `docs/DATA_CONTRACT.md`:
-  payload shape, event semantics, precedence rule, or integration contract.
-
-- ADR:
-  only for a durable, non-obvious architectural decision with meaningful alternatives
-  that future work may reasonably question again.
-
-Do not add comments that paraphrase the implementation.
-Prefer clearer naming or simpler structure when that solves the readability problem.
+Goal: keep each task traceable, verifiable, and easy to review.
 
 ## 1. Define the task
 
@@ -113,97 +12,161 @@ Before editing, identify:
 - Scope
 - Constraints
 - Done criteria
-- Files or areas likely to be affected
+- Files or areas likely to change
 - Risks or unclear assumptions
 
 For small tasks, this can be a short summary.
-For broad or risky tasks, create a plan before editing.
+For broader or risky tasks, create a plan before editing.
 
-## 2. Inspect context
+Required task contract before edits:
 
-Read the relevant project context before changing files:
+- Mode: how to execute the task
+- Goal: expected outcome
+- Scope: what may change
+- Out of scope: what must not change
+- Verification: checks that prove the result
+- Stop condition: exact condition for stopping and reporting
+
+Keep the contract compact. A short paragraph is acceptable only if all six fields are still explicit.
+
+## 2. Start from the right source
+
+For MVP work, do not start from memory.
+
+Before a substantial work block:
+
+1. Read `MVP_PLAN.md` and the current task notes.
+2. Compare the plan with the repository state.
+3. Check whether the next planned step is still the right next step.
+4. Update the plan first if reality changed.
+5. Convert the selected plan item into a concrete task contract.
+6. Execute only within that scope.
+
+`MVP_PLAN.md` is the roadmap; tasks are execution units derived from it.
+When working from a numbered step, use the step text as scope and do not expand it until the plan is updated.
+
+## 3. Pick the safest mode
+
+- Direct edit: small, low-risk changes with clear scope.
+- Plan-first: broad, risky, architectural, integration, dependency, CI/CD, or multi-module work.
+- Audit-only: inspect, classify, or understand only; do not edit.
+- Staged execution: risky cleanup, deletion, migration, or work that previously caused breakage; start with audit-only and use small approved batches.
+- Repair loop: when checks fail, find the root cause, fix it, and rerun the relevant checks.
+
+If the mode is unclear, choose the safer one.
+For cleanup or deletion, never start with broad edits.
+
+## 4. Inspect context
+
+Read the relevant context before changing files:
 
 - `AGENTS.md`
-- `README.md` (if present)
-- Relevant files in `docs/`
-- Existing implementation files
-- Tests
-- Config files
-- Scripts
-- CI/CD configuration, if relevant
+- `README.md` when present
+- relevant files in `docs/`
+- implementation files
+- tests
+- config files
+- scripts
+- CI/CD configuration when relevant
 
 Do not rely on assumptions when repository evidence is available.
-
 If docs and code conflict, report the contradiction.
 
-## 3. Plan when needed
+## 5. Plan when needed
 
 Create a short plan before:
 
-- Architecture changes
-- Database or schema changes
-- Auth or security-sensitive changes
-- Dependency changes
+- architecture changes
+- database or schema changes
+- auth or security-sensitive changes
+- dependency changes
 - CI/CD changes
-- Deployment changes
-- Public API changes
-- Large refactors
-- Changes touching several modules at once
+- deployment changes
+- public API changes
+- large refactors
+- changes touching several modules at once
 
 The plan should include:
 
-- Intended approach
-- Files likely to change
-- Verification steps
-- Risks
+- intended approach
+- files likely to change
+- verification steps
+- risks
 
-## 4. Implement a small focused diff
+## 6. Implement a small focused diff
 
-Change only what is needed for the task.
+Change only what the task needs.
 
 Do not:
 
-- Refactor unrelated code
-- Reformat unrelated files
-- Create temporary test files in the repository
-- Rewrite working project-specific instructions with generic text
-- Modify application code during documentation-only tasks
+- refactor unrelated code
+- reformat unrelated files
+- create temporary test files in the repository
+- rewrite project-specific instructions with generic text
+- modify application code during documentation-only tasks
 
-## 5. Verify
+If the request crosses a boundary between subsystems, such as plugin <-> Unity, runtime <-> serialized scene state, or code <-> documented contract, confirm the intended end-to-end behavior before editing.
 
-Run checks using `docs/VERIFICATION.md` as canonical policy and command/source-of-truth.
-For non-documentation changes, automated checks are required and must be executed before manual smoke checks.
+Do not present a partial implementation as complete.
 
-If a check cannot be run, state:
+If a required change conflicts with an owner instruction or looks intentionally deferred, stop and ask for clarification instead of silently narrowing the scope.
 
-- Which check was not run
-- Why it was not run
-- What should be checked later
+A preparatory patch is allowed only when the owner explicitly approves it as a separate stage. In that case, report clearly that user-facing behavior is not yet implemented end to end.
 
-## 6. Repair loop
+## 7. Keep it simple
+
+Before reporting completion, review the diff for unnecessary complexity.
+
+Simplify where safe:
+
+- keep one source of truth for each rule
+- reuse existing project patterns
+- remove speculative abstractions and unused extension points
+- avoid fallback branches without a concrete failure mode
+- avoid helpers and wrappers that do not improve clarity
+- remove comments that merely restate the code
+- keep the change localized to the smallest reasonable area
+
+If non-obvious complexity remains, explain why it is necessary.
+Do not expand scope while simplifying.
+
+## 8. Verify
+
+Use `docs/VERIFICATION.md` as the canonical policy and command/source of truth.
+
+For non-documentation tasks:
+
+- run automated checks before manual smoke checks
+- if a check cannot be run, say which one, why, and what must be checked later
+
+## 9. Repair loop
 
 If verification fails:
 
 1. Read the failure carefully.
 2. Identify the root cause.
-3. Fix the cause, not only the visible symptom.
+3. Fix the cause, not just the symptom.
 4. Re-run the relevant checks.
 5. Report remaining failures honestly.
 
 Do not hide failed checks.
 
-## 7. Final response
+## 10. Preserve decisions
+
+Record non-obvious decisions while the context is fresh.
+
+Use the narrowest appropriate place:
+
+- Inline comment or JSDoc: local intent, external constraint, invariant, or deliberate trade-off not obvious from code.
+- `docs/ARCHITECTURE.md`: subsystem responsibility, state ownership, dependency direction, or cross-layer design decision.
+- `docs/DATA_CONTRACT.md`: payload shape, event semantics, precedence rule, or integration contract.
+- ADR: only for a durable architectural decision with meaningful alternatives that may need revisiting.
+
+Do not add comments that paraphrase the implementation.
+Prefer clearer naming or simpler structure when that solves the problem.
+
+## 11. Final response
 
 Use the canonical final report format from `AGENTS.md`.
 
 Do not add a rollback section by default. Include rollback guidance only when explicitly requested.
-
-## 8. Expected result
-
-A completed task should make it clear:
-
-- What changed
-- Why it changed
-- Where it changed
-- How it was checked
-- What still needs human review

@@ -73,6 +73,7 @@ type TagSuggestion = {
   displayTag: string;
 };
 
+// 0..3 map to the default, path, date, and tag suggestion panes.
 type FilterSuggestionMode = 0 | 1 | 2 | 3;
 
 export type ReverySkyMapViewDependencies = {
@@ -82,6 +83,9 @@ export type ReverySkyMapViewDependencies = {
   now?: () => number;
 };
 
+/**
+ * Own the Obsidian view shell, bridge lifecycle, and filter UI around the Unity map.
+ */
 export class ReverySkyMapView extends ItemView {
   navigation = false;
   private readonly bridge: BridgePort;
@@ -259,6 +263,9 @@ export class ReverySkyMapView extends ItemView {
     emptyElement(this.contentEl as ObsidianHTMLElement);
   }
 
+  /**
+   * Subscribe once to vault events that can invalidate the graph.
+   */
   private ensureRefreshSubscriptions(): void {
     if (this.refreshSubscriptionsRegistered) {
       return;
@@ -354,6 +361,7 @@ export class ReverySkyMapView extends ItemView {
 
     this.semanticRefreshPending = true;
     this.clearResolveBarrierFallbackTimer();
+    // `metadataCache.resolved` is the ideal flush point; fall back if it never arrives.
     this.resolveBarrierFallbackTimer = setTimeout(() => {
       this.resolveBarrierFallbackTimer = null;
       if (!this.semanticRefreshPending) {
@@ -365,6 +373,9 @@ export class ReverySkyMapView extends ItemView {
     }, GRAPH_RESOLVE_BARRIER_FALLBACK_MS);
   }
 
+  /**
+   * Debounce graph refreshes during bursty file-system changes.
+   */
   private scheduleGraphRefresh(): void {
     if (!this.refreshActive) {
       return;
@@ -395,6 +406,9 @@ export class ReverySkyMapView extends ItemView {
     }, FILTER_INPUT_DEBOUNCE_MS);
   }
 
+  /**
+   * Reapply the current UI filters to the freshest source graph before sending it to Unity.
+   */
   private emitGraphFromSource(): void {
     if (!this.sourceGraphPayload) {
       return;
@@ -705,6 +719,7 @@ export class ReverySkyMapView extends ItemView {
   }
 
   private resolveAutoSuggestionMode(): FilterSuggestionMode {
+    // Keep the suggestion pane aligned with the operator the user is currently typing.
     const currentQuery = this.searchComponent?.inputEl?.value ?? this.searchComponent?.getValue() ?? this.pathFilterQuery;
     if (/\s$/.test(currentQuery)) {
       return 0;

@@ -1,5 +1,9 @@
 export const BRIDGE_PROTOCOL_VERSION = "2.0.0";
 
+/**
+ * Shared bridge message and payload types.
+ * Keep this contract aligned with the iframe runtime.
+ */
 export type BridgeReadyMessage = {
   protocolVersion: string;
   type: "bridge:ready";
