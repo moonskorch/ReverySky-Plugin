@@ -59,11 +59,27 @@ Before implementation, write a short task contract that answers six questions:
 Keep it compact (typically 6-10 lines).  
 For tiny low-risk edits, a one-paragraph compact contract is acceptable if all six fields are still explicit.
 
-### UI styling
+## UI styling
 
 For UI styling changes, reuse existing project patterns and native controls where practical.
 Do not add custom icons, inline SVG data URIs, or decorative behavior unless required by the task or already established in the codebase.
 Call out any non-obvious styling technique in the final report.
+
+## Simplification pass
+
+Before reporting completion, review your own diff for unnecessary complexity.
+
+Simplify where safe:
+- keep one source of truth for each rule;
+- reuse existing project patterns;
+- remove speculative abstractions and unused extension points;
+- avoid fallback branches without a concrete failure mode;
+- avoid helpers and wrappers that do not improve clarity;
+- remove comments that merely restate the code;
+- keep the change localized to the smallest reasonable area.
+
+If non-obvious complexity remains, explain why it is necessary.
+Do not expand scope while simplifying.
 
 ## 1. Define the task
 

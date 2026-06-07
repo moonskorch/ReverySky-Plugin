@@ -1,63 +1,226 @@
-﻿# ReverySky Map for Obsidian - Architecture
+# ReverySky Map for Obsidian - Architecture
 
-## Purpose
-ReverySky Map is an Obsidian desktop plugin that renders vault relationships in a Unity WebGL runtime embedded in a custom Obsidian view.
+## Purpose and Scope
+ReverySky Map is an Obsidian desktop plugin that renders relationships between vault notes inside a Unity WebGL scene embedded in a custom Obsidian view.
 
-## Scope
-Implemented scope for the current codebase:
-- Custom Obsidian view and command (`Open ReverySky Map`).
-- Vault graph extraction from markdown files (notes, tags, resolved links).
-- Type-safe bridge envelopes between plugin and embedded runtime.
-- Unity runtime hosting through a local HTTP server bound to `127.0.0.1`.
+Current in-scope behavior:
+- open a dedicated map view from an Obsidian command;
+- build a graph from markdown files and resolved links;
+- let the view filter the effective graph before sending it to Unity;
+- host the local WebGL runtime on `127.0.0.1`;
+- round-trip note selection between Obsidian and the Unity runtime.
 
-Out of scope for this repository stage:
-- Note authoring from Unity.
-- Non-map gameplay systems from the standalone ReverySky application.
-- Mobile-specific runtime behavior.
+## System Overview
+The system has three runtime boundaries:
+1. Obsidian plugin code in TypeScript.
+2. A loopback HTTP host that serves the WebGL package.
+3. Unity runtime code compiled into the WebGL build.
 
-## Runtime Topology
-1. Obsidian plugin opens a custom view.
-2. View loads `unity-webgl/index.html` in an iframe.
-3. `UnityIframeBridge` waits for `bridge:ready`.
-4. Plugin builds graph payload and sends `graph:set`.
-5. Runtime consumes payload and renders map state.
+Main system parts:
 
-## Core Components
-- `src/main.ts`: plugin lifecycle, command registration, view activation, local runtime server setup.
-- `src/view/ReverySkyMapView.ts`: iframe initialization and bridge attachment.
-- `src/graph/*`: vault graph extraction and normalization.
-- `src/bridge/*`: protocol types, validation, bridge transport.
-- `src/runtime/UnityWebglLocalServer.ts`: secure local static file serving for Unity runtime assets.
+- Obsidian plugin shell
+  Registers the custom view and the `Open ReverySky Map` command, and lazily creates the local WebGL server.
+  Main code: `src/main.ts`
+  Depends on: Obsidian `Plugin`, `WorkspaceLeaf`, `UnityWebglLocalServer`
 
-## Automated Test Baseline (TypeScript)
-- Selected stack: Vitest (`vitest`) + `jsdom` for TypeScript plugin and bridge verification.
-- Test layout: `tests/**/*.test.ts`.
-- Scope boundary: TS tests cover plugin-side logic and bridge orchestration with mocked iframe/runtime boundary; Unity project tests are handled separately.
+- Map view and UI state
+  Creates the iframe, restores and persists view state, reacts to vault changes, applies filters, and coordinates bridge traffic.
+  Main code: `src/view/ReverySkyMapView.ts`
+  Depends on: `VaultGraphBuilder`, `GraphPathFilter`, `UnityIframeBridge`, Obsidian workspace APIs
 
-## Unity WebGL Asset Model
-- Tracked source template: `unity-webgl/index.template.html`.
-- Generated runtime host page: `unity-webgl/index.html` (not tracked).
-- Runtime binaries: `unity-webgl/Build/*` (generated locally, not tracked).
-- Import workflow: `scripts/import-unity-webgl.ps1` copies Unity export artifacts and generates runtime files.
+- Graph extraction and normalization
+  Converts vault files and resolved links into a stable graph payload with normalized paths, tags, dates, and note ids.
+  Main code: `src/graph/VaultGraphBuilder.ts`, `src/graph/GraphNormalizer.ts`
+  Depends on: Obsidian `vault` and `metadataCache`
 
-## Repository Boundaries
-- `unity/ReverySkyMap` is the Unity source project used to produce WebGL exports.
-- `reference/` is excluded from commits and used only as a local reference workspace.
+- Bridge transport and validation
+  Defines the cross-runtime contract, validates payloads, and delivers `postMessage` envelopes to and from the iframe.
+  Main code: `src/bridge/BridgeTypes.ts`, `src/bridge/MessageValidator.ts`, `src/bridge/UnityIframeBridge.ts`
+  Depends on: browser `postMessage`, protocol version `2.0.0`
 
-## Reference Project Policy
-- `reference/ReverySky` is a reference/inspiration workspace, not a restore baseline.
-- Do not rollback, reset, or bulk-copy from `reference/ReverySky` into `unity/ReverySkyMap`.
-- `reference/ReverySky` may be used only for targeted comparison or selective fragment-level adaptation.
+- Local WebGL host
+  Serves `unity-webgl/` over loopback HTTP and rejects path traversal or unsupported methods.
+  Main code: `src/runtime/UnityWebglLocalServer.ts`
+  Depends on: Node `http`, `fs`, `path`
 
-## Graph Ownership
-- The plugin builds a source graph from vault data, then derives the effective `graph:set` payload in the view before sending it to Unity.
-- Query parsing and filtering live on the plugin side in `src/view/ReverySkyMapView.ts` and `src/graph/GraphPathFilter.ts`.
-- Current supported filter slices are `path:`, `date:`, and `tag:`; unsupported terms stay plugin-side and are surfaced as view guidance.
-- `Tags` visibility and `enginePreference` are view state, not Unity-owned state.
-- Unity consumes the already-filtered payload and does not own filter parsing or source-graph derivation.
+- Unity runtime source
+  Receives graph payloads, owns runtime graph state, rebuilds the scene, focuses notes, and requests note opening back in Obsidian.
+  Main code: `unity/ReverySkyMap/Assets/Scripts/Bridge/*.cs`, `unity/ReverySkyMap/Assets/Scripts/DreamScape/*.cs`
+  Depends on: `MapRuntimeContext`, `ObsidianBridge`, `Cartographer`, `FocusNode`
 
-## Current Graph Model
-- Graph notes carry `id`, `path`, `title`, `tags`, optional canonical `date`, and `size` in bytes.
-- `date` is produced from note metadata with frontmatter date preferred and file creation time as fallback.
-- `tags` are merged from inline tags and frontmatter tags, then normalized and deduplicated before emission.
-- `enginePreference` is an optional payload hint that travels with the effective graph when the view has a selected runtime engine.
+- Generated WebGL package
+  Delivers the compiled runtime and host page used by the iframe.
+  Main code: `unity-webgl/`, `unity-webgl/index.template.html`, `scripts/import-unity-webgl.ps1`
+  Depends on: Unity WebGL export pipeline
+
+## Execution Paths
+Most plugin-side behavior is coordinated from `ReverySkyMapView`, while `src/main.ts` stays limited to lifecycle and view activation.
+The main entry points are the plugin startup path, the map command, the view startup path, and incoming bridge messages from the runtime. The routes below show how control moves from those entry points through the code.
+
+### Path 1. Command -> view activation -> iframe startup
+1. `src/main.ts` -> `ReverySkyMapPlugin.onload()`
+   Registers `REVERYSKY_MAP_VIEW_TYPE` and the `open-reverysky-map` command.
+2. `src/main.ts` -> command callback -> `activateMapView()`
+   Finds an existing map leaf or creates one with `workspace.getRightLeaf(false)` and `leaf.setViewState(...)`.
+3. Obsidian opens the custom view and calls `src/view/ReverySkyMapView.ts` -> `onOpen()`.
+4. `onOpen()` calls `plugin.getUnityRuntimeUrl()`.
+5. `src/main.ts` -> `getUnityRuntimeUrl()` lazily creates `UnityWebglLocalServer`, then calls `getBaseUrl()`.
+6. `src/runtime/UnityWebglLocalServer.ts` -> `getBaseUrl()` -> `startServer()`
+   Starts a loopback HTTP server and returns `http://127.0.0.1:<port>/index.html`.
+7. `ReverySkyMapView.onOpen()` creates the iframe with that URL and waits for the iframe `load` event.
+8. On iframe load, `ReverySkyMapView.onOpen()` calls `bridge.attach(iframe.contentWindow, callbacks)`.
+
+### Path 2. Handshake -> graph build -> postMessage -> Unity ingest
+1. The runtime posts `bridge:ready`.
+2. `src/bridge/UnityIframeBridge.ts` -> `onMessage()`
+   Validates the incoming message and calls the registered `onReady` callback.
+3. `src/view/ReverySkyMapView.ts` -> `refreshGraphNow()`
+   Rebuilds the source graph and immediately hands off to emission logic.
+4. `src/view/ReverySkyMapView.ts` -> `emitGraphFromSource()`
+   Takes the source payload, applies the active filter, applies `showTags`, and includes `enginePreference`.
+5. `src/graph/VaultGraphBuilder.ts` -> `build(app)`
+   Reads markdown files from the vault, derives stable note ids, normalizes tags and paths, and builds links from `metadataCache.resolvedLinks`.
+6. `src/view/ReverySkyMapView.ts` -> `bridge.sendGraphSet(outgoingPayload)`
+7. `src/bridge/UnityIframeBridge.ts` -> `sendGraphSet()`
+   Validates the payload with `MessageValidator`, builds a `graph:set` envelope, and calls `iframeWindow.postMessage(...)`.
+8. Unity receives `graph:set`, updates `MapRuntimeContext`, and rebuilds the visible graph through `Cartographer`.
+
+### Path 3. Vault or UI change -> filtered graph refresh
+1. `ReverySkyMapView` registers vault, metadata, and UI listeners during startup.
+2. A graph-significant change happens:
+   vault metadata changes, path filter input changes, tag visibility toggles, or engine preference changes.
+3. `src/view/ReverySkyMapView.ts` updates its local state:
+   `pathFilterQuery`, `showTags`, `enginePreference`, and the parsed filter result.
+4. The view re-enters `emitGraphFromSource()`.
+5. `src/graph/GraphPathFilter.ts`
+   Parses the query and returns the filtered `GraphPayload` subset.
+6. `src/bridge/UnityIframeBridge.ts` -> `sendGraphSet()`
+   Sends the effective graph that Unity should render now.
+
+### Path 4. Unity note-open request -> Obsidian note open
+1. Unity sends `note:open`.
+2. `src/bridge/UnityIframeBridge.ts` -> `onMessage()`
+   Validates the message and calls `onNoteOpen(payload)`.
+3. `src/view/ReverySkyMapView.ts` -> `openRequestedNote(payload)`
+4. `openRequestedNote()` resolves the target note by id and path, chooses the target leaf, and calls `app.workspace.openLinkText(...)`.
+5. Control returns to Obsidian, which opens or focuses the requested note.
+
+### Key plugin-side control points
+
+- `src/main.ts` -> `ReverySkyMapPlugin`
+  Owns plugin startup, command registration, view activation, and lazy runtime-server creation.
+
+- `src/view/ReverySkyMapView.ts` -> `ReverySkyMapView`
+  Owns the main execution paths after the view exists: iframe startup, refresh triggers, filtering, graph emission, and note opening.
+
+- `src/graph/VaultGraphBuilder.ts` -> `VaultGraphBuilder.build(app)`
+  Owns graph extraction from Obsidian state.
+
+- `src/graph/GraphPathFilter.ts` -> parse/apply helpers
+  Owns query parsing and graph narrowing before handoff to Unity.
+
+- `src/bridge/UnityIframeBridge.ts` -> `attach()`, `sendGraphSet()`, `sendNoteFocus()`, `onMessage()`
+  Owns browser-side message transport and validation handoff points.
+
+- `src/runtime/UnityWebglLocalServer.ts` -> `getBaseUrl()`, `startServer()`, `handleRequest()`
+  Owns runtime hosting and the boundary between plugin code and generated WebGL assets.
+
+## State Ownership and Contracts
+### Ownership rules
+
+- Raw vault files, metadata cache, and resolved links are owned by Obsidian.
+  They are the source of truth for note existence and links.
+
+- Stable note ids, normalized paths, normalized tags, and canonical note date are owned by the TypeScript graph layer.
+  They are built in `VaultGraphBuilder` and `GraphNormalizer`.
+
+- The effective graph after filters is owned by `ReverySkyMapView`.
+  The view emits the filtered payload that Unity receives.
+
+- `pathFilterQuery`, `showTags`, and `enginePreference` are owned by `ReverySkyMapView` state.
+  They are persisted as view state and re-applied on open.
+
+- Runtime notes, links, selected note, and graph layout are owned by the Unity runtime.
+  They are stored in `MapRuntimeContext` and consumed by `Cartographer`.
+
+- WebGL file serving is owned by `UnityWebglLocalServer`.
+  The runtime is hosted locally, not from an external site.
+
+### Bridge contract
+The canonical plugin-side contract lives in:
+- `docs/DATA_CONTRACT.md`
+- `src/bridge/BridgeTypes.ts`
+- `src/bridge/MessageValidator.ts`
+
+Important current contract facts:
+- protocol version is `2.0.0`;
+- startup order is `bridge:ready` first, then `graph:set`;
+- `path` values must stay vault-relative and use `/` separators;
+- `graph:set` carries the effective filtered graph;
+- `enginePreference` is an optional plugin-owned runtime hint;
+- invalid outgoing payloads are rejected before dispatch;
+- invalid incoming bridge messages are ignored with non-fatal error reporting.
+
+## Build, Packaging, and Deployment Boundaries
+Source and generated surfaces are intentionally separate:
+
+Main repository surfaces:
+
+- `src/`
+  Role: Obsidian plugin source
+  Type: source
+
+- `unity/ReverySkyMap/`
+  Role: Unity source project
+  Type: source
+
+- `unity-webgl/index.template.html`
+  Role: tracked host template
+  Type: source
+
+- `unity-webgl/index.html`
+  Role: local runtime host page
+  Type: generated
+
+- `unity-webgl/Build/*` and `unity-webgl/TemplateData/*`
+  Role: WebGL export artifacts
+  Type: generated
+
+- `main.js`
+  Role: bundled plugin entry output
+  Type: generated
+
+Build and import flow:
+1. `npm run build` validates TypeScript, builds `main.js`, and checks expected release artifacts.
+2. Unity exports WebGL from `unity/ReverySkyMap`.
+3. `scripts/import-unity-webgl.ps1` copies the export into `unity-webgl/` and regenerates runtime files used by the plugin.
+4. At runtime the plugin starts `UnityWebglLocalServer`, and the iframe loads the served `index.html`.
+
+## Verification
+Detailed commands live in `docs/VERIFICATION.md`. This section only maps the main architecture areas to their checks.
+
+- Entry path: command -> view -> runtime startup
+  Automated checks: `npm run build`
+  Manual checks: confirm the map command opens the custom view and the iframe starts successfully
+
+- Handshake and bridge transport
+  Automated checks: `npm run test`, especially `tests/bridge/*`
+  Manual checks: verify `bridge:ready` -> `graph:set` flow in the map view
+
+- View execution paths, filter state, and note-open flow
+  Automated checks: `npm run test`, especially `tests/view/ReverySkyMapView.test.ts`
+  Manual checks: open the map, change filters, and open a note from the runtime
+
+- Visual plugin UI states
+  Automated checks: `npm run test:ui-visual` when UI changed
+  Manual checks: review screenshots for search/filter controls and toggles
+
+- Unity runtime source changes
+  Automated checks: Unity-side tests when available
+  Manual checks: open the Unity project, enter Play mode, and verify runtime behavior
+
+## Known Risks and Open Questions
+- There is no repository-defined CI, so architecture regressions depend on local verification discipline.
+- TypeScript tests cover the plugin side well enough to show intent, but they do not prove the packaged Unity WebGL build is fresh.
+- Unity runtime quality depends on a new export plus a correct `scripts/import-unity-webgl.ps1` import step after Unity-side changes.
+- The repository contains both source-of-truth docs and generated runtime assets; future work must keep those boundaries explicit to avoid editing generated files as if they were source.
