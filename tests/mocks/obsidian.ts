@@ -1,3 +1,25 @@
+export class Plugin {
+  public app: unknown;
+  public manifest: { id: string };
+
+  constructor(app?: unknown, manifest?: { id?: string }) {
+    this.app = app ?? {};
+    this.manifest = { id: manifest?.id ?? "reverysky-map" };
+  }
+
+  registerView(_type: string, _creator: (leaf: WorkspaceLeaf) => unknown): void {}
+
+  addRibbonIcon(_icon: string, _title: string, _callback: () => unknown): void {}
+
+  addCommand(_command: { id: string; name: string; callback: () => unknown }): void {}
+
+  async loadData(): Promise<unknown> {
+    return null;
+  }
+
+  async saveData(_data: unknown): Promise<void> {}
+}
+
 export class ItemView {
   public contentEl: HTMLElement;
   public app: unknown;
