@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GraphPayload } from "../../src/bridge/BridgeTypes";
-import type { ReverySkyMapViewDependencies } from "../../src/view/ReverySkyMapView";
+import type { MapViewDependencies } from "../../src/view/MapView";
 
-import { ReverySkyMapView } from "../../src/view/ReverySkyMapView";
+import { MapView } from "../../src/view/MapView";
 
 type BridgeCallbacks = {
   onReady?: () => void;
@@ -66,7 +66,7 @@ function makePathPayload(): GraphPayload {
   };
 }
 
-describe("ReverySkyMapView bridge integration", () => {
+describe("MapView bridge integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -104,14 +104,14 @@ describe("ReverySkyMapView bridge integration", () => {
     const buildGraph = vi.fn().mockReturnValue(payload);
     const notify = vi.fn();
 
-    const deps: ReverySkyMapViewDependencies = {
+    const deps: MapViewDependencies = {
       createBridge: () => bridge,
       buildGraph: buildGraph as (app: never) => GraphPayload,
       notify,
       now: () => 1700000000000
     };
 
-    const view = new ReverySkyMapView({ app } as never, plugin as never, deps);
+    const view = new MapView({ app } as never, plugin as never, deps);
     await view.onOpen();
 
     const iframe = view.contentEl.querySelector("iframe");
@@ -189,14 +189,14 @@ describe("ReverySkyMapView bridge integration", () => {
     const buildGraph = vi.fn().mockReturnValue(payload);
     const notify = vi.fn();
 
-    const deps: ReverySkyMapViewDependencies = {
+    const deps: MapViewDependencies = {
       createBridge: () => bridge,
       buildGraph: buildGraph as (app: never) => GraphPayload,
       notify,
       now: () => 1700000000000
     };
 
-    const view = new ReverySkyMapView({ app } as never, plugin as never, deps);
+    const view = new MapView({ app } as never, plugin as never, deps);
     await view.onOpen();
 
     const iframe = view.contentEl.querySelector("iframe");
@@ -273,7 +273,7 @@ describe("ReverySkyMapView bridge integration", () => {
     payload.notes[0].id = "note_abc";
     payload.notes[0].path = "Folder/Note.md";
 
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -346,7 +346,7 @@ describe("ReverySkyMapView bridge integration", () => {
     payload.notes[0].id = "note_abc";
     payload.notes[0].path = "Folder/Note.md";
 
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -429,7 +429,7 @@ describe("ReverySkyMapView bridge integration", () => {
 
     const payload = makePayload();
     const buildGraph = vi.fn().mockReturnValue(payload);
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -538,7 +538,7 @@ describe("ReverySkyMapView bridge integration", () => {
 
     const payload = makePayload();
     const buildGraph = vi.fn().mockReturnValue(payload);
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -652,7 +652,7 @@ describe("ReverySkyMapView bridge integration", () => {
 
     const payload = makePayload();
     const buildGraph = vi.fn().mockReturnValue(payload);
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -754,7 +754,7 @@ describe("ReverySkyMapView bridge integration", () => {
     const queuedPayload = makePayload();
     queuedPayload.notes[0].id = "queued";
     const buildGraph = vi.fn().mockReturnValue(queuedPayload);
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -860,7 +860,7 @@ describe("ReverySkyMapView bridge integration", () => {
     ];
     payload.vault.noteCount = payload.notes.length;
 
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -962,7 +962,7 @@ describe("ReverySkyMapView bridge integration", () => {
       .mockReturnValueOnce(payloadBefore)
       .mockReturnValueOnce(payloadAfter);
 
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -1032,7 +1032,7 @@ describe("ReverySkyMapView bridge integration", () => {
 
     const payload = makePathPayload();
     const buildGraph = vi.fn().mockReturnValue(payload);
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -1118,7 +1118,7 @@ describe("ReverySkyMapView bridge integration", () => {
     payload.notes[2].tags = ["archive"];
     const buildGraph = vi.fn().mockReturnValue(payload);
 
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -1206,7 +1206,7 @@ describe("ReverySkyMapView bridge integration", () => {
 
     const payload = makePathPayload();
     const buildGraph = vi.fn().mockReturnValue(payload);
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -1285,7 +1285,7 @@ describe("ReverySkyMapView bridge integration", () => {
     };
 
     const payload = makePathPayload();
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -1351,7 +1351,7 @@ describe("ReverySkyMapView bridge integration", () => {
     };
 
     const payload = makePathPayload();
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -1427,7 +1427,7 @@ describe("ReverySkyMapView bridge integration", () => {
       size: 5
     });
     payload.vault.noteCount = payload.notes.length;
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -1518,7 +1518,7 @@ describe("ReverySkyMapView bridge integration", () => {
     };
 
     const payload = makePathPayload();
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -1602,7 +1602,7 @@ describe("ReverySkyMapView bridge integration", () => {
     };
 
     const payload = makePathPayload();
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -1696,7 +1696,7 @@ describe("ReverySkyMapView bridge integration", () => {
     payload.notes[1].date = "2026-01-15T00:00:00.000Z";
     payload.notes[2].date = "2025-01-01T00:00:00.000Z";
     payload.vault.noteCount = payload.notes.length;
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -1793,7 +1793,7 @@ describe("ReverySkyMapView bridge integration", () => {
     payload.notes[0].date = "2026-03-01T00:00:00.000Z";
     payload.notes[1].date = "2026-03-15T00:00:00.000Z";
     payload.notes[2].date = "2026-03-31T00:00:00.000Z";
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -1864,7 +1864,7 @@ describe("ReverySkyMapView bridge integration", () => {
     payload.notes[0].date = "2026-04-10T00:00:00.000Z";
     payload.notes[1].date = "2026-04-11T00:00:00.000Z";
     payload.notes[2].date = "2026-04-12T00:00:00.000Z";
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -1946,7 +1946,7 @@ describe("ReverySkyMapView bridge integration", () => {
     };
 
     const payload = makePathPayload();
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -2012,7 +2012,7 @@ describe("ReverySkyMapView bridge integration", () => {
     };
 
     const payload = makePathPayload();
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -2083,7 +2083,7 @@ describe("ReverySkyMapView bridge integration", () => {
     payload.notes[0].date = "2026-04-10T00:00:00.000Z";
     payload.notes[1].date = "2026-04-11T00:00:00.000Z";
     payload.notes[2].date = "2026-04-12T00:00:00.000Z";
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -2161,7 +2161,7 @@ describe("ReverySkyMapView bridge integration", () => {
     payload.notes[1].date = "2026-01-15T00:00:00.000Z";
     payload.notes[2].date = "2026-02-01T00:00:00.000Z";
     const buildGraph = vi.fn().mockReturnValue(payload);
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -2237,7 +2237,7 @@ describe("ReverySkyMapView bridge integration", () => {
     payload.notes[2].tags = ["archive"];
     const buildGraph = vi.fn().mockReturnValue(payload);
 
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -2320,7 +2320,7 @@ describe("ReverySkyMapView bridge integration", () => {
 
     const payload = makePathPayload();
     const buildGraph = vi.fn().mockReturnValue(payload);
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -2402,7 +2402,7 @@ describe("ReverySkyMapView bridge integration", () => {
     };
 
     const payload = makePathPayload();
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -2475,7 +2475,7 @@ describe("ReverySkyMapView bridge integration", () => {
     };
 
     const payload = makePathPayload();
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -2539,7 +2539,7 @@ describe("ReverySkyMapView bridge integration", () => {
     };
 
     const payload = makePathPayload();
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -2600,7 +2600,7 @@ describe("ReverySkyMapView bridge integration", () => {
     };
 
     const payload = makePathPayload();
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -2666,7 +2666,7 @@ describe("ReverySkyMapView bridge integration", () => {
     };
 
     const payload = makePathPayload();
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -2734,7 +2734,7 @@ describe("ReverySkyMapView bridge integration", () => {
     };
 
     const payload = makePathPayload();
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {
@@ -2798,7 +2798,7 @@ describe("ReverySkyMapView bridge integration", () => {
       sendGraphSet: vi.fn(),
       sendNoteFocus: vi.fn()
     };
-    const view = new ReverySkyMapView(
+    const view = new MapView(
       { app } as never,
       plugin as never,
       {

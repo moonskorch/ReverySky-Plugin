@@ -1,5 +1,5 @@
 import { Plugin, WorkspaceLeaf } from "obsidian";
-import { REVERYSKY_MAP_VIEW_TYPE, ReverySkyMapView } from "./view/ReverySkyMapView";
+import { MAP_VIEW_TYPE, MapView } from "./view/MapView";
 import { UnityWebglLocalServer } from "./runtime/UnityWebglLocalServer";
 import path from "node:path";
 
@@ -12,8 +12,8 @@ export default class ReverySkyMapPlugin extends Plugin {
 
   async onload(): Promise<void> {
     this.registerView(
-      REVERYSKY_MAP_VIEW_TYPE,
-      (leaf: WorkspaceLeaf) => new ReverySkyMapView(leaf, this)
+      MAP_VIEW_TYPE,
+      (leaf: WorkspaceLeaf) => new MapView(leaf, this)
     );
 
     this.addRibbonIcon("sparkles", "Toggle ReverySky Map", async () => {
@@ -30,7 +30,7 @@ export default class ReverySkyMapPlugin extends Plugin {
   }
 
   async onunload(): Promise<void> {
-    this.app.workspace.detachLeavesOfType(REVERYSKY_MAP_VIEW_TYPE);
+    this.app.workspace.detachLeavesOfType(MAP_VIEW_TYPE);
     if (this.unityWebglServer) {
       await this.unityWebglServer.stop();
       this.unityWebglServer = null;
@@ -52,7 +52,7 @@ export default class ReverySkyMapPlugin extends Plugin {
 
   private async activateMapView(): Promise<void> {
     const { workspace } = this.app;
-    let leaf: WorkspaceLeaf | null = workspace.getLeavesOfType(REVERYSKY_MAP_VIEW_TYPE)[0] ?? null;
+    let leaf: WorkspaceLeaf | null = workspace.getLeavesOfType(MAP_VIEW_TYPE)[0] ?? null;
 
     if (!leaf) {
       leaf = workspace.getRightLeaf(false);
@@ -60,7 +60,7 @@ export default class ReverySkyMapPlugin extends Plugin {
         return;
       }
       await leaf.setViewState({
-        type: REVERYSKY_MAP_VIEW_TYPE,
+        type: MAP_VIEW_TYPE,
         active: true
       });
     }
@@ -70,10 +70,10 @@ export default class ReverySkyMapPlugin extends Plugin {
 
   private async toggleMapView(): Promise<void> {
     const { workspace } = this.app;
-    const leaves = workspace.getLeavesOfType(REVERYSKY_MAP_VIEW_TYPE);
+    const leaves = workspace.getLeavesOfType(MAP_VIEW_TYPE);
 
     if (leaves.length > 0) {
-      workspace.detachLeavesOfType(REVERYSKY_MAP_VIEW_TYPE);
+      workspace.detachLeavesOfType(MAP_VIEW_TYPE);
       return;
     }
 
