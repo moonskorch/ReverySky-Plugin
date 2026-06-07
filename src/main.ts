@@ -12,6 +12,10 @@ export default class ReverySkyMapPlugin extends Plugin {
       (leaf: WorkspaceLeaf) => new ReverySkyMapView(leaf, this)
     );
 
+    this.addRibbonIcon("sparkles", "Toggle ReverySky Map", async () => {
+      await this.toggleMapView();
+    });
+
     this.addCommand({
       id: "open-reverysky-map",
       name: "Open ReverySky Map",
@@ -55,6 +59,18 @@ export default class ReverySkyMapPlugin extends Plugin {
     }
 
     await workspace.revealLeaf(leaf);
+  }
+
+  private async toggleMapView(): Promise<void> {
+    const { workspace } = this.app;
+    const leaves = workspace.getLeavesOfType(REVERYSKY_MAP_VIEW_TYPE);
+
+    if (leaves.length > 0) {
+      workspace.detachLeavesOfType(REVERYSKY_MAP_VIEW_TYPE);
+      return;
+    }
+
+    await this.activateMapView();
   }
 
   private resolvePluginDirectory(): string {

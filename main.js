@@ -2239,6 +2239,9 @@ var ReverySkyMapPlugin = class extends import_obsidian2.Plugin {
       REVERYSKY_MAP_VIEW_TYPE,
       (leaf) => new ReverySkyMapView(leaf, this)
     );
+    this.addRibbonIcon("sparkles", "Toggle ReverySky Map", async () => {
+      await this.toggleMapView();
+    });
     this.addCommand({
       id: "open-reverysky-map",
       name: "Open ReverySky Map",
@@ -2276,6 +2279,15 @@ var ReverySkyMapPlugin = class extends import_obsidian2.Plugin {
       });
     }
     await workspace.revealLeaf(leaf);
+  }
+  async toggleMapView() {
+    const { workspace } = this.app;
+    const leaves = workspace.getLeavesOfType(REVERYSKY_MAP_VIEW_TYPE);
+    if (leaves.length > 0) {
+      workspace.detachLeavesOfType(REVERYSKY_MAP_VIEW_TYPE);
+      return;
+    }
+    await this.activateMapView();
   }
   resolvePluginDirectory() {
     const adapter = this.app.vault.adapter;

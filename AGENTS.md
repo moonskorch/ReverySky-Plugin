@@ -132,3 +132,8 @@
 
 ## UI Changes
 - For plugin-side UI implementation, screenshot matching, visual polish, and visual regressions, use the `ui-polish` skill.
+
+### Preserve non-obvious decisions
+During implementation, add a short inline comment or JSDoc only when the code contains a non-obvious constraint, invariant, or deliberate trade-off that cannot be made clear through naming or structure.
+Do not add comments that restate the code.
+

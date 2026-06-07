@@ -81,6 +81,30 @@ Simplify where safe:
 If non-obvious complexity remains, explain why it is necessary.
 Do not expand scope while simplifying.
 
+## Preserve non-obvious decisions
+
+During implementation, record non-obvious decisions while the context is fresh.
+
+Use the narrowest appropriate place:
+
+- Inline comment or JSDoc:
+  local intent, external constraint, invariant, or deliberate trade-off
+  that is not obvious from the code.
+
+- `docs/ARCHITECTURE.md`:
+  subsystem responsibility, state ownership, dependency direction,
+  or cross-layer design decision.
+
+- `docs/DATA_CONTRACT.md`:
+  payload shape, event semantics, precedence rule, or integration contract.
+
+- ADR:
+  only for a durable, non-obvious architectural decision with meaningful alternatives
+  that future work may reasonably question again.
+
+Do not add comments that paraphrase the implementation.
+Prefer clearer naming or simpler structure when that solves the readability problem.
+
 ## 1. Define the task
 
 Before editing, identify:
