@@ -22,6 +22,9 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
   [Tooltip("Vertical spacing for multiple notes on the same day (up OR down)")]
   [SerializeField] private float sameDateStackDistance = 2.2f;
 
+  [Tooltip("Maximum number of notes on the same date that may stay in one vertical stack")]
+  [SerializeField, Min(1)] private int maxSameDateVerticalNotes = 5;
+
   [Range(0f, 180f)]
   [Tooltip("Max random turn (deg) when stepping the chain to the next day")]
   [SerializeField] private float chainTurnMaxDeg = 110f;
@@ -70,25 +73,48 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
     ClearGraph();
     if (notes == null || notes.Count == 0) return;
 
-    // Intentionally exclude extreme sentinel dates (e.g. DateTime.MinValue) from the depth range calculation.
-    // Such entries are still placed on the map, but their Z gets clamped to the nearest edge of the valid range.
-    // This keeps the layout visually compact instead of creating a huge depth gap to regular note dates.
-    var minimumDate = DateTime.MinValue.AddDays(1);
-    var maximumDate = DateTime.MaxValue.AddDays(-1);
-    var datesMinLimited = notes.Where(d => d.DateTime >= minimumDate);
-    var datesMaxLimited = notes.Where(d => d.DateTime <= maximumDate);
-    var minDate = datesMinLimited.Any() ? datesMinLimited.Min(d => d.DateTime) : minimumDate;
-    var maxDate = datesMaxLimited.Any() ? datesMaxLimited.Max(d => d.DateTime) : maximumDate;
-
-    // TODO Consider note count
-    var dateRangeDays = Mathf.Max(0f, (float)(maxDate - minDate).TotalDays);
-    dateDepthRange = Mathf.Max(0.01f, depthPerDay * dateRangeDays);
-    OnDateAxisRangeChanged?.Invoke(ZMin, ZMax);
-
-    // 1) Notes (lightweight local-chain by DateTime; same-day = vertical if fits)
-    // If same-day entries no longer fit,
-    // they continue spreading within that date's XY plane as a compact local chain.
+    // small same-day groups -> vertical if fits
+    // groups above maxSameDateVerticalNotes -> XY chain with virtual-day Z steps
     var ordered = notes.OrderBy(d => d.DateTime).ToList();
+
+    int extraVirtualDays = 0;
+    int sentinelExtraVirtualDays = 0;
+    DateTime minDate = DateTime.MinValue;
+    DateTime maxDate = DateTime.MinValue;
+    bool hasRegularDates = false;
+
+    int scan = 0;
+    while (scan < ordered.Count)
+    {
+      var day = ordered[scan].DateTime.Date;
+      int start = scan;
+      bool isSentinel = IsMinimumDateSentinel(ordered[start]);
+
+      while (scan < ordered.Count && ordered[scan].DateTime.Date == day)
+        scan++;
+
+      int count = scan - start;
+      int extra = count > maxSameDateVerticalNotes ? count - 1 : 0;
+      extraVirtualDays += extra;
+
+      if (isSentinel)
+        sentinelExtraVirtualDays = extra;
+      else
+      {
+        if (!hasRegularDates)
+        {
+          minDate = ordered[start].DateTime;
+          hasRegularDates = true;
+        }
+
+        maxDate = ordered[scan - 1].DateTime;
+      }
+    }
+
+    float dateRangeDays = Mathf.Max(0f, (float)(maxDate - minDate).TotalDays);
+    float totalVirtualDays = dateRangeDays + extraVirtualDays;
+    dateDepthRange = Mathf.Max(0.01f, depthPerDay * totalVirtualDays);
+    OnDateAxisRangeChanged?.Invoke(ZMin, ZMax);
 
     var rng = new System.Random(STABLE_SEED);
 
@@ -97,6 +123,7 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
     Vector2 dir = Rotate2(Vector2.right, RandomRange(rng, 0f, 360f) * Mathf.Deg2Rad).normalized;
 
     bool hasPrev = false;
+    int insertedRegularVirtualDaysBefore = 0;
 
     int idx = 0;
     while (idx < ordered.Count)
@@ -106,23 +133,74 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
       int start = idx;
       while (idx < ordered.Count && ordered[idx].DateTime.Date == day) idx++;
       int count = idx - start;
+      bool isSentinel = IsMinimumDateSentinel(ordered[start]);
+      bool useVirtualChain = count > maxSameDateVerticalNotes;
+      float virtualDay = VirtualDayByDate(
+        ordered[start],
+        minDate,
+        sentinelExtraVirtualDays,
+        insertedRegularVirtualDaysBefore);
 
-      // earliest note of the day: step once from previous moment in time
+      if (isSentinel && useVirtualChain)
+      {
+        for (int k = count - 1; k >= 0; k--)
+        {
+          if (k < count - 1)
+            cur = StepChainLocal(cur, ref dir, rng);
+
+          float sentinelVirtualDay = sentinelExtraVirtualDays - k;
+
+          PlaceNoteLocal(
+            ordered[start + k],
+            cur,
+            sentinelVirtualDay,
+            totalVirtualDays);
+        }
+
+        hasPrev = true;
+        continue;
+      }
+
       if (hasPrev)
         cur = StepChainLocal(cur, ref dir, rng);
 
-      PlaceNoteLocal(ordered[start], cur, minDate, maxDate);
+      if (!isSentinel && useVirtualChain)
+      {
+        float baseVirtualDay = VirtualDayByDate(
+          ordered[start],
+          minDate,
+          sentinelExtraVirtualDays,
+          insertedRegularVirtualDaysBefore);
+
+        for (int k = 0; k < count; k++)
+        {
+          if (k > 0)
+            cur = StepChainLocal(cur, ref dir, rng);
+
+          PlaceNoteLocal(
+            ordered[start + k],
+            cur,
+            baseVirtualDay + k,
+            totalVirtualDays);
+        }
+
+        insertedRegularVirtualDaysBefore += count - 1;
+        hasPrev = true;
+        continue;
+      }
+
+      PlaceNoteLocal(ordered[start], cur, virtualDay, totalVirtualDays);
 
       if (count > 1)
       {
         float sign = DayStackSign(day);
 
-        if (TryPlaceDayVerticalLocal(ordered, start, count, cur, sign, minDate, maxDate, out var last))
+        if (TryPlaceDayVerticalLocal(ordered, start, count, cur, sign, virtualDay, totalVirtualDays, out var last))
         {
           cur = last;
           dir = Vector2.up * sign;
         }
-        else if (TryPlaceDayVerticalLocal(ordered, start, count, cur, -sign, minDate, maxDate, out last))
+        else if (TryPlaceDayVerticalLocal(ordered, start, count, cur, -sign, virtualDay, totalVirtualDays, out last))
         {
           cur = last;
           dir = Vector2.up * -sign;
@@ -133,7 +211,7 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
           for (int k = 1; k < count; k++)
           {
             cur = StepChainLocal(cur, ref dir, rng);
-            PlaceNoteLocal(ordered[start + k], cur, minDate, maxDate);
+            PlaceNoteLocal(ordered[start + k], cur, virtualDay, totalVirtualDays);
           }
         }
       }
@@ -197,9 +275,11 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
     }
   }
 
-  private void PlaceNoteLocal(NoteData data, Vector2 localXY, DateTime minDate, DateTime maxDate)
+  private void PlaceNoteLocal(NoteData data, Vector2 localXY, float virtualDay, float totalVirtualDays)
   {
-    float zLocal = DepthByDateLocal(data.DateTime, minDate, maxDate);
+    float zLocal = DepthByVirtualDayLocal(
+      virtualDay,
+      totalVirtualDays);
     if (clampZToRange)
     {
       float half = dateDepthRange * 0.5f;
@@ -221,12 +301,37 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
     });
   }
 
-  private float DepthByDateLocal(DateTime date, DateTime minDate, DateTime maxDate)
+  private static bool IsMinimumDateSentinel(NoteData note)
   {
-    if (maxDate <= minDate) return 0f;
+    return note != null &&
+      note.DateTime == DateTime.MinValue;
+  }
 
-    var totalDays = (maxDate - minDate).TotalDays;
-    var t = (float)((date - minDate).TotalDays / totalDays);
+  private static float VirtualDayByDate(
+    NoteData note,
+    DateTime minDate,
+    int sentinelExtraVirtualDays,
+    int insertedRegularVirtualDaysBefore)
+  {
+    if (IsMinimumDateSentinel(note))
+      return 0f;
+
+    return
+      sentinelExtraVirtualDays +
+      (float)(note.DateTime - minDate).TotalDays +
+      insertedRegularVirtualDaysBefore;
+  }
+
+  private float DepthByVirtualDayLocal(
+    float virtualDay,
+    float totalVirtualDays)
+  {
+    if (totalVirtualDays <= 0f)
+      return 0f;
+
+    float t =
+      virtualDay /
+      totalVirtualDays;
 
     float half = dateDepthRange * 0.5f;
 
@@ -251,8 +356,8 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
     int count,
     Vector2 baseLocal,
     float sign,
-    DateTime minDate,
-    DateTime maxDate,
+    float virtualDay,
+    float totalVirtualDays,
     out Vector2 lastLocal)
   {
     lastLocal = baseLocal;
@@ -264,7 +369,7 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
     for (int k = 1; k < count; k++)
     {
       var xy = baseLocal + Vector2.up * (sign * sameDateStackDistance * k);
-      PlaceNoteLocal(ordered[start + k], xy, minDate, maxDate);
+      PlaceNoteLocal(ordered[start + k], xy, virtualDay, totalVirtualDays);
       lastLocal = xy;
     }
 

@@ -671,6 +671,7 @@ MonoBehaviour:
   scapeWarper: {fileID: 428893403}
   chainStepDistance: 2.5
   sameDateStackDistance: 2
+  maxSameDateVerticalNotes: 5
   chainTurnMaxDeg: 60
   dateDepthRange: 200
   depthPerDay: 2.5
@@ -2517,9 +2518,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
   injectSampleData: 0
   sampleScenario: 0
-  sampleNoteCount: 200
+  sampleNoteCount: 1000
   sampleTagPoolSize: 65
-  sampleDateSpanDays: 60
+  sampleDateSpanDays: 50
   sampleMaxTagsPerNote: 4
   sampleExtraLinks: 60
 --- !u!1 &1787028428
