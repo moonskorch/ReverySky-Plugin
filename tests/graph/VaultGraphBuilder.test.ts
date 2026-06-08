@@ -83,7 +83,58 @@ describe("VaultGraphBuilder", () => {
     });
   });
 
-  it("falls back to created date when frontmatter date is blank", () => {
+  it.each([
+    {
+      name: "prefers date over created aliases",
+      frontmatter: {
+        date: "2026-02-03",
+        created: "2026-02-02",
+        created_at: "2026-02-01"
+      },
+      expected: "2026-02-03T00:00:00.000Z"
+    },
+    {
+      name: "falls back to created when date is missing or invalid",
+      frontmatter: {
+        date: "invalid",
+        created: "2026-03-04"
+      },
+      expected: "2026-03-04T00:00:00.000Z"
+    },
+    {
+      name: "falls back to created_at when earlier aliases are missing or invalid",
+      frontmatter: {
+        date: "   ",
+        created: "invalid",
+        created_at: "2026-04-05"
+      },
+      expected: "2026-04-05T00:00:00.000Z"
+    }
+  ])("$name", ({ frontmatter, expected }) => {
+    const ctime = Date.UTC(2026, 4, 20, 12, 30, 0);
+    const file = makeFile("Fallback/Priority.md", {
+      ctime,
+      mtime: ctime,
+      size: 10
+    });
+
+    const app = {
+      vault: {
+        getMarkdownFiles: () => [file]
+      },
+      metadataCache: {
+        getFileCache: () => ({
+          frontmatter
+        }),
+        resolvedLinks: {}
+      }
+    };
+
+    const payload = VaultGraphBuilder.build(app as never);
+    expect(payload.notes[0]?.date).toBe(expected);
+  });
+
+  it("falls back to file.stat.ctime when all supported frontmatter aliases are missing or invalid", () => {
     const ctime = Date.UTC(2026, 4, 20, 12, 30, 0);
     const file = makeFile("Fallback/Created.md", {
       ctime,
@@ -98,7 +149,9 @@ describe("VaultGraphBuilder", () => {
       metadataCache: {
         getFileCache: () => ({
           frontmatter: {
-            date: "   "
+            date: "   ",
+            created: "invalid",
+            created_at: null
           }
         }),
         resolvedLinks: {}

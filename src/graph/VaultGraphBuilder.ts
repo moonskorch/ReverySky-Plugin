@@ -87,8 +87,7 @@ export class VaultGraphBuilder {
       ...VaultGraphBuilder.getFrontmatterTags(frontmatter?.tags)
     ]);
 
-    const created = Number.isFinite(file.stat.ctime) ? new Date(file.stat.ctime).toISOString() : undefined;
-    const date = VaultGraphBuilder.getFrontmatterDate(frontmatter?.date) ?? created;
+    const date = VaultGraphBuilder.getCanonicalNoteDate(frontmatter, file);
 
     return {
       id: VaultGraphBuilder.makeStableId(file.path),
@@ -137,6 +136,25 @@ export class VaultGraphBuilder {
       return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
     }
     return undefined;
+  }
+
+  private static getCanonicalNoteDate(frontmatter: Record<string, unknown> | undefined, file: TFile): string | undefined {
+    return (
+      VaultGraphBuilder.getFrontmatterDate(frontmatter?.date) ??
+      VaultGraphBuilder.getFrontmatterDate(frontmatter?.created) ??
+      VaultGraphBuilder.getFrontmatterDate(frontmatter?.created_at) ??
+      VaultGraphBuilder.getFileCreationDate(file)
+    );
+  }
+
+  private static getFileCreationDate(file: TFile): string | undefined {
+    const ctime = file?.stat?.ctime;
+    if (!Number.isFinite(ctime)) {
+      return undefined;
+    }
+
+    const d = new Date(ctime);
+    return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
   }
 
   /**

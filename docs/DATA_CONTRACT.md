@@ -82,7 +82,7 @@ type GraphLink = {
 
 ## Current Producer Semantics
 - `graph:set` is the effective filtered payload emitted by the plugin view, not the raw vault snapshot.
-- `notes[].date` is the plugin's canonical note date, with frontmatter date preferred and file creation time used as fallback.
+- `notes[].date` uses `frontmatter.date`, then `frontmatter.created`, then `frontmatter.created_at`, then file creation time. Missing, blank, or invalid candidates are skipped, and the field is omitted when no valid source exists.
 - `notes[].tags` are produced by merging inline tags and frontmatter tags, then normalizing and deduplicating the result.
 - `notes[].size` is emitted as file size in bytes.
 - `enginePreference`, when present, is a plugin-owned runtime hint and travels with the effective graph payload.
