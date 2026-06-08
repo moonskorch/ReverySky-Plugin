@@ -85,6 +85,9 @@ Current runtime behavior snapshot for Unity ingestion and map interaction:
   - derivation: trimmed tag string -> shared integer id mapping.
 - `notes[].date` -> static-25D date depth placement.
   - fallback: parse failure or missing date maps to `DateTime.MinValue`.
+  - `DateTime.MinValue` is a technical sentinel: it is excluded from the normal date range and clamped to the oldest map edge.
+  - any valid date from `DateTime.MinValue.AddDays(1)` onward is treated as a normal date and may create a visible timeline gap.
+  - there is no semantic cutoff that treats all dates before a chosen year as undated.
 - `notes[].size` -> star scale factor via runtime percentile statistics.
   - fallback: negative size maps to `0`.
 - `enginePreference` -> preferred runtime engine mode for the next graph build.

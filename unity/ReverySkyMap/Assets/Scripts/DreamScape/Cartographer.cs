@@ -14,6 +14,7 @@ public class Cartographer : MonoBehaviour
   [Header("Engines")]
   [SerializeField] private MonoBehaviour forcesEngineBehaviour;
   [SerializeField] private MonoBehaviour static25DEngineBehaviour;
+  [SerializeField] private MonoBehaviour staticLinksEngineBehaviour;
   [SerializeField] private CartographerEngine defaultEngine = CartographerEngine.Auto;
 
   [Tooltip("Auto: if notes count > threshold => Static25D, else Forces")]
@@ -39,6 +40,7 @@ public class Cartographer : MonoBehaviour
 
   private ICartographerEngine _forcesEngine;
   private ICartographerEngine _static25dEngine;
+  private ICartographerEngine _staticLinksEngine;
   private ICartographerEngine _activeEngine;
 
   public ICartographerEngine ActiveEngine => _activeEngine;
@@ -54,6 +56,7 @@ public class Cartographer : MonoBehaviour
 
     _forcesEngine = forcesEngineBehaviour as ICartographerEngine;
     _static25dEngine = static25DEngineBehaviour as ICartographerEngine;
+    _staticLinksEngine = staticLinksEngineBehaviour as ICartographerEngine;
   }
 
   private void Start()
@@ -143,9 +146,12 @@ public class Cartographer : MonoBehaviour
 
   private void SwitchEngine(CartographerEngine resolvedMode)
   {
-    var next = (resolvedMode == CartographerEngine.Static25D) ? 
-      _static25dEngine : 
-      _forcesEngine;
+    var next = resolvedMode switch
+    {
+      CartographerEngine.Static25D => _static25dEngine,
+      CartographerEngine.StaticLinks => _staticLinksEngine,
+      _ => _forcesEngine
+    };
     if (next == null) return;
 
     if (_activeEngine != null && _activeEngine != next) 

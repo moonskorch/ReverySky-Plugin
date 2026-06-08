@@ -15,7 +15,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 - Scene entry point:
   - Responsibility: hosts the runtime scene and serialized wiring for the map, UI, camera, and engines.
   - Main code location: `Assets/Scenes/ScarScapeScene.unity`
-  - Important dependencies: `GameInput`, `CameraOrbitalController`, `Cartographer`, `CartographerForcesEngine`, `Cartographer25DEngine`, `ScapeCameraWarper`, `ChangeViewControl`, `RotateCameraUI`, `Notification`
+  - Important dependencies: `GameInput`, `CameraOrbitalController`, `Cartographer`, `CartographerForcesEngine`, `Cartographer25DEngine`, `CartographerStaticLinksEngine`, `ScapeCameraWarper`, `ChangeViewControl`, `RotateCameraUI`, `Notification`
 - Bridge and runtime state:
   - Responsibility: validates inbound bridge envelopes, converts payloads into runtime models, and stores the current graph snapshot.
   - Main code location: `Assets/Scripts/Bridge/ObsidianBridge.cs`, `Assets/Scripts/Bridge/MapRuntimeContext.cs`, `Assets/Scripts/Models/NoteData.cs`
@@ -25,8 +25,8 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Main code location: `Assets/Scripts/DreamScape/Cartographer.cs`
   - Important dependencies: `ICartographerEngine`, `FocusNode`, `ChangeViewControl`, `Notification`, `SampleDataGenerator`, `MapRuntimeContext`
 - Graph layout engines:
-  - Responsibility: build and clear stars, tags, and links for the two runtime modes.
-  - Main code location: `Assets/Scripts/DreamScape/CartographerForcesEngine.cs`, `Assets/Scripts/DreamScape/Cartographer25DEngine.cs`, `Assets/Scripts/Interfaces/ICartographerEngine.cs`
+  - Responsibility: build and clear stars, tags, and links for the three runtime engines.
+  - Main code location: `Assets/Scripts/DreamScape/CartographerForcesEngine.cs`, `Assets/Scripts/DreamScape/Cartographer25DEngine.cs`, `Assets/Scripts/DreamScape/CartographerStaticLinksEngine.cs`, `Assets/Scripts/Interfaces/ICartographerEngine.cs`
   - Important dependencies: `StarSO`, `TagNodeSO`, `ScapeCameraWarper`, `NoteData`, `MapRuntimeContext.RuntimeNoteLink`
 - Interaction and camera:
   - Responsibility: turns touch and mouse input into focus, orbit, zoom, view switching, and note-open actions.
@@ -47,7 +47,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 
 1. Unity loads `Assets/Scenes/ScarScapeScene.unity`.
 2. `ObsidianBridge.EnsureInstance()` in `Assets/Scripts/Bridge/ObsidianBridge.cs` creates a persistent bridge object if the scene does not already contain one.
-3. Scene wiring activates `GameInput`, `CameraOrbitalController`, `FocusNode`, `Cartographer`, both engine components, `ScapeCameraWarper`, `ChangeViewControl`, `RotateCameraUI`, `Notification`, and `SampleDataGenerator`.
+3. Scene wiring activates `GameInput`, `CameraOrbitalController`, `FocusNode`, `Cartographer`, the engine components, `ScapeCameraWarper`, `ChangeViewControl`, `RotateCameraUI`, `Notification`, and `SampleDataGenerator`.
 4. `Cartographer.Start()` calls `SampleDataGenerator.TryInjectSampleDataIfNeeded()` when sample injection is enabled and then calls `RebuildGraph(MapRuntimeContext.EnginePreference)`.
 5. `Cartographer` subscribes to `MapRuntimeContext.OnNotesChanged` and UI events so later payloads or button clicks can rebuild the active graph.
 
@@ -58,7 +58,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 3. Tags are de-duplicated by name, blank titles become `GameSettings.DefaultTitle`, invalid dates become `DateTime.MinValue`, and non-positive link weights are normalized to `1`.
 4. `MapRuntimeContext.SetTagNames`, `SetLinks`, and `SetNotes` store the runtime source of truth and raise `OnNotesChanged`.
 5. `Cartographer.HandleRuntimeNotesChanged()` calls `RebuildGraph(MapRuntimeContext.EnginePreference)`.
-6. `Cartographer.ResolveModeByNotesCount()` selects `Forces` or `Static25D` unless `defaultEngine` overrides that choice.
+6. `Cartographer.ResolveModeByNotesCount()` selects `Forces` or `Static25D` unless `defaultEngine` overrides that choice; `StaticLinks` is available through the serialized `defaultEngine` override but is not part of the note-count auto-policy yet.
 7. The chosen engine runs `BuildGraph(notes)`, then `ApplyView(CurrentView)`, and `Cartographer` rebinds `ScapeCameraWarper` when the active engine is `Static25D`.
 8. `Cartographer.SetCameraFocus()` restores the previous selection from `MapRuntimeContext.CurrentNoteId` or `FocusNode.LastSelectedStarId`.
 
@@ -96,7 +96,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Responsibility: represents the normalized runtime note model consumed by engines and visuals.
   - Code anchor: `Assets/Scripts/Models/NoteData.cs`
   - Entry point: created by `ObsidianBridge` and sample data generation
-  - Calls / sends to: `StarSO`, `CartographerForcesEngine`, `Cartographer25DEngine`
+  - Calls / sends to: `StarSO`, `CartographerForcesEngine`, `Cartographer25DEngine`, `CartographerStaticLinksEngine`
 
 ### Graph engines and layout
 
@@ -120,6 +120,11 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Code anchor: `Assets/Scripts/DreamScape/Cartographer25DEngine.cs::BuildGraph`, `ClearGraph`, `OnDateAxisRangeChanged`
   - Entry point: `Cartographer.BuildGraph`
   - Calls / sends to: `StarSO`, `ScapeCameraWarper`, `CameraOrbitalController`
+- `CartographerStaticLinksEngine`
+  - Responsibility: builds a static link-based map for medium-scale evaluation, calculates positions once during `BuildGraph()`, and uses tag anchors, direct note links, bounded link relaxation, spatial packing, and a visible-edge budget without per-frame layout simulation.
+  - Code anchor: `Assets/Scripts/DreamScape/CartographerStaticLinksEngine.cs::BuildGraph`, `ClearGraph`, `CalculateBoundRadius`
+  - Entry point: `Cartographer.BuildGraph`
+  - Calls / sends to: `StarSO`, `TagNodeSO`, `MapRuntimeContext.RuntimeNoteLink`
 - `ScapeCameraWarper`
   - Responsibility: warps the 2.5D layout around the camera based on engine-specific depth profiles.
   - Code anchor: `Assets/Scripts/DreamScape/ScapeCameraWarper.cs::Rebind`, `ApplyWarp`, `Clear`
@@ -179,7 +184,8 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 - `MapRuntimeContext` is the source of truth for live runtime notes, links, tag names, runtime mode, selected note id, engine preference, and the `NotesVersion` counter.
 - `ObsidianBridge` owns bridge validation and all conversion from the JSON envelope into runtime models.
 - `Cartographer` owns engine selection, rebuild timing, current view, and focus restoration.
-- `CartographerForcesEngine` and `Cartographer25DEngine` own placement and cleanup of instantiated stars, tags, and edge objects.
+- `CartographerForcesEngine`, `Cartographer25DEngine`, and `CartographerStaticLinksEngine` own placement and cleanup of instantiated stars, tags, and edge objects for their respective layout strategies.
+- `CartographerStaticLinksEngine` owns the static link-based placement for medium-scale graphs, runs once during `BuildGraph()`, and does not tick per frame.
 - `ScapeCameraWarper` owns the 2.5D warp state and only participates when the active engine is `Static25D`.
 - `StarSO` recomputes note-length scale buckets whenever `MapRuntimeContext.NotesVersion` changes.
 - `GameInput` treats UI hits as blocked input and only forwards gestures that originate on the map.
@@ -192,7 +198,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Negative note sizes clamp to `0`.
   - Non-positive link weights normalize to `1`.
   - Unknown bridge fields are ignored.
-- `Cartographer.ResolveModeByNotesCount()` uses `defaultEngine` first, then `enginePreference`, then the note-count threshold.
+- `Cartographer.ResolveModeByNotesCount()` uses `defaultEngine` first, then `enginePreference`, then the note-count threshold. `StaticLinks` is only selected through the serialized `defaultEngine` override for now.
 
 ## Build, Packaging, and Deployment
 
