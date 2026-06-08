@@ -17,8 +17,11 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
   [SerializeField] private float springK = 8f;
   [SerializeField] private float gravityK = 1.0f;
   [SerializeField] private float damping = 0.86f;
-  [SerializeField] private float boundRadius = 14f;
-  [SerializeField] private float spawnRadius = 8f;
+
+  [Header("Dynamic sphere scaling")]
+  [SerializeField, Min(0.1f)] private float nodeSpacingFactor = 3.8f;
+  [SerializeField, Min(0.1f)] private float minimumBoundRadius = 6f;
+  [SerializeField, Range(0.05f, 1f)] private float spawnFillRatio = 0.65f;
 
   [Header("Visual")]
   [SerializeField] private float tagScale = 0.7f;
@@ -27,7 +30,9 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
   [SerializeField] private float orbitAngularSpeed = 0.1f;
 
   private const int STABLE_SEED = 12345;
+
   private System.Random _rng;
+  private float _boundRadius;
 
   private readonly List<Node> _nodes = new();
   private readonly List<Edge> _edges = new();
@@ -56,7 +61,7 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
   public CartographerEngine EngineType => CartographerEngine.Forces;
   public bool RequiresTick => true;
 
-  public float BoundRadius => boundRadius;
+  public float BoundRadius => _boundRadius;
   public Vector3 Pivot => layoutParent ? layoutParent.position : transform.position;
   public ScapeCameraWarper ScapeWarper => null;
 
@@ -65,11 +70,31 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
   private void Awake()
   {
     _rng = new System.Random(STABLE_SEED);
+    CalculateLayoutRadii(
+      totalNodeCount: 0,
+      nodeSpacingFactor,
+      minimumBoundRadius,
+      spawnFillRatio,
+      out _boundRadius,
+      out _);
   }
 
   public void BuildGraph(List<NoteData> notes)
   {
     ClearGraph();
+
+    _rng = new System.Random(STABLE_SEED);
+
+    int totalNodeCount = CountPhysicalNodeCount(notes);
+
+    CalculateLayoutRadii(
+      totalNodeCount,
+      nodeSpacingFactor,
+      minimumBoundRadius,
+      spawnFillRatio,
+      out _boundRadius,
+      out float spawnRadius);
+
     if (notes == null || notes.Count == 0) return;
 
     var tagIndex = new Dictionary<int, int>();
@@ -78,7 +103,7 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
     {
       var data = notes[di];
 
-      var starPos = RandDeterministic();
+      var starPos = RandDeterministic(spawnRadius);
       var star = starTemplate.Instantiate(starPos, data, layoutParent);
       _stars.Add(star);
 
@@ -96,7 +121,7 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
       {
         if (!tagIndex.TryGetValue(tagId, out int ti))
         {
-          var tag = TagNode.Create(tagNodeTemplate, RandDeterministic(), tagId, layoutParent);
+          var tag = TagNode.Create(tagNodeTemplate, RandDeterministic(spawnRadius), tagId, layoutParent);
           tag.transform.localScale = Vector3.one * tagScale;
 
           var tagNode = new Node
@@ -271,8 +296,8 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
       n.t.position += n.v * dt;
 
       var lp = n.t.localPosition;
-      if (lp.magnitude > boundRadius)
-        n.t.localPosition = lp.normalized * boundRadius;
+      if (lp.magnitude > _boundRadius)
+        n.t.localPosition = lp.normalized * _boundRadius;
 
       _nodes[i] = n;
     }
@@ -311,7 +336,60 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
     return null;
   }
 
-  private Vector3 RandDeterministic()
+  public static void CalculateLayoutRadii(
+    int totalNodeCount,
+    float nodeSpacingFactor,
+    float minimumBoundRadius,
+    float spawnFillRatio,
+    out float boundRadius,
+    out float spawnRadius)
+  {
+    int safeNodeCount =
+      Mathf.Max(1, totalNodeCount);
+
+    float safeNodeSpacingFactor =
+      Mathf.Max(0.1f, nodeSpacingFactor);
+
+    float safeMinimumBoundRadius =
+      Mathf.Max(0.1f, minimumBoundRadius);
+
+    float safeSpawnFillRatio =
+      Mathf.Clamp(spawnFillRatio, 0.05f, 1f);
+
+    boundRadius =
+      Mathf.Max(
+        safeMinimumBoundRadius,
+        safeNodeSpacingFactor *
+        Mathf.Pow(safeNodeCount, 1f / 3f));
+
+    spawnRadius =
+      boundRadius * safeSpawnFillRatio;
+  }
+
+  private static int CountPhysicalNodeCount(
+    List<NoteData> notes)
+  {
+    if (notes == null || notes.Count == 0)
+      return 0;
+
+    var uniqueTagIds =
+      new HashSet<int>();
+
+    for (int i = 0; i < notes.Count; i++)
+    {
+      NoteData note = notes[i];
+      if (note?.TagIds == null)
+        continue;
+
+      foreach (int tagId in note.TagIds)
+        uniqueTagIds.Add(tagId);
+    }
+
+    return notes.Count + uniqueTagIds.Count;
+  }
+
+  private Vector3 RandDeterministic(
+    float spawnRadius)
   {
     float x = (float)(_rng.NextDouble() * 2 - 1);
     float y = (float)(_rng.NextDouble() * 2 - 1);
