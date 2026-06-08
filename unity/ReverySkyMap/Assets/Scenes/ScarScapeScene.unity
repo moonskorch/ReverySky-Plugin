@@ -2437,6 +2437,7 @@ GameObject:
   - component: {fileID: 1780593169}
   - component: {fileID: 1780593168}
   - component: {fileID: 1780593167}
+  - component: {fileID: 1780593170}
   m_Layer: 0
   m_Name: Cartographer
   m_TagString: Untagged
@@ -2482,12 +2483,7 @@ MonoBehaviour:
   viewIconPlanets: {fileID: 21300000, guid: a23efd95330d88e4aba3ca87f60ffd5f, type: 3}
   viewIconSimple: {fileID: 21300000, guid: e619271fbe5ff854fa1c4e701befe7c5, type: 3}
   notification: {fileID: 1893426638}
-  injectSampleData: 0
-  sampleNoteCount: 30
-  sampleTagPoolSize: 12
-  sampleDateSpanDays: 20
-  sampleMaxTagsPerNote: 4
-  sampleExtraLinks: 25
+  sampleDataGenerator: {fileID: 1780593170}
 --- !u!4 &1780593169
 Transform:
   m_ObjectHideFlags: 0
@@ -2506,6 +2502,25 @@ Transform:
   - {fileID: 428893402}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1780593170
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1780593166}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d740bdf4eb7b4abcb7dc758b213c8361, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
+  injectSampleData: 0
+  sampleScenario: 0
+  sampleNoteCount: 100
+  sampleTagPoolSize: 0
+  sampleDateSpanDays: 1
+  sampleMaxTagsPerNote: 2
+  sampleExtraLinks: 10
 --- !u!1 &1787028428
 GameObject:
   m_ObjectHideFlags: 0

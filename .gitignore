@@ -37,6 +37,7 @@ unity/ReverySkyMap/.vs/
 # IDE local state
 .vs/
 .local-notes/
+**/.local-notes/
 
 # Local cleanup tracking
 unity/ReverySkyMap/docs/CLEANUP_BATCH_LEDGER.md
