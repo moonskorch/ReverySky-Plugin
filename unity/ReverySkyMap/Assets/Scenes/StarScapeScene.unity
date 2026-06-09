@@ -2520,11 +2520,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
   injectSampleData: 0
   sampleScenario: 0
-  sampleNoteCount: 10000
-  sampleTagPoolSize: 200
+  sampleNoteCount: 30
+  sampleTagPoolSize: 0
   sampleDateSpanDays: 365
   sampleMaxTagsPerNote: 5
-  sampleExtraLinks: 1000
+  sampleExtraLinks: 20
 --- !u!1 &1787028428
 GameObject:
   m_ObjectHideFlags: 0
@@ -2610,9 +2610,10 @@ MonoBehaviour:
   tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
   edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
   nodeSpacingFactor: 10
+  taglessGraphSpacingMultiplier: 1
   minimumBoundRadius: 6
   componentSpreadRatio: 0.95
-  tagSpreadRatio: 0.612
+  tagSpreadRatio: 0.6
   noteSpacing: 10
   maxPackingAttempts: 32
   tagScale: 0.7

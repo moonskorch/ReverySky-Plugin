@@ -17,6 +17,8 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
 
   [Header("Dynamic sphere scaling")]
   [SerializeField, Min(0.1f)] private float nodeSpacingFactor = 3.8f;
+  [Tooltip("Additional spacing multiplier used only when the graph contains no tag nodes.")]
+  [SerializeField, Min(0.1f)] private float taglessGraphSpacingMultiplier = 1f;
   [SerializeField, Min(0.1f)] private float minimumBoundRadius = 6f;
 
   [Header("Static links layout")]
@@ -42,6 +44,7 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
 
   private List<int>[] _tagNodesByNote = Array.Empty<List<int>>();
   private Vector3[] _componentCenterByNode = Array.Empty<Vector3>();
+  private Vector3[] _volumeSeedByNote = Array.Empty<Vector3>();
 
   private sealed class Node
   {
@@ -75,6 +78,7 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
   private sealed class Component
   {
     public readonly List<int> Nodes = new();
+    public readonly List<int> Notes = new();
     public readonly List<int> Tags = new();
     public string Key;
     public Vector3 Center;
@@ -101,7 +105,7 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
 
     _boundRadius = CalculateBoundRadius(
       _nodes.Count,
-      nodeSpacingFactor,
+      EffectiveNodeSpacingFactor(),
       minimumBoundRadius);
 
     if (_noteCount == 0)
@@ -109,6 +113,7 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
 
     var components = FindConnectedComponents();
     PlaceTagAnchors(components);
+    PlaceNoteVolumeSeeds(components);
     PlaceNotes();
     SpreadCrowdedNotes();
     InstantiateNodes();
@@ -138,6 +143,7 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
     _stars.Clear();
     _tagNodesByNote = Array.Empty<List<int>>();
     _componentCenterByNode = Array.Empty<Vector3>();
+    _volumeSeedByNote = Array.Empty<Vector3>();
     _noteCount = 0;
   }
 
@@ -186,6 +192,14 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
       safeSpacing * Mathf.Pow(safeNodeCount, 1f / 3f));
   }
 
+  private float EffectiveNodeSpacingFactor()
+  {
+    bool hasNoTagNodes = _nodes.Count == _noteCount;
+    return hasNoTagNodes
+      ? nodeSpacingFactor * Mathf.Max(0.1f, taglessGraphSpacingMultiplier)
+      : nodeSpacingFactor;
+  }
+
   private void BuildLogicalGraph(List<NoteData> notes)
   {
     var orderedNotes = (notes ?? new List<NoteData>())
@@ -195,6 +209,7 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
 
     _noteCount = orderedNotes.Count;
     _tagNodesByNote = new List<int>[_noteCount];
+    _volumeSeedByNote = new Vector3[_noteCount];
 
     var tagIdsByNote = new List<int>[_noteCount];
     var tagFrequency = new Dictionary<int, int>();
@@ -310,7 +325,10 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
       {
         int nodeIndex = queue.Dequeue();
         component.Nodes.Add(nodeIndex);
-        if (!_nodes[nodeIndex].IsNote) component.Tags.Add(nodeIndex);
+        if (_nodes[nodeIndex].IsNote)
+          component.Notes.Add(nodeIndex);
+        else
+          component.Tags.Add(nodeIndex);
 
         for (int i = 0; i < adjacency[nodeIndex].Count; i++)
         {
@@ -322,6 +340,7 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
       }
 
       component.Nodes.Sort(CompareNodeKeys);
+      component.Notes.Sort(CompareNodeKeys);
       component.Tags.Sort(CompareNodeKeys);
       component.Key = _nodes[component.Nodes[0]].Key;
       components.Add(component);
@@ -374,13 +393,61 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
     }
   }
 
+  private void PlaceNoteVolumeSeeds(List<Component> components)
+  {
+    bool hasNoTagNodes = _nodes.Count == _noteCount;
+
+    for (int componentIndex = 0; componentIndex < components.Count; componentIndex++)
+    {
+      var component = components[componentIndex];
+      float desiredSpread = Mathf.Max(
+        noteSpacing * 2f,
+        EffectiveNodeSpacingFactor() * Mathf.Pow(
+          Mathf.Max(1, component.Notes.Count),
+          1f / 3f));
+
+      if (hasNoTagNodes)
+      {
+        float centerMargin = noteSpacing * 0.5f;
+        float maxSafeCenterDistance = Mathf.Max(
+          0f,
+          _boundRadius - desiredSpread - centerMargin);
+
+        component.Center = componentIndex == 0
+          ? Vector3.zero
+          : FibonacciBallPoint(componentIndex - 1, components.Count - 1) *
+            maxSafeCenterDistance *
+            Mathf.Clamp(componentSpreadRatio, 0.05f, 0.95f);
+
+        for (int i = 0; i < component.Nodes.Count; i++)
+          _componentCenterByNode[component.Nodes[i]] = component.Center;
+      }
+
+      float maxLocalSpread = Mathf.Max(
+        0f,
+        _boundRadius - component.Center.magnitude - noteSpacing * 0.5f);
+      float localSpread = Mathf.Min(maxLocalSpread, desiredSpread);
+
+      for (int noteOffset = 0; noteOffset < component.Notes.Count; noteOffset++)
+      {
+        int noteIndex = component.Notes[noteOffset];
+        _volumeSeedByNote[noteIndex] = ClampToSphere(
+          component.Center +
+          FibonacciBallPoint(noteOffset, component.Notes.Count) * localSpread,
+          noteSpacing * 0.5f);
+      }
+    }
+  }
+
   private void PlaceNotes()
   {
     for (int noteIndex = 0; noteIndex < _noteCount; noteIndex++)
     {
       var node = _nodes[noteIndex];
       var tags = _tagNodesByNote[noteIndex];
-      Vector3 basePosition = _componentCenterByNode[noteIndex];
+      Vector3 basePosition = tags.Count == 0
+        ? _volumeSeedByNote[noteIndex]
+        : _componentCenterByNode[noteIndex];
 
       if (tags.Count > 0)
       {
@@ -434,9 +501,31 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
         if (occupied.Contains(cell) || !IsInsideSphere(center, cellSize * 0.5f))
           continue;
 
+        bool usesOriginalCell = offset == Vector3Int.zero;
+        Vector3 placedPosition;
+        if (usesOriginalCell)
+        {
+          placedPosition = target;
+        }
+        else
+        {
+          Vector3 originalCellCenter = CellCenter(origin, cellSize);
+          Vector3 intraCellOffset = target - originalCellCenter;
+          Vector3 organicOffset =
+            intraCellOffset +
+            StableDirection(node.Key, 97) * cellSize * 0.15f;
+
+          organicOffset = new Vector3(
+            Mathf.Clamp(organicOffset.x, -cellSize * 0.35f, cellSize * 0.35f),
+            Mathf.Clamp(organicOffset.y, -cellSize * 0.35f, cellSize * 0.35f),
+            Mathf.Clamp(organicOffset.z, -cellSize * 0.35f, cellSize * 0.35f));
+
+          placedPosition = center + organicOffset;
+        }
+
         occupied.Add(cell);
         node.LocalPosition = ClampToSphere(
-          center + StableDirection(node.Key, 97) * cellSize * 0.12f,
+          placedPosition,
           cellSize * 0.25f);
         break;
       }
