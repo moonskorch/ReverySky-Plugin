@@ -1,25 +1,8 @@
 import { SearchComponent, setIcon } from "obsidian";
-import type { GraphEnginePreference } from "../bridge/BridgeTypes";
+import { ENGINE_PREFERENCE_OPTIONS } from "../bridge/EnginePreference";
 import { MapSession } from "./MapSession";
 
 const FILTER_SUGGESTIONS_HIDE_DELAY_MS = 120;
-const ENGINE_PREFERENCE_OPTIONS: ReadonlyArray<{
-  value: GraphEnginePreference;
-  label: string;
-}> = [
-  {
-    value: "auto",
-    label: "Auto"
-  },
-  {
-    value: "forces",
-    label: "Map of links (<200 notes)"
-  },
-  {
-    value: "static25d",
-    label: "Map of dates"
-  }
-] as const;
 
 type ObsidianHTMLElement = HTMLElement & {
   createEl?: <K extends keyof HTMLElementTagNameMap>(tagName: K) => HTMLElementTagNameMap[K];

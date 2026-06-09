@@ -1,3 +1,5 @@
+import type { GraphEnginePreference } from "./EnginePreference";
+
 export const BRIDGE_PROTOCOL_VERSION = "2.0.0";
 
 /**
@@ -50,8 +52,6 @@ export type GraphLink = {
   weight?: number;
   kind?: "resolved";
 };
-
-export type GraphEnginePreference = "auto" | "forces" | "static25d";
 
 export type GraphPayload = {
   graphVersion: string;

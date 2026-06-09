@@ -12,6 +12,10 @@ import type {
   NoteFocusPayload,
   NoteOpenPayload
 } from "../bridge/BridgeTypes";
+import {
+  DEFAULT_ENGINE_PREFERENCE,
+  normalizeGraphEnginePreference
+} from "../bridge/EnginePreference";
 import { GraphPathFilter, type ParsedPathFilter, type PathFilterParseResult } from "../graph/GraphPathFilter";
 
 const GRAPH_REFRESH_DEBOUNCE_MS = 250;
@@ -19,8 +23,6 @@ const GRAPH_RESOLVE_BARRIER_FALLBACK_MS = 700;
 const FILTER_INPUT_DEBOUNCE_MS = 250;
 const MAX_FOLDER_SUGGESTIONS = 80;
 const MAX_TAG_SUGGESTIONS = 200;
-const DEFAULT_ENGINE_PREFERENCE: GraphEnginePreference = "auto";
-
 export type MapViewState = {
   pathFilterQuery?: unknown;
   showTags?: unknown;
@@ -123,7 +125,7 @@ export class MapSession {
     const nextQuery =
       typeof nextState.pathFilterQuery === "string" ? nextState.pathFilterQuery : "";
     const nextShowTags = typeof nextState.showTags === "boolean" ? nextState.showTags : true;
-    const nextEnginePreference = this.normalizeEnginePreference(nextState.enginePreference);
+    const nextEnginePreference = normalizeGraphEnginePreference(nextState.enginePreference);
     this.pathFilterQuery = nextQuery;
     this.showTags = nextShowTags;
     this.enginePreference = nextEnginePreference;
@@ -184,7 +186,7 @@ export class MapSession {
   }
 
   setEnginePreference(enginePreference: unknown): void {
-    this.enginePreference = this.normalizeEnginePreference(enginePreference);
+    this.enginePreference = normalizeGraphEnginePreference(enginePreference);
     this.emitGraphFromSource();
   }
 
@@ -856,12 +858,6 @@ export class MapSession {
       ? "Only path:, date:, and tag: terms are applied in this view."
       : "";
     this.activePathFilter = parseResult.hasPathTerms ? parseResult.parsed : null;
-  }
-
-  private normalizeEnginePreference(value: unknown): GraphEnginePreference {
-    return value === "forces" || value === "static25d" || value === "auto"
-      ? value
-      : DEFAULT_ENGINE_PREFERENCE;
   }
 
   private ensureFolderSuggestionsReady(): void {

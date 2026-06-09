@@ -1,10 +1,13 @@
 import {
   BRIDGE_PROTOCOL_VERSION,
-  type GraphEnginePreference,
   GraphPayload,
   IncomingBridgeMessage,
   NoteOpenMessage
 } from "./BridgeTypes";
+import {
+  formatGraphEnginePreferenceValues,
+  isGraphEnginePreference
+} from "./EnginePreference";
 
 /**
  * Validate bridge messages at the boundary so malformed payloads fail fast.
@@ -72,9 +75,9 @@ export class MessageValidator {
 
     if (
       payload.enginePreference !== undefined &&
-      !this.isGraphEnginePreference(payload.enginePreference)
+      !isGraphEnginePreference(payload.enginePreference)
     ) {
-      errors.push("payload.enginePreference must be one of: auto, forces, static25d");
+      errors.push(`payload.enginePreference must be one of: ${formatGraphEnginePreferenceValues()}`);
     }
 
     return errors;
@@ -140,9 +143,5 @@ export class MessageValidator {
       return false;
     }
     return !Number.isNaN(new Date(value).getTime());
-  }
-
-  private static isGraphEnginePreference(value: unknown): value is GraphEnginePreference {
-    return value === "auto" || value === "forces" || value === "static25d";
   }
 }

@@ -2518,7 +2518,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d740bdf4eb7b4abcb7dc758b213c8361, type: 3}
   m_Name: 
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
-  injectSampleData: 1
+  injectSampleData: 0
   sampleScenario: 0
   sampleNoteCount: 10000
   sampleTagPoolSize: 200
