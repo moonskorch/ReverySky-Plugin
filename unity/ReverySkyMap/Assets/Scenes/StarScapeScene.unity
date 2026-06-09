@@ -2614,8 +2614,6 @@ MonoBehaviour:
   componentSpreadRatio: 0.95
   tagSpreadRatio: 0.612
   noteSpacing: 10
-  linkPull: 0
-  linkRelaxationPasses: 0
   maxPackingAttempts: 32
   tagScale: 0.7
   maxVisibleEdges: 1500

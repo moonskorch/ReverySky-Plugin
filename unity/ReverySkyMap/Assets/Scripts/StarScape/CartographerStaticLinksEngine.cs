@@ -23,8 +23,6 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
   [SerializeField, Range(0.05f, 0.95f)] private float componentSpreadRatio = 0.62f;
   [SerializeField, Range(0.05f, 0.95f)] private float tagSpreadRatio = 0.48f;
   [SerializeField, Min(0.1f)] private float noteSpacing = 1.8f;
-  [SerializeField, Range(0f, 1f)] private float linkPull = 0.25f;
-  [SerializeField, Range(0, 8)] private int linkRelaxationPasses = 2;
   [SerializeField, Range(1, 128)] private int maxPackingAttempts = 32;
 
   [Header("Visual")]
@@ -32,7 +30,6 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
   [SerializeField, Min(0)] private int maxVisibleEdges = 1500;
 
   private const float GOLDEN_ANGLE_RAD = 2.39996323f;
-  private const float MAX_LAYOUT_LINK_WEIGHT = 4f;
 
   private float _boundRadius;
   private int _noteCount;
@@ -113,7 +110,6 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
     var components = FindConnectedComponents();
     PlaceTagAnchors(components);
     PlaceNotes();
-    RelaxDirectLinks();
     SpreadCrowdedNotes();
     InstantiateNodes();
     InstantiateLines();
@@ -406,46 +402,6 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
       float jitterScale = Mathf.Lerp(0.75f, 1.65f, Hash01(node.Key, 19));
       Vector3 jitter = StableDirection(node.Key, 31) * noteSpacing * jitterScale;
       node.LocalPosition = ClampToSphere(basePosition + jitter, noteSpacing * 0.5f);
-    }
-  }
-
-  private void RelaxDirectLinks()
-  {
-    int passes = Mathf.Clamp(linkRelaxationPasses, 0, 8);
-    float pull = Mathf.Clamp01(linkPull);
-    if (passes == 0 || pull <= 0f || _noteLinks.Count == 0) return;
-
-    var weightedSums = new Vector3[_noteCount];
-    var totalWeights = new float[_noteCount];
-    var next = new Vector3[_noteCount];
-
-    for (int pass = 0; pass < passes; pass++)
-    {
-      Array.Clear(weightedSums, 0, weightedSums.Length);
-      Array.Clear(totalWeights, 0, totalWeights.Length);
-
-      for (int i = 0; i < _noteLinks.Count; i++)
-      {
-        var edge = _noteLinks[i];
-        float weight = Mathf.Clamp(edge.Weight, 0.25f, MAX_LAYOUT_LINK_WEIGHT);
-        weightedSums[edge.A] += _nodes[edge.B].LocalPosition * weight;
-        weightedSums[edge.B] += _nodes[edge.A].LocalPosition * weight;
-        totalWeights[edge.A] += weight;
-        totalWeights[edge.B] += weight;
-      }
-
-      for (int noteIndex = 0; noteIndex < _noteCount; noteIndex++)
-      {
-        Vector3 current = _nodes[noteIndex].LocalPosition;
-        next[noteIndex] = totalWeights[noteIndex] <= 0f
-          ? current
-          : ClampToSphere(
-            Vector3.Lerp(current, weightedSums[noteIndex] / totalWeights[noteIndex], pull),
-            noteSpacing * 0.5f);
-      }
-
-      for (int noteIndex = 0; noteIndex < _noteCount; noteIndex++)
-        _nodes[noteIndex].LocalPosition = next[noteIndex];
     }
   }
 
