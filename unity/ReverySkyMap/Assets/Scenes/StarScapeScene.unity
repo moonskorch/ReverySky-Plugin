@@ -2479,7 +2479,7 @@ MonoBehaviour:
   forcesEngineBehaviour: {fileID: 280067059}
   static25DEngineBehaviour: {fileID: 428893401}
   staticLinksEngineBehaviour: {fileID: 1829145876}
-  defaultEngine: 3
+  defaultEngine: 0
   autoSwitchThreshold: 200
   changeViewControl: {fileID: 1156615015}
   viewButtonImage: {fileID: 1542272346}
@@ -2518,7 +2518,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d740bdf4eb7b4abcb7dc758b213c8361, type: 3}
   m_Name: 
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
-  injectSampleData: 0
+  injectSampleData: 1
   sampleScenario: 0
   sampleNoteCount: 10000
   sampleTagPoolSize: 200
