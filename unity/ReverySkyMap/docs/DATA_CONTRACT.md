@@ -46,7 +46,7 @@ type GraphPayload = {
   enginePreference?: GraphEnginePreference;
 };
 
-type GraphEnginePreference = "auto" | "forces" | "static25d";
+type GraphEnginePreference = "auto" | "forces" | "static25D" | "staticLinks";
 
 type GraphNoteNode = {
   id: string;
@@ -71,7 +71,7 @@ type GraphLink = {
 - `id` is required and stable across updates.
 - `path` is vault-relative with `/` separators.
 - Links with missing note ids are tolerated at ingest and dropped later during Forces edge resolution.
-- `enginePreference`, when provided, must be one of: `auto`, `forces`, `static25d`.
+- `enginePreference`, when provided, must be one of: `auto`, `forces`, `static25D`, `staticLinks`.
 - Unknown fields are ignored, not fatal.
 
 ## Runtime Field Usage (Unity)
@@ -91,7 +91,7 @@ Current runtime behavior snapshot for Unity ingestion and map interaction:
 - `notes[].size` -> star scale factor via runtime percentile statistics.
   - fallback: negative size maps to `0`.
 - `enginePreference` -> preferred runtime engine mode for the next graph build.
-  - expected mapping: `auto` = threshold-based auto selection, `forces` = links map preference, `static25d` = dates map preference.
+  - expected mapping: `auto` = threshold-based selection (`Forces` for small graphs, `StaticLinks` for large graphs), `forces` = links map preference with the same large-graph fallback to `StaticLinks`, `static25D` = explicit dates map preference, `staticLinks` = explicit static links map preference.
 - `links[].sourceId` and `links[].targetId` -> note-note edges in Forces engine.
   - gate: empty ids and self-links are dropped during bridge mapping; missing runtime node ids are dropped by Forces edge resolution.
 - `links[].weight` -> Forces spring rest length (`idealEdgeLen / sqrt(weight)`).

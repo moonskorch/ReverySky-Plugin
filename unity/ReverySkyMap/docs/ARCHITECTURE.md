@@ -14,7 +14,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 
 - Scene entry point:
   - Responsibility: hosts the runtime scene and serialized wiring for the map, UI, camera, and engines.
-  - Main code location: `Assets/Scenes/ScarScapeScene.unity`
+  - Main code location: `Assets/Scenes/StarScapeScene.unity`
   - Important dependencies: `GameInput`, `CameraOrbitalController`, `Cartographer`, `CartographerForcesEngine`, `Cartographer25DEngine`, `CartographerStaticLinksEngine`, `ScapeCameraWarper`, `ChangeViewControl`, `RotateCameraUI`, `Notification`
 - Bridge and runtime state:
   - Responsibility: validates inbound bridge envelopes, converts payloads into runtime models, and stores the current graph snapshot.
@@ -45,7 +45,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 
 ### 1. Scene startup and optional sample data
 
-1. Unity loads `Assets/Scenes/ScarScapeScene.unity`.
+1. Unity loads `Assets/Scenes/StarScapeScene.unity`.
 2. `ObsidianBridge.EnsureInstance()` in `Assets/Scripts/Bridge/ObsidianBridge.cs` creates a persistent bridge object if the scene does not already contain one.
 3. Scene wiring activates `GameInput`, `CameraOrbitalController`, `FocusNode`, `Cartographer`, the engine components, `ScapeCameraWarper`, `ChangeViewControl`, `RotateCameraUI`, `Notification`, and `SampleDataGenerator`.
 4. `Cartographer.Start()` calls `SampleDataGenerator.TryInjectSampleDataIfNeeded()` when sample injection is enabled and then calls `RebuildGraph(MapRuntimeContext.EnginePreference)`.
@@ -58,7 +58,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 3. Tags are de-duplicated by name, blank titles become `GameSettings.DefaultTitle`, invalid dates become `DateTime.MinValue`, and non-positive link weights are normalized to `1`.
 4. `MapRuntimeContext.SetTagNames`, `SetLinks`, and `SetNotes` store the runtime source of truth and raise `OnNotesChanged`.
 5. `Cartographer.HandleRuntimeNotesChanged()` calls `RebuildGraph(MapRuntimeContext.EnginePreference)`.
-6. `Cartographer.ResolveModeByNotesCount()` selects `Forces` or `Static25D` unless `defaultEngine` overrides that choice; `StaticLinks` is available through the serialized `defaultEngine` override but is not part of the note-count auto-policy yet.
+6. `Cartographer.ResolveModeByNotesCount()` uses `defaultEngine` first. Without an override, explicit `Static25D` and `StaticLinks` stay fixed, while `Auto` and `Forces` resolve by note count: small graphs use `Forces`, large graphs use `StaticLinks`.
 7. The chosen engine runs `BuildGraph(notes)`, then `ApplyView(CurrentView)`, and `Cartographer` rebinds `ScapeCameraWarper` when the active engine is `Static25D`.
 8. `Cartographer.SetCameraFocus()` restores the previous selection from `MapRuntimeContext.CurrentNoteId` or `FocusNode.LastSelectedStarId`.
 
@@ -198,7 +198,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Negative note sizes clamp to `0`.
   - Non-positive link weights normalize to `1`.
   - Unknown bridge fields are ignored.
-- `Cartographer.ResolveModeByNotesCount()` uses `defaultEngine` first, then `enginePreference`, then the note-count threshold. `StaticLinks` is only selected through the serialized `defaultEngine` override for now.
+- `Cartographer.ResolveModeByNotesCount()` uses `defaultEngine` first, then preserves explicit `Static25D` and `StaticLinks`, then resolves `Auto` and `Forces` by the note-count threshold.
 
 ## Build, Packaging, and Deployment
 
@@ -206,7 +206,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 - Test assemblies are split by Unity test mode:
   - `Assets/Tests/EditMode/ReverySkyMap.EditModeTests.asmdef`
   - `Assets/Tests/PlayMode/ReverySkyMap.PlayModeTests.asmdef`
-- The scene entry point is `Assets/Scenes/ScarScapeScene.unity`.
+- The scene entry point is `Assets/Scenes/StarScapeScene.unity`.
 - Prefabs and ScriptableObjects that define the visible runtime live under `Assets/Prefabs`, `Assets/_Visuals`, and `Assets/ScriptableObjects`.
 - Package-level dependencies in `Packages/manifest.json` include URP, UGUI, TextMesh Pro, and `com.gamelovers.mcp-unity` for Unity MCP-based verification.
 - The Unity side stops at the exported scene/runtime boundary; parent plugin hosting and WebGL import are handled outside this subproject.
@@ -221,7 +221,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Manual checks when needed: inspect note placement, date-range behavior, and the `Static25D` camera slider
 - PlayMode bootstrap and visual stability:
   - Automated checks: `Assets/Tests/PlayMode/DreamScapeRuntimePlayModeTests.cs` (`MapRuntimePlayModeTests`)
-  - Manual checks when needed: open `Assets/Scenes/ScarScapeScene.unity`, enter Play mode, and confirm no missing scripts or critical console errors
+  - Manual checks when needed: open `Assets/Scenes/StarScapeScene.unity`, enter Play mode, and confirm no missing scripts or critical console errors
 
 Use `docs/VERIFICATION.md` for the exact check order, MCP-first policy, and fallback rules.
 

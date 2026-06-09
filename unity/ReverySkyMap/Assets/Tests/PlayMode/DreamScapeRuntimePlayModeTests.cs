@@ -8,7 +8,7 @@ using UnityEngine.TestTools;
 
 public class MapRuntimePlayModeTests
 {
-  private const string ScenePath = "Assets/Scenes/ScarScapeScene.unity";
+  private const string ScenePath = "Assets/Scenes/StarScapeScene.unity";
   private const int SnapshotWidth = 960;
   private const int SnapshotHeight = 540;
 
@@ -73,6 +73,12 @@ public class MapRuntimePlayModeTests
     Assert.That(MapRuntimeContext.EnginePreference, Is.EqualTo(CartographerEngine.Static25D));
     Assert.That(cartographer.ActiveEngine, Is.Not.Null);
     Assert.That(cartographer.ActiveEngine.EngineType, Is.EqualTo(CartographerEngine.Static25D));
+
+    bridge.OnGraphSet(StaticLinksEnginePreferencePayload);
+    yield return WaitFrames(4);
+    Assert.That(MapRuntimeContext.EnginePreference, Is.EqualTo(CartographerEngine.StaticLinks));
+    Assert.That(cartographer.ActiveEngine, Is.Not.Null);
+    Assert.That(cartographer.ActiveEngine.EngineType, Is.EqualTo(CartographerEngine.StaticLinks));
 
     UnityEngine.Object.Destroy(bridgeObject);
 
@@ -306,7 +312,17 @@ public class MapRuntimePlayModeTests
     "]}}";
 
   private const string Static25DEnginePreferencePayload =
-    "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"enginePreference\":\"static25d\",\"notes\":[" +
+    "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"enginePreference\":\"static25D\",\"notes\":[" +
+    "{\"id\":\"e1\",\"path\":\"engine/e1.md\",\"title\":\"Engine 1\",\"tags\":[\"engine\"],\"date\":\"2025-04-01T00:00:00Z\",\"size\":111}," +
+    "{\"id\":\"e2\",\"path\":\"engine/e2.md\",\"title\":\"Engine 2\",\"tags\":[\"engine\"],\"date\":\"2025-04-03T00:00:00Z\",\"size\":222}," +
+    "{\"id\":\"e3\",\"path\":\"engine/e3.md\",\"title\":\"Engine 3\",\"tags\":[\"engine\"],\"date\":\"2025-04-05T00:00:00Z\",\"size\":333}" +
+    "],\"links\":[" +
+    "{\"sourceId\":\"e1\",\"targetId\":\"e2\",\"weight\":1.0}," +
+    "{\"sourceId\":\"e2\",\"targetId\":\"e3\",\"weight\":1.0}" +
+    "]}}";
+
+  private const string StaticLinksEnginePreferencePayload =
+    "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"enginePreference\":\"staticLinks\",\"notes\":[" +
     "{\"id\":\"e1\",\"path\":\"engine/e1.md\",\"title\":\"Engine 1\",\"tags\":[\"engine\"],\"date\":\"2025-04-01T00:00:00Z\",\"size\":111}," +
     "{\"id\":\"e2\",\"path\":\"engine/e2.md\",\"title\":\"Engine 2\",\"tags\":[\"engine\"],\"date\":\"2025-04-03T00:00:00Z\",\"size\":222}," +
     "{\"id\":\"e3\",\"path\":\"engine/e3.md\",\"title\":\"Engine 3\",\"tags\":[\"engine\"],\"date\":\"2025-04-05T00:00:00Z\",\"size\":333}" +

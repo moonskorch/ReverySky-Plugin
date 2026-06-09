@@ -41,7 +41,7 @@ type GraphPayload = {
   enginePreference?: GraphEnginePreference;
 };
 
-type GraphEnginePreference = "auto" | "forces" | "static25d";
+type GraphEnginePreference = "auto" | "forces" | "static25D" | "staticLinks";
 
 type GraphNoteNode = {
   id: string;
@@ -65,7 +65,7 @@ type GraphLink = {
 - `id` must be stable for the same note across sessions.
 - `date` must be a single canonical note date in ISO 8601 format when provided.
 - `size` must be a non-negative integer measured in bytes.
-- `enginePreference`, when provided, must be one of: `auto`, `forces`, `static25d`.
+- `enginePreference`, when provided, must be one of: `auto`, `forces`, `static25D`, `staticLinks`.
 - Producer rule: `vault.noteCount` should equal `notes.length` for every emitted payload.
 - Unknown fields must be safely ignored by consumers.
 

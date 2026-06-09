@@ -2480,7 +2480,7 @@ MonoBehaviour:
   static25DEngineBehaviour: {fileID: 428893401}
   staticLinksEngineBehaviour: {fileID: 1829145876}
   defaultEngine: 0
-  autoSwitchThreshold: 200
+  autoSwitchThreshold: 500
   changeViewControl: {fileID: 1156615015}
   viewButtonImage: {fileID: 1542272346}
   viewIconPlanets: {fileID: 21300000, guid: a23efd95330d88e4aba3ca87f60ffd5f, type: 3}

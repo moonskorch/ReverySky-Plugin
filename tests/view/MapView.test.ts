@@ -1244,13 +1244,21 @@ describe("MapView bridge integration", () => {
     expect(linksPayload.enginePreference).toBe("forces");
     expect(engineSelect.value).toBe("forces");
 
-    engineSelect.value = "static25d";
+    engineSelect.value = "static25D";
     engineSelect.dispatchEvent(new Event("change"));
     expect(buildGraph).toHaveBeenCalledTimes(1);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(3);
     const datesPayload = bridge.sendGraphSet.mock.calls[2]?.[0] as GraphPayload;
-    expect(datesPayload.enginePreference).toBe("static25d");
-    expect(engineSelect.value).toBe("static25d");
+    expect(datesPayload.enginePreference).toBe("static25D");
+    expect(engineSelect.value).toBe("static25D");
+
+    engineSelect.value = "staticLinks";
+    engineSelect.dispatchEvent(new Event("change"));
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(4);
+    const staticLinksPayload = bridge.sendGraphSet.mock.calls[3]?.[0] as GraphPayload;
+    expect(staticLinksPayload.enginePreference).toBe("staticLinks");
+    expect(engineSelect.value).toBe("staticLinks");
   });
 
   it("opens filter panel by gear button and closes it by close button", async () => {
@@ -2678,10 +2686,10 @@ describe("MapView bridge integration", () => {
     );
 
     await view.setState({
-      enginePreference: "static25d"
+      enginePreference: "static25D"
     });
     expect(view.getState()).toMatchObject({
-      enginePreference: "static25d"
+      enginePreference: "static25D"
     });
 
     await view.onOpen();
@@ -2695,11 +2703,11 @@ describe("MapView bridge integration", () => {
 
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
     const outgoingPayload = bridge.sendGraphSet.mock.calls[0]?.[0] as GraphPayload;
-    expect(outgoingPayload.enginePreference).toBe("static25d");
+    expect(outgoingPayload.enginePreference).toBe("static25D");
     const engineSelect = view.contentEl.querySelector(
       ".reverysky-map-engine-select"
     ) as HTMLSelectElement;
-    expect(engineSelect.value).toBe("static25d");
+    expect(engineSelect.value).toBe("static25D");
   });
 
   it("restores tag filter query from view state", async () => {

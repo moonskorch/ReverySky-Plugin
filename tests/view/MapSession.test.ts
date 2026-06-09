@@ -376,7 +376,7 @@ describe("MapSession", () => {
     await session.setState({
       pathFilterQuery: "tag:#project",
       showTags: false,
-      enginePreference: "static25d"
+      enginePreference: "static25D"
     });
 
     session.start(() => undefined);
@@ -388,7 +388,7 @@ describe("MapSession", () => {
     const restoredPayload = sendGraph.mock.calls[0]?.[0] as GraphPayload;
     expect(restoredPayload.notes.map((note) => note.id)).toEqual(["project"]);
     expect(restoredPayload.notes[0]?.tags).toEqual([]);
-    expect(restoredPayload.enginePreference).toBe("static25d");
+    expect(restoredPayload.enginePreference).toBe("static25D");
 
     session.setFilterQuery("path:archive");
     vi.advanceTimersByTime(250);

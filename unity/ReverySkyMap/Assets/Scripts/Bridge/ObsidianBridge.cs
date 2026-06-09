@@ -216,11 +216,17 @@ public class ObsidianBridge : MonoBehaviour
 
   private static CartographerEngine ParseEnginePreference(string value)
   {
+    if (string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase))
+      return CartographerEngine.Auto;
+
     if (string.Equals(value, "forces", StringComparison.OrdinalIgnoreCase))
       return CartographerEngine.Forces;
 
-    if (string.Equals(value, "static25d", StringComparison.OrdinalIgnoreCase))
+    if (string.Equals(value, "static25D", StringComparison.OrdinalIgnoreCase))
       return CartographerEngine.Static25D;
+
+    if (string.Equals(value, "staticLinks", StringComparison.OrdinalIgnoreCase))
+      return CartographerEngine.StaticLinks;
 
     return CartographerEngine.Auto;
   }

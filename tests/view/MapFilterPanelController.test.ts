@@ -137,7 +137,7 @@ describe("MapFilterPanelController", () => {
     await session.setState({
       pathFilterQuery: "tag:#project",
       showTags: false,
-      enginePreference: "static25d"
+      enginePreference: "static25D"
     });
 
     const controller = new MapFilterPanelController(session);
@@ -151,7 +151,7 @@ describe("MapFilterPanelController", () => {
 
     expect(searchInput.value).toBe("tag:#project");
     expect(tagsToggle.getAttribute("aria-checked")).toBe("false");
-    expect(engineSelect.value).toBe("static25d");
+    expect(engineSelect.value).toBe("static25D");
     expect(message.textContent).toBe("");
   });
 });

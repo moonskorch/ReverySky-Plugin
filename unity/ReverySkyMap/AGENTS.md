@@ -3,7 +3,7 @@
 ## Project Overview
 - This folder is the Unity runtime subproject for ReverySky Map.
 - Unity version: `6000.3.8f1`.
-- Primary scene: `Assets/Scenes/ScarScapeScene.unity`.
+- Primary scene: `Assets/Scenes/StarScapeScene.unity`.
 - Main runtime areas:
   - `Assets/Scripts/*`
   - `Assets/Prefabs/*`

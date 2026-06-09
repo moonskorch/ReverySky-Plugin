@@ -90,8 +90,59 @@ public class ObsidianBridgeEditModeTests
     bridge.OnGraphSet(TestPayloads.EnginePreferenceStatic25DPayload);
     Assert.That(MapRuntimeContext.EnginePreference, Is.EqualTo(CartographerEngine.Static25D));
 
+    bridge.OnGraphSet(TestPayloads.EnginePreferenceStaticLinksPayload);
+    Assert.That(MapRuntimeContext.EnginePreference, Is.EqualTo(CartographerEngine.StaticLinks));
+
     bridge.OnGraphSet(TestPayloads.EnginePreferenceInvalidPayload);
     Assert.That(MapRuntimeContext.EnginePreference, Is.EqualTo(CartographerEngine.Auto));
+  }
+
+  [Test]
+  public void ResolveModeByNotesCount_UsesStaticLinksForLargeAutoAndForcesGraphs()
+  {
+    var cartographerObject = new GameObject("CartographerResolveModeTests");
+    try
+    {
+      var cartographer = cartographerObject.AddComponent<Cartographer>();
+      var resolveMode = typeof(Cartographer).GetMethod("ResolveModeByNotesCount", BindingFlags.Instance | BindingFlags.NonPublic);
+
+      Assert.That(resolveMode, Is.Not.Null);
+
+      var autoLarge = (CartographerEngine)resolveMode.Invoke(cartographer, new object[] { 501, CartographerEngine.Auto });
+      var forcesLarge = (CartographerEngine)resolveMode.Invoke(cartographer, new object[] { 501, CartographerEngine.Forces });
+      var forcesSmall = (CartographerEngine)resolveMode.Invoke(cartographer, new object[] { 500, CartographerEngine.Forces });
+
+      Assert.That(autoLarge, Is.EqualTo(CartographerEngine.StaticLinks));
+      Assert.That(forcesLarge, Is.EqualTo(CartographerEngine.StaticLinks));
+      Assert.That(forcesSmall, Is.EqualTo(CartographerEngine.Forces));
+    }
+    finally
+    {
+      Object.DestroyImmediate(cartographerObject);
+    }
+  }
+
+  [Test]
+  public void ResolveModeByNotesCount_KeepsExplicitStaticPreferences()
+  {
+    var cartographerObject = new GameObject("CartographerResolveExplicitModeTests");
+    try
+    {
+      var cartographer = cartographerObject.AddComponent<Cartographer>();
+      var resolveMode = typeof(Cartographer).GetMethod("ResolveModeByNotesCount", BindingFlags.Instance | BindingFlags.NonPublic);
+
+      Assert.That(resolveMode, Is.Not.Null);
+
+      var static25D = (CartographerEngine)resolveMode.Invoke(cartographer, new object[] { 9999, CartographerEngine.Static25D });
+      var staticLinks = (CartographerEngine)resolveMode.Invoke(cartographer, new object[] { 1, CartographerEngine.StaticLinks });
+
+      Assert.That(static25D, Is.EqualTo(CartographerEngine.Static25D));
+      Assert.That(staticLinks, Is.EqualTo(CartographerEngine.StaticLinks));
+    }
+    finally
+    {
+      Object.DestroyImmediate(cartographerObject);
+    }
   }
 
   [Test]
@@ -286,8 +337,13 @@ public class ObsidianBridgeEditModeTests
       "],\"links\":[]}}";
 
     public const string EnginePreferenceStatic25DPayload =
-      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"enginePreference\":\"static25d\",\"notes\":[" +
-      "{\"id\":\"e2\",\"path\":\"engine/static25d.md\",\"title\":\"Static25D\",\"tags\":[],\"date\":\"2025-01-01T00:00:00Z\",\"size\":1}" +
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"enginePreference\":\"static25D\",\"notes\":[" +
+      "{\"id\":\"e2\",\"path\":\"engine/static25D.md\",\"title\":\"Static25D\",\"tags\":[],\"date\":\"2025-01-01T00:00:00Z\",\"size\":1}" +
+      "],\"links\":[]}}";
+
+    public const string EnginePreferenceStaticLinksPayload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"enginePreference\":\"staticLinks\",\"notes\":[" +
+      "{\"id\":\"e4\",\"path\":\"engine/staticLinks.md\",\"title\":\"StaticLinks\",\"tags\":[],\"date\":\"2025-01-01T00:00:00Z\",\"size\":1}" +
       "],\"links\":[]}}";
 
     public const string EnginePreferenceInvalidPayload =

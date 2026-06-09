@@ -17,8 +17,8 @@ public class Cartographer : MonoBehaviour
   [SerializeField] private MonoBehaviour staticLinksEngineBehaviour;
   [SerializeField] private CartographerEngine defaultEngine = CartographerEngine.Auto;
 
-  [Tooltip("Auto: if notes count > threshold => Static25D, else Forces")]
-  [SerializeField] private int autoSwitchThreshold = 200;
+  [Tooltip("Auto/Forces: large graphs use StaticLinks; small graphs use Forces. Static25D and StaticLinks stay explicit.")]
+  [SerializeField] private int autoSwitchThreshold = 500;
 
   [Header("Change view button")]
   [SerializeField] private ChangeViewControl changeViewControl;
@@ -39,12 +39,12 @@ public class Cartographer : MonoBehaviour
   public Vector3 Pivot => _activeEngine != null ? _activeEngine.Pivot : transform.position;
 
   private ICartographerEngine _forcesEngine;
-  private ICartographerEngine _static25dEngine;
+  private ICartographerEngine _static25DEngine;
   private ICartographerEngine _staticLinksEngine;
   private ICartographerEngine _activeEngine;
 
   public ICartographerEngine ActiveEngine => _activeEngine;
-  public Cartographer25DEngine Static25DEngine => (Cartographer25DEngine)_static25dEngine;
+  public Cartographer25DEngine Static25DEngine => (Cartographer25DEngine)_static25DEngine;
 
   public event Action<CartographerEngine> OnEngineChanged;
 
@@ -55,7 +55,7 @@ public class Cartographer : MonoBehaviour
     I = this;
 
     _forcesEngine = forcesEngineBehaviour as ICartographerEngine;
-    _static25dEngine = static25DEngineBehaviour as ICartographerEngine;
+    _static25DEngine = static25DEngineBehaviour as ICartographerEngine;
     _staticLinksEngine = staticLinksEngineBehaviour as ICartographerEngine;
   }
 
@@ -133,14 +133,12 @@ public class Cartographer : MonoBehaviour
     if (defaultEngine != CartographerEngine.Auto)
       return defaultEngine;
 
-    if (enginePreferred == CartographerEngine.Static25D ||
-      (enginePreferred == CartographerEngine.Forces && notesCount < autoSwitchThreshold))
-    {
+    if (enginePreferred == CartographerEngine.Static25D || enginePreferred == CartographerEngine.StaticLinks)
       return enginePreferred;
-    }
 
-    return notesCount > autoSwitchThreshold
-      ? CartographerEngine.Static25D
+    var isLargeGraph = notesCount > autoSwitchThreshold;
+    return isLargeGraph
+      ? CartographerEngine.StaticLinks
       : CartographerEngine.Forces;
   }
 
@@ -148,7 +146,7 @@ public class Cartographer : MonoBehaviour
   {
     var next = resolvedMode switch
     {
-      CartographerEngine.Static25D => _static25dEngine,
+      CartographerEngine.Static25D => _static25DEngine,
       CartographerEngine.StaticLinks => _staticLinksEngine,
       _ => _forcesEngine
     };

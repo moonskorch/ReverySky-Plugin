@@ -53,7 +53,7 @@ describe("MessageValidator", () => {
     expect(errors).toContain("payload.links[0].weight must be a positive number when defined");
     expect(errors).toContain("payload.notes[0].id must be a non-empty string");
     expect(errors).toContain("payload.notes[0].size must be a non-negative integer");
-    expect(errors).toContain("payload.enginePreference must be one of: auto, forces, static25d");
+    expect(errors).toContain("payload.enginePreference must be one of: auto, forces, static25D, staticLinks");
   });
 
   it("rejects incoming bridge:ready message with protocol mismatch", () => {

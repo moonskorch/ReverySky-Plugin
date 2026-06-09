@@ -1,8 +1,9 @@
-export const ENGINE_PREFERENCE_VALUES = ["auto", "forces", "static25d"] as const;
+export const ENGINE_PREFERENCE_VALUES = ["auto", "forces", "staticLinks", "static25D"] as const;
 
 export type GraphEnginePreference = (typeof ENGINE_PREFERENCE_VALUES)[number];
 
 export const DEFAULT_ENGINE_PREFERENCE: GraphEnginePreference = "auto";
+export const AUTO_SWITCH_THRESHOLD_NOTES = 500;
 
 export const ENGINE_PREFERENCE_OPTIONS: ReadonlyArray<{
   value: GraphEnginePreference;
@@ -14,11 +15,15 @@ export const ENGINE_PREFERENCE_OPTIONS: ReadonlyArray<{
   },
   {
     value: "forces",
-    label: "Map of links (<200 notes)"
+    label: `Dynamic links (<=${AUTO_SWITCH_THRESHOLD_NOTES} notes)`
   },
   {
-    value: "static25d",
-    label: "Map of dates"
+    value: "staticLinks",
+    label: "Static links"
+  },
+  {
+    value: "static25D",
+    label: "Dates"
   }
 ] as const;
 

@@ -178,8 +178,8 @@ Likely risks:
 ## Step 8 (DONE) - Legacy scene dependency map and extraction boundary
 
 Goal:
-- Audit `reference/ReverySky/Assets/Scenes/ScarScapeScene.unity` and define the exact MVP include/exclude list.
-- Lock extraction source to `ScarScapeScene` and map-critical scripts only.
+- Audit `reference/ReverySky/Assets/Scenes/StarScapeScene.unity` and define the exact MVP include/exclude list.
+- Lock extraction source to `StarScapeScene` and map-critical scripts only.
 
 Files likely affected:
 - `docs/ARCHITECTURE.md`
@@ -191,7 +191,7 @@ Acceptance criteria:
 - It is clear which scene/scripts/prefabs are copied first and which are deferred.
 
 Manual test steps:
-1. Verify documented source scene is `ScarScapeScene`.
+1. Verify documented source scene is `StarScapeScene`.
 2. Verify excluded systems include note editing, non-map gameplay flows, DB/save flows.
 3. Verify next step has a concrete file-copy target.
 

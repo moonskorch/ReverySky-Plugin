@@ -100,7 +100,7 @@ If a required automated check cannot be run, report:
 
 Manual checks are required in addition to automation:
 1. Open this Unity project.
-2. Open `Assets/Scenes/ScarScapeScene.unity`.
+2. Open `Assets/Scenes/StarScapeScene.unity`.
 3. Enter Play mode.
 4. Confirm no missing scripts and no critical runtime errors in Console.
 

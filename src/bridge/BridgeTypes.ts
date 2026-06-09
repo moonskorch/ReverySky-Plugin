@@ -1,4 +1,5 @@
 import type { GraphEnginePreference } from "./EnginePreference";
+export type { GraphEnginePreference } from "./EnginePreference";
 
 export const BRIDGE_PROTOCOL_VERSION = "2.0.0";
 
