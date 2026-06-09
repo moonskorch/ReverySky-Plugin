@@ -2519,12 +2519,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
   injectSampleData: 0
-  sampleScenario: 0
-  sampleNoteCount: 30
-  sampleTagPoolSize: 0
+  sampleScenario: 2
+  sampleNoteCount: 10000
+  sampleTagPoolSize: 250
   sampleDateSpanDays: 365
-  sampleMaxTagsPerNote: 5
-  sampleExtraLinks: 20
+  sampleMaxTagsPerNote: 3
+  sampleExtraLinks: 2000
 --- !u!1 &1787028428
 GameObject:
   m_ObjectHideFlags: 0

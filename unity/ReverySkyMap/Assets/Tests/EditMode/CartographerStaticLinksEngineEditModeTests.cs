@@ -43,6 +43,79 @@ public class CartographerStaticLinksEngineEditModeTests
   }
 
   [Test]
+  public void CalculateTaglessComponentRadius_MoreNotesGrowRadius()
+  {
+    float small =
+      CartographerStaticLinksEngine.CalculateTaglessComponentRadius(
+        100,
+        10f,
+        10f);
+
+    float large =
+      CartographerStaticLinksEngine.CalculateTaglessComponentRadius(
+        10000,
+        10f,
+        10f);
+
+    Assert.That(large, Is.GreaterThan(small));
+  }
+
+  [Test]
+  public void CalculateTaglessComponentsBoundRadius_MultipleComponentsRequireMoreRoom()
+  {
+    float one =
+      CartographerStaticLinksEngine.CalculateTaglessComponentsBoundRadius(
+        new[] { 10000 },
+        10f,
+        10f,
+        6f);
+
+    float four =
+      CartographerStaticLinksEngine.CalculateTaglessComponentsBoundRadius(
+        new[] { 2500, 2500, 2500, 2500 },
+        10f,
+        10f,
+        6f);
+
+    Assert.That(four, Is.GreaterThan(one));
+  }
+
+  [Test]
+  public void CalculateTaglessComponentsBoundRadius_SameInputsGiveSameResult()
+  {
+    float first =
+      CartographerStaticLinksEngine.CalculateTaglessComponentsBoundRadius(
+        new[] { 2500, 2500, 2500, 2500 },
+        10f,
+        10f,
+        6f);
+
+    float second =
+      CartographerStaticLinksEngine.CalculateTaglessComponentsBoundRadius(
+        new[] { 2500, 2500, 2500, 2500 },
+        10f,
+        10f,
+        6f);
+
+    Assert.That(first, Is.EqualTo(second));
+  }
+
+  [Test]
+  public void CalculateTaglessComponentsBoundRadius_EmptyInputIsSafe()
+  {
+    float result =
+      CartographerStaticLinksEngine.CalculateTaglessComponentsBoundRadius(
+        System.Array.Empty<int>(),
+        10f,
+        10f,
+        6f);
+
+    Assert.That(result, Is.GreaterThan(0f));
+    Assert.That(float.IsNaN(result), Is.False);
+    Assert.That(float.IsInfinity(result), Is.False);
+  }
+
+  [Test]
   public void Engine_ExposesStaticContract()
   {
     GameObject gameObject = new GameObject("CartographerStaticLinksEngineEditModeTests");

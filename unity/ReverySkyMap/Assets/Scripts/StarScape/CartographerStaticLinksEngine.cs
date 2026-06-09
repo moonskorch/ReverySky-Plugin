@@ -32,6 +32,7 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
   [SerializeField, Min(0)] private int maxVisibleEdges = 1500;
 
   private const float GOLDEN_ANGLE_RAD = 2.39996323f;
+  private const float TAGLESS_COMPONENT_VOLUME_SCALE = 1.5f;
 
   private float _boundRadius;
   private int _noteCount;
@@ -190,6 +191,71 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
     return Mathf.Max(
       safeMinimum,
       safeSpacing * Mathf.Pow(safeNodeCount, 1f / 3f));
+  }
+
+  public static float CalculateTaglessComponentRadius(
+    int noteCount,
+    float spacingFactor,
+    float noteSpacing)
+  {
+    int safeNoteCount = Mathf.Max(1, noteCount);
+    float safeSpacingFactor = Mathf.Max(0.1f, spacingFactor);
+    float safeNoteSpacing = Mathf.Max(0.1f, noteSpacing);
+
+    return Mathf.Max(
+      safeNoteSpacing * 2f,
+      safeSpacingFactor * Mathf.Pow(safeNoteCount, 1f / 3f));
+  }
+
+  public static float CalculateTaglessComponentsBoundRadius(
+    IReadOnlyList<int> componentNoteCounts,
+    float spacingFactor,
+    float noteSpacing,
+    float minimumBoundRadius)
+  {
+    float safeSpacingFactor = Mathf.Max(0.1f, spacingFactor);
+    float safeNoteSpacing = Mathf.Max(0.1f, noteSpacing);
+    float safeMinimum = Mathf.Max(0.1f, minimumBoundRadius);
+
+    if (componentNoteCounts == null || componentNoteCounts.Count == 0)
+      return safeMinimum;
+
+    float envelopeVolume = 0f;
+    float largestRadius = 0f;
+    float secondLargestRadius = 0f;
+
+    for (int i = 0; i < componentNoteCounts.Count; i++)
+    {
+      float radius = CalculateTaglessComponentRadius(
+        componentNoteCounts[i],
+        safeSpacingFactor,
+        safeNoteSpacing);
+
+      if (radius > largestRadius)
+      {
+        secondLargestRadius = largestRadius;
+        largestRadius = radius;
+      }
+      else if (radius > secondLargestRadius)
+      {
+        secondLargestRadius = radius;
+      }
+
+      float envelopeRadius = radius + safeNoteSpacing;
+      envelopeVolume += envelopeRadius * envelopeRadius * envelopeRadius;
+    }
+
+    float volumeBound =
+      Mathf.Pow(envelopeVolume, 1f / 3f) *
+      TAGLESS_COMPONENT_VOLUME_SCALE;
+
+    float centerOuterBound = componentNoteCounts.Count > 1
+      ? largestRadius + (secondLargestRadius * 2f) + (safeNoteSpacing * 2f)
+      : largestRadius + safeNoteSpacing;
+
+    return Mathf.Max(
+      safeMinimum,
+      Mathf.Max(volumeBound, centerOuterBound));
   }
 
   private float EffectiveNodeSpacingFactor()
@@ -397,6 +463,12 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
   {
     bool hasNoTagNodes = _nodes.Count == _noteCount;
 
+    if (hasNoTagNodes && components.Count > 1)
+    {
+      PlaceTaglessComponentVolumeSeeds(components);
+      return;
+    }
+
     for (int componentIndex = 0; componentIndex < components.Count; componentIndex++)
     {
       var component = components[componentIndex];
@@ -427,6 +499,91 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
         0f,
         _boundRadius - component.Center.magnitude - noteSpacing * 0.5f);
       float localSpread = Mathf.Min(maxLocalSpread, desiredSpread);
+
+      for (int noteOffset = 0; noteOffset < component.Notes.Count; noteOffset++)
+      {
+        int noteIndex = component.Notes[noteOffset];
+        _volumeSeedByNote[noteIndex] = ClampToSphere(
+          component.Center +
+          FibonacciBallPoint(noteOffset, component.Notes.Count) * localSpread,
+          noteSpacing * 0.5f);
+      }
+    }
+  }
+
+  private void PlaceTaglessComponentVolumeSeeds(List<Component> components)
+  {
+    float spacingFactor = EffectiveNodeSpacingFactor();
+    var componentRadii = new float[components.Count];
+    var componentNoteCounts = new int[components.Count];
+
+    for (int componentIndex = 0; componentIndex < components.Count; componentIndex++)
+    {
+      int noteCount = components[componentIndex].Notes.Count;
+      componentNoteCounts[componentIndex] = noteCount;
+      componentRadii[componentIndex] = CalculateTaglessComponentRadius(
+        noteCount,
+        spacingFactor,
+        noteSpacing);
+    }
+
+    _boundRadius = Mathf.Max(
+      _boundRadius,
+      CalculateTaglessComponentsBoundRadius(
+        componentNoteCounts,
+        spacingFactor,
+        noteSpacing,
+        minimumBoundRadius));
+
+    float largestRadius = componentRadii[0];
+    float largestOuterRadius = components.Count > 1
+      ? componentRadii.Skip(1).Max()
+      : 0f;
+
+    float minimumCenterSpread =
+      largestRadius +
+      largestOuterRadius +
+      noteSpacing;
+
+    float availableCenterSpread = Mathf.Max(
+      0f,
+      _boundRadius -
+      largestOuterRadius -
+      noteSpacing * 0.5f);
+
+    float centerSpread = Mathf.Min(
+      availableCenterSpread,
+      Mathf.Max(
+        minimumCenterSpread,
+        availableCenterSpread *
+        Mathf.Clamp(componentSpreadRatio, 0.05f, 0.95f)));
+
+    components[0].Center = Vector3.zero;
+    for (int i = 0; i < components[0].Nodes.Count; i++)
+      _componentCenterByNode[components[0].Nodes[i]] = components[0].Center;
+
+    for (int componentIndex = 1; componentIndex < components.Count; componentIndex++)
+    {
+      var component = components[componentIndex];
+      component.Center =
+        FibonacciSpherePoint(componentIndex - 1, components.Count - 1) *
+        centerSpread;
+
+      for (int i = 0; i < component.Nodes.Count; i++)
+        _componentCenterByNode[component.Nodes[i]] = component.Center;
+    }
+
+    for (int componentIndex = 0; componentIndex < components.Count; componentIndex++)
+    {
+      var component = components[componentIndex];
+      float maxLocalSpread = Mathf.Max(
+        0f,
+        _boundRadius -
+        component.Center.magnitude -
+        noteSpacing * 0.5f);
+      float localSpread = Mathf.Min(
+        maxLocalSpread,
+        componentRadii[componentIndex]);
 
       for (int noteOffset = 0; noteOffset < component.Notes.Count; noteOffset++)
       {
@@ -474,6 +631,7 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
 
   private void SpreadCrowdedNotes()
   {
+    bool hasNoTagNodes = _nodes.Count == _noteCount;
     float cellSize = Mathf.Max(0.1f, noteSpacing);
     var offsets = BuildPackingOffsets(Mathf.Clamp(maxPackingAttempts, 1, 128));
     var occupied = new HashSet<Vector3Int>();
@@ -501,7 +659,9 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
         if (occupied.Contains(cell) || !IsInsideSphere(center, cellSize * 0.5f))
           continue;
 
-        bool usesOriginalCell = offset == Vector3Int.zero;
+        bool usesOriginalCell =
+          hasNoTagNodes &&
+          offset == Vector3Int.zero;
         Vector3 placedPosition;
         if (usesOriginalCell)
         {
@@ -668,6 +828,21 @@ public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
       Mathf.Cos(angle) * radial,
       y,
       Mathf.Sin(angle) * radial) * fill;
+  }
+
+  private static Vector3 FibonacciSpherePoint(int index, int count)
+  {
+    if (count <= 1) return Vector3.zero;
+
+    float t = (index + 0.5f) / count;
+    float y = 1f - 2f * t;
+    float radial = Mathf.Sqrt(Mathf.Max(0f, 1f - y * y));
+    float angle = index * GOLDEN_ANGLE_RAD;
+
+    return new Vector3(
+      Mathf.Cos(angle) * radial,
+      y,
+      Mathf.Sin(angle) * radial);
   }
 
   private static Vector3 StableDirection(string key, int salt)
