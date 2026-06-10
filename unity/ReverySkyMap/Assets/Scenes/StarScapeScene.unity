@@ -269,6 +269,84 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 217002428}
   m_CullTransparentMesh: 1
+--- !u!1 &263919525
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 263919526}
+  - component: {fileID: 263919527}
+  m_Layer: 0
+  m_Name: Engine_Grid_v1_1_Relaxed
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &263919526
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 263919525}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 870600019}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &263919527
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 263919525}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8491dc9545e057b4a8dcf1efdcdc3f06, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::Engine_Grid_v1_1_Relaxed
+  starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
+  layoutParent: {fileID: 1327961058}
+  tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
+  edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
+  nodeSpacingFactor: 7
+  minimumBoundRadius: 12
+  componentSpreadRatio: 0.62
+  initialLocalSpreadRatio: 0.68
+  maxIterations: 160
+  minIterations: 40
+  stableIterationsRequired: 8
+  largeGraphNodeCount: 1500
+  largeGraphIterationFloor: 88
+  settleEpsilon: 0.008
+  simulationStep: 0.055
+  damping: 0.82
+  maxNodeStep: 0.9
+  noteTagRestLength: 6.5
+  directLinkRestLength: 5.4
+  minimumDirectLinkRestLength: 1.8
+  noteTagSpringStrength: 2.2
+  directLinkSpringStrength: 3.6
+  componentGravityStrength: 0.08
+  tagAnchorStrength: 0.35
+  tagMass: 1.8
+  repulsionRadius: 4.8
+  repulsionStrength: 24
+  maxRepulsionChecksPerNode: 320
+  overlapCleanupPasses: 3
+  minimumNodeDistance: 2
+  maxOverlapChecksPerNode: 320
+  tagScale: 0.7
+  maxVisibleEdges: 1500
+  directLinkBudgetRatio: 0.6
 --- !u!1 &280067058
 GameObject:
   m_ObjectHideFlags: 0
@@ -1274,6 +1352,42 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &870600018
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 870600019}
+  m_Layer: 0
+  m_Name: EngineExperiments
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &870600019
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 870600018}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1829145875}
+  - {fileID: 263919526}
+  - {fileID: 1289320289}
+  - {fileID: 962736924}
+  - {fileID: 1104841049}
+  m_Father: {fileID: 1780593169}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &894537233
 GameObject:
   m_ObjectHideFlags: 0
@@ -1457,6 +1571,89 @@ MonoBehaviour:
             m_StringArgument: 
             m_BoolArgument: 0
           m_CallState: 2
+--- !u!1 &962736922
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 962736924}
+  - component: {fileID: 962736923}
+  m_Layer: 0
+  m_Name: Engine_Barnes_v1
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &962736923
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 962736922}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a865e9178ad4d848b655ed32af2591b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::Engine_Barnes_v1
+  starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
+  layoutParent: {fileID: 1327961058}
+  tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
+  edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
+  nodeSpacingFactor: 8.5
+  minimumBoundRadius: 14
+  componentSpreadRatio: 0.78
+  initialLocalSpreadRatio: 0.86
+  taggedNoteSeedDistanceFactor: 0.95
+  maxIterations: 88
+  minIterations: 28
+  stableIterationsRequired: 6
+  largeGraphNodeCount: 1800
+  largeGraphIterationFloor: 52
+  settleEpsilon: 0.014
+  simulationStep: 0.052
+  damping: 0.76
+  maxNodeStep: 1.2
+  noteTagRestLength: 8
+  directLinkRestLength: 7
+  minimumDirectLinkRestLength: 2.8
+  noteTagSpringStrength: 0.95
+  directLinkSpringStrength: 1.55
+  componentGravityStrength: 0.016
+  tagAnchorStrength: 0.07
+  tagMass: 2
+  repulsionStrength: 30
+  repulsionSofteningDistance: 1.8
+  barnesHutTheta: 0.82
+  octreeLeafCapacity: 6
+  octreeMaxDepth: 16
+  maxBarnesHutVisitsPerNode: 512
+  maxExactLeafChecksPerLeaf: 32
+  overlapCleanupPasses: 2
+  minimumNodeDistance: 2.4
+  maxOverlapChecksPerNode: 96
+  tagScale: 0.7
+  maxVisibleEdges: 1500
+  directLinkBudgetRatio: 0.6
+--- !u!4 &962736924
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 962736922}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 870600019}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1085980073
 GameObject:
   m_ObjectHideFlags: 0
@@ -1493,6 +1690,91 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: -20}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &1104841047
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1104841049}
+  - component: {fileID: 1104841050}
+  m_Layer: 0
+  m_Name: Engine_Barnes_v2_FixedCenterIntoPlate
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1104841049
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1104841047}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 870600019}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1104841050
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1104841047}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0bca31753fdae334780c27d1feca7418, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::Engine_Barnes_v2_FixedCenterIntoPlate
+  starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
+  layoutParent: {fileID: 1327961058}
+  tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
+  edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
+  initialSpacingFactor: 8.5
+  minimumInitialSpread: 14
+  componentSpreadRatio: 0.78
+  initialLocalSpreadRatio: 0.86
+  taggedNoteSeedDistanceFactor: 0.95
+  minimumNavigationRadius: 14
+  navigationPadding: 4
+  maxIterations: 26
+  minIterations: 10
+  stableIterationsRequired: 2
+  largeGraphNodeCount: 1800
+  largeGraphIterationFloor: 16
+  settleEpsilon: 0.08
+  simulationStep: 0.052
+  damping: 0.76
+  maxNodeStep: 1.2
+  noteTagRestLength: 8
+  directLinkRestLength: 7
+  minimumDirectLinkRestLength: 2.8
+  noteTagSpringStrength: 0.95
+  directLinkSpringStrength: 1.55
+  componentGravityStrength: 0.016
+  tagAnchorStrength: 0.07
+  tagMass: 2
+  repulsionStrength: 30
+  repulsionSofteningDistance: 1.8
+  barnesHutTheta: 1.25
+  octreeLeafCapacity: 4
+  octreeMaxDepth: 16
+  maxBarnesHutVisitsPerNode: 192
+  maxExactLeafChecksPerLeaf: 32
+  overlapCleanupPasses: 2
+  minimumNodeDistance: 2.4
+  maxOverlapChecksPerNode: 96
+  tagScale: 0.7
+  maxVisibleEdges: 1500
+  directLinkBudgetRatio: 0.6
 --- !u!1 &1156615010
 GameObject:
   m_ObjectHideFlags: 0
@@ -1629,6 +1911,87 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ChangeViewControl
   changeViewButton: {fileID: 1156615012}
+--- !u!1 &1289320287
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1289320289}
+  - component: {fileID: 1289320288}
+  m_Layer: 0
+  m_Name: Engine_Grid_v2_FixedCenterIntoPlate
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1289320288
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1289320287}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 78d0e870a2468c64f922fe2ce0742f4f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::Engine_Grid_v2_FixedCenterIntoPlate
+  starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
+  layoutParent: {fileID: 1327961058}
+  tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
+  edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
+  initialSpacingFactor: 8.5
+  minimumInitialSpread: 14
+  componentSpreadRatio: 0.78
+  initialLocalSpreadRatio: 0.86
+  taggedNoteSeedDistanceFactor: 0.95
+  minimumNavigationRadius: 14
+  navigationPadding: 4
+  maxIterations: 36
+  minIterations: 14
+  stableIterationsRequired: 3
+  largeGraphNodeCount: 1800
+  largeGraphIterationFloor: 22
+  settleEpsilon: 0.05
+  simulationStep: 0.052
+  damping: 0.76
+  maxNodeStep: 1.2
+  noteTagRestLength: 8
+  directLinkRestLength: 7
+  minimumDirectLinkRestLength: 2.8
+  noteTagSpringStrength: 0.95
+  directLinkSpringStrength: 1.55
+  componentGravityStrength: 0.016
+  tagAnchorStrength: 0.07
+  tagMass: 2
+  repulsionRadius: 6.5
+  repulsionStrength: 24
+  maxRepulsionChecksPerNode: 128
+  overlapCleanupPasses: 2
+  minimumNodeDistance: 2.4
+  maxOverlapChecksPerNode: 96
+  tagScale: 0.7
+  maxVisibleEdges: 1500
+  directLinkBudgetRatio: 0.6
+--- !u!4 &1289320289
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1289320287}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 870600019}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1308032181
 GameObject:
   m_ObjectHideFlags: 0
@@ -2503,7 +2866,7 @@ Transform:
   - {fileID: 1327961058}
   - {fileID: 280067060}
   - {fileID: 428893402}
-  - {fileID: 1829145875}
+  - {fileID: 870600019}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1780593170
@@ -2520,11 +2883,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
   injectSampleData: 0
   sampleScenario: 2
-  sampleNoteCount: 10000
-  sampleTagPoolSize: 250
+  sampleNoteCount: 501
+  sampleTagPoolSize: 60
   sampleDateSpanDays: 365
-  sampleMaxTagsPerNote: 3
-  sampleExtraLinks: 2000
+  sampleMaxTagsPerNote: 4
+  sampleExtraLinks: 500
 --- !u!1 &1787028428
 GameObject:
   m_ObjectHideFlags: 0
@@ -2572,7 +2935,7 @@ GameObject:
   - component: {fileID: 1829145875}
   - component: {fileID: 1829145876}
   m_Layer: 0
-  m_Name: StaticLinksEngine
+  m_Name: Engine_EmptySpheres
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2586,12 +2949,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1829145874}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1780593169}
+  m_Father: {fileID: 870600019}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1829145876
 MonoBehaviour:

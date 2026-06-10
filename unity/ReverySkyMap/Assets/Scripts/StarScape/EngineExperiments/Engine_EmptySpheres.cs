@@ -3,11 +3,23 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
+// Evaluation:
+// - Node spacing remains good even in extreme cases.
+// - Structural readability collapses as graph size increases; on small and medium maps, much of the structure is already sacrificed in exchange for dispersion.
+// - In tagless graphs, the result becomes a set of empty spheres with near-random distribution across the sphere surface; the layout does not reflect note-link structure.
+// - On the test vaults, this variant distorts the structure that is actually present in the data.
+// [Cartographer] Graph built in 2399,1 ms (notes=10000, engine=StaticLinks)
+// Assessment:
+// - The map produces a visible output, but the structural value of that output ranges from low to near-zero.
+// - Performance is excellent.
+// - Best kept as a fallback, especially for very large graphs, where it is still preferable to an error state or placeholder output.
+
+
 /// <summary>
 /// Static link-based map for medium and large graphs.
 /// Builds positions once from tags and direct note links, then freezes the map.
 /// </summary>
-public class CartographerStaticLinksEngine : MonoBehaviour, ICartographerEngine
+public class Engine_EmptySpheres : MonoBehaviour, ICartographerEngine
 {
   [Header("Prefabs & Parents")]
   [SerializeField] private StarSO starTemplate;

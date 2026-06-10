@@ -17,7 +17,7 @@ public class Cartographer : MonoBehaviour
   [SerializeField] private MonoBehaviour staticLinksEngineBehaviour;
   [SerializeField] private CartographerEngine defaultEngine = CartographerEngine.Auto;
 
-  [Tooltip("Auto/Forces: large graphs use StaticLinks; small graphs use Forces. Static25D and StaticLinks stay explicit.")]
+  [Tooltip("Auto/Forces: large graphs use the static-slot engine; small graphs use Forces. Static25D and StaticLinks stay explicit.")]
   [SerializeField] private int autoSwitchThreshold = 500;
 
   [Header("Change view button")]
@@ -44,6 +44,7 @@ public class Cartographer : MonoBehaviour
   private ICartographerEngine _activeEngine;
 
   public ICartographerEngine ActiveEngine => _activeEngine;
+  public ICartographerEngine StaticSlotEngine => _staticLinksEngine;
   public Cartographer25DEngine Static25DEngine => (Cartographer25DEngine)_static25DEngine;
 
   public event Action<CartographerEngine> OnEngineChanged;

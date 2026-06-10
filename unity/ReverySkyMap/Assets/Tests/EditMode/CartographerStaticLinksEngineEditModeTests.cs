@@ -6,8 +6,8 @@ public class CartographerStaticLinksEngineEditModeTests
   [Test]
   public void CalculateBoundRadius_SameInputs_GiveSameResult()
   {
-    float first = CartographerStaticLinksEngine.CalculateBoundRadius(200, 3.8f, 6f);
-    float second = CartographerStaticLinksEngine.CalculateBoundRadius(200, 3.8f, 6f);
+    float first = Engine_EmptySpheres.CalculateBoundRadius(200, 3.8f, 6f);
+    float second = Engine_EmptySpheres.CalculateBoundRadius(200, 3.8f, 6f);
 
     Assert.That(first, Is.EqualTo(second));
   }
@@ -15,8 +15,8 @@ public class CartographerStaticLinksEngineEditModeTests
   [Test]
   public void CalculateBoundRadius_MoreNodes_GrowRadius()
   {
-    float small = CartographerStaticLinksEngine.CalculateBoundRadius(50, 3.8f, 6f);
-    float large = CartographerStaticLinksEngine.CalculateBoundRadius(1000, 3.8f, 6f);
+    float small = Engine_EmptySpheres.CalculateBoundRadius(50, 3.8f, 6f);
+    float large = Engine_EmptySpheres.CalculateBoundRadius(1000, 3.8f, 6f);
 
     Assert.That(large, Is.GreaterThan(small));
   }
@@ -25,7 +25,7 @@ public class CartographerStaticLinksEngineEditModeTests
   [TestCase(-10)]
   public void CalculateBoundRadius_ZeroOrNegativeInputs_AreNormalizedSafely(int totalNodeCount)
   {
-    float radius = CartographerStaticLinksEngine.CalculateBoundRadius(totalNodeCount, 3.8f, 6f);
+    float radius = Engine_EmptySpheres.CalculateBoundRadius(totalNodeCount, 3.8f, 6f);
 
     Assert.That(radius, Is.GreaterThan(0f));
     Assert.That(float.IsNaN(radius), Is.False);
@@ -35,7 +35,7 @@ public class CartographerStaticLinksEngineEditModeTests
   [Test]
   public void CalculateBoundRadius_TenThousandNodes_RemainsFinite()
   {
-    float radius = CartographerStaticLinksEngine.CalculateBoundRadius(10000, 3.8f, 6f);
+    float radius = Engine_EmptySpheres.CalculateBoundRadius(10000, 3.8f, 6f);
 
     Assert.That(radius, Is.GreaterThan(0f));
     Assert.That(float.IsNaN(radius), Is.False);
@@ -46,13 +46,13 @@ public class CartographerStaticLinksEngineEditModeTests
   public void CalculateTaglessComponentRadius_MoreNotesGrowRadius()
   {
     float small =
-      CartographerStaticLinksEngine.CalculateTaglessComponentRadius(
+      Engine_EmptySpheres.CalculateTaglessComponentRadius(
         100,
         10f,
         10f);
 
     float large =
-      CartographerStaticLinksEngine.CalculateTaglessComponentRadius(
+      Engine_EmptySpheres.CalculateTaglessComponentRadius(
         10000,
         10f,
         10f);
@@ -64,14 +64,14 @@ public class CartographerStaticLinksEngineEditModeTests
   public void CalculateTaglessComponentsBoundRadius_MultipleComponentsRequireMoreRoom()
   {
     float one =
-      CartographerStaticLinksEngine.CalculateTaglessComponentsBoundRadius(
+      Engine_EmptySpheres.CalculateTaglessComponentsBoundRadius(
         new[] { 10000 },
         10f,
         10f,
         6f);
 
     float four =
-      CartographerStaticLinksEngine.CalculateTaglessComponentsBoundRadius(
+      Engine_EmptySpheres.CalculateTaglessComponentsBoundRadius(
         new[] { 2500, 2500, 2500, 2500 },
         10f,
         10f,
@@ -84,14 +84,14 @@ public class CartographerStaticLinksEngineEditModeTests
   public void CalculateTaglessComponentsBoundRadius_SameInputsGiveSameResult()
   {
     float first =
-      CartographerStaticLinksEngine.CalculateTaglessComponentsBoundRadius(
+      Engine_EmptySpheres.CalculateTaglessComponentsBoundRadius(
         new[] { 2500, 2500, 2500, 2500 },
         10f,
         10f,
         6f);
 
     float second =
-      CartographerStaticLinksEngine.CalculateTaglessComponentsBoundRadius(
+      Engine_EmptySpheres.CalculateTaglessComponentsBoundRadius(
         new[] { 2500, 2500, 2500, 2500 },
         10f,
         10f,
@@ -104,7 +104,7 @@ public class CartographerStaticLinksEngineEditModeTests
   public void CalculateTaglessComponentsBoundRadius_EmptyInputIsSafe()
   {
     float result =
-      CartographerStaticLinksEngine.CalculateTaglessComponentsBoundRadius(
+      Engine_EmptySpheres.CalculateTaglessComponentsBoundRadius(
         System.Array.Empty<int>(),
         10f,
         10f,
@@ -122,7 +122,7 @@ public class CartographerStaticLinksEngineEditModeTests
 
     try
     {
-      var engine = gameObject.AddComponent<CartographerStaticLinksEngine>();
+      var engine = gameObject.AddComponent<Engine_EmptySpheres>();
 
       Assert.That(engine.EngineType, Is.EqualTo(CartographerEngine.StaticLinks));
       Assert.That(engine.RequiresTick, Is.False);

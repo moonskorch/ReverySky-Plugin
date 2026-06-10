@@ -58,6 +58,7 @@ public class MapRuntimePlayModeTests
 
     Cartographer cartographer = UnityEngine.Object.FindFirstObjectByType<Cartographer>();
     Assert.That(cartographer, Is.Not.Null);
+    Assert.That(cartographer.StaticSlotEngine, Is.Not.Null);
 
     var bridgeObject = new GameObject("ObsidianBridgeEnginePreferencePlayModeTest");
     var bridge = bridgeObject.AddComponent<ObsidianBridge>();
@@ -78,7 +79,7 @@ public class MapRuntimePlayModeTests
     yield return WaitFrames(4);
     Assert.That(MapRuntimeContext.EnginePreference, Is.EqualTo(CartographerEngine.StaticLinks));
     Assert.That(cartographer.ActiveEngine, Is.Not.Null);
-    Assert.That(cartographer.ActiveEngine.EngineType, Is.EqualTo(CartographerEngine.StaticLinks));
+    Assert.That(cartographer.ActiveEngine, Is.SameAs(cartographer.StaticSlotEngine));
 
     UnityEngine.Object.Destroy(bridgeObject);
 
