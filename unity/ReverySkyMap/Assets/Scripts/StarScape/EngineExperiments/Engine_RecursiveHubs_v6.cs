@@ -13,10 +13,11 @@ using UnityEngine;
 /// A normal map looks good and space-like even on small maps, although it is less structural than Force.
 /// On live maps, it sometimes looks more effective than the standard graph in terms of structure
 /// (for example, the sequential rows in OneMegaHub or the continent-like structures in MMOWikiVault).
-/// On a live 10K map, it is very slow, but it builds highly meaningful semantic regions and is better than the native graph.
+/// On a live 10K map, it is very slow, but it builds highly meaningful semantic regions and might be better than the native graph.
 /// At 501 nodes, FPS is 40-55, with spin.
 /// At 2K, FPS is 20-25 and feels smooth.
 /// At 5K, FPS is 10-14, and lower during animation.
+/// At 10K, FPS is 5-7 when static. Better than other 10K maps!
 /// [Cartographer] Graph built in 61,0 ms (notes=2000, engine=StaticLinks)
 /// [RecursiveHubs/v3] Construction completed placed=2250/2250, waves=75, roots=12, backboneEdges=2238, remainingRefinementPasses=105, visibleEdges=760, navigationRadius=238,7
 /// [RecursiveHubs/v6] Post-build optimization edgeBudget=760, culledLongLines=0, disabledSpin=2000, disabledBillboards=0

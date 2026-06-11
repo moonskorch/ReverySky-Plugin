@@ -4,6 +4,7 @@ using System.Linq;
 using UnityEngine;
 
 // Evaluation:
+// - 2-3 fps on 10K
 // - Node spacing remains good even in extreme cases.
 // - Structural readability collapses as graph size increases; on small and medium maps, much of the structure is already sacrificed in exchange for dispersion.
 // - In tagless graphs, the result becomes a set of empty spheres with near-random distribution across the sphere surface; the layout does not reflect note-link structure.

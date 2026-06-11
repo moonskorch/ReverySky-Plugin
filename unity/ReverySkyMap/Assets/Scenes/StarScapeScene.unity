@@ -655,6 +655,86 @@ MonoBehaviour:
   pivotFollowEps: 0.002
   pivotFollowLerp: 12
   pivotFollowMaxSpeed: 6
+--- !u!1 &380152426
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 380152428}
+  - component: {fileID: 380152427}
+  m_Layer: 0
+  m_Name: Engine_LandmarkStress_v1
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &380152427
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 380152426}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: baa48b367c0489c4ab05ed2b23d29ba6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::Engine_LandmarkStress_v1
+  starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
+  layoutParent: {fileID: 1327961058}
+  tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
+  edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
+  nodeSpacingFactor: 6.4
+  minimumBoundRadius: 10
+  componentSpreadRatio: 0.78
+  componentRadiusFactor: 1.16
+  minimumNodeDistance: 2.45
+  maxLandmarks: 48
+  maxLandmarksPerComponent: 10
+  landmarkCountFactor: 0.9
+  landmarkExclusionGraphDepth: 1
+  landmarkSpreadRatio: 0.72
+  landmarkPropagationDepth: 4
+  maxLandmarkInfluencesPerNode: 5
+  landmarkProximityPower: 1.35
+  preferNotesAsLandmarks: 1
+  directLinkScoreWeight: 2.5
+  noteTagScoreWeight: 0.55
+  degreeScoreBonus: 0.55
+  tagNodeScoreMultiplier: 1.2
+  maximumTagHubScore: 6
+  linkRelaxationPasses: 8
+  linkPull: 0.12
+  maxMovePerPass: 0.72
+  noteTagRestLength: 7.2
+  directLinkRestLength: 6.8
+  minimumDirectLinkRestLength: 3
+  landmarkMobility: 0.22
+  separationPasses: 2
+  maxSeparationChecksPerNode: 128
+  tagScale: 0.7
+  maxVisibleEdges: 1500
+  directLinkBudgetRatio: 0.58
+  maxVisibleTagEdgeRestMultiplier: 2.8
+--- !u!4 &380152428
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 380152426}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 870600019}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -1066,6 +1146,77 @@ MonoBehaviour:
   rotEpsDeg: 0.08
   fovEps: 0.05
   maxHzWhileMoving: 0
+--- !u!1 &455655978
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 455655979}
+  - component: {fileID: 455655980}
+  m_Layer: 0
+  m_Name: Engine_MacroCosmos10K_v1
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &455655979
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 455655978}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 870600019}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &455655980
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 455655978}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec887cdf6aba5cb4d8070f5938dadb8d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::Engine_MacroCosmos10K_v1
+  starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
+  layoutParent: {fileID: 1327961058}
+  tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
+  edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
+  maxMacroClusters: 112
+  tailBucketCount: 12
+  minimumNamedClusterSize: 3
+  targetClusterCountFactor: 1.15
+  maxTagsConsideredPerNote: 8
+  galaxySpacingFactor: 11.5
+  clusterRadiusFactor: 4.4
+  minimumClusterRadius: 7
+  minimumBoundRadius: 24
+  initialClusterSpreadRatio: 0.82
+  starCloudFillRatio: 0.88
+  clusterDiskThickness: 0.22
+  spiralTwist: 2.7
+  clusterLayoutIterations: 28
+  clusterLinkPull: 0.13
+  clusterSeparationPush: 0.72
+  clusterGap: 8
+  maxClusterMovePerIteration: 3.2
+  centerGravity: 0.025
+  topicAnchorScale: 0.86
+  maxVisibleClusterEdges: 420
+  maxVisibleTopicAnchors: 64
+  minimumVisibleClusterEdgeWeight: 1.5
 --- !u!1 &475636367
 GameObject:
   m_ObjectHideFlags: 0
@@ -1747,6 +1898,9 @@ Transform:
   - {fileID: 1257250708}
   - {fileID: 1265467670}
   - {fileID: 1274860667}
+  - {fileID: 455655979}
+  - {fileID: 1942975378}
+  - {fileID: 380152428}
   m_Father: {fileID: 1780593169}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &894537233
@@ -3992,12 +4146,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
   injectSampleData: 0
-  sampleScenario: 2
-  sampleNoteCount: 1000
-  sampleTagPoolSize: 65
+  sampleScenario: 0
+  sampleNoteCount: 2500
+  sampleTagPoolSize: 300
   sampleDateSpanDays: 365
   sampleMaxTagsPerNote: 4
-  sampleExtraLinks: 500
+  sampleExtraLinks: 2000
 --- !u!1 &1787028428
 GameObject:
   m_ObjectHideFlags: 0
@@ -4255,6 +4409,76 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e0e9ee5927d417d4a8227dd99b5779d3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Notification
+--- !u!1 &1942975376
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1942975378}
+  - component: {fileID: 1942975377}
+  m_Layer: 0
+  m_Name: Engine_StarfieldConstellations10K_v1
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1942975377
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1942975376}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 68633ddc445effd40a2ed80e869d2a33, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::Engine_StarfieldConstellations10K_v1
+  starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
+  layoutParent: {fileID: 1327961058}
+  tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
+  edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
+  maxConstellations: 128
+  tailConstellationCount: 16
+  minimumNamedConstellationSize: 3
+  targetConstellationCountFactor: 1.25
+  maxTagsConsideredPerNote: 8
+  skyRadiusFactor: 18
+  minimumSkyRadius: 44
+  skyPadding: 18
+  minimumAngularRadiusDegrees: 2.6
+  maximumAngularRadiusDegrees: 10
+  depthVariationRatio: 0.08
+  starPatchFillRatio: 0.9
+  spiralTwist: 1.8
+  constellationLayoutIterations: 24
+  relationPull: 0.08
+  angularSeparationPush: 0.9
+  minimumAngularGapDegrees: 2.8
+  maxDirectionMovePerIteration: 0.035
+  topicAnchorScale: 0.78
+  maxVisibleConstellationEdges: 360
+  maxVisibleTopicAnchors: 72
+  minimumVisibleRelationWeight: 1.5
+--- !u!4 &1942975378
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1942975376}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 870600019}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1956217079
 GameObject:
   m_ObjectHideFlags: 0
