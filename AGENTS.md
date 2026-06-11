@@ -31,13 +31,9 @@
 
 ## Development Commands
 - Install deps: `npm install`
-- Plugin dev build/watch path: `npm run dev`
-- Plugin production build: `npm run build`
-- TS automated tests (single run): `npm run test`
-- TS automated tests (watch mode): `npm run test:watch`
-- UI visual regression tests: `npm run test:ui-visual`
-- UI visual baseline update: `npm run test:ui-visual:update`
-- UI visual report: `npm run test:ui-visual:report`
+- Common plugin commands: `npm run dev`, `npm run build`, `npm run test`
+- Full verification command matrix: `docs/VERIFICATION.md`
+- UI visual regression commands: `docs/VERIFICATION.md`
 - Unity export import: `powershell -ExecutionPolicy Bypass -File .\scripts\import-unity-webgl.ps1 -ExportRoot "<UnityWebGLExportRoot>"`
 - Full workflow for clean setup and manual validation: `docs/WEBGL_INTEGRATION_RUNBOOK.md`
 
@@ -119,6 +115,7 @@
 ## Documentation Routing
 - Architecture and boundaries: `docs/ARCHITECTURE.md`
 - Bridge schema and validation expectations: `docs/DATA_CONTRACT.md`
+- Task workflow, repair loop, and final report policy: `docs/AGENT_WORKFLOW.md`
 - Delivery sequence and manual acceptance checks: `docs/MVP_PLAN.md`
 - Verification policy and command matrix: `docs/VERIFICATION.md`
 - Post-MVP bug and feature backlog: `docs/BUGS_AND_FEATURES.md`
@@ -126,6 +123,7 @@
 - Build/import/install operations: `docs/WEBGL_INTEGRATION_RUNBOOK.md`
 
 ## Known Unknowns
+- Broader risk tracking lives in `docs/RISKS.md`.
 - CI is not defined in repository configuration.
 - TS automated baseline exists, but comprehensive coverage is not yet established; add or extend targeted automated checks as part of risky or behavior-changing tasks.
 - Runtime integration quality depends on fresh Unity WebGL export and correct import via `scripts/import-unity-webgl.ps1`.

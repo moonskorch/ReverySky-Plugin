@@ -8,11 +8,11 @@ This workflow defines deterministic execution for Unity-only tasks in `unity/Rev
 
 ## Required Start Sequence
 Before substantial work:
-1. Read `AGENTS.md`, `docs/MVP_PLAN.md`, `docs/VERIFICATION.md`, and this file.
+1. Read `AGENTS.md`, this file, and the task-relevant docs it routes to.
 2. Confirm current active step in `docs/MVP_PLAN.md`.
 3. Align scope with that step only.
 4. Choose execution mode.
-5. Connect Unity MCP and confirm live access (scene info + console logs).
+5. Connect Unity MCP and confirm live access before Unity-state edits or checks.
 
 ## Staged Execution
 Use staged execution for deletion, pruning, or dependency-sensitive cleanup work.
@@ -31,11 +31,10 @@ General staged rules:
 
 ## MCP-First Operating Rule
 - Use Unity MCP as the primary interface for Unity project state access and Unity-side manipulations.
-- For Unity scene/object/component/asset/material/transform operations, prefer native MCP commands over direct serialized file edits.
-- For Unity test execution, scene state checks, and editor log inspection, prefer MCP commands first.
+- For scene/object/component/asset/material/transform operations, prefer MCP commands over direct serialized file edits.
 - Do not directly edit `*.unity`, `*.prefab`, `*.asset`, or `*.meta` when an equivalent MCP operation exists.
-- Fallback to direct file patching only when no suitable MCP operation exists (for example C# source/docs), and record the reason in the task report.
-- Do not guess `execute_menu_item` paths; use only paths confirmed by MCP Unity command reference and current Unity menu-item listing.
+- Use `docs/VERIFICATION.md` for test execution, scene status, console-log checks, command-source rules, and fallback handling.
+- Fallback to direct file patching only when no suitable MCP operation exists, and record the reason in the task report.
 
 ## Execution Modes
 - `Direct edit`: small, low-risk Unity change with clear scope.
@@ -73,4 +72,4 @@ Parent references:
 - `../../docs/MVP_PLAN.md`
 
 ## Reporting Requirements
-Use the canonical final report format from `AGENTS.md`.
+Use the final report format from `AGENTS.md`.

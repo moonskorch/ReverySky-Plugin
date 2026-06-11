@@ -13,11 +13,13 @@
   - `ProjectSettings/*`
 
 ## Local Docs
+- `docs/ARCHITECTURE.md`: code-grounded runtime architecture guide
 - `docs/MVP_PLAN.md`: Unity execution plan and step-specific exceptions
 - `docs/VERIFICATION.md`: Unity verification policy and check order
 - `docs/WORKFLOW.md`: Unity execution workflow and staged cleanup protocol
 - `docs/RISKS.md`: Unity risk register
 - `docs/DATA_CONTRACT.md`: Unity runtime contract subset
+- `docs/CLEANUP_BATCH_LEDGER.md`: append-only cleanup history and evidence ledger
 
 ## Scope Boundary
 - Owned here:
@@ -37,7 +39,7 @@
 ## Workflow
 - Use evidence-first decisions: inspect repository and Unity/MCP state before editing.
 - Keep edits small and targeted; avoid broad multi-area changes in one pass.
-- Use staged execution for risky cleanup or deletion work.
+- Use `docs/WORKFLOW.md` for execution modes, staged cleanup, and repair flow.
 - Preserve locked `DONE` steps in `docs/MVP_PLAN.md`.
 - Report docs/code contradictions explicitly.
 - Before edits, define a compact task contract with:
@@ -47,7 +49,7 @@
   - `Out of scope`
   - `Verification`
   - `Stop condition`
-- Unity MCP is the default interface for Unity project access and asset manipulation.
+- Unity MCP is the default interface for Unity project access and asset manipulation; detailed verification commands live in `docs/VERIFICATION.md`.
 
 ## Verification
 - Use `docs/VERIFICATION.md` as the only detailed verification procedure.

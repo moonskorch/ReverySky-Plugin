@@ -10,12 +10,12 @@ Trigger:
 - Any staged deletion or pruning in map runtime subsystems.
 
 Mitigation:
+- Use staged cleanup from `docs/WORKFLOW.md` and the `cleanup-batch` skill.
 - Require dependency evidence before deletion (scene/prefab/SO/serialized/GUID).
-- Use micro-batches only.
-- Re-verify after each batch.
+- Re-verify with the gate in `docs/VERIFICATION.md`.
 
 Verification signal:
-- EditMode + PlayMode baseline pass after each batch.
+- Relevant EditMode/PlayMode checks pass after each batch.
 - No missing-script/runtime-reference errors in map scene smoke.
 
 ## R2. Flaky PlayMode Smoke Gate
@@ -29,6 +29,7 @@ Mitigation:
 - Keep smoke scope minimal and deterministic.
 - Avoid long chains of scene-side assertions.
 - Separate smoke failure diagnostics from cleanup edits.
+- Use the transport-caveat handling in `docs/VERIFICATION.md`.
 
 Verification signal:
 - Stable repeated smoke pass over several reruns.

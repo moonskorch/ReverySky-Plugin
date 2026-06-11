@@ -107,15 +107,16 @@ Manual checks are required in addition to automation:
 ## Cleanup / Deletion Verification Loop
 
 For cleanup or deletion tasks:
-- staged execution model is canonical in `docs/WORKFLOW.md#staged-execution`;
-- batch gate/protocol is canonical in skill `cleanup-batch`;
-- this section defines verification-only loop for each approved micro-batch:
-1. Capture baseline test status before edits.
-2. Apply only an approved micro-batch.
-3. Re-run automated Unity checks immediately.
-4. Re-run manual scene smoke check.
-5. Stop on first regression and repair before next batch.
-6. Record MCP evidence (scene status + scoped console logs) for the batch report.
+- execution flow is owned by `docs/WORKFLOW.md`;
+- detailed candidate and approval protocol is owned by skill `cleanup-batch`;
+- this file owns only the verification gate for each approved micro-batch.
+
+Verification gate:
+1. Capture baseline test status before edits when risk warrants it.
+2. After the approved micro-batch, re-run the relevant automated Unity checks.
+3. Run the manual scene smoke check when serialized scene/prefab/asset behavior is touched.
+4. Stop on first regression and use the repair loop in `docs/WORKFLOW.md`.
+5. Record MCP evidence: scene status, scoped console logs, and test outcome or transport caveat.
 
 ### Workspace hygiene after PlayMode/MCP runs (Required)
 - Test-run transient scenes named `Assets/InitTestScene*.unity` (and matching `.meta`) are artifacts, not source.
@@ -143,4 +144,4 @@ This Unity verification file does not replace parent plugin verification require
 - `docs/DATA_CONTRACT.md`
 
 ## Task Report Requirements
-Use the canonical final report format from `AGENTS.md`.
+Use the final report format from `AGENTS.md`.

@@ -30,7 +30,7 @@ Files likely affected:
 - `package.json`
 - `tsconfig.json`
 - `src/main.ts`
-- `src/view/ReverySkyMapView.ts`
+- `src/view/MapView.ts`
 
 Acceptance criteria:
 - Plugin loads in Obsidian desktop without errors.
@@ -51,7 +51,7 @@ Goal:
 
 Files likely affected:
 - `unity-webgl/index.html`
-- `src/view/ReverySkyMapView.ts`
+- `src/view/MapView.ts`
 
 Acceptance criteria:
 - Map view shows embedded placeholder page inside Obsidian.
@@ -73,7 +73,7 @@ Goal:
 Files likely affected:
 - `src/bridge/BridgeTypes.ts`
 - `src/bridge/UnityIframeBridge.ts`
-- `src/view/ReverySkyMapView.ts`
+- `src/view/MapView.ts`
 - `unity-webgl/index.html`
 
 Acceptance criteria:
@@ -160,7 +160,7 @@ Goal:
 
 Files likely affected:
 - `unity-webgl/index.html`
-- `src/view/ReverySkyMapView.ts`
+- `src/view/MapView.ts`
 - `src/bridge/UnityIframeBridge.ts`
 
 Acceptance criteria:
@@ -304,7 +304,7 @@ Files likely affected:
 - `unity-webgl/index.html`
 - `unity-webgl/Build/*`
 - `unity-webgl/TemplateData/*`
-- `src/view/ReverySkyMapView.ts`
+- `src/view/MapView.ts`
 
 Acceptance criteria:
 - Obsidian map view loads Unity runtime locally.
@@ -505,7 +505,7 @@ Files likely affected:
 - `unity/ReverySkyMap/Assets/Scripts/Bridge/*`
 - `unity/ReverySkyMap/Assets/Scripts/*`
 - `src/bridge/UnityIframeBridge.ts`
-- `src/view/ReverySkyMapView.ts`
+- `src/view/MapView.ts`
 - `src/main.ts`
 
 Acceptance criteria:
@@ -528,7 +528,7 @@ Goal:
 
 Files likely affected:
 - `src/graph/VaultGraphBuilder.ts`
-- `src/view/ReverySkyMapView.ts`
+- `src/view/MapView.ts`
 - `src/bridge/UnityIframeBridge.ts`
 - `manifest.json`
 - build/release scripts

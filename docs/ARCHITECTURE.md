@@ -182,6 +182,8 @@ The canonical plugin-side contract lives in:
 Important current contract facts:
 - protocol version is `2.0.0`;
 - startup order is `bridge:ready` first, then `graph:set`;
+- runtime-to-plugin messages are `bridge:ready` and `note:open`;
+- plugin-to-runtime messages are `graph:set` and `note:focus`;
 - `path` values must stay vault-relative and use `/` separators;
 - `graph:set` carries the effective filtered graph;
 - `enginePreference` is an optional plugin-owned runtime hint;
@@ -218,7 +220,7 @@ Main repository surfaces:
   Type: generated
 
 Build and import flow:
-1. `npm run build` validates TypeScript and writes `main.js`.
+1. `npm run build` checks local WebGL artifacts, validates TypeScript, writes `main.js`, and checks release artifacts.
 2. Unity exports WebGL from `unity/ReverySkyMap`.
 3. `scripts/import-unity-webgl.ps1` copies the export into `unity-webgl/` and regenerates runtime files used by the plugin.
 4. At runtime the plugin starts `UnityWebglLocalServer`, and the iframe loads the served `index.html`.

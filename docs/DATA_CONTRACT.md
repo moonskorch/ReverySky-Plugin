@@ -23,10 +23,12 @@ Fields:
 
 ## Message Types
 Plugin -> runtime:
-- `graph:set`: full graph payload
+- `graph:set`: effective filtered graph payload.
+- `note:focus`: current-note focus hint with optional `id` and `path`.
 
 Runtime -> plugin:
-- `bridge:ready`: runtime is initialized and ready to receive payloads
+- `bridge:ready`: runtime is initialized and ready to receive payloads.
+- `note:open`: request for Obsidian to open a note by `id` and/or `path`.
 
 ## Graph Payload
 ```ts
@@ -72,6 +74,7 @@ type GraphLink = {
 ## Validation Requirements
 - Outgoing `graph:set` payloads are validated before postMessage dispatch.
 - Incoming `bridge:ready` is accepted only when `protocolVersion` matches exactly.
+- Incoming `note:open` is accepted only when `protocolVersion` matches and the payload includes a non-empty `id` or `path`.
 - Invalid envelopes are rejected with explicit, non-fatal error reporting.
 - Unity runtime ingest is fail-soft: it treats `vault.noteCount` as informational (uses `notes` as source of truth).
 - Unity runtime ingest is fail-soft for unresolved links: missing endpoints are tolerated at ingest and dropped later during edge resolution.

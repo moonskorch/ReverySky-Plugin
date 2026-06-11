@@ -19,7 +19,7 @@ Policy:
 ## Current automated checks in this repository
 
 Core commands:
-- `npm run build` - TypeScript compile check + production bundle build (`esbuild`).
+- `npm run build` - WebGL artifact check + TypeScript compile check + production bundle build (`esbuild`) + plugin release artifact check.
 - `npm run test` - Vitest single-run suite for TS baseline tests.
 - `npm run test:watch` - Vitest watch mode for local iteration.
 - `npm run test:ui-visual` - Playwright visual regression run for `tests/visual`.
@@ -40,7 +40,7 @@ Current TS baseline test suites:
   - validates error path for invalid payload without dispatch;
   - validates `bridge:ready` handling for attached iframe source only;
   - validates ignoring foreign source messages and listener cleanup on `detach()`.
-- `tests/view/ReverySkyMapView.test.ts`
+- `tests/view/MapView.test.ts`
   - validates iframe creation and bridge attach on `onOpen`;
   - validates handshake flow `bridge:ready` -> graph build -> `graph:set`;
   - validates `detach()` and container cleanup on `onClose`.
@@ -84,7 +84,7 @@ Strongly expected automated tests (add or run when available):
 - VaultGraphBuilder
 - GraphNormalizer
 - MessageValidator
-- bridge transport and handshake flow (`UnityIframeBridge`, `ReverySkyMapView`)
+- bridge transport and handshake flow (`UnityIframeBridge`, `MapView`)
 
 Manual checks:
 - Use small vault with known notes and links.

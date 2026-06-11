@@ -15,26 +15,26 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 - Scene entry point:
   - Responsibility: hosts the runtime scene and serialized wiring for the map, UI, camera, and engines.
   - Main code location: `Assets/Scenes/StarScapeScene.unity`
-  - Important dependencies: `GameInput`, `CameraOrbitalController`, `Cartographer`, `CartographerForcesEngine`, `Cartographer25DEngine`, `CartographerStaticLinksEngine`, `ScapeCameraWarper`, `ChangeViewControl`, `RotateCameraUI`, `Notification`
+  - Important dependencies: `GameInput`, `CameraOrbitalController`, `Cartographer`, `CartographerForcesEngine`, `Cartographer25DEngine`, the serialized `StaticLinks` slot engine, `ScapeCameraWarper`, `ChangeViewControl`, `RotateCameraUI`, `Notification`
 - Bridge and runtime state:
   - Responsibility: validates inbound bridge envelopes, converts payloads into runtime models, and stores the current graph snapshot.
   - Main code location: `Assets/Scripts/Bridge/ObsidianBridge.cs`, `Assets/Scripts/Bridge/MapRuntimeContext.cs`, `Assets/Scripts/Models/NoteData.cs`
   - Important dependencies: `GameSettings`, `CartographerEngine`, `MapRuntimeContext.OnNotesChanged`, `MapRuntimeContext.OnOpenNoteRequested`
 - Graph orchestration:
   - Responsibility: chooses the active layout engine, rebuilds the graph when runtime notes change, and restores focus after ingest or selection.
-  - Main code location: `Assets/Scripts/DreamScape/Cartographer.cs`
+  - Main code location: `Assets/Scripts/StarScape/Cartographer.cs`
   - Important dependencies: `ICartographerEngine`, `FocusNode`, `ChangeViewControl`, `Notification`, `SampleDataGenerator`, `MapRuntimeContext`
 - Graph layout engines:
-  - Responsibility: build and clear stars, tags, and links for the three runtime engines.
-  - Main code location: `Assets/Scripts/DreamScape/CartographerForcesEngine.cs`, `Assets/Scripts/DreamScape/Cartographer25DEngine.cs`, `Assets/Scripts/DreamScape/CartographerStaticLinksEngine.cs`, `Assets/Scripts/Interfaces/ICartographerEngine.cs`
+  - Responsibility: build, tick when needed, and clear stars, tags, and links for the active runtime engine.
+  - Main code location: `Assets/Scripts/StarScape/CartographerForcesEngine.cs`, `Assets/Scripts/StarScape/Cartographer25DEngine.cs`, `Assets/Scripts/StarScape/EngineExperiments/*`, `Assets/Scripts/Interfaces/ICartographerEngine.cs`
   - Important dependencies: `StarSO`, `TagNodeSO`, `ScapeCameraWarper`, `NoteData`, `MapRuntimeContext.RuntimeNoteLink`
 - Interaction and camera:
   - Responsibility: turns touch and mouse input into focus, orbit, zoom, view switching, and note-open actions.
-  - Main code location: `Assets/Scripts/GameInput/GameInput.cs`, `Assets/Scripts/DreamScape/FocusNode.cs`, `Assets/Scripts/Camera/CameraOrbitalController.cs`, `Assets/Scripts/UI/ChangeViewControl.cs`, `Assets/Scripts/UI/RotateCameraUI.cs`
+  - Main code location: `Assets/Scripts/GameInput/GameInput.cs`, `Assets/Scripts/StarScape/FocusNode.cs`, `Assets/Scripts/Camera/CameraOrbitalController.cs`, `Assets/Scripts/UI/ChangeViewControl.cs`, `Assets/Scripts/UI/RotateCameraUI.cs`
   - Important dependencies: `EventSystem`, `Camera.main`, `MapRuntimeContext`, `Cartographer.I`, `GameSettings`
 - Visual assets and support objects:
   - Responsibility: provide prefabs, scale calibration, labels, and the optional sample graph injector.
-  - Main code location: `Assets/Scripts/ScriptableObjects/StarSO.cs`, `Assets/Scripts/ScriptableObjects/TagNodeSO.cs`, `Assets/Scripts/Notification/Notification.cs`, `Assets/Scripts/DreamScape/SampleDataGenerator.cs`
+  - Main code location: `Assets/Scripts/ScriptableObjects/StarSO.cs`, `Assets/Scripts/ScriptableObjects/TagNodeSO.cs`, `Assets/Scripts/Notification/Notification.cs`, `Assets/Scripts/StarScape/SampleDataGenerator.cs`
   - Important dependencies: `MapRuntimeContext.NotesVersion`, `MapRuntimeContext.HasRuntimeNotes`, prefab assets in `Assets/Prefabs`
 - Automated checks:
   - Responsibility: guard bridge parsing, layout rules, and PlayMode bootstrap/visual stability.
@@ -59,7 +59,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 4. `MapRuntimeContext.SetTagNames`, `SetLinks`, and `SetNotes` store the runtime source of truth and raise `OnNotesChanged`.
 5. `Cartographer.HandleRuntimeNotesChanged()` calls `RebuildGraph(MapRuntimeContext.EnginePreference)`.
 6. `Cartographer.ResolveModeByNotesCount()` uses `defaultEngine` first. Without an override, explicit `Static25D` and `StaticLinks` stay fixed, while `Auto` and `Forces` resolve by note count: small graphs use `Forces`, large graphs use `StaticLinks`.
-7. The chosen engine runs `BuildGraph(notes)`, then `ApplyView(CurrentView)`, and `Cartographer` rebinds `ScapeCameraWarper` when the active engine is `Static25D`.
+7. The chosen engine runs `BuildGraph(notes)`, then `ApplyView(CurrentView)`, and `Cartographer` rebinds any `ScapeCameraWarper` exposed by the active engine.
 8. `Cartographer.SetCameraFocus()` restores the previous selection from `MapRuntimeContext.CurrentNoteId` or `FocusNode.LastSelectedStarId`.
 
 ### 3. Note focus and open-note callback
@@ -96,38 +96,38 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Responsibility: represents the normalized runtime note model consumed by engines and visuals.
   - Code anchor: `Assets/Scripts/Models/NoteData.cs`
   - Entry point: created by `ObsidianBridge` and sample data generation
-  - Calls / sends to: `StarSO`, `CartographerForcesEngine`, `Cartographer25DEngine`, `CartographerStaticLinksEngine`
+  - Calls / sends to: `StarSO` and the active `ICartographerEngine` implementation
 
 ### Graph engines and layout
 
 - `Cartographer`
   - Responsibility: chooses the active engine, rebuilds the graph, applies the current view, and restores focus.
-  - Code anchor: `Assets/Scripts/DreamScape/Cartographer.cs::Start`, `RebuildGraph`, `BuildGraph`, `FocusRuntimeNote`
+  - Code anchor: `Assets/Scripts/StarScape/Cartographer.cs::Start`, `RebuildGraph`, `BuildGraph`, `FocusRuntimeNote`
   - Entry point: `MapRuntimeContext.OnNotesChanged`, UI events, scene start
   - Calls / sends to: `ICartographerEngine`, `FocusNode`, `Notification`, `ScapeCameraWarper`
 - `ICartographerEngine`
   - Responsibility: defines the common contract for engine selection, graph building, and navigation lookup.
   - Code anchor: `Assets/Scripts/Interfaces/ICartographerEngine.cs`
-  - Entry point: implemented by both layout engines
+  - Entry point: implemented by active layout engines
   - Calls / sends to: `Cartographer`, `CameraOrbitalController`, `FocusNode`
 - `CartographerForcesEngine`
   - Responsibility: builds a force-directed layout with note-tag edges, note-note links, and per-frame ticks.
-  - Code anchor: `Assets/Scripts/DreamScape/CartographerForcesEngine.cs::BuildGraph`, `Tick`, `ClearGraph`
+  - Code anchor: `Assets/Scripts/StarScape/CartographerForcesEngine.cs::BuildGraph`, `Tick`, `ClearGraph`
   - Entry point: `Cartographer.BuildGraph`
   - Calls / sends to: `StarSO`, `TagNodeSO`, `MapRuntimeContext.Links`
 - `Cartographer25DEngine`
   - Responsibility: builds the date-based 2.5D layout and publishes date-axis range for the camera slider.
-  - Code anchor: `Assets/Scripts/DreamScape/Cartographer25DEngine.cs::BuildGraph`, `ClearGraph`, `OnDateAxisRangeChanged`
+  - Code anchor: `Assets/Scripts/StarScape/Cartographer25DEngine.cs::BuildGraph`, `ClearGraph`, `OnDateAxisRangeChanged`
   - Entry point: `Cartographer.BuildGraph`
   - Calls / sends to: `StarSO`, `ScapeCameraWarper`, `CameraOrbitalController`
-- `CartographerStaticLinksEngine`
-  - Responsibility: builds a static link-based map for medium-scale evaluation, calculates positions once during `BuildGraph()`, and uses tag anchors, direct note links, bounded link relaxation, spatial packing, and a visible-edge budget without per-frame layout simulation.
-  - Code anchor: `Assets/Scripts/DreamScape/CartographerStaticLinksEngine.cs::BuildGraph`, `ClearGraph`, `CalculateBoundRadius`
+- `StaticLinks` slot engines
+  - Responsibility: provide the serialized large-graph engine selected by `Cartographer` when the resolved mode is `StaticLinks`.
+  - Code anchor: `Assets/Scripts/StarScape/EngineExperiments/Engine_RecursiveHubs_v3.cs::BuildGraph`, `Tick`, `ClearGraph`; `Assets/Scripts/StarScape/EngineExperiments/Engine_EmptySpheres.cs::BuildGraph`, `CalculateBoundRadius`
   - Entry point: `Cartographer.BuildGraph`
   - Calls / sends to: `StarSO`, `TagNodeSO`, `MapRuntimeContext.RuntimeNoteLink`
 - `ScapeCameraWarper`
   - Responsibility: warps the 2.5D layout around the camera based on engine-specific depth profiles.
-  - Code anchor: `Assets/Scripts/DreamScape/ScapeCameraWarper.cs::Rebind`, `ApplyWarp`, `Clear`
+  - Code anchor: `Assets/Scripts/StarScape/ScapeCameraWarper.cs::Rebind`, `ApplyWarp`, `Clear`
   - Entry point: rebound by `Cartographer` after a `Static25D` build
   - Calls / sends to: active engine `Stars`, `Camera.main`, `layoutParent`
 - `StarSO`
@@ -150,7 +150,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Calls / sends to: `FocusNode`, `CameraOrbitalController`, `EventSystem`
 - `FocusNode`
   - Responsibility: resolves taps on stars and tags into focus changes and note-open requests.
-  - Code anchor: `Assets/Scripts/DreamScape/FocusNode.cs::HandleTouch`, `SetSelectedStar`, `ResetFocus`
+  - Code anchor: `Assets/Scripts/StarScape/FocusNode.cs::HandleTouch`, `SetSelectedStar`, `ResetFocus`
   - Entry point: `GameInput` events
   - Calls / sends to: `CameraOrbitalController`, `MapRuntimeContext`, `Cartographer.I`
 - `CameraOrbitalController`
@@ -175,7 +175,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Calls / sends to: scene UI object
 - `SampleDataGenerator`
   - Responsibility: optionally injects a deterministic sample graph when no runtime notes exist.
-  - Code anchor: `Assets/Scripts/DreamScape/SampleDataGenerator.cs::TryInjectSampleDataIfNeeded`
+  - Code anchor: `Assets/Scripts/StarScape/SampleDataGenerator.cs::TryInjectSampleDataIfNeeded`
   - Entry point: `Cartographer.Start()`
   - Calls / sends to: `MapRuntimeContext.SetNotes`, `SetLinks`, `SetTagNames`
 
@@ -184,8 +184,8 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 - `MapRuntimeContext` is the source of truth for live runtime notes, links, tag names, runtime mode, selected note id, engine preference, and the `NotesVersion` counter.
 - `ObsidianBridge` owns bridge validation and all conversion from the JSON envelope into runtime models.
 - `Cartographer` owns engine selection, rebuild timing, current view, and focus restoration.
-- `CartographerForcesEngine`, `Cartographer25DEngine`, and `CartographerStaticLinksEngine` own placement and cleanup of instantiated stars, tags, and edge objects for their respective layout strategies.
-- `CartographerStaticLinksEngine` owns the static link-based placement for medium-scale graphs, runs once during `BuildGraph()`, and does not tick per frame.
+- `CartographerForcesEngine`, `Cartographer25DEngine`, and the engine assigned to `Cartographer.staticLinksEngineBehaviour` own placement and cleanup of instantiated stars, tags, and edge objects for their respective layout strategies.
+- The current scene wiring assigns the `StaticLinks` slot to `Engine_RecursiveHubs_v3`, which can continue construction or refinement through `Tick()` after `BuildGraph()`. `Engine_EmptySpheres` remains a static fallback/evaluation engine with EditMode coverage for its radius calculations and static contract.
 - `ScapeCameraWarper` owns the 2.5D warp state and only participates when the active engine is `Static25D`.
 - `StarSO` recomputes note-length scale buckets whenever `MapRuntimeContext.NotesVersion` changes.
 - `GameInput` treats UI hits as blocked input and only forwards gestures that originate on the map.
@@ -216,9 +216,9 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 - Bridge parsing and runtime mapping:
   - Automated checks: `Assets/Tests/EditMode/ObsidianBridgeEditModeTests.cs`
   - Manual checks when needed: load the scene and confirm `graph:set` populates notes, links, tags, and focus state without errors
-- Engine selection and 2.5D layout:
-  - Automated checks: `Assets/Tests/EditMode/Cartographer25DEngineEditModeTests.cs`
-  - Manual checks when needed: inspect note placement, date-range behavior, and the `Static25D` camera slider
+- Engine selection and layout:
+  - Automated checks: `Assets/Tests/EditMode/CartographerForcesEngineRadiusEditModeTests.cs`, `Assets/Tests/EditMode/CartographerStaticLinksEngineEditModeTests.cs`, PlayMode engine-preference checks in `Assets/Tests/PlayMode/DreamScapeRuntimePlayModeTests.cs`
+  - Manual checks when needed: inspect force layout, static-link slot output, date-range behavior, and the `Static25D` camera slider
 - PlayMode bootstrap and visual stability:
   - Automated checks: `Assets/Tests/PlayMode/DreamScapeRuntimePlayModeTests.cs` (`MapRuntimePlayModeTests`)
   - Manual checks when needed: open `Assets/Scenes/StarScapeScene.unity`, enter Play mode, and confirm no missing scripts or critical console errors
@@ -228,7 +228,9 @@ Use `docs/VERIFICATION.md` for the exact check order, MCP-first policy, and fall
 ## Known Risks and Open Questions
 
 - The scene YAML still references `CartographerStatic25DEngine` for the 2.5D component, while the code defines `Cartographer25DEngine`. The runtime may still be fine if the serialized script reference is correct, but the naming drift is worth keeping visible.
+- The scene YAML also contains legacy class identifiers such as `CartographerStaticLinksEngine` on components whose script GUIDs now resolve to experiment classes. Treat GUID/script references as authoritative when checking scene wiring.
 - `CartographerForcesEngine` destroys and recreates graph objects on each rebuild, so large note sets will pay that cost on every `graph:set`.
 - `Cartographer25DEngine` still contains TODOs for date labels, radial movement, LOD, and the preferred camera start position.
+- Several `StaticLinks` candidates live under `Assets/Scripts/StarScape/EngineExperiments`; this is useful for evaluation but keeps active engine ownership dependent on scene serialization.
 - `GameInput` still depends on legacy `Input` and `EventSystem` APIs rather than the newer Input System package.
 - `ObsidianBridge` is auto-created at runtime, so its presence is implicit rather than scene-owned.
