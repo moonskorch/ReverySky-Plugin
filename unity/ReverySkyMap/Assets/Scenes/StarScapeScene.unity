@@ -269,6 +269,89 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 217002428}
   m_CullTransparentMesh: 1
+--- !u!1 &235577397
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 235577399}
+  - component: {fileID: 235577398}
+  m_Layer: 0
+  m_Name: Engine_Barnes_v5_FasterMidSize
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &235577398
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 235577397}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7fb222a24be94e5ba3b72f264969da79, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::Engine_Barnes_v5_FasterMidSize
+  starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
+  layoutParent: {fileID: 1327961058}
+  tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
+  edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
+  nodeSpacingFactor: 8.5
+  minimumBoundRadius: 14
+  componentSpreadRatio: 0.78
+  initialLocalSpreadRatio: 0.86
+  taggedNoteSeedDistanceFactor: 0.95
+  maxIterations: 28
+  minIterations: 12
+  stableIterationsRequired: 3
+  largeGraphNodeCount: 1800
+  largeGraphIterationFloor: 18
+  settleEpsilon: 0.035
+  simulationStep: 0.058
+  damping: 0.74
+  maxNodeStep: 1.35
+  noteTagRestLength: 8
+  directLinkRestLength: 7
+  minimumDirectLinkRestLength: 2.8
+  noteTagSpringStrength: 0.9
+  directLinkSpringStrength: 1.45
+  componentGravityStrength: 0.014
+  tagAnchorStrength: 0.06
+  tagMass: 2
+  repulsionStrength: 30
+  repulsionSofteningDistance: 1.8
+  barnesHutTheta: 1.18
+  octreeLeafCapacity: 10
+  octreeMaxDepth: 14
+  maxBarnesHutVisitsPerNode: 192
+  maxExactLeafChecksPerLeaf: 16
+  overlapCleanupPasses: 1
+  minimumNodeDistance: 2.4
+  maxOverlapChecksPerNode: 72
+  tagScale: 0.7
+  maxVisibleEdges: 1500
+  directLinkBudgetRatio: 0.6
+--- !u!4 &235577399
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 235577397}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 870600019}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &263919525
 GameObject:
   m_ObjectHideFlags: 0
@@ -714,6 +797,189 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   minSpeed: 0.1
   maxSpeed: 5
+--- !u!1 &410784953
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 410784955}
+  - component: {fileID: 410784954}
+  m_Layer: 0
+  m_Name: Engine_RecursiveHubs_v2
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &410784954
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 410784953}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 868a2c1b208683f4d8c436dc949dddfe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::Engine_RecursiveHubs_v2
+  starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
+  layoutParent: {fileID: 1327961058}
+  tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
+  edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
+  nodeSpacingFactor: 7.4
+  minimumNavigationRadius: 14
+  navigationPadding: 6
+  componentRadiusFactor: 1.08
+  componentGapFactor: 1.45
+  rootSpreadRatio: 0.78
+  directLinkScoreWeight: 2.4
+  noteTagScoreWeight: 0.55
+  degreeScoreBonus: 0.5
+  tagNodeScoreMultiplier: 1.35
+  maximumTagHubScore: 6.5
+  maxRootHubsPerComponent: 10
+  rootCountFactor: 0.9
+  rootExclusionGraphDepth: 2
+  preferNotesAsRoots: 1
+  minimumNodeDistance: 2.7
+  hubChildDistanceFactor: 2.55
+  leafChildDistanceFactor: 1.45
+  childReservationFactor: 0.92
+  maximumChildReservation: 16
+  siblingShellFactor: 0.58
+  childHubDegreeThreshold: 4
+  maxPlacementAttempts: 128
+  directLinkParentWeight: 3.6
+  noteTagParentWeight: 0.75
+  parentScoreInfluence: 0.08
+  parentCrowdingPenalty: 0.22
+  frontierTargetScoreWeight: 4.5
+  frontierRelationWeight: 1.15
+  animateRefinement: 1
+  refinementPasses: 18
+  refinementPassesPerFrame: 1
+  linkPull: 0.095
+  maxMovePerPass: 0.62
+  noteTagRestLength: 8.2
+  directLinkRestLength: 7
+  minimumDirectLinkRestLength: 3.4
+  rootMobility: 0.12
+  separationPassesPerRefinement: 2
+  clusterGuardDistanceFactor: 3.2
+  maxSeparationChecksPerNode: 160
+  tagScale: 0.7
+  maxVisibleEdges: 1500
+  backboneBudgetRatio: 0.46
+  directLinkBudgetRatio: 0.42
+  maxVisibleTagEdgeRestMultiplier: 2.8
+--- !u!4 &410784955
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 410784953}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 870600019}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &413781433
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 413781435}
+  - component: {fileID: 413781434}
+  m_Layer: 0
+  m_Name: Engine_RecursiveHubs_v1
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &413781434
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 413781433}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 687cd2b927fbca3488dc9cd9d03284f6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::Engine_RecursiveHubs_v1
+  starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
+  layoutParent: {fileID: 1327961058}
+  tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
+  edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
+  nodeSpacingFactor: 5.8
+  minimumBoundRadius: 10
+  componentRadiusFactor: 0.92
+  componentEnvelopeFactor: 1.35
+  componentSpreadRatio: 0.78
+  directLinkScoreWeight: 2.2
+  noteTagScoreWeight: 0.7
+  degreeScoreBonus: 0.45
+  tagNodeScoreMultiplier: 1.8
+  maximumTagHubScore: 9
+  maxRootHubsPerComponent: 6
+  rootCountFactor: 0.55
+  rootExclusionGraphDepth: 1
+  rootSpreadRatio: 0.68
+  minimumNodeDistance: 2.4
+  hubChildDistanceFactor: 2.1
+  leafChildDistanceFactor: 1.25
+  childReservationFactor: 0.72
+  maximumChildReservation: 12
+  siblingShellFactor: 0.46
+  childHubDegreeThreshold: 4
+  maxPlacementAttempts: 72
+  directLinkParentWeight: 3
+  noteTagParentWeight: 1
+  parentScoreInfluence: 0.08
+  parentCrowdingPenalty: 0.16
+  frontierTargetScoreWeight: 4
+  frontierRelationWeight: 1
+  springRelaxationPasses: 6
+  springPull: 0.11
+  maxSpringMovePerPass: 0.75
+  noteTagRestLength: 6
+  directLinkRestLength: 6.5
+  minimumDirectLinkRestLength: 2.8
+  rootMobility: 0.18
+  overlapCleanupPasses: 2
+  maxOverlapChecksPerNode: 96
+  tagScale: 0.7
+  maxVisibleEdges: 1500
+  backboneBudgetRatio: 0.52
+  directLinkBudgetRatio: 0.32
+--- !u!4 &413781435
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 413781433}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 870600019}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &428893400
 GameObject:
   m_ObjectHideFlags: 0
@@ -800,6 +1066,89 @@ MonoBehaviour:
   rotEpsDeg: 0.08
   fovEps: 0.05
   maxHzWhileMoving: 0
+--- !u!1 &475636367
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 475636369}
+  - component: {fileID: 475636368}
+  m_Layer: 0
+  m_Name: Engine_Barnes_v3_Recentered
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &475636368
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 475636367}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4a9723842c424871aa2e9c26a87b10d6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::Engine_Barnes_v3_Recentered
+  starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
+  layoutParent: {fileID: 1327961058}
+  tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
+  edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
+  nodeSpacingFactor: 8.5
+  minimumBoundRadius: 14
+  componentSpreadRatio: 0.78
+  initialLocalSpreadRatio: 0.86
+  taggedNoteSeedDistanceFactor: 0.95
+  maxIterations: 88
+  minIterations: 28
+  stableIterationsRequired: 6
+  largeGraphNodeCount: 1800
+  largeGraphIterationFloor: 52
+  settleEpsilon: 0.014
+  simulationStep: 0.052
+  damping: 0.76
+  maxNodeStep: 1.2
+  noteTagRestLength: 8
+  directLinkRestLength: 7
+  minimumDirectLinkRestLength: 2.8
+  noteTagSpringStrength: 0.95
+  directLinkSpringStrength: 1.55
+  componentGravityStrength: 0.016
+  tagAnchorStrength: 0.07
+  tagMass: 2
+  repulsionStrength: 30
+  repulsionSofteningDistance: 1.8
+  barnesHutTheta: 0.82
+  octreeLeafCapacity: 6
+  octreeMaxDepth: 16
+  maxBarnesHutVisitsPerNode: 512
+  maxExactLeafChecksPerLeaf: 32
+  overlapCleanupPasses: 2
+  minimumNodeDistance: 2.4
+  maxOverlapChecksPerNode: 96
+  tagScale: 0.7
+  maxVisibleEdges: 1500
+  directLinkBudgetRatio: 0.6
+--- !u!4 &475636369
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 475636367}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 870600019}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &523709430
 GameObject:
   m_ObjectHideFlags: 0
@@ -1387,6 +1736,17 @@ Transform:
   - {fileID: 1289320289}
   - {fileID: 962736924}
   - {fileID: 1104841049}
+  - {fileID: 475636369}
+  - {fileID: 1326329809}
+  - {fileID: 235577399}
+  - {fileID: 1217887768}
+  - {fileID: 1620806343}
+  - {fileID: 413781435}
+  - {fileID: 410784955}
+  - {fileID: 1479358101}
+  - {fileID: 1257250708}
+  - {fileID: 1265467670}
+  - {fileID: 1274860667}
   m_Father: {fileID: 1780593169}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &894537233
@@ -1912,6 +2272,426 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ChangeViewControl
   changeViewButton: {fileID: 1156615012}
+--- !u!1 &1217887766
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1217887768}
+  - component: {fileID: 1217887767}
+  m_Layer: 0
+  m_Name: Engine_Barnes_v6_ShapeBalanced
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1217887767
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1217887766}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 56f3775aa96b45f1847568680aca0dcd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::Engine_Barnes_v6_ShapeBalanced
+  starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
+  layoutParent: {fileID: 1327961058}
+  tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
+  edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
+  nodeSpacingFactor: 8.5
+  minimumBoundRadius: 14
+  componentSpreadRatio: 0.78
+  initialLocalSpreadRatio: 0.86
+  taggedNoteSeedDistanceFactor: 0.95
+  maxIterations: 34
+  minIterations: 14
+  stableIterationsRequired: 3
+  largeGraphNodeCount: 1800
+  largeGraphIterationFloor: 22
+  settleEpsilon: 0.026
+  simulationStep: 0.058
+  damping: 0.74
+  maxNodeStep: 1.35
+  noteTagRestLength: 8
+  directLinkRestLength: 7
+  minimumDirectLinkRestLength: 2.8
+  noteTagSpringStrength: 0.92
+  directLinkSpringStrength: 1.65
+  componentGravityStrength: 0.012
+  tagAnchorStrength: 0.06
+  tagMass: 2
+  repulsionStrength: 30
+  repulsionSofteningDistance: 1.8
+  barnesHutTheta: 0.98
+  octreeLeafCapacity: 8
+  octreeMaxDepth: 14
+  maxBarnesHutVisitsPerNode: 288
+  maxExactLeafChecksPerLeaf: 24
+  overlapCleanupPasses: 1
+  minimumNodeDistance: 2.4
+  maxOverlapChecksPerNode: 72
+  tagScale: 0.7
+  maxVisibleEdges: 1500
+  directLinkBudgetRatio: 0.6
+--- !u!4 &1217887768
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1217887766}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 870600019}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1257250706
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1257250708}
+  - component: {fileID: 1257250707}
+  m_Layer: 0
+  m_Name: Engine_RecursiveHubs_v4
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1257250707
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1257250706}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fba31f6405e04734a8c7a60a2906fa20, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::Engine_RecursiveHubs_v4
+  starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
+  layoutParent: {fileID: 1327961058}
+  tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
+  edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
+  animateConstruction: 0
+  nodesPerConstructionFrame: 420
+  constructionBatchesPerFrame: 1
+  nodeSpacingFactor: 8.1
+  minimumNavigationRadius: 14
+  navigationPadding: 7
+  componentRadiusFactor: 1.12
+  componentGapFactor: 1.65
+  rootSpreadRatio: 0.82
+  directLinkScoreWeight: 2.8
+  noteTagScoreWeight: 0.45
+  degreeScoreBonus: 0.62
+  tagNodeScoreMultiplier: 1.15
+  maximumTagHubScore: 5.8
+  maxRootHubsPerComponent: 12
+  rootCountFactor: 1.05
+  rootExclusionGraphDepth: 2
+  preferNotesAsRootHubs: 1
+  minimumNodeDistance: 2.9
+  hubChildDistanceFactor: 2.85
+  leafChildDistanceFactor: 1.55
+  childReservationFactor: 1.05
+  maximumChildReservation: 18
+  siblingShellFactor: 0.72
+  childHubDegreeThreshold: 4
+  maxPlacementAttempts: 192
+  fallbackHubDistanceFactor: 3.2
+  directLinkParentWeight: 4
+  noteTagParentWeight: 0.65
+  parentScoreInfluence: 0.07
+  parentCrowdingPenalty: 0.28
+  frontierTargetScoreWeight: 5.2
+  frontierRelationWeight: 1.25
+  frontierDepthPenalty: 0.12
+  animateRefinement: 1
+  refinementPasses: 20
+  refinementPassesPerFrame: 1
+  linkPull: 0.085
+  maxMovePerPass: 0.58
+  noteTagRestLength: 8.6
+  directLinkRestLength: 7.2
+  minimumDirectLinkRestLength: 3.5
+  rootMobility: 0.1
+  separationPassesPerRefinement: 2
+  clusterGuardDistanceFactor: 3.6
+  rootGuardDistanceFactor: 5
+  maxSeparationChecksPerNode: 180
+  tagScale: 0.7
+  maxVisibleEdges: 1500
+  backboneBudgetRatio: 0.48
+  directLinkBudgetRatio: 0.42
+  maxVisibleTagEdgeRestMultiplier: 2.6
+--- !u!4 &1257250708
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1257250706}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 870600019}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1265467668
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1265467670}
+  - component: {fileID: 1265467669}
+  m_Layer: 0
+  m_Name: Engine_RecursiveHubs_v5
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1265467669
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1265467668}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f6ef9dccdc562eb418c5348bb4a1a1b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::Engine_RecursiveHubs_v5
+  starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
+  layoutParent: {fileID: 1327961058}
+  tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
+  edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
+  animateConstruction: 1
+  nodesPerConstructionFrame: 420
+  constructionBatchesPerFrame: 1
+  nodeSpacingFactor: 8.1
+  minimumNavigationRadius: 14
+  navigationPadding: 7
+  componentRadiusFactor: 1.12
+  componentGapFactor: 1.65
+  rootSpreadRatio: 0.82
+  directLinkScoreWeight: 2.8
+  noteTagScoreWeight: 0.45
+  degreeScoreBonus: 0.62
+  tagNodeScoreMultiplier: 1.15
+  maximumTagHubScore: 5.8
+  maxRootHubsPerComponent: 12
+  rootCountFactor: 1.05
+  rootExclusionGraphDepth: 2
+  preferNotesAsRootHubs: 1
+  minimumNodeDistance: 2.9
+  hubChildDistanceFactor: 2.85
+  leafChildDistanceFactor: 1.55
+  childReservationFactor: 1.05
+  maximumChildReservation: 18
+  siblingShellFactor: 0.72
+  childHubDegreeThreshold: 4
+  maxPlacementAttempts: 192
+  fallbackHubDistanceFactor: 3.2
+  directLinkParentWeight: 4
+  noteTagParentWeight: 0.65
+  parentScoreInfluence: 0.07
+  parentCrowdingPenalty: 0.28
+  frontierTargetScoreWeight: 5.2
+  frontierRelationWeight: 1.25
+  frontierDepthPenalty: 0.12
+  animateRefinement: 1
+  refinementPasses: 20
+  refinementPassesPerFrame: 1
+  linkPull: 0.085
+  maxMovePerPass: 0.58
+  noteTagRestLength: 8.6
+  directLinkRestLength: 7.2
+  minimumDirectLinkRestLength: 3.5
+  rootMobility: 0.1
+  separationPassesPerRefinement: 2
+  clusterGuardDistanceFactor: 3.6
+  rootGuardDistanceFactor: 5
+  maxSeparationChecksPerNode: 180
+  tagScale: 0.7
+  maxVisibleEdges: 1500
+  backboneBudgetRatio: 0.48
+  directLinkBudgetRatio: 0.42
+  maxVisibleTagEdgeRestMultiplier: 2.6
+  constructionLifetime: 1
+  constructionAnimationSeconds: 5
+  endlessConstructionNodesPerFrame: 120
+  constructionBatchesPerFrameV5: 1
+  timingFrameRate: 30
+  linkRefinementLifetime: 1
+  linkRefinementSeconds: 20
+  instantLinkRefinementPasses: 24
+  linkRefinementPassesPerFrameV5: 1
+  endlessLinkWarmupPasses: 24
+  keepLinksAliveForever: 1
+--- !u!4 &1265467670
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1265467668}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 870600019}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1274860666
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1274860667}
+  - component: {fileID: 1274860668}
+  m_Layer: 0
+  m_Name: Engine_RecursiveHubs_v6
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1274860667
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1274860666}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 870600019}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1274860668
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1274860666}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b3653078ce92514a8a7003a3b083d11, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::Engine_RecursiveHubs_v6
+  starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
+  layoutParent: {fileID: 1327961058}
+  tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
+  edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
+  animateConstruction: 1
+  nodesPerConstructionFrame: 420
+  constructionBatchesPerFrame: 1
+  nodeSpacingFactor: 8.1
+  minimumNavigationRadius: 14
+  navigationPadding: 7
+  componentRadiusFactor: 1.12
+  componentGapFactor: 1.65
+  rootSpreadRatio: 0.82
+  directLinkScoreWeight: 2.8
+  noteTagScoreWeight: 0.45
+  degreeScoreBonus: 0.62
+  tagNodeScoreMultiplier: 1.15
+  maximumTagHubScore: 5.8
+  maxRootHubsPerComponent: 12
+  rootCountFactor: 1.05
+  rootExclusionGraphDepth: 2
+  preferNotesAsRootHubs: 1
+  minimumNodeDistance: 2.9
+  hubChildDistanceFactor: 2.85
+  leafChildDistanceFactor: 1.55
+  childReservationFactor: 1.05
+  maximumChildReservation: 18
+  siblingShellFactor: 0.72
+  childHubDegreeThreshold: 4
+  maxPlacementAttempts: 192
+  fallbackHubDistanceFactor: 3.2
+  directLinkParentWeight: 4
+  noteTagParentWeight: 0.65
+  parentScoreInfluence: 0.07
+  parentCrowdingPenalty: 0.28
+  frontierTargetScoreWeight: 5.2
+  frontierRelationWeight: 1.25
+  frontierDepthPenalty: 0.12
+  animateRefinement: 1
+  refinementPasses: 20
+  refinementPassesPerFrame: 1
+  linkPull: 0.085
+  maxMovePerPass: 0.58
+  noteTagRestLength: 8.6
+  directLinkRestLength: 7.2
+  minimumDirectLinkRestLength: 3.5
+  rootMobility: 0.1
+  separationPassesPerRefinement: 2
+  clusterGuardDistanceFactor: 3.6
+  rootGuardDistanceFactor: 5
+  maxSeparationChecksPerNode: 180
+  tagScale: 0.7
+  maxVisibleEdges: 1500
+  backboneBudgetRatio: 0.48
+  directLinkBudgetRatio: 0.42
+  maxVisibleTagEdgeRestMultiplier: 2.6
+  constructionLifetime: 1
+  constructionAnimationSeconds: 5
+  endlessConstructionNodesPerFrame: 120
+  constructionBatchesPerFrameV6: 1
+  timingFrameRate: 30
+  linkRefinementLifetime: 1
+  linkRefinementSeconds: 20
+  instantLinkRefinementPasses: 24
+  linkRefinementPassesPerFrameV6: 1
+  endlessLinkWarmupPasses: 24
+  keepLinksAliveForever: 0
+  edgeBudgetMode: 1
+  manualVisibleEdges: 900
+  smallGraphVisibleEdges: 420
+  smallGraphNodeThreshold: 700
+  minimumVisibleEdges: 260
+  maximumVisibleEdges: 1100
+  visibleEdgesPerNode: 0.38
+  backboneBudgetRatioV6: 0.58
+  directLinkBudgetRatioV6: 0.3
+  tagEdgeRestLengthMultiplierV6: 2.15
+  pruneLongNonBackboneEdges: 1
+  nonBackboneMaxRestLengthMultiplier: 3
+  largeGraphVisualPolicy: 1
+  largeGraphVisualThreshold: 1600
+  logOptimizationSummary: 1
 --- !u!1 &1289320287
 GameObject:
   m_ObjectHideFlags: 0
@@ -2083,6 +2863,89 @@ MonoBehaviour:
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
+--- !u!1 &1326329807
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1326329809}
+  - component: {fileID: 1326329808}
+  m_Layer: 0
+  m_Name: Engine_Barnes_v4_TaglessIsotropicSeed
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1326329808
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1326329807}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 92607c82d28b4710aa54d39c8a85531c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::Engine_Barnes_v4_TaglessIsotropicSeed
+  starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
+  layoutParent: {fileID: 1327961058}
+  tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
+  edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
+  nodeSpacingFactor: 8.5
+  minimumBoundRadius: 14
+  componentSpreadRatio: 0.78
+  initialLocalSpreadRatio: 0.86
+  taggedNoteSeedDistanceFactor: 0.95
+  maxIterations: 88
+  minIterations: 28
+  stableIterationsRequired: 6
+  largeGraphNodeCount: 1800
+  largeGraphIterationFloor: 52
+  settleEpsilon: 0.014
+  simulationStep: 0.052
+  damping: 0.76
+  maxNodeStep: 1.2
+  noteTagRestLength: 8
+  directLinkRestLength: 7
+  minimumDirectLinkRestLength: 2.8
+  noteTagSpringStrength: 0.95
+  directLinkSpringStrength: 1.55
+  componentGravityStrength: 0.016
+  tagAnchorStrength: 0.07
+  tagMass: 2
+  repulsionStrength: 30
+  repulsionSofteningDistance: 1.8
+  barnesHutTheta: 0.82
+  octreeLeafCapacity: 6
+  octreeMaxDepth: 16
+  maxBarnesHutVisitsPerNode: 512
+  maxExactLeafChecksPerLeaf: 32
+  overlapCleanupPasses: 2
+  minimumNodeDistance: 2.4
+  maxOverlapChecksPerNode: 96
+  tagScale: 0.7
+  maxVisibleEdges: 1500
+  directLinkBudgetRatio: 0.6
+--- !u!4 &1326329809
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1326329807}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 870600019}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1327961057
 GameObject:
   m_ObjectHideFlags: 0
@@ -2437,6 +3300,106 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!1 &1479358099
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1479358101}
+  - component: {fileID: 1479358100}
+  m_Layer: 0
+  m_Name: Engine_RecursiveHubs_v3
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1479358100
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1479358099}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 58537b1ab1e304447ac181e67bcc1104, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::Engine_RecursiveHubs_v3
+  starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
+  layoutParent: {fileID: 1327961058}
+  tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
+  edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
+  animateConstruction: 1
+  nodesPerConstructionFrame: 420
+  constructionBatchesPerFrame: 1
+  nodeSpacingFactor: 8.1
+  minimumNavigationRadius: 14
+  navigationPadding: 7
+  componentRadiusFactor: 1.12
+  componentGapFactor: 1.65
+  rootSpreadRatio: 0.82
+  directLinkScoreWeight: 2.8
+  noteTagScoreWeight: 0.45
+  degreeScoreBonus: 0.62
+  tagNodeScoreMultiplier: 1.15
+  maximumTagHubScore: 5.8
+  maxRootHubsPerComponent: 12
+  rootCountFactor: 1.05
+  rootExclusionGraphDepth: 2
+  preferNotesAsRootHubs: 1
+  minimumNodeDistance: 2.9
+  hubChildDistanceFactor: 2.85
+  leafChildDistanceFactor: 1.55
+  childReservationFactor: 1.05
+  maximumChildReservation: 18
+  siblingShellFactor: 0.72
+  childHubDegreeThreshold: 4
+  maxPlacementAttempts: 192
+  fallbackHubDistanceFactor: 3.2
+  directLinkParentWeight: 4
+  noteTagParentWeight: 0.65
+  parentScoreInfluence: 0.07
+  parentCrowdingPenalty: 0.28
+  frontierTargetScoreWeight: 5.2
+  frontierRelationWeight: 1.25
+  frontierDepthPenalty: 0.12
+  animateRefinement: 1
+  refinementPasses: 20
+  refinementPassesPerFrame: 1
+  linkPull: 0.085
+  maxMovePerPass: 0.58
+  noteTagRestLength: 8.6
+  directLinkRestLength: 7.2
+  minimumDirectLinkRestLength: 3.5
+  rootMobility: 0.1
+  separationPassesPerRefinement: 2
+  clusterGuardDistanceFactor: 3.6
+  rootGuardDistanceFactor: 5
+  maxSeparationChecksPerNode: 180
+  tagScale: 0.7
+  maxVisibleEdges: 1500
+  backboneBudgetRatio: 0.48
+  directLinkBudgetRatio: 0.42
+  maxVisibleTagEdgeRestMultiplier: 2.6
+--- !u!4 &1479358101
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1479358099}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 870600019}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1479820783
 GameObject:
   m_ObjectHideFlags: 0
@@ -2718,6 +3681,94 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1542272343}
   m_CullTransparentMesh: 1
+--- !u!1 &1620806341
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1620806343}
+  - component: {fileID: 1620806342}
+  m_Layer: 0
+  m_Name: Engine_Barnes_v7_VolumeGuard
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1620806342
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1620806341}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c812cb4d49d4a0a82109e7159f35ebb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::Engine_Barnes_v7_VolumeGuard
+  starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
+  layoutParent: {fileID: 1327961058}
+  tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
+  edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
+  nodeSpacingFactor: 8.5
+  minimumBoundRadius: 14
+  componentSpreadRatio: 0.78
+  initialLocalSpreadRatio: 0.86
+  taggedNoteSeedDistanceFactor: 0.95
+  maxIterations: 34
+  minIterations: 14
+  stableIterationsRequired: 3
+  largeGraphNodeCount: 1800
+  largeGraphIterationFloor: 22
+  settleEpsilon: 0.026
+  simulationStep: 0.058
+  damping: 0.74
+  maxNodeStep: 1.35
+  noteTagRestLength: 8
+  directLinkRestLength: 7
+  minimumDirectLinkRestLength: 2.8
+  noteTagSpringStrength: 0.92
+  directLinkSpringStrength: 1.65
+  taglessDirectLinkBoost: 1.18
+  componentGravityStrength: 0.012
+  tagAnchorStrength: 0.06
+  tagMass: 2
+  repulsionStrength: 30
+  repulsionSofteningDistance: 1.8
+  barnesHutTheta: 0.98
+  octreeLeafCapacity: 8
+  octreeMaxDepth: 14
+  maxBarnesHutVisitsPerNode: 288
+  maxExactLeafChecksPerLeaf: 24
+  volumeGuardStrength: 0.34
+  minimumThinAxisRatio: 0.58
+  structuralDepthBias: 0.42
+  taglessVolumeGuardMultiplier: 0.35
+  overlapCleanupPasses: 1
+  minimumNodeDistance: 2.4
+  maxOverlapChecksPerNode: 72
+  tagScale: 0.7
+  maxVisibleEdges: 1500
+  directLinkBudgetRatio: 0.6
+--- !u!4 &1620806343
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1620806341}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 870600019}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1629943785
 GameObject:
   m_ObjectHideFlags: 0
@@ -2900,7 +3951,7 @@ MonoBehaviour:
   focusNode: {fileID: 1780593167}
   forcesEngineBehaviour: {fileID: 280067059}
   static25DEngineBehaviour: {fileID: 428893401}
-  staticLinksEngineBehaviour: {fileID: 1829145876}
+  staticLinksEngineBehaviour: {fileID: 1274860668}
   defaultEngine: 0
   autoSwitchThreshold: 500
   changeViewControl: {fileID: 1156615015}
@@ -2941,12 +3992,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
   injectSampleData: 0
-  sampleScenario: 0
-  sampleNoteCount: 501
-  sampleTagPoolSize: 50
+  sampleScenario: 2
+  sampleNoteCount: 1000
+  sampleTagPoolSize: 65
   sampleDateSpanDays: 365
   sampleMaxTagsPerNote: 4
-  sampleExtraLinks: 100
+  sampleExtraLinks: 500
 --- !u!1 &1787028428
 GameObject:
   m_ObjectHideFlags: 0

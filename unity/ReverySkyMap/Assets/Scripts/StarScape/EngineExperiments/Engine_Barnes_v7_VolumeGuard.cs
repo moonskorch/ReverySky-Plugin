@@ -4,38 +4,21 @@ using System.Diagnostics;
 using System.Linq;
 using UnityEngine;
 
-// Evaluation:
-// - At ~2K notes, the clustering looks excellent: the map has a strong shape without collapsing into an artificial sphere.
-// - Tagless map has a strange vertical shape.
-// - Cluster separation is clear, and the clusters do not degrade into spherical blobs.
-// - As graph size increases, especially with more hub-heavy structures, the layout becomes prone to congestion.
-// [Cartographer] Graph built in 27113,7 ms (notes=10000, engine=StaticLinks)
-// [Cartographer] Graph built in 13713,7 ms (notes=5000, engine=StaticLinks)
-// [Cartographer] Graph built in 3746,4 ms (notes=2000, engine=StaticLinks)
-// [CartographerSettledForces/BarnesHut] Built notes=2000, tags=100, tagEdges=4986, noteLinks=2496, visibleEdges=1500, components=4, iterations=52, boundRadius=108,8, octreePeakNodes=1357, treeVisits=13325357, treeApproximations=3872759, exactLeafChecks=16543129, skippedExactLeafBodies=0, cappedTraversals=0, overlapChecks=10477, totalMs=3743,2, ClearGraphMs=0,5, BuildLogicalGraphMs=15,9, CalculateBoundRadiusMs=0,0, FindConnectedComponentsMs=2,5, InitializeStablePositionsMs=2,9, RelaxLayoutMs=3320,6, BuildBarnesHutTreeMs=37,4, ApplyBarnesHutRepulsionMs=3235,3, ApplySpringsTagEdgesMs=18,8, ApplySpringsDirectLinksMs=14,4, ApplyAnchorsMs=2,4, IntegratePositionsMs=11,3, ResolveResidualOverlapsMs=9,9, InstantiateNodesMs=368,8, InstantiateLinesMs=22,1
-// - Defect: the map center is offset toward the edge, causing part of the layout to flatten against the bound-radius limit.
-// Assessment:
-// - Visually, this variant is promising for medium-sized and more strongly clustered graphs.
-// - It is not viable yet: performance must improve even for medium graph sizes, and the center-offset defect must be fixed.
-// - After those fixes, it may still be worth keeping as an intermediate candidate.
-
 /// <summary>
-/// Static force-directed map for medium and large note graphs.
-///
-/// The engine calculates a bounded force layout once during BuildGraph(), then
-/// instantiates the visual objects at their final positions. Runtime Tick() is
-/// intentionally empty.
-///
-/// Scaling strategy:
-/// - direct note links and note-tag relations are spring edges;
-/// - Barnes-Hut octree repulsion approximates distant groups of nodes;
-/// - the main settle pass avoids pairwise O(N^2) scans;
-/// - a bounded spatial hash cleanup resolves only residual close overlaps;
-/// - disconnected components receive stable centers before relaxation;
-/// - layout iterations, octree traversal, overlap cleanup, and rendered edges are bounded.
+/// At 2K, the visual layout is at the congestion limit.
+/// [Cartographer] Graph built in 1910,3 ms (notes=2000, engine=StaticLinks)
+/// [Cartographer] Graph built in 5206,3 ms (notes=5000, engine=StaticLinks)
+/// The tagless map is more distributed, but less structural.
+/// The tagged map is slightly plate-shaped, like a sphere compressed from above. It may still be worth tuning a more spacious version for larger maps.
+/// Overall: an improved v1 and the strongest force-layout variant for structure readability on maps up to 2K.
 /// </summary>
+
+// Evaluation target:
+// - Standalone Barnes-family experiment based on the faster v5/v6 direction.
+// - Fight plate-shaped tagged layouts with a cheap volume guard tied to graph degree.
+// - Keep tagless layouts isotropic, with slightly stronger direct-link structure.
 [DisallowMultipleComponent]
-public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
+public class Engine_Barnes_v7_VolumeGuard : MonoBehaviour, ICartographerEngine
 {
   [Header("Prefabs & Parents")]
   [SerializeField] private StarSO starTemplate;
@@ -44,7 +27,6 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
   [SerializeField] private LineRenderer edgePrefab;
 
   [Header("Dynamic sphere scaling")]
-  [Tooltip("Primary map-density control. Larger values create a more relaxed map volume.")]
   [SerializeField, Min(0.1f)] private float nodeSpacingFactor = 8.5f;
   [SerializeField, Min(0.1f)] private float minimumBoundRadius = 14f;
   [SerializeField, Range(0.05f, 0.95f)] private float componentSpreadRatio = 0.78f;
@@ -52,44 +34,46 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
   [SerializeField, Range(0.1f, 2f)] private float taggedNoteSeedDistanceFactor = 0.95f;
 
   [Header("Settled relaxation")]
-  [SerializeField, Range(1, 1000)] private int maxIterations = 88;
-  [SerializeField, Range(0, 1000)] private int minIterations = 28;
-  [SerializeField, Range(1, 64)] private int stableIterationsRequired = 6;
-  [Tooltip("At this physical-node count the engine uses largeGraphIterationFloor as the maximum iteration budget.")]
+  [SerializeField, Range(1, 1000)] private int maxIterations = 34;
+  [SerializeField, Range(0, 1000)] private int minIterations = 14;
+  [SerializeField, Range(1, 64)] private int stableIterationsRequired = 3;
   [SerializeField, Min(1)] private int largeGraphNodeCount = 1800;
-  [SerializeField, Range(1, 1000)] private int largeGraphIterationFloor = 52;
-  [SerializeField, Min(0.0001f)] private float settleEpsilon = 0.014f;
-  [SerializeField, Range(0.001f, 0.5f)] private float simulationStep = 0.052f;
-  [SerializeField, Range(0.01f, 0.999f)] private float damping = 0.76f;
-  [SerializeField, Min(0.01f)] private float maxNodeStep = 1.2f;
+  [SerializeField, Range(1, 1000)] private int largeGraphIterationFloor = 22;
+  [SerializeField, Min(0.0001f)] private float settleEpsilon = 0.026f;
+  [SerializeField, Range(0.001f, 0.5f)] private float simulationStep = 0.058f;
+  [SerializeField, Range(0.01f, 0.999f)] private float damping = 0.74f;
+  [SerializeField, Min(0.01f)] private float maxNodeStep = 1.35f;
 
   [Header("Springs")]
   [SerializeField, Min(0.01f)] private float noteTagRestLength = 8.0f;
   [SerializeField, Min(0.01f)] private float directLinkRestLength = 7.0f;
   [SerializeField, Min(0.01f)] private float minimumDirectLinkRestLength = 2.8f;
-  [SerializeField, Min(0f)] private float noteTagSpringStrength = 0.95f;
-  [SerializeField, Min(0f)] private float directLinkSpringStrength = 1.55f;
-  [Tooltip("Keep small. This prevents component drift without collapsing the map into a ball.")]
-  [SerializeField, Min(0f)] private float componentGravityStrength = 0.016f;
-  [SerializeField, Min(0f)] private float tagAnchorStrength = 0.07f;
+  [SerializeField, Min(0f)] private float noteTagSpringStrength = 0.92f;
+  [SerializeField, Min(0f)] private float directLinkSpringStrength = 1.65f;
+  [SerializeField, Range(1f, 2f)] private float taglessDirectLinkBoost = 1.18f;
+  [SerializeField, Min(0f)] private float componentGravityStrength = 0.012f;
+  [SerializeField, Min(0f)] private float tagAnchorStrength = 0.06f;
   [SerializeField, Min(0.1f)] private float tagMass = 2.0f;
 
   [Header("Barnes-Hut repulsion")]
   [SerializeField, Min(0f)] private float repulsionStrength = 30f;
   [SerializeField, Min(0.01f)] private float repulsionSofteningDistance = 1.8f;
-  [Tooltip("Lower is more accurate and slower. Values around 0.65-0.85 are a practical range.")]
-  [SerializeField, Range(0.2f, 1.5f)] private float barnesHutTheta = 0.82f;
-  [SerializeField, Range(1, 32)] private int octreeLeafCapacity = 6;
-  [SerializeField, Range(4, 24)] private int octreeMaxDepth = 16;
-  [Tooltip("Hard per-node traversal cap. Keeps pathological octree shapes bounded.")]
-  [SerializeField, Range(32, 8192)] private int maxBarnesHutVisitsPerNode = 512;
-  [Tooltip("Hard cap for exact bodies inside one deepest leaf. Normally leafCapacity keeps this much lower.")]
-  [SerializeField, Range(4, 512)] private int maxExactLeafChecksPerLeaf = 32;
+  [SerializeField, Range(0.2f, 1.5f)] private float barnesHutTheta = 0.98f;
+  [SerializeField, Range(1, 32)] private int octreeLeafCapacity = 8;
+  [SerializeField, Range(4, 24)] private int octreeMaxDepth = 14;
+  [SerializeField, Range(32, 8192)] private int maxBarnesHutVisitsPerNode = 288;
+  [SerializeField, Range(4, 512)] private int maxExactLeafChecksPerLeaf = 24;
+
+  [Header("Volume guard")]
+  [SerializeField, Range(0f, 1f)] private float volumeGuardStrength = 0.34f;
+  [SerializeField, Range(0.1f, 0.95f)] private float minimumThinAxisRatio = 0.58f;
+  [SerializeField, Range(0f, 1f)] private float structuralDepthBias = 0.42f;
+  [SerializeField, Range(0f, 1f)] private float taglessVolumeGuardMultiplier = 0.35f;
 
   [Header("Residual overlap cleanup")]
-  [SerializeField, Range(0, 16)] private int overlapCleanupPasses = 2;
+  [SerializeField, Range(0, 16)] private int overlapCleanupPasses = 1;
   [SerializeField, Min(0.01f)] private float minimumNodeDistance = 2.4f;
-  [SerializeField, Range(8, 4096)] private int maxOverlapChecksPerNode = 96;
+  [SerializeField, Range(8, 4096)] private int maxOverlapChecksPerNode = 72;
 
   [Header("Visual")]
   [SerializeField, Min(0.01f)] private float tagScale = 0.7f;
@@ -97,39 +81,37 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
   [SerializeField, Range(0f, 1f)] private float directLinkBudgetRatio = 0.6f;
 
   private const float GOLDEN_ANGLE_RAD = 2.39996323f;
-  protected const float MIN_SQR_DISTANCE = 0.000001f;
+  private const float MIN_SQR_DISTANCE = 0.000001f;
+  private const float VOLUME_GOLDEN_RATIO_FRACTION = 0.61803398875f;
 
   private float _boundRadius;
   private int _noteCount;
   private int _settledIterations;
+  private bool _isTaglessGraph;
   private long _barnesHutNodeVisits;
   private long _barnesHutApproximations;
   private long _barnesHutExactChecks;
-  private long _barnesHutSkippedExactLeafBodies;
   private long _barnesHutCappedTraversals;
   private int _peakOctreeNodes;
   private long _overlapPairChecks;
-
   private double _buildBarnesHutTreeMs;
   private double _applyBarnesHutRepulsionMs;
-  private double _applyTagSpringsMs;
-  private double _applyDirectLinkSpringsMs;
+  private double _applySpringsMs;
   private double _applyAnchorsMs;
   private double _integratePositionsMs;
+  private double _volumeGuardMs;
 
-  protected readonly List<Node> _nodes = new();
+  private readonly List<Node> _nodes = new();
   private readonly List<Edge> _tagEdges = new();
   private readonly List<Edge> _noteLinks = new();
-  protected readonly List<Component> _components = new();
+  private readonly List<Component> _components = new();
   private readonly List<LineRenderer> _lines = new();
   private readonly List<Star> _stars = new();
-
   private List<int>[] _tagNodeIndicesByNote = Array.Empty<List<int>>();
 
   private readonly Dictionary<Vector3Int, List<int>> _grid = new();
   private readonly List<List<int>> _gridBucketPool = new();
   private int _usedGridBuckets;
-
   private Vector3[] _overlapCorrections = Array.Empty<Vector3>();
   private int[] _overlapCorrectionCounts = Array.Empty<int>();
 
@@ -137,21 +119,20 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
   private int _usedOctreeNodes;
   private int _octreeRootIndex = -1;
 
-  protected sealed class Node
+  private sealed class Node
   {
     public bool IsNote;
     public NoteData Note;
     public int TagId;
     public int TagFrequency;
     public string Key;
-
     public float Mass;
+    public int Degree;
     public Vector3 Position;
     public Vector3 Velocity;
     public Vector3 Force;
     public Vector3 InitialPosition;
     public Vector3 ComponentCenter;
-
     public Star Star;
     public TagNode TagNode;
 
@@ -190,7 +171,7 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     }
   }
 
-  protected sealed class Component
+  private sealed class Component
   {
     public readonly List<int> Nodes = new();
     public string Key;
@@ -203,10 +184,9 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     public float HalfSize;
     public float Mass;
     public Vector3 WeightedPositionSum;
-    public readonly List<int> Bodies = new(8);
+    public readonly List<int> Bodies = new(10);
     public readonly int[] Children = new int[8];
     public bool HasChildren;
-
     public bool IsLeaf => !HasChildren;
 
     public void Reset(Vector3 center, float halfSize)
@@ -229,7 +209,6 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
   public Vector3 Pivot => layoutParent ? layoutParent.position : transform.position;
   public ScapeCameraWarper ScapeWarper => null;
   public IReadOnlyList<Star> Stars => _stars;
-  protected float MinimumNodeDistance => minimumNodeDistance;
 
   private void Awake()
   {
@@ -238,13 +217,11 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
 
   public void Tick(float dt)
   {
-    // The settled layout is intentionally frozen after BuildGraph().
   }
 
   public void BuildGraph(List<NoteData> notes)
   {
     var totalStopwatch = Stopwatch.StartNew();
-
     var clearStopwatch = Stopwatch.StartNew();
     ClearGraph();
     clearStopwatch.Stop();
@@ -253,21 +230,11 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     BuildLogicalGraph(notes);
     logicalStopwatch.Stop();
 
-    var radiusStopwatch = Stopwatch.StartNew();
-    _boundRadius = CalculateBoundRadius(
-      _nodes.Count,
-      nodeSpacingFactor,
-      minimumBoundRadius);
-    radiusStopwatch.Stop();
-
+    _boundRadius = CalculateBoundRadius(_nodes.Count, nodeSpacingFactor, minimumBoundRadius);
     if (_noteCount == 0)
     {
       totalStopwatch.Stop();
-      UnityEngine.Debug.Log(
-        $"[CartographerSettledForces/BarnesHut] BuildGraph totalMs={totalStopwatch.Elapsed.TotalMilliseconds:F1}, " +
-        $"ClearGraphMs={clearStopwatch.Elapsed.TotalMilliseconds:F1}, " +
-        $"BuildLogicalGraphMs={logicalStopwatch.Elapsed.TotalMilliseconds:F1}, " +
-        $"CalculateBoundRadiusMs={radiusStopwatch.Elapsed.TotalMilliseconds:F1}, notes=0");
+      UnityEngine.Debug.Log($"[Barnes/v7] BuildGraph totalMs={totalStopwatch.Elapsed.TotalMilliseconds:F1}, notes=0");
       return;
     }
 
@@ -277,7 +244,6 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
 
     var initializeStopwatch = Stopwatch.StartNew();
     InitializeStablePositions();
-    AfterInitializeStablePositions();
     initializeStopwatch.Stop();
 
     var settleStopwatch = Stopwatch.StartNew();
@@ -286,7 +252,9 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
 
     var overlapStopwatch = Stopwatch.StartNew();
     ResolveResidualOverlaps();
-    AfterResidualOverlaps();
+    RecenterLayout();
+    ApplyVolumeGuard();
+    RecenterLayout();
     overlapStopwatch.Stop();
 
     var instantiateNodesStopwatch = Stopwatch.StartNew();
@@ -298,29 +266,21 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     instantiateLinesStopwatch.Stop();
 
     totalStopwatch.Stop();
-
     UnityEngine.Debug.Log(
-      $"[CartographerSettledForces/BarnesHut] Built notes={_noteCount}, tags={_nodes.Count - _noteCount}, " +
+      $"[Barnes/v7] Built notes={_noteCount}, tags={_nodes.Count - _noteCount}, " +
       $"tagEdges={_tagEdges.Count}, noteLinks={_noteLinks.Count}, visibleEdges={_lines.Count}, " +
       $"components={_components.Count}, iterations={_settledIterations}, boundRadius={_boundRadius:F1}, " +
-      $"octreePeakNodes={_peakOctreeNodes}, treeVisits={_barnesHutNodeVisits}, " +
+      $"tagless={_isTaglessGraph}, octreePeakNodes={_peakOctreeNodes}, treeVisits={_barnesHutNodeVisits}, " +
       $"treeApproximations={_barnesHutApproximations}, exactLeafChecks={_barnesHutExactChecks}, " +
-      $"skippedExactLeafBodies={_barnesHutSkippedExactLeafBodies}, " +
       $"cappedTraversals={_barnesHutCappedTraversals}, overlapChecks={_overlapPairChecks}, " +
-      $"totalMs={totalStopwatch.Elapsed.TotalMilliseconds:F1}, " +
-      $"ClearGraphMs={clearStopwatch.Elapsed.TotalMilliseconds:F1}, " +
+      $"totalMs={totalStopwatch.Elapsed.TotalMilliseconds:F1}, ClearGraphMs={clearStopwatch.Elapsed.TotalMilliseconds:F1}, " +
       $"BuildLogicalGraphMs={logicalStopwatch.Elapsed.TotalMilliseconds:F1}, " +
-      $"CalculateBoundRadiusMs={radiusStopwatch.Elapsed.TotalMilliseconds:F1}, " +
       $"FindConnectedComponentsMs={componentsStopwatch.Elapsed.TotalMilliseconds:F1}, " +
       $"InitializeStablePositionsMs={initializeStopwatch.Elapsed.TotalMilliseconds:F1}, " +
-      $"RelaxLayoutMs={settleStopwatch.Elapsed.TotalMilliseconds:F1}, " +
-      $"BuildBarnesHutTreeMs={_buildBarnesHutTreeMs:F1}, " +
-      $"ApplyBarnesHutRepulsionMs={_applyBarnesHutRepulsionMs:F1}, " +
-      $"ApplySpringsTagEdgesMs={_applyTagSpringsMs:F1}, " +
-      $"ApplySpringsDirectLinksMs={_applyDirectLinkSpringsMs:F1}, " +
-      $"ApplyAnchorsMs={_applyAnchorsMs:F1}, " +
-      $"IntegratePositionsMs={_integratePositionsMs:F1}, " +
-      $"ResolveResidualOverlapsMs={overlapStopwatch.Elapsed.TotalMilliseconds:F1}, " +
+      $"RelaxLayoutMs={settleStopwatch.Elapsed.TotalMilliseconds:F1}, BuildBarnesHutTreeMs={_buildBarnesHutTreeMs:F1}, " +
+      $"ApplyBarnesHutRepulsionMs={_applyBarnesHutRepulsionMs:F1}, ApplySpringsMs={_applySpringsMs:F1}, " +
+      $"ApplyAnchorsMs={_applyAnchorsMs:F1}, IntegratePositionsMs={_integratePositionsMs:F1}, " +
+      $"ApplyVolumeGuardMs={_volumeGuardMs:F1}, ResolveResidualOverlapsMs={overlapStopwatch.Elapsed.TotalMilliseconds:F1}, " +
       $"InstantiateNodesMs={instantiateNodesStopwatch.Elapsed.TotalMilliseconds:F1}, " +
       $"InstantiateLinesMs={instantiateLinesStopwatch.Elapsed.TotalMilliseconds:F1}");
   }
@@ -342,28 +302,25 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     _noteLinks.Clear();
     _components.Clear();
     _stars.Clear();
-
     _tagNodeIndicesByNote = Array.Empty<List<int>>();
     _overlapCorrections = Array.Empty<Vector3>();
     _overlapCorrectionCounts = Array.Empty<int>();
 
     _noteCount = 0;
     _settledIterations = 0;
+    _isTaglessGraph = false;
     _barnesHutNodeVisits = 0;
     _barnesHutApproximations = 0;
     _barnesHutExactChecks = 0;
-    _barnesHutSkippedExactLeafBodies = 0;
     _barnesHutCappedTraversals = 0;
     _peakOctreeNodes = 0;
     _overlapPairChecks = 0;
-
     _buildBarnesHutTreeMs = 0d;
     _applyBarnesHutRepulsionMs = 0d;
-    _applyTagSpringsMs = 0d;
-    _applyDirectLinkSpringsMs = 0d;
+    _applySpringsMs = 0d;
     _applyAnchorsMs = 0d;
     _integratePositionsMs = 0d;
-
+    _volumeGuardMs = 0d;
     ResetSpatialGrid();
     ResetOctree();
   }
@@ -399,18 +356,12 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     return null;
   }
 
-  public static float CalculateBoundRadius(
-    int totalNodeCount,
-    float spacingFactor,
-    float minimumRadius)
+  public static float CalculateBoundRadius(int totalNodeCount, float spacingFactor, float minimumRadius)
   {
     int safeNodeCount = Mathf.Max(1, totalNodeCount);
     float safeSpacing = Mathf.Max(0.1f, spacingFactor);
     float safeMinimum = Mathf.Max(0.1f, minimumRadius);
-
-    return Mathf.Max(
-      safeMinimum,
-      safeSpacing * Mathf.Pow(safeNodeCount, 1f / 3f));
+    return Mathf.Max(safeMinimum, safeSpacing * Mathf.Pow(safeNodeCount, 1f / 3f));
   }
 
   private void BuildLogicalGraph(List<NoteData> notes)
@@ -422,45 +373,35 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
 
     _noteCount = orderedNotes.Count;
     _tagNodeIndicesByNote = new List<int>[_noteCount];
-
     var tagIdsByNote = new List<int>[_noteCount];
     var tagFrequencyById = new Dictionary<int, int>();
 
     for (int noteIndex = 0; noteIndex < _noteCount; noteIndex++)
     {
       var note = orderedNotes[noteIndex];
-      var tagIds = (note.TagIds ?? new List<int>())
-        .Distinct()
-        .OrderBy(tagId => tagId)
-        .ToList();
-
+      var tagIds = (note.TagIds ?? new List<int>()).Distinct().OrderBy(tagId => tagId).ToList();
       tagIdsByNote[noteIndex] = tagIds;
       _tagNodeIndicesByNote[noteIndex] = new List<int>(tagIds.Count);
-      _nodes.Add(new Node
-      {
-        IsNote = true,
-        Note = note,
-        Key = NoteKey(note),
-        Mass = 1f
-      });
+      _nodes.Add(new Node { IsNote = true, Note = note, Key = NoteKey(note), Mass = 1f });
 
       for (int i = 0; i < tagIds.Count; i++)
       {
-        tagFrequencyById.TryGetValue(tagIds[i], out int count);
-        tagFrequencyById[tagIds[i]] = count + 1;
+        int tagId = tagIds[i];
+        tagFrequencyById.TryGetValue(tagId, out int frequency);
+        tagFrequencyById[tagId] = frequency + 1;
       }
     }
 
-    var tagNodeIndexById = new Dictionary<int, int>();
-    foreach (int tagId in tagFrequencyById.Keys.OrderBy(tagId => tagId))
+    var tagNodeById = new Dictionary<int, int>();
+    foreach (var pair in tagFrequencyById.OrderBy(pair => pair.Key))
     {
-      tagNodeIndexById[tagId] = _nodes.Count;
+      tagNodeById[pair.Key] = _nodes.Count;
       _nodes.Add(new Node
       {
         IsNote = false,
-        TagId = tagId,
-        TagFrequency = tagFrequencyById[tagId],
-        Key = $"tag:{tagId}",
+        TagId = pair.Key,
+        TagFrequency = pair.Value,
+        Key = $"tag:{pair.Key}",
         Mass = Mathf.Max(0.1f, tagMass)
       });
     }
@@ -470,73 +411,73 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
       var tagIds = tagIdsByNote[noteIndex];
       for (int i = 0; i < tagIds.Count; i++)
       {
-        int tagNodeIndex = tagNodeIndexById[tagIds[i]];
+        int tagNodeIndex = tagNodeById[tagIds[i]];
         _tagNodeIndicesByNote[noteIndex].Add(tagNodeIndex);
-        _tagEdges.Add(new Edge(
-          noteIndex,
-          tagNodeIndex,
-          weight: 1f,
-          restLength: Mathf.Max(0.01f, noteTagRestLength),
-          kind: EdgeKind.NoteTag));
+        AddEdge(_tagEdges, noteIndex, tagNodeIndex, 1f, noteTagRestLength, EdgeKind.NoteTag);
       }
     }
 
-    BuildDirectNoteLinks();
+    BuildDirectLinks();
+    _isTaglessGraph = _nodes.Count == _noteCount;
   }
 
-  private void BuildDirectNoteLinks()
+  private void BuildDirectLinks()
   {
-    if (!MapRuntimeContext.IsRuntimeMode || MapRuntimeContext.Links == null)
+    if (MapRuntimeContext.Links == null || MapRuntimeContext.Links.Count == 0)
       return;
 
     var noteIndexById = new Dictionary<string, int>(StringComparer.Ordinal);
     for (int noteIndex = 0; noteIndex < _noteCount; noteIndex++)
     {
       string id = _nodes[noteIndex].Note?.Id;
-      if (!string.IsNullOrWhiteSpace(id) && !noteIndexById.ContainsKey(id))
+      if (!string.IsNullOrEmpty(id) && !noteIndexById.ContainsKey(id))
         noteIndexById[id] = noteIndex;
     }
 
     var maximumWeightByPair = new Dictionary<long, float>();
-    foreach (var link in MapRuntimeContext.Links)
+    for (int linkIndex = 0; linkIndex < MapRuntimeContext.Links.Count; linkIndex++)
     {
-      if (link == null ||
-          !noteIndexById.TryGetValue(link.SourceId ?? string.Empty, out int source) ||
-          !noteIndexById.TryGetValue(link.TargetId ?? string.Empty, out int target) ||
-          source == target)
+      var link = MapRuntimeContext.Links[linkIndex];
+      if (link == null || string.IsNullOrEmpty(link.SourceId) || string.IsNullOrEmpty(link.TargetId))
+        continue;
+
+      if (!noteIndexById.TryGetValue(link.SourceId, out int a) ||
+          !noteIndexById.TryGetValue(link.TargetId, out int b) ||
+          a == b)
       {
         continue;
       }
 
-      int a = Mathf.Min(source, target);
-      int b = Mathf.Max(source, target);
-      long pairKey = PairKey(a, b);
-      float weight = link.Weight > 0f ? link.Weight : 1f;
-
-      if (!maximumWeightByPair.TryGetValue(pairKey, out float previousWeight) ||
-          weight > previousWeight)
+      if (a > b)
       {
-        maximumWeightByPair[pairKey] = weight;
+        int temp = a;
+        a = b;
+        b = temp;
       }
+
+      long key = PairKey(a, b);
+      float safeWeight = Mathf.Max(0.01f, link.Weight);
+      if (!maximumWeightByPair.TryGetValue(key, out float existing) || safeWeight > existing)
+        maximumWeightByPair[key] = safeWeight;
     }
 
     foreach (var pair in maximumWeightByPair.OrderBy(pair => pair.Key))
     {
       DecodePairKey(pair.Key, out int a, out int b);
-
       float safeWeight = Mathf.Max(0.01f, pair.Value);
       float restLength = Mathf.Clamp(
         directLinkRestLength / Mathf.Sqrt(safeWeight),
         minimumDirectLinkRestLength,
         directLinkRestLength * 1.5f);
-
-      _noteLinks.Add(new Edge(
-        a,
-        b,
-        safeWeight,
-        restLength,
-        EdgeKind.DirectNoteLink));
+      AddEdge(_noteLinks, a, b, safeWeight, restLength, EdgeKind.DirectNoteLink);
     }
+  }
+
+  private void AddEdge(List<Edge> edges, int a, int b, float weight, float restLength, EdgeKind kind)
+  {
+    edges.Add(new Edge(a, b, weight, restLength, kind));
+    _nodes[a].Degree++;
+    _nodes[b].Degree++;
   }
 
   private void FindConnectedComponents()
@@ -547,7 +488,6 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
 
     AddAdjacency(_tagEdges, adjacency);
     AddAdjacency(_noteLinks, adjacency);
-
     var visited = new bool[_nodes.Count];
     var queue = new Queue<int>();
 
@@ -568,7 +508,6 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
         {
           int neighbor = adjacency[nodeIndex][i];
           if (visited[neighbor]) continue;
-
           visited[neighbor] = true;
           queue.Enqueue(neighbor);
         }
@@ -582,9 +521,7 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     _components.Sort((left, right) =>
     {
       int sizeOrder = right.Nodes.Count.CompareTo(left.Nodes.Count);
-      return sizeOrder != 0
-        ? sizeOrder
-        : string.CompareOrdinal(left.Key, right.Key);
+      return sizeOrder != 0 ? sizeOrder : string.CompareOrdinal(left.Key, right.Key);
     });
   }
 
@@ -599,9 +536,7 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
 
   private void InitializeStablePositions()
   {
-    float componentSpread =
-      _boundRadius *
-      Mathf.Clamp(componentSpreadRatio, 0.05f, 0.95f);
+    float componentSpread = _boundRadius * Mathf.Clamp(componentSpreadRatio, 0.05f, 0.95f);
 
     for (int componentIndex = 0; componentIndex < _components.Count; componentIndex++)
     {
@@ -613,35 +548,33 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
       float maximumLocalSpread = Mathf.Max(
         0.1f,
         _boundRadius - component.Center.magnitude - minimumNodeDistance);
-
       float desiredLocalSpread = Mathf.Max(
         minimumNodeDistance * 2f,
         nodeSpacingFactor *
         Mathf.Pow(Mathf.Max(1, component.Nodes.Count), 1f / 3f) *
         Mathf.Clamp(initialLocalSpreadRatio, 0.05f, 0.95f));
-
       float localSpread = Mathf.Min(maximumLocalSpread, desiredLocalSpread);
 
       for (int offset = 0; offset < component.Nodes.Count; offset++)
       {
         int nodeIndex = component.Nodes[offset];
         var node = _nodes[nodeIndex];
-
-        Vector3 seed =
-          component.Center +
-          FibonacciBallPoint(offset, component.Nodes.Count) * localSpread +
-          StableDirection(node.Key, 17) * minimumNodeDistance * 0.25f;
+        Vector3 local = _isTaglessGraph
+          ? ScrambledBallPoint(offset, component.Nodes.Count, node.Key) * localSpread
+          : FibonacciBallPoint(offset, component.Nodes.Count) * localSpread +
+            StableDirection(node.Key, 17) * minimumNodeDistance * 0.25f;
 
         node.ComponentCenter = component.Center;
-        node.Position = ClampToSphere(seed, minimumNodeDistance * 0.5f);
+        node.Position = ClampToSphere(component.Center + local, minimumNodeDistance * 0.5f);
         node.InitialPosition = node.Position;
         node.Velocity = Vector3.zero;
         node.Force = Vector3.zero;
       }
     }
 
-    // Notes with tags start close to their stable tag anchors. The later
-    // relaxation pass still lets direct note links reshape the local graph.
+    if (_isTaglessGraph)
+      return;
+
     for (int noteIndex = 0; noteIndex < _noteCount; noteIndex++)
     {
       var tagNodeIndices = _tagNodeIndicesByNote[noteIndex];
@@ -650,7 +583,6 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
 
       Vector3 weightedAnchorSum = Vector3.zero;
       float totalWeight = 0f;
-
       for (int i = 0; i < tagNodeIndices.Count; i++)
       {
         var tagNode = _nodes[tagNodeIndices[i]];
@@ -668,7 +600,6 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
         StableDirection(note.Key, 29) *
         noteTagRestLength *
         Mathf.Max(0.1f, taggedNoteSeedDistanceFactor);
-
       note.Position = ClampToSphere(tagSeed, minimumNodeDistance * 0.5f);
       note.InitialPosition = note.Position;
     }
@@ -683,9 +614,7 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     float safeDamping = Mathf.Clamp(damping, 0.01f, 0.999f);
     float safeMaxNodeStep = Mathf.Max(0.01f, maxNodeStep);
     float safeSettleEpsilon = Mathf.Max(0.0001f, settleEpsilon);
-
     int consecutiveStableIterations = 0;
-
     var phaseStopwatch = new Stopwatch();
 
     for (int iteration = 0; iteration < safeMaxIterations; iteration++)
@@ -704,13 +633,10 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
 
       phaseStopwatch.Restart();
       ApplySprings(_tagEdges, noteTagSpringStrength);
+      float directStrength = directLinkSpringStrength * (_isTaglessGraph ? taglessDirectLinkBoost : 1f);
+      ApplySprings(_noteLinks, directStrength);
       phaseStopwatch.Stop();
-      _applyTagSpringsMs += phaseStopwatch.Elapsed.TotalMilliseconds;
-
-      phaseStopwatch.Restart();
-      ApplySprings(_noteLinks, directLinkSpringStrength);
-      phaseStopwatch.Stop();
-      _applyDirectLinkSpringsMs += phaseStopwatch.Elapsed.TotalMilliseconds;
+      _applySpringsMs += phaseStopwatch.Elapsed.TotalMilliseconds;
 
       phaseStopwatch.Restart();
       ApplyAnchors();
@@ -718,20 +644,18 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
       _applyAnchorsMs += phaseStopwatch.Elapsed.TotalMilliseconds;
 
       phaseStopwatch.Restart();
-      float totalMove = IntegratePositions(
-        safeSimulationStep,
-        safeDamping,
-        safeMaxNodeStep);
-      totalMove += AfterLayoutIteration();
+      float totalMove = IntegratePositions(safeSimulationStep, safeDamping, safeMaxNodeStep);
+      totalMove += RecenterLayout();
       phaseStopwatch.Stop();
       _integratePositionsMs += phaseStopwatch.Elapsed.TotalMilliseconds;
 
+      phaseStopwatch.Restart();
+      totalMove += ApplyVolumeGuard();
+      phaseStopwatch.Stop();
+      _volumeGuardMs += phaseStopwatch.Elapsed.TotalMilliseconds;
+
       _settledIterations = iteration + 1;
-
-      float averageMove = _nodes.Count > 0
-        ? totalMove / _nodes.Count
-        : 0f;
-
+      float averageMove = _nodes.Count > 0 ? totalMove / _nodes.Count : 0f;
       if (_settledIterations >= safeMinIterations && averageMove <= safeSettleEpsilon)
       {
         consecutiveStableIterations++;
@@ -745,41 +669,11 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     }
   }
 
-  private float IntegratePositions(
-    float safeSimulationStep,
-    float safeDamping,
-    float safeMaxNodeStep)
-  {
-    float totalMove = 0f;
-
-    for (int nodeIndex = 0; nodeIndex < _nodes.Count; nodeIndex++)
-    {
-      var node = _nodes[nodeIndex];
-
-      node.Velocity =
-        (node.Velocity + (node.Force / Mathf.Max(0.1f, node.Mass)) * safeSimulationStep) *
-        safeDamping;
-
-      Vector3 step = node.Velocity * safeSimulationStep;
-      if (step.magnitude > safeMaxNodeStep)
-        step = step.normalized * safeMaxNodeStep;
-
-      node.Position = ClampToSphere(
-        node.Position + step,
-        minimumNodeDistance * 0.5f);
-
-      totalMove += step.magnitude;
-    }
-
-    return totalMove;
-  }
-
   private int ResolveIterationBudget()
   {
     int ceiling = Mathf.Max(1, maxIterations);
     int floor = Mathf.Clamp(largeGraphIterationFloor, 1, ceiling);
     int graphSizeAtFloor = Mathf.Max(1, largeGraphNodeCount);
-
     float sizeRatio = Mathf.Clamp01((float)_nodes.Count / graphSizeAtFloor);
     return Mathf.RoundToInt(Mathf.Lerp(ceiling, floor, sizeRatio));
   }
@@ -790,15 +684,133 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
       _nodes[i].Force = Vector3.zero;
   }
 
+  private float IntegratePositions(float safeSimulationStep, float safeDamping, float safeMaxNodeStep)
+  {
+    float totalMove = 0f;
+    for (int nodeIndex = 0; nodeIndex < _nodes.Count; nodeIndex++)
+    {
+      var node = _nodes[nodeIndex];
+      node.Velocity =
+        (node.Velocity + (node.Force / Mathf.Max(0.1f, node.Mass)) * safeSimulationStep) *
+        safeDamping;
+
+      Vector3 step = node.Velocity * safeSimulationStep;
+      if (step.magnitude > safeMaxNodeStep)
+        step = step.normalized * safeMaxNodeStep;
+
+      node.Position = ClampToSphere(node.Position + step, minimumNodeDistance * 0.5f);
+      totalMove += step.magnitude;
+    }
+
+    return totalMove;
+  }
+
+  private float RecenterLayout()
+  {
+    if (_nodes.Count == 0)
+      return 0f;
+
+    Vector3 center = Vector3.zero;
+    for (int i = 0; i < _nodes.Count; i++)
+      center += _nodes[i].Position;
+
+    center /= _nodes.Count;
+    if (center.sqrMagnitude <= MIN_SQR_DISTANCE)
+      return 0f;
+
+    float margin = minimumNodeDistance * 0.5f;
+    for (int i = 0; i < _nodes.Count; i++)
+      _nodes[i].Position = ClampToSphere(_nodes[i].Position - center, margin);
+
+    return center.magnitude * _nodes.Count;
+  }
+
+  private float ApplyVolumeGuard()
+  {
+    if (_nodes.Count < 3 || volumeGuardStrength <= 0f)
+      return 0f;
+
+    Vector3 min = _nodes[0].Position;
+    Vector3 max = _nodes[0].Position;
+    for (int i = 1; i < _nodes.Count; i++)
+    {
+      Vector3 position = _nodes[i].Position;
+      min = Vector3.Min(min, position);
+      max = Vector3.Max(max, position);
+    }
+
+    Vector3 size = max - min;
+    float[] extents = { size.x, size.y, size.z };
+    int thinAxis = 0;
+    int wideAxis = 0;
+    for (int axis = 1; axis < 3; axis++)
+    {
+      if (extents[axis] < extents[thinAxis]) thinAxis = axis;
+      if (extents[axis] > extents[wideAxis]) wideAxis = axis;
+    }
+
+    int middleAxis = 3 - thinAxis - wideAxis;
+    float thinExtent = Mathf.Max(0.001f, extents[thinAxis]);
+    float middleExtent = Mathf.Max(0.001f, extents[middleAxis]);
+    float targetThinExtent = middleExtent * Mathf.Clamp(minimumThinAxisRatio, 0.1f, 0.95f);
+    if (thinExtent >= targetThinExtent)
+      return 0f;
+
+    float centerOnAxis = (GetAxis(min, thinAxis) + GetAxis(max, thinAxis)) * 0.5f;
+    float strength = Mathf.Clamp01(volumeGuardStrength);
+    if (_isTaglessGraph)
+      strength *= Mathf.Clamp01(taglessVolumeGuardMultiplier);
+
+    float targetScale = Mathf.Clamp(targetThinExtent / thinExtent, 1f, 1.55f);
+    float appliedScale = Mathf.Lerp(1f, targetScale, strength);
+    float deficitHalf = Mathf.Max(0f, targetThinExtent - thinExtent) * 0.5f;
+    float moved = 0f;
+    float margin = minimumNodeDistance * 0.5f;
+
+    for (int i = 0; i < _nodes.Count; i++)
+    {
+      var node = _nodes[i];
+      Vector3 position = node.Position;
+      float oldCoordinate = GetAxis(position, thinAxis);
+      float centered = oldCoordinate - centerOnAxis;
+      float degreeBias = Mathf.Clamp01(node.Degree / 8f);
+      float signedDepth = HashSigned(node.Key, 907 + thinAxis);
+      float structuralLift =
+        signedDepth *
+        deficitHalf *
+        Mathf.Clamp01(structuralDepthBias) *
+        Mathf.Lerp(0.35f, 1f, degreeBias);
+
+      float nextCentered = centered * appliedScale + structuralLift * strength;
+      SetAxis(ref position, thinAxis, centerOnAxis + nextCentered);
+      Vector3 clamped = ClampToSphere(position, margin);
+      moved += (clamped - node.Position).magnitude;
+      node.Position = clamped;
+    }
+
+    return moved;
+  }
+
   private void BuildBarnesHutTree()
   {
     ResetOctree();
+    if (_nodes.Count == 0)
+      return;
 
-    float rootHalfSize = Mathf.Max(
-      minimumBoundRadius,
-      _boundRadius + minimumNodeDistance + 0.1f);
+    Vector3 min = _nodes[0].Position;
+    Vector3 max = _nodes[0].Position;
+    for (int nodeIndex = 1; nodeIndex < _nodes.Count; nodeIndex++)
+    {
+      Vector3 position = _nodes[nodeIndex].Position;
+      min = Vector3.Min(min, position);
+      max = Vector3.Max(max, position);
+    }
 
-    _octreeRootIndex = AllocateOctreeNode(Vector3.zero, rootHalfSize);
+    Vector3 rootCenter = (min + max) * 0.5f;
+    Vector3 size = max - min;
+    float rootHalfSize = Mathf.Max(size.x, Mathf.Max(size.y, size.z)) * 0.5f;
+    rootHalfSize = Mathf.Max(0.1f, rootHalfSize + repulsionSofteningDistance + 0.1f);
+    _octreeRootIndex = AllocateOctreeNode(rootCenter, rootHalfSize);
 
     for (int nodeIndex = 0; nodeIndex < _nodes.Count; nodeIndex++)
       InsertBody(_octreeRootIndex, nodeIndex, depth: 0);
@@ -816,9 +828,7 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
   {
     OctreeNode node;
     if (_usedOctreeNodes < _octreeNodePool.Count)
-    {
       node = _octreeNodePool[_usedOctreeNodes];
-    }
     else
     {
       node = new OctreeNode();
@@ -834,13 +844,11 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     var treeNode = _octreeNodePool[octreeNodeIndex];
     var body = _nodes[bodyIndex];
     float bodyMass = Mathf.Max(0.1f, body.Mass);
-
     treeNode.Mass += bodyMass;
     treeNode.WeightedPositionSum += body.Position * bodyMass;
 
     int safeLeafCapacity = Mathf.Clamp(octreeLeafCapacity, 1, 32);
     int safeMaxDepth = Mathf.Clamp(octreeMaxDepth, 4, 24);
-
     if (treeNode.IsLeaf)
     {
       if (treeNode.Bodies.Count < safeLeafCapacity ||
@@ -851,13 +859,9 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
         return;
       }
 
-      Subdivide(octreeNodeIndex);
-
+      treeNode.HasChildren = true;
       for (int existingBodyOffset = 0; existingBodyOffset < treeNode.Bodies.Count; existingBodyOffset++)
-      {
-        int existingBodyIndex = treeNode.Bodies[existingBodyOffset];
-        InsertBodyIntoChild(octreeNodeIndex, existingBodyIndex, depth + 1);
-      }
+        InsertBodyIntoChild(octreeNodeIndex, treeNode.Bodies[existingBodyOffset], depth + 1);
 
       treeNode.Bodies.Clear();
     }
@@ -870,7 +874,6 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     var parent = _octreeNodePool[parentIndex];
     int childOffset = ChildOffset(parent.Center, _nodes[bodyIndex].Position);
     int childIndex = parent.Children[childOffset];
-
     if (childIndex < 0)
     {
       float childHalfSize = parent.HalfSize * 0.5f;
@@ -882,50 +885,33 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     InsertBody(childIndex, bodyIndex, depth);
   }
 
-  private void Subdivide(int octreeNodeIndex)
-  {
-    _octreeNodePool[octreeNodeIndex].HasChildren = true;
-  }
-
   private void ApplyBarnesHutRepulsion()
   {
     if (_octreeRootIndex < 0 || repulsionStrength <= 0f)
       return;
 
-    int safeVisitCap = Mathf.Max(32, maxBarnesHutVisitsPerNode);
-
+    int visitCap = Mathf.Max(32, maxBarnesHutVisitsPerNode);
     for (int nodeIndex = 0; nodeIndex < _nodes.Count; nodeIndex++)
     {
-      int visits = 0;
-      ApplyRepulsionFromTreeNode(
-        targetNodeIndex: nodeIndex,
-        octreeNodeIndex: _octreeRootIndex,
-        visitCount: ref visits,
-        visitCap: safeVisitCap);
-
-      if (visits >= safeVisitCap)
+      int visitCount = 0;
+      ApplyRepulsionFromTreeNode(nodeIndex, _octreeRootIndex, ref visitCount, visitCap);
+      if (visitCount >= visitCap)
         _barnesHutCappedTraversals++;
     }
   }
 
-  private void ApplyRepulsionFromTreeNode(
-    int targetNodeIndex,
-    int octreeNodeIndex,
-    ref int visitCount,
-    int visitCap)
+  private void ApplyRepulsionFromTreeNode(int targetNodeIndex, int octreeNodeIndex, ref int visitCount, int visitCap)
   {
-    if (visitCount >= visitCap)
+    if (octreeNodeIndex < 0 || visitCount >= visitCap)
       return;
 
     visitCount++;
     _barnesHutNodeVisits++;
-
     var treeNode = _octreeNodePool[octreeNodeIndex];
     if (treeNode.Mass <= 0f)
       return;
 
     var target = _nodes[targetNodeIndex];
-
     if (treeNode.IsLeaf)
     {
       ApplyExactLeafRepulsion(targetNodeIndex, treeNode);
@@ -937,7 +923,6 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     float distanceSqr = away.sqrMagnitude;
     float distance = Mathf.Sqrt(Mathf.Max(MIN_SQR_DISTANCE, distanceSqr));
     float nodeWidth = treeNode.HalfSize * 2f;
-
     bool containsTarget = ContainsPoint(treeNode, target.Position);
     bool canApproximate =
       !containsTarget &&
@@ -945,7 +930,7 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
 
     if (canApproximate)
     {
-      ApplyAggregateRepulsion(targetNodeIndex, octreeNodeIndex, centerOfMass, treeNode.Mass);
+      ApplyRepulsion(targetNodeIndex, centerOfMass, treeNode.Mass, 401 + octreeNodeIndex);
       _barnesHutApproximations++;
       return;
     }
@@ -954,13 +939,7 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     {
       int childIndex = treeNode.Children[childOffset];
       if (childIndex < 0) continue;
-
-      ApplyRepulsionFromTreeNode(
-        targetNodeIndex,
-        childIndex,
-        ref visitCount,
-        visitCap);
-
+      ApplyRepulsionFromTreeNode(targetNodeIndex, childIndex, ref visitCount, visitCap);
       if (visitCount >= visitCap)
         return;
     }
@@ -978,50 +957,19 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
         continue;
 
       if (appliedChecks >= safeCheckCap)
-      {
-        _barnesHutSkippedExactLeafBodies += treeNode.Bodies.Count - bodyOffset;
         break;
-      }
 
       _barnesHutExactChecks++;
       appliedChecks++;
-      ApplySingleSourceRepulsion(
+      ApplyRepulsion(
         targetNodeIndex,
-        sourceNodeIndex,
-        Mathf.Max(0.1f, _nodes[sourceNodeIndex].Mass));
+        _nodes[sourceNodeIndex].Position,
+        Mathf.Max(0.1f, _nodes[sourceNodeIndex].Mass),
+        503 + sourceNodeIndex);
     }
   }
 
-  private void ApplyAggregateRepulsion(
-    int targetNodeIndex,
-    int octreeNodeIndex,
-    Vector3 sourceCenter,
-    float sourceMass)
-  {
-    ApplyRepulsion(
-      targetNodeIndex,
-      sourceCenter,
-      sourceMass,
-      salt: 401 + octreeNodeIndex);
-  }
-
-  private void ApplySingleSourceRepulsion(
-    int targetNodeIndex,
-    int sourceNodeIndex,
-    float sourceMass)
-  {
-    ApplyRepulsion(
-      targetNodeIndex,
-      _nodes[sourceNodeIndex].Position,
-      sourceMass,
-      salt: 503 + sourceNodeIndex);
-  }
-
-  private void ApplyRepulsion(
-    int targetNodeIndex,
-    Vector3 sourcePosition,
-    float sourceMass,
-    int salt)
+  private void ApplyRepulsion(int targetNodeIndex, Vector3 sourcePosition, float sourceMass, int salt)
   {
     var target = _nodes[targetNodeIndex];
     Vector3 away = target.Position - sourcePosition;
@@ -1044,33 +992,7 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
       Mathf.Max(0f, repulsionStrength) *
       Mathf.Max(0.1f, sourceMass) /
       denominator;
-
     target.Force += direction * magnitude;
-  }
-
-  private static int ChildOffset(Vector3 center, Vector3 position)
-  {
-    int result = 0;
-    if (position.x >= center.x) result |= 1;
-    if (position.y >= center.y) result |= 2;
-    if (position.z >= center.z) result |= 4;
-    return result;
-  }
-
-  private static Vector3 ChildCenterOffset(int childOffset, float childHalfSize)
-  {
-    return new Vector3(
-      (childOffset & 1) != 0 ? childHalfSize : -childHalfSize,
-      (childOffset & 2) != 0 ? childHalfSize : -childHalfSize,
-      (childOffset & 4) != 0 ? childHalfSize : -childHalfSize);
-  }
-
-  private static bool ContainsPoint(OctreeNode treeNode, Vector3 position)
-  {
-    return
-      Mathf.Abs(position.x - treeNode.Center.x) <= treeNode.HalfSize &&
-      Mathf.Abs(position.y - treeNode.Center.y) <= treeNode.HalfSize &&
-      Mathf.Abs(position.z - treeNode.Center.z) <= treeNode.HalfSize;
   }
 
   private void ApplySprings(List<Edge> edges, float springStrength)
@@ -1083,7 +1005,6 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
       var edge = edges[edgeIndex];
       var a = _nodes[edge.A];
       var b = _nodes[edge.B];
-
       Vector3 delta = b.Position - a.Position;
       float distanceSqr = delta.sqrMagnitude;
 
@@ -1104,11 +1025,7 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
       float weightScale = edge.Kind == EdgeKind.DirectNoteLink
         ? Mathf.Clamp(Mathf.Sqrt(Mathf.Max(0.01f, edge.Weight)), 0.5f, 3f)
         : 1f;
-
-      Vector3 force =
-        direction *
-        (safeSpringStrength * weightScale * extension);
-
+      Vector3 force = direction * (safeSpringStrength * weightScale * extension);
       a.Force += force;
       b.Force -= force;
     }
@@ -1122,7 +1039,6 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     for (int nodeIndex = 0; nodeIndex < _nodes.Count; nodeIndex++)
     {
       var node = _nodes[nodeIndex];
-
       if (safeComponentGravity > 0f)
         node.Force += (node.ComponentCenter - node.Position) * safeComponentGravity;
 
@@ -1137,17 +1053,14 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     float safeMinimumDistance = Mathf.Max(0.01f, minimumNodeDistance);
     float safeMinimumDistanceSqr = safeMinimumDistance * safeMinimumDistance;
     int safeMaxChecks = Mathf.Max(1, maxOverlapChecksPerNode);
-
     if (safePasses == 0 || _nodes.Count <= 1)
       return;
 
     EnsureOverlapBuffers();
-
     for (int pass = 0; pass < safePasses; pass++)
     {
       Array.Clear(_overlapCorrections, 0, _overlapCorrections.Length);
       Array.Clear(_overlapCorrectionCounts, 0, _overlapCorrectionCounts.Length);
-
       BuildSpatialGrid(safeMinimumDistance);
 
       for (int nodeIndex = 0; nodeIndex < _nodes.Count; nodeIndex++)
@@ -1170,7 +1083,6 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
 
                 checks++;
                 _overlapPairChecks++;
-
                 var other = _nodes[otherIndex];
                 Vector3 delta = other.Position - node.Position;
                 float distanceSqr = delta.sqrMagnitude;
@@ -1191,7 +1103,6 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
 
                 float separation = safeMinimumDistance - distance;
                 Vector3 correction = direction * (separation * 0.5f);
-
                 _overlapCorrections[nodeIndex] -= correction;
                 _overlapCorrections[otherIndex] += correction;
                 _overlapCorrectionCounts[nodeIndex]++;
@@ -1206,18 +1117,12 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
         int correctionCount = _overlapCorrectionCounts[nodeIndex];
         if (correctionCount <= 0) continue;
 
-        Vector3 correction =
-          _overlapCorrections[nodeIndex] /
-          correctionCount;
-
+        Vector3 correction = _overlapCorrections[nodeIndex] / correctionCount;
         if (correction.sqrMagnitude <= MIN_SQR_DISTANCE)
           continue;
 
         var node = _nodes[nodeIndex];
-        node.Position = ClampToSphere(
-          node.Position + correction,
-          safeMinimumDistance * 0.5f);
-
+        node.Position = ClampToSphere(node.Position + correction, safeMinimumDistance * 0.5f);
         movedAny = true;
       }
 
@@ -1281,39 +1186,27 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
   {
     if (starTemplate == null)
     {
-      UnityEngine.Debug.LogError("[CartographerSettledForces] Missing starTemplate.");
+      UnityEngine.Debug.LogError("[Barnes/v7] Missing starTemplate.");
       return;
     }
 
     bool canCreateTags = tagNodeTemplate != null;
     if (!canCreateTags && _nodes.Count > _noteCount)
-      UnityEngine.Debug.LogWarning("[CartographerSettledForces] Missing tagNodeTemplate. Tag nodes were skipped.");
+      UnityEngine.Debug.LogWarning("[Barnes/v7] Missing tagNodeTemplate. Tag nodes were skipped.");
 
     for (int nodeIndex = 0; nodeIndex < _nodes.Count; nodeIndex++)
     {
       var node = _nodes[nodeIndex];
-      Vector3 worldPosition = layoutParent
-        ? layoutParent.TransformPoint(node.Position)
-        : node.Position;
-
+      Vector3 worldPosition = layoutParent ? layoutParent.TransformPoint(node.Position) : node.Position;
       if (node.IsNote)
       {
-        node.Star = starTemplate.Instantiate(
-          worldPosition,
-          node.Note,
-          layoutParent);
-
+        node.Star = starTemplate.Instantiate(worldPosition, node.Note, layoutParent);
         if (node.Star != null)
           _stars.Add(node.Star);
       }
       else if (canCreateTags)
       {
-        node.TagNode = TagNode.Create(
-          tagNodeTemplate,
-          worldPosition,
-          node.TagId,
-          layoutParent);
-
+        node.TagNode = TagNode.Create(tagNodeTemplate, worldPosition, node.TagId, layoutParent);
         if (node.TagNode != null)
           node.TagNode.transform.localScale = Vector3.one * tagScale;
       }
@@ -1343,29 +1236,13 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
       .ToList();
 
     int added = 0;
-    added += InstantiateLinesFromEdges(
-      orderedDirectLinks,
-      startIndex: 0,
-      maxCount: directBudget);
-
-    added += InstantiateLinesFromEdges(
-      orderedTagEdges,
-      startIndex: 0,
-      maxCount: safeBudget - added);
-
+    added += InstantiateLinesFromEdges(orderedDirectLinks, 0, directBudget);
+    added += InstantiateLinesFromEdges(orderedTagEdges, 0, safeBudget - added);
     if (added < safeBudget)
-    {
-      added += InstantiateLinesFromEdges(
-        orderedDirectLinks,
-        startIndex: directBudget,
-        maxCount: safeBudget - added);
-    }
+      InstantiateLinesFromEdges(orderedDirectLinks, directBudget, safeBudget - added);
   }
 
-  private int InstantiateLinesFromEdges(
-    List<Edge> edges,
-    int startIndex,
-    int maxCount)
+  private int InstantiateLinesFromEdges(List<Edge> edges, int startIndex, int maxCount)
   {
     int added = 0;
     int safeStart = Mathf.Clamp(startIndex, 0, edges.Count);
@@ -1389,30 +1266,27 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     return added;
   }
 
-  protected Vector3 ClampToSphere(Vector3 position, float margin)
+  private Vector3 ClampToSphere(Vector3 position, float margin)
   {
     float radius = Mathf.Max(0.01f, _boundRadius - Mathf.Max(0f, margin));
-    return position.sqrMagnitude <= radius * radius
-      ? position
-      : position.normalized * radius;
-  }
-
-  protected virtual float AfterLayoutIteration()
-  {
-    return 0f;
-  }
-
-  protected virtual void AfterInitializeStablePositions()
-  {
-  }
-
-  protected virtual void AfterResidualOverlaps()
-  {
+    return position.sqrMagnitude <= radius * radius ? position : position.normalized * radius;
   }
 
   private int CompareNodeKeys(int left, int right)
   {
     return string.CompareOrdinal(_nodes[left].Key, _nodes[right].Key);
+  }
+
+  private static float GetAxis(Vector3 position, int axis)
+  {
+    return axis == 0 ? position.x : axis == 1 ? position.y : position.z;
+  }
+
+  private static void SetAxis(ref Vector3 position, int axis, float value)
+  {
+    if (axis == 0) position.x = value;
+    else if (axis == 1) position.y = value;
+    else position.z = value;
   }
 
   private static Vector3Int ToCell(Vector3 position, float cellSize)
@@ -1424,6 +1298,31 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
       Mathf.FloorToInt(position.z / safeCellSize));
   }
 
+  private static int ChildOffset(Vector3 center, Vector3 position)
+  {
+    int result = 0;
+    if (position.x >= center.x) result |= 1;
+    if (position.y >= center.y) result |= 2;
+    if (position.z >= center.z) result |= 4;
+    return result;
+  }
+
+  private static Vector3 ChildCenterOffset(int childOffset, float childHalfSize)
+  {
+    return new Vector3(
+      (childOffset & 1) != 0 ? childHalfSize : -childHalfSize,
+      (childOffset & 2) != 0 ? childHalfSize : -childHalfSize,
+      (childOffset & 4) != 0 ? childHalfSize : -childHalfSize);
+  }
+
+  private static bool ContainsPoint(OctreeNode treeNode, Vector3 position)
+  {
+    return
+      Mathf.Abs(position.x - treeNode.Center.x) <= treeNode.HalfSize &&
+      Mathf.Abs(position.y - treeNode.Center.y) <= treeNode.HalfSize &&
+      Mathf.Abs(position.z - treeNode.Center.z) <= treeNode.HalfSize;
+  }
+
   private static Vector3 FibonacciBallPoint(int index, int count)
   {
     if (count <= 1) return Vector3.zero;
@@ -1433,11 +1332,7 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     float radial = Mathf.Sqrt(Mathf.Max(0f, 1f - y * y));
     float angle = index * GOLDEN_ANGLE_RAD;
     float fill = Mathf.Pow((index + 1f) / count, 1f / 3f);
-
-    return new Vector3(
-      Mathf.Cos(angle) * radial,
-      y,
-      Mathf.Sin(angle) * radial) * fill;
+    return new Vector3(Mathf.Cos(angle) * radial, y, Mathf.Sin(angle) * radial) * fill;
   }
 
   private static Vector3 FibonacciSpherePoint(int index, int count)
@@ -1448,11 +1343,17 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     float y = 1f - 2f * t;
     float radial = Mathf.Sqrt(Mathf.Max(0f, 1f - y * y));
     float angle = index * GOLDEN_ANGLE_RAD;
+    return new Vector3(Mathf.Cos(angle) * radial, y, Mathf.Sin(angle) * radial);
+  }
 
-    return new Vector3(
-      Mathf.Cos(angle) * radial,
-      y,
-      Mathf.Sin(angle) * radial);
+  private static Vector3 ScrambledBallPoint(int index, int count, string key)
+  {
+    if (count <= 1) return Vector3.zero;
+
+    Vector3 direction = StableDirection(key, 701);
+    float radialSample = Mathf.Repeat((index + 0.5f) * VOLUME_GOLDEN_RATIO_FRACTION, 1f);
+    float radius = Mathf.Pow(Mathf.Lerp(0.08f, 1f, radialSample), 1f / 3f);
+    return direction * radius;
   }
 
   private static Vector3 StableDirection(string key, int salt)
@@ -1460,11 +1361,7 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     float y = Mathf.Lerp(-1f, 1f, Hash01(key, salt));
     float radial = Mathf.Sqrt(Mathf.Max(0f, 1f - y * y));
     float angle = Hash01(key, salt + 1) * Mathf.PI * 2f;
-
-    return new Vector3(
-      Mathf.Cos(angle) * radial,
-      y,
-      Mathf.Sin(angle) * radial);
+    return new Vector3(Mathf.Cos(angle) * radial, y, Mathf.Sin(angle) * radial);
   }
 
   private static Vector3 StablePairDirection(int a, int b, int salt)
@@ -1479,6 +1376,11 @@ public class Engine_Barnes_v1 : MonoBehaviour, ICartographerEngine
     return note == null
       ? "note:<null>"
       : $"note:{note.Id ?? string.Empty}|{note.Path ?? string.Empty}|{note.Name ?? string.Empty}";
+  }
+
+  private static float HashSigned(string value, int salt)
+  {
+    return Hash01(value, salt) * 2f - 1f;
   }
 
   private static float Hash01(string value, int salt)
