@@ -1,7 +1,7 @@
 # Cartographer Engine Eval Journal
 
 Status: active
-Last updated: 2026-06-11
+Last updated: 2026-06-12
 
 ## Theme
 
@@ -33,7 +33,8 @@ current Unity runtime behavior:
 - `Static25D` handles the date-axis map.
 - `StaticLinks` is the large-graph slot under active experimentation.
 - In the current dirty workspace, `Assets/Scenes/StarScapeScene.unity` wires the
-  `StaticLinks` slot to `Engine_RecursiveHubs_v3`.
+  `StaticLinks` slot to a RecursiveHubs candidate; the latest and most
+  developed variant in the eval family is `Engine_RecursiveHubs_v6`.
 - The same dirty workspace contains several untracked engine candidates; treat
   them as experiment state until explicitly accepted.
 
@@ -75,10 +76,10 @@ current Unity runtime behavior:
 | `Engine_StarfieldConstellations10K_v1` | constellation atlas | `StaticLinks`, no tick | Pending manual evaluation against `Engine_MacroCosmos10K_v1` and recursive hubs. Hides local links and emphasizes macro theme constellations. |
 | `Engine_RecursiveHubs_v1` | structural hub placement | `StaticLinks`, no tick | Superseded by v2. Owner notes describe artificial separation, long links, edge flattening, and hub/large-map congestion. |
 | `Engine_RecursiveHubs_v2` | iterative hub-cluster layout | `StaticLinks`, ticks during refinement | Strong cosmos character and useful local links, but serious FPS issues at 5K and 10K. Worth improving as a distinct visual direction. |
-| `Engine_RecursiveHubs_v3` | progressive structural hubs | `StaticLinks`, ticks during construction/refinement | Current active scene candidate. Owner notes prefer this direction over Barnes up to about 2K, with FPS and line-LOD issues still open. |
+| `Engine_RecursiveHubs_v3` | progressive structural hubs | `StaticLinks`, ticks during construction/refinement | Earlier RecursiveHubs baseline. Owner notes preferred this direction over Barnes up to about 2K, but it is now superseded by v6 as the active family baseline. |
 | `Engine_RecursiveHubs_v4` | safety wrapper for v3 | `StaticLinks`, inherits v3 | Targets the camera/focus risk from progressive construction. Source comments conflict: one note says the bug was not fixed and the variant is rejected, while the structured block still says pending validation. |
 | `Engine_RecursiveHubs_v5` | v3 animation-control wrapper | `StaticLinks`, inherits v3 | Pending FPS/feel evaluation. Separates construction timing from link refinement timing. |
-| `Engine_RecursiveHubs_v6` | v3 final-pass wrapper | `StaticLinks`, inherits v3 | Pending comparison against v3 on 2K/5K maps. Adds animation timing, adaptive line budgets, edge pruning, and optional large-graph visual throttles. |
+| `Engine_RecursiveHubs_v6` | RecursiveHubs final-pass wrapper | `StaticLinks`, inherits v3 | Current active family baseline and latest worked-out variant. Adds animation timing, adaptive line budgets, edge pruning, and optional large-graph visual throttles. |
 
 ### Candidate families
 
@@ -91,18 +92,21 @@ current Unity runtime behavior:
 
 ### Current best-known state
 
-No final accepted best-known engine is recorded in this journal yet.
+Owner verdict now settles the medium-and-large-graph direction on the
+RecursiveHubs family.
 
-Working state from source comments:
-- `Engine_RecursiveHubs_v3` appears to be the preferred visual direction around
-  2K notes, but still needs FPS/LOD work.
-- `Engine_Barnes_v7_VolumeGuard` appears to be the strongest Barnes/force-family
-  candidate up to about 2K, but still has glue/shape issues.
-- 10K-oriented macro candidates are not yet manually evaluated in the current
-  source comments.
+- Accepted direction for medium and large maps: the RecursiveHubs family, with
+  `Engine_RecursiveHubs_v6` as the current active baseline.
+- This choice covers the 2K and 10K work focus the eval was steering toward.
+- The decision is based on the owner's read that RecursiveHubs is the most
+  beautiful, structural, and performant option across those sizes.
+- Barnes and macro candidates remain useful references, but they are no longer
+  the primary line of development for medium or large maps.
 
 ## Decisions Currently in Force
 
+- Treat RecursiveHubs as the accepted medium-and-large-map direction until a
+  later owner verdict changes it.
 - Do not edit engine source comments while formalizing this journal.
 - Treat comments before engine classes as primary raw experiment notes.
 - Keep changing experiment state in this journal, not scattered across new
@@ -126,9 +130,8 @@ Working state from source comments:
 
 ## Open Questions
 
-- Which candidate is the accepted current best-known state, if any?
-- Should the active `StaticLinks` slot remain `Engine_RecursiveHubs_v3`, move to
-  v6, move to `Engine_Barnes_v7_VolumeGuard`, or split by graph size?
+- Should the active `StaticLinks` slot stay on `Engine_RecursiveHubs_v6` or move
+  to another RecursiveHubs variant if tuning proves it is worth it?
 - What is the primary fast iteration dataset: 501 notes, 2K notes, or another
   sample size?
 - What is the final eval set: likely Normal, Hub, Clusters, and Tagless at
@@ -143,17 +146,14 @@ Working state from source comments:
 
 - Confirm the eval set and owner scoring vocabulary before the next engine
   iteration.
-- Classify current candidates as `accepted`, `active`, `pending`, `fallback`,
-  `rejected`, or `reference only`.
-- Run a side-by-side manual comparison of `Engine_RecursiveHubs_v3`,
-  `Engine_RecursiveHubs_v6`, and `Engine_Barnes_v7_VolumeGuard` on the same 2K
-  dataset.
-- Run a separate large-graph comparison of `Engine_MacroCosmos10K_v1`,
-  `Engine_StarfieldConstellations10K_v1`, and the best recursive-hub candidate.
-- Decide whether `StaticLinks` should be one engine or a graph-size policy that
-  dispatches to different engines.
-- If a candidate becomes accepted, promote it from experimental state into a
-  stable production path and update scene wiring deliberately.
+- Reclassify the non-RecursiveHubs candidates as `reference only`, `fallback`,
+  or `parked` where that matches the current owner verdict.
+- Keep tuning `Engine_RecursiveHubs_v6` and its close RecursiveHubs derivatives
+  for shape, FPS, and line readability on 2K and 10K.
+- Decide whether future RecursiveHubs variants deserve a separate comparison
+  round or can stay as local tuning work under the same accepted direction.
+- If a future owner verdict changes the chosen family, promote that change into
+  scene wiring deliberately.
 
 ## Risks and Acceptable Divergences
 
@@ -172,6 +172,8 @@ Working state from source comments:
 - Source comments contain some unresolved contradictions, especially around
   `Engine_RecursiveHubs_v4`; journal entries should resolve those only after
   fresh evaluation.
+- The accepted direction can still evolve within the RecursiveHubs family, but
+  the medium-and-large-map choice itself is now settled.
 
 ## Verification Notes
 
@@ -201,5 +203,9 @@ Missing or not yet standardized:
 
 ## Recent Changes
 
+- 2026-06-12: Recorded owner verdict that RecursiveHubs is the accepted
+  medium-and-large-map direction. `Engine_RecursiveHubs_v6` is the current
+  baseline in that family. Continue tuning within RecursiveHubs instead of
+  comparing it against Barnes or macro candidates as the main line.
 - 2026-06-11: Created the journal from current source comments and scene/docs
   inspection. No engine code or engine comments were changed.

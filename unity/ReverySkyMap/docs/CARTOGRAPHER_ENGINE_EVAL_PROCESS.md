@@ -145,6 +145,10 @@ Track these separately:
   range;
 - iteration baseline: the exact state used for one candidate or sweep.
 
+Current accepted medium-and-large-graph direction:
+- RecursiveHubs family, with `Engine_RecursiveHubs_v6` as the active baseline
+  until a later owner verdict says otherwise.
+
 Independent candidate engines should be compared from the same baseline. Do not
 stack candidate A on candidate B unless the owner explicitly turns B into the
 new best-known state first.
@@ -291,9 +295,9 @@ Before letting the agent autonomously implement new engines, use the skill in
 this order:
 1. `propose-next`
 2. owner approval
-3. `compare-existing` for `Engine_RecursiveHubs_v3`,
-   `Engine_RecursiveHubs_v6`, and `Engine_Barnes_v7_VolumeGuard`
+3. `compare-existing` within the RecursiveHubs family only if a tuning question
+   still needs evidence
 4. owner visual verdict
-5. one approved `run-one-approved` iteration
+5. one approved `run-one-approved` iteration on the RecursiveHubs line
 
 This keeps the process controlled while the evidence format stabilizes.

@@ -121,8 +121,8 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Entry point: `Cartographer.BuildGraph`
   - Calls / sends to: `StarSO`, `ScapeCameraWarper`, `CameraOrbitalController`
 - `StaticLinks` slot engines
-  - Responsibility: provide the serialized large-graph engine selected by `Cartographer` when the resolved mode is `StaticLinks`.
-  - Code anchor: `Assets/Scripts/StarScape/EngineExperiments/Engine_RecursiveHubs_v3.cs::BuildGraph`, `Tick`, `ClearGraph`; `Assets/Scripts/StarScape/EngineExperiments/Engine_EmptySpheres.cs::BuildGraph`, `CalculateBoundRadius`
+  - Responsibility: provide the serialized large-graph engine selected by `Cartographer` when the resolved mode is `StaticLinks`. The current chosen direction for medium and large maps is the RecursiveHubs family, with `Engine_RecursiveHubs_v6` as the latest worked-out baseline.
+  - Code anchor: `Assets/Scripts/StarScape/EngineExperiments/Engine_RecursiveHubs_v6.cs::BuildGraph`, `Tick`, `ClearGraph`; `Assets/Scripts/StarScape/EngineExperiments/Engine_EmptySpheres.cs::BuildGraph`, `CalculateBoundRadius`
   - Entry point: `Cartographer.BuildGraph`
   - Calls / sends to: `StarSO`, `TagNodeSO`, `MapRuntimeContext.RuntimeNoteLink`
 - `ScapeCameraWarper`
@@ -185,7 +185,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 - `ObsidianBridge` owns bridge validation and all conversion from the JSON envelope into runtime models.
 - `Cartographer` owns engine selection, rebuild timing, current view, and focus restoration.
 - `CartographerForcesEngine`, `Cartographer25DEngine`, and the engine assigned to `Cartographer.staticLinksEngineBehaviour` own placement and cleanup of instantiated stars, tags, and edge objects for their respective layout strategies.
-- The current scene wiring assigns the `StaticLinks` slot to `Engine_RecursiveHubs_v3`, which can continue construction or refinement through `Tick()` after `BuildGraph()`. `Engine_EmptySpheres` remains a static fallback/evaluation engine with EditMode coverage for its radius calculations and static contract.
+- The current scene wiring assigns the `StaticLinks` slot to the RecursiveHubs baseline under eval, which can continue construction or refinement through `Tick()` after `BuildGraph()`. `Engine_EmptySpheres` remains a static fallback/evaluation engine with EditMode coverage for its radius calculations and static contract.
 - `ScapeCameraWarper` owns the 2.5D warp state and only participates when the active engine is `Static25D`.
 - `StarSO` recomputes note-length scale buckets whenever `MapRuntimeContext.NotesVersion` changes.
 - `GameInput` treats UI hits as blocked input and only forwards gestures that originate on the map.
