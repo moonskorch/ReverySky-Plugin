@@ -123,25 +123,32 @@ public class ObsidianBridgeEditModeTests
   }
 
   [Test]
-  public void ResolveModeByNotesCount_KeepsExplicitStaticPreferences()
+  public void ResolveModeByNotesCount_KeepsExplicitStaticSlotPreference()
   {
     var cartographerObject = new GameObject("CartographerResolveExplicitModeTests");
+    var static25DEngineObject = new GameObject("CartographerResolveExplicitStatic25DTests");
     try
     {
       var cartographer = cartographerObject.AddComponent<Cartographer>();
+      var static25DEngine = static25DEngineObject.AddComponent<Cartographer25DEngine>();
       var resolveMode = typeof(Cartographer).GetMethod("ResolveModeByNotesCount", BindingFlags.Instance | BindingFlags.NonPublic);
+      FieldInfo static25DEngineField = typeof(Cartographer).GetField("_static25DEngine", BindingFlags.Instance | BindingFlags.NonPublic);
 
       Assert.That(resolveMode, Is.Not.Null);
+      Assert.That(static25DEngineField, Is.Not.Null);
 
-      var static25D = (CartographerEngine)resolveMode.Invoke(cartographer, new object[] { 9999, CartographerEngine.Static25D });
+      static25DEngineField.SetValue(cartographer, static25DEngine);
+
+      var static25D = (CartographerEngine)resolveMode.Invoke(cartographer, new object[] { 1, CartographerEngine.Static25D });
       var staticLinks = (CartographerEngine)resolveMode.Invoke(cartographer, new object[] { 1, CartographerEngine.StaticLinks });
 
-      Assert.That(static25D, Is.EqualTo(CartographerEngine.Static25D));
+      Assert.That(static25D, Is.EqualTo(cartographer.Static25DEngine.EngineType));
       Assert.That(staticLinks, Is.EqualTo(CartographerEngine.StaticLinks));
     }
     finally
     {
       Object.DestroyImmediate(cartographerObject);
+      Object.DestroyImmediate(static25DEngineObject);
     }
   }
 

@@ -13,7 +13,7 @@ using UnityEngine;
 /// equilibrium.
 /// </summary>
 [DisallowMultipleComponent]
-public class Engine_RecursiveHubs_v7 : MonoBehaviour, ICartographerEngine
+public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographerEngine
 {
   private enum AnimationLifetime
   {
