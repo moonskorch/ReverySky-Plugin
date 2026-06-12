@@ -74,7 +74,7 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
         getState: () => ({
           pathFilterQuery: "tag:#project",
           showTags: false,
-          enginePreference: "static25D"
+          mapLayout: "dates"
         })
       },
       setViewState: vi.fn()
@@ -97,7 +97,7 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
       mapViewState: {
         pathFilterQuery: "tag:#project",
         showTags: false,
-        enginePreference: "static25D"
+        mapLayout: "dates"
       }
     });
     expect(harness.detachLeavesOfType).toHaveBeenCalledWith(MAP_VIEW_TYPE);
@@ -111,7 +111,7 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
       state: {
         pathFilterQuery: "tag:#project",
         showTags: false,
-        enginePreference: "static25D"
+        mapLayout: "dates"
       }
     });
     expect(harness.revealLeaf).toHaveBeenCalledWith(reopenedLeaf);
@@ -126,7 +126,7 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
         mapViewState: {
           pathFilterQuery: "path:Archive",
           showTags: true,
-          enginePreference: "forces"
+          mapLayout: "dynamicLinks"
         }
       },
       rightLeaf: newLeaf
@@ -142,7 +142,7 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
       state: {
         pathFilterQuery: "path:Archive",
         showTags: true,
-        enginePreference: "forces"
+        mapLayout: "dynamicLinks"
       }
     });
   });

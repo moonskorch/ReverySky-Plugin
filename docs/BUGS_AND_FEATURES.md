@@ -32,7 +32,7 @@ Purpose:
 
 3. Optimize engine-only switching across the bridge.
     - Expected: changing only the preferred engine should not require resending the full `graph:set` payload with all notes and links.
-    - Current state: plugin-side engine filter updates reuse cached source graph, but still redispatch the entire effective graph payload when only `enginePreference` changes.
+    - Current state: plugin-side layout preference updates reuse cached source graph, but still redispatch the entire effective graph payload when only `mapLayout` changes.
     - Follow-up direction: consider a lightweight bridge message such as `engine:set` (or similar) so engine-only changes can trigger runtime rebuild without retransmitting the full graph payload.
 
 4. Expand filter parameters to better match native Obsidian Graph behavior.

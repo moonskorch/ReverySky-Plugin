@@ -48,7 +48,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 1. Unity loads `Assets/Scenes/StarScapeScene.unity`.
 2. `ObsidianBridge.EnsureInstance()` in `Assets/Scripts/Bridge/ObsidianBridge.cs` creates a persistent bridge object if the scene does not already contain one.
 3. Scene wiring activates `GameInput`, `CameraOrbitalController`, `FocusNode`, `Cartographer`, the engine components, `ScapeCameraWarper`, `ChangeViewControl`, `RotateCameraUI`, and `Notification`. `SampleDataGenerator` is retained for editor-only sample seeding, not for shipped runtime fallback.
-4. `Cartographer.Start()` calls `SampleDataGenerator.TryInjectSampleDataIfNeeded()` only inside `UNITY_EDITOR`, then calls `RebuildGraph(MapRuntimeContext.EnginePreference)`.
+4. `Cartographer.Start()` calls `SampleDataGenerator.TryInjectSampleDataIfNeeded()` only inside `UNITY_EDITOR`, then calls `RebuildGraph(MapRuntimeContext.MapLayoutPreference)`.
 5. `Cartographer` subscribes to `MapRuntimeContext.OnNotesChanged` and UI events so later payloads or button clicks can rebuild the active graph.
 
 ### 2. `graph:set` ingestion and graph rebuild
@@ -57,7 +57,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 2. The bridge rejects payloads with a wrong `protocolVersion` or `type`, then normalizes the payload into `NoteData` and `MapRuntimeContext.RuntimeNoteLink` objects.
 3. Tags are de-duplicated by name, blank titles become `GameSettings.DefaultTitle`, invalid dates become `DateTime.MinValue`, and non-positive link weights are normalized to `1`.
 4. `MapRuntimeContext.SetTagNames`, `SetLinks`, and `SetNotes` store the runtime source of truth and raise `OnNotesChanged`.
-5. `Cartographer.HandleRuntimeNotesChanged()` calls `RebuildGraph(MapRuntimeContext.EnginePreference)`.
+5. `Cartographer.HandleRuntimeNotesChanged()` calls `RebuildGraph(MapRuntimeContext.MapLayoutPreference)`.
 6. `Cartographer.ResolveModeByNotesCount()` uses `defaultEngine` first. Without an override, explicit `Static25D` and `StaticLinks` stay fixed, while `Auto` and `Forces` resolve by note count: small graphs use `Forces`, large graphs use `StaticLinks`.
 7. The chosen engine runs `BuildGraph(notes)`, then `ApplyView(CurrentView)`, and `Cartographer` rebinds any `ScapeCameraWarper` exposed by the active engine.
 8. `Cartographer.SetCameraFocus()` restores the previous selection from `MapRuntimeContext.CurrentNoteId` or `FocusNode.LastSelectedStarId`.
@@ -181,7 +181,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 
 ## State Ownership and Contracts
 
-- `MapRuntimeContext` is the source of truth for live runtime notes, links, tag names, runtime mode, selected note id, engine preference, and the `NotesVersion` counter.
+- `MapRuntimeContext` is the source of truth for live runtime notes, links, tag names, runtime mode, selected note id, layout preference, and the `NotesVersion` counter.
 - `ObsidianBridge` owns bridge validation and all conversion from the JSON envelope into runtime models.
 - `Cartographer` owns engine selection, rebuild timing, current view, and focus restoration.
 - `CartographerForcesEngine`, `Cartographer25DEngine`, and the engine assigned to `Cartographer.staticLinksEngineBehaviour` own placement and cleanup of instantiated stars, tags, and edge objects for their respective layout strategies.

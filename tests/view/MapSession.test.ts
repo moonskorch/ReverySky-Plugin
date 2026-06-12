@@ -18,7 +18,7 @@ function makePayload(): GraphPayload {
       }
     ],
     links: [],
-    enginePreference: "auto"
+    mapLayout: "auto"
   };
 }
 
@@ -54,7 +54,7 @@ function makePathPayload(): GraphPayload {
       { sourceId: "daily", targetId: "project", kind: "resolved" },
       { sourceId: "project", targetId: "archive", kind: "resolved" }
     ],
-    enginePreference: "auto"
+    mapLayout: "auto"
   };
 }
 
@@ -376,7 +376,7 @@ describe("MapSession", () => {
     await session.setState({
       pathFilterQuery: "tag:#project",
       showTags: false,
-      enginePreference: "static25D"
+      mapLayout: "dates"
     });
 
     session.start(() => undefined);
@@ -388,7 +388,7 @@ describe("MapSession", () => {
     const restoredPayload = sendGraph.mock.calls[0]?.[0] as GraphPayload;
     expect(restoredPayload.notes.map((note) => note.id)).toEqual(["project"]);
     expect(restoredPayload.notes[0]?.tags).toEqual([]);
-    expect(restoredPayload.enginePreference).toBe("static25D");
+    expect(restoredPayload.mapLayout).toBe("dates");
 
     session.setFilterQuery("path:archive");
     vi.advanceTimersByTime(250);

@@ -19,7 +19,7 @@ function makePayload(): GraphPayload {
       }
     ],
     links: [],
-    enginePreference: "auto"
+    mapLayout: "auto"
   };
 }
 

@@ -1,5 +1,5 @@
 import { SearchComponent, setIcon } from "obsidian";
-import { ENGINE_PREFERENCE_OPTIONS } from "../bridge/EnginePreference";
+import { MAP_LAYOUT_PREFERENCE_OPTIONS } from "../bridge/LayoutPreference";
 import { MapSession } from "./MapSession";
 
 const FILTER_SUGGESTIONS_HIDE_DELAY_MS = 120;
@@ -22,7 +22,7 @@ export class MapFilterPanelController {
   private filterPanelEl: HTMLElement | null = null;
   private filterToggleButtonEl: HTMLButtonElement | null = null;
   private tagsToggleButtonEl: HTMLButtonElement | null = null;
-  private engineDropdownEl: HTMLSelectElement | null = null;
+  private layoutDropdownEl: HTMLSelectElement | null = null;
   private filterSuggestionMode: FilterSuggestionMode = 0;
   private searchComponent: SearchComponent | null = null;
   private filterPanelOpen = false;
@@ -168,27 +168,27 @@ export class MapFilterPanelController {
       toggleTags(event);
     });
 
-    const engineSection = createChild(filterContainer as ObsidianHTMLElement, "div");
-    engineSection.className = "reverysky-map-filter-section reverysky-map-filter-control-group";
+    const layoutSection = createChild(filterContainer as ObsidianHTMLElement, "div");
+    layoutSection.className = "reverysky-map-filter-section reverysky-map-filter-control-group";
 
-    const engineSectionTitle = createChild(engineSection as ObsidianHTMLElement, "div");
-    engineSectionTitle.className = "reverysky-map-filter-field-label";
-    engineSectionTitle.textContent = "Engine";
+    const layoutSectionTitle = createChild(layoutSection as ObsidianHTMLElement, "div");
+    layoutSectionTitle.className = "reverysky-map-filter-field-label";
+    layoutSectionTitle.textContent = "Map layout";
 
-    const engineSelectHost = createChild(engineSection as ObsidianHTMLElement, "div");
-    engineSelectHost.className = "reverysky-map-engine-select-host";
-    const engineDropdown = createChild(engineSelectHost as ObsidianHTMLElement, "select");
-    this.engineDropdownEl = engineDropdown;
-    for (const option of ENGINE_PREFERENCE_OPTIONS) {
-      const optionEl = createChild(engineDropdown as ObsidianHTMLElement, "option");
+    const layoutSelectHost = createChild(layoutSection as ObsidianHTMLElement, "div");
+    layoutSelectHost.className = "reverysky-map-engine-select-host";
+    const layoutDropdown = createChild(layoutSelectHost as ObsidianHTMLElement, "select");
+    this.layoutDropdownEl = layoutDropdown;
+    for (const option of MAP_LAYOUT_PREFERENCE_OPTIONS) {
+      const optionEl = createChild(layoutDropdown as ObsidianHTMLElement, "option");
       optionEl.value = option.value;
       optionEl.textContent = option.label;
     }
-    engineDropdown.classList.add("reverysky-map-engine-select");
-    engineDropdown.setAttribute("aria-label", "Select engine");
-    engineDropdown.addEventListener("change", () => {
-      this.session.setEnginePreference(engineDropdown.value);
-      this.refreshEngineDropdownUi();
+    layoutDropdown.classList.add("reverysky-map-engine-select");
+    layoutDropdown.setAttribute("aria-label", "Select map layout");
+    layoutDropdown.addEventListener("change", () => {
+      this.session.setMapLayoutPreference(layoutDropdown.value);
+      this.refreshLayoutDropdownUi();
     });
 
     this.setFilterPanelOpen(false);
@@ -200,7 +200,7 @@ export class MapFilterPanelController {
     this.syncSearchComponentValue();
     this.refreshFilterMessage();
     this.refreshTagsToggleUi();
-    this.refreshEngineDropdownUi();
+    this.refreshLayoutDropdownUi();
   }
 
   refreshSuggestions(): void {
@@ -238,7 +238,7 @@ export class MapFilterPanelController {
     this.filterPanelEl = null;
     this.filterToggleButtonEl = null;
     this.tagsToggleButtonEl = null;
-    this.engineDropdownEl = null;
+    this.layoutDropdownEl = null;
     this.filterSuggestionMode = 0;
     this.filterPanelOpen = false;
   }
@@ -615,17 +615,17 @@ export class MapFilterPanelController {
     this.tagsToggleButtonEl.setAttribute("aria-checked", uiState.showTags ? "true" : "false");
   }
 
-  private refreshEngineDropdownUi(): void {
-    if (!this.engineDropdownEl) {
+  private refreshLayoutDropdownUi(): void {
+    if (!this.layoutDropdownEl) {
       return;
     }
 
     const uiState = this.session.getFilterUiState();
-    if (this.engineDropdownEl.value === uiState.enginePreference) {
+    if (this.layoutDropdownEl.value === uiState.mapLayout) {
       return;
     }
 
-    this.engineDropdownEl.value = uiState.enginePreference;
+    this.layoutDropdownEl.value = uiState.mapLayout;
   }
 
   private formatPathFilterTerm(folderPath: string): string {

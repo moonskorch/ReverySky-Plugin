@@ -534,10 +534,10 @@ public class CameraOrbitalController : MonoBehaviour
     RebuildOrbitTarget();
   }
 
-  private void ShowDateSlider(CartographerEngine engine) 
+  private void ShowDateSlider(MapLayoutMode engine)
   {
     if (dateSlider == null) return;
-    dateSlider.gameObject.SetActive(engine == CartographerEngine.Static25D);
+    dateSlider.gameObject.SetActive(engine == MapLayoutMode.Dates);
 
     SyncDateSliderFromCurrentFocus();
   }
@@ -561,18 +561,18 @@ public class CameraOrbitalController : MonoBehaviour
     if (dateSlider == null) return;
 
     if (Cartographer.I.Static25DEngine != null && 
-      Cartographer.I.ActiveEngine?.EngineType == CartographerEngine.Static25D)
+      Cartographer.I.ActiveEngine?.EngineType == MapLayoutMode.Dates)
     {
       UpdateZAxisRange(Cartographer.I.Static25DEngine.ZMin, Cartographer.I.Static25DEngine.ZMax);
     }
 
-    ShowDateSlider(Cartographer.I.ActiveEngine?.EngineType ?? CartographerEngine.Auto);
+    ShowDateSlider(Cartographer.I.ActiveEngine?.EngineType ?? MapLayoutMode.Auto);
   }
 
   private void SyncDateSliderFromCurrentFocus()
   {
     if (dateSlider == null) return;
-    if (Cartographer.I?.ActiveEngine?.EngineType != CartographerEngine.Static25D) return;
+    if (Cartographer.I?.ActiveEngine?.EngineType != MapLayoutMode.Dates) return;
 
     // range might be not initialized yet
     if (Mathf.Approximately(dateZMin, dateZMax)) return;

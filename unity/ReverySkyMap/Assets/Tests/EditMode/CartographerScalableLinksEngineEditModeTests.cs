@@ -4,14 +4,14 @@ using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 
-public class CartographerStaticLinksEngineEditModeTests
+public class CartographerScalableLinksEngineEditModeTests
 {
   [Test]
-  public void Engine_ExposesStaticContract()
+  public void Engine_ExposesScalableLinksContract()
   {
     using var scope = CreateEngineScope(new List<NoteData>(), new List<MapRuntimeContext.RuntimeNoteLink>());
 
-    Assert.That(scope.Engine.EngineType, Is.EqualTo(CartographerEngine.StaticLinks));
+    Assert.That(scope.Engine.EngineType, Is.EqualTo(MapLayoutMode.ScalableLinks));
     Assert.That(scope.Engine.RequiresTick, Is.False);
     Assert.That(scope.Engine.ScapeWarper, Is.Null);
   }
@@ -148,7 +148,7 @@ public class CartographerStaticLinksEngineEditModeTests
   private static StarSO CreateStarTemplatePrefab()
   {
     var template = ScriptableObject.CreateInstance<StarSO>();
-    var prefab = new GameObject("CartographerStaticLinksEngineTestStarPrefab");
+    var prefab = new GameObject("CartographerScalableLinksEngineTestStarPrefab");
     prefab.AddComponent<Star>();
 
     FieldInfo prefabField = typeof(StarSO).GetField("prefab", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -167,7 +167,7 @@ public class CartographerStaticLinksEngineEditModeTests
     public EngineScope(StarSO template)
     {
       starTemplate = template;
-      engineObject = new GameObject("CartographerStaticLinksEngineEditModeTests");
+      engineObject = new GameObject("CartographerScalableLinksEngineEditModeTests");
       Engine = engineObject.AddComponent<CartographerEngineRecursiveHubsEngine>();
 
       FieldInfo prefabField = typeof(StarSO).GetField("prefab", BindingFlags.Instance | BindingFlags.NonPublic);

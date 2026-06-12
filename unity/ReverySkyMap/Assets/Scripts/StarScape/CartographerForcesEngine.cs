@@ -58,7 +58,7 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
     public float restLen;
   }
 
-  public CartographerEngine EngineType => CartographerEngine.Forces;
+  public MapLayoutMode EngineType => MapLayoutMode.DynamicLinks;
   public bool RequiresTick => true;
 
   public float BoundRadius => _boundRadius;

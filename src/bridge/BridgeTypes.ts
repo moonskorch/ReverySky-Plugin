@@ -1,5 +1,5 @@
-import type { GraphEnginePreference } from "./EnginePreference";
-export type { GraphEnginePreference } from "./EnginePreference";
+import type { MapLayoutPreference } from "./LayoutPreference";
+export type { MapLayoutPreference } from "./LayoutPreference";
 
 export const BRIDGE_PROTOCOL_VERSION = "2.0.0";
 
@@ -62,7 +62,7 @@ export type GraphPayload = {
   };
   notes: GraphNoteNode[];
   links: GraphLink[];
-  enginePreference?: GraphEnginePreference;
+  mapLayout?: MapLayoutPreference;
 };
 
 export type GraphSetMessage = {

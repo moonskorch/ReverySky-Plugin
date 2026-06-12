@@ -53,7 +53,7 @@ public sealed class ScapeCameraWarper : MonoBehaviour
   private Vector3 _tubeAxisWorld = Vector3.forward;
   private Vector3 _tubeOriginWorld = Vector3.zero;
 
-  public void ApplyEngineProfile(CartographerEngine engineType)
+  public void ApplyEngineProfile(MapLayoutMode engineType)
   {
     if (!useEngineProfiles)
       return;
@@ -62,7 +62,7 @@ public sealed class ScapeCameraWarper : MonoBehaviour
     float nextDepthEnd;
     float nextMaxScale;
 
-    if (engineType == CartographerEngine.Static25D)
+    if (engineType == MapLayoutMode.Dates)
     {
       nextDepthStart = staticDepthStart;
       nextDepthEnd = staticDepthEnd;

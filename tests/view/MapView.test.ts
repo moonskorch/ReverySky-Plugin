@@ -26,7 +26,7 @@ function makePayload(): GraphPayload {
       }
     ],
     links: [],
-    enginePreference: "auto"
+    mapLayout: "auto"
   };
 }
 
@@ -62,7 +62,7 @@ function makePathPayload(): GraphPayload {
       { sourceId: "daily", targetId: "project", kind: "resolved" },
       { sourceId: "project", targetId: "archive", kind: "resolved" }
     ],
-    enginePreference: "auto"
+    mapLayout: "auto"
   };
 }
 
@@ -1229,36 +1229,36 @@ describe("MapView bridge integration", () => {
     expect(buildGraph).toHaveBeenCalledTimes(1);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
     const initialPayload = bridge.sendGraphSet.mock.calls[0]?.[0] as GraphPayload;
-    expect(initialPayload.enginePreference).toBe("auto");
+    expect(initialPayload.mapLayout).toBe("auto");
 
     const engineSelect = view.contentEl.querySelector(
       ".reverysky-map-engine-select"
     ) as HTMLSelectElement;
     expect(engineSelect.value).toBe("auto");
 
-    engineSelect.value = "forces";
+    engineSelect.value = "dynamicLinks";
     engineSelect.dispatchEvent(new Event("change"));
     expect(buildGraph).toHaveBeenCalledTimes(1);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
     const linksPayload = bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload;
-    expect(linksPayload.enginePreference).toBe("forces");
-    expect(engineSelect.value).toBe("forces");
+    expect(linksPayload.mapLayout).toBe("dynamicLinks");
+    expect(engineSelect.value).toBe("dynamicLinks");
 
-    engineSelect.value = "static25D";
+    engineSelect.value = "dates";
     engineSelect.dispatchEvent(new Event("change"));
     expect(buildGraph).toHaveBeenCalledTimes(1);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(3);
     const datesPayload = bridge.sendGraphSet.mock.calls[2]?.[0] as GraphPayload;
-    expect(datesPayload.enginePreference).toBe("static25D");
-    expect(engineSelect.value).toBe("static25D");
+    expect(datesPayload.mapLayout).toBe("dates");
+    expect(engineSelect.value).toBe("dates");
 
-    engineSelect.value = "staticLinks";
+    engineSelect.value = "scalableLinks";
     engineSelect.dispatchEvent(new Event("change"));
     expect(buildGraph).toHaveBeenCalledTimes(1);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(4);
-    const staticLinksPayload = bridge.sendGraphSet.mock.calls[3]?.[0] as GraphPayload;
-    expect(staticLinksPayload.enginePreference).toBe("staticLinks");
-    expect(engineSelect.value).toBe("staticLinks");
+    const scalableLinksPayload = bridge.sendGraphSet.mock.calls[3]?.[0] as GraphPayload;
+    expect(scalableLinksPayload.mapLayout).toBe("scalableLinks");
+    expect(engineSelect.value).toBe("scalableLinks");
   });
 
   it("opens filter panel by gear button and closes it by close button", async () => {
@@ -2686,10 +2686,10 @@ describe("MapView bridge integration", () => {
     );
 
     await view.setState({
-      enginePreference: "static25D"
+      mapLayout: "dates"
     });
     expect(view.getState()).toMatchObject({
-      enginePreference: "static25D"
+      mapLayout: "dates"
     });
 
     await view.onOpen();
@@ -2703,11 +2703,11 @@ describe("MapView bridge integration", () => {
 
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
     const outgoingPayload = bridge.sendGraphSet.mock.calls[0]?.[0] as GraphPayload;
-    expect(outgoingPayload.enginePreference).toBe("static25D");
+    expect(outgoingPayload.mapLayout).toBe("dates");
     const engineSelect = view.contentEl.querySelector(
       ".reverysky-map-engine-select"
     ) as HTMLSelectElement;
-    expect(engineSelect.value).toBe("static25D");
+    expect(engineSelect.value).toBe("dates");
   });
 
   it("restores tag filter query from view state", async () => {

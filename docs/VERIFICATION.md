@@ -47,7 +47,7 @@ Current TS baseline test suites:
 
 Current visual regression suites:
 - `tests/visual/engine-dropdown.spec.ts`
-  - validates the engine dropdown focused state in the preview harness.
+  - validates the map layout dropdown focused state in the preview harness.
 - `tests/visual/tags-toggle-off.spec.ts`
   - validates the tags toggle off state in the preview harness.
 

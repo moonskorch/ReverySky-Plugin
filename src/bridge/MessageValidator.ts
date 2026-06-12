@@ -5,9 +5,9 @@ import {
   NoteOpenMessage
 } from "./BridgeTypes";
 import {
-  formatGraphEnginePreferenceValues,
-  isGraphEnginePreference
-} from "./EnginePreference";
+  formatMapLayoutPreferenceValues,
+  isMapLayoutPreference
+} from "./LayoutPreference";
 
 /**
  * Validate bridge messages at the boundary so malformed payloads fail fast.
@@ -74,10 +74,10 @@ export class MessageValidator {
     }
 
     if (
-      payload.enginePreference !== undefined &&
-      !isGraphEnginePreference(payload.enginePreference)
+      payload.mapLayout !== undefined &&
+      !isMapLayoutPreference(payload.mapLayout)
     ) {
-      errors.push(`payload.enginePreference must be one of: ${formatGraphEnginePreferenceValues()}`);
+      errors.push(`payload.mapLayout must be one of: ${formatMapLayoutPreferenceValues()}`);
     }
 
     return errors;

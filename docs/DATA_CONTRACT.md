@@ -40,10 +40,10 @@ type GraphPayload = {
   };
   notes: GraphNoteNode[];
   links: GraphLink[];
-  enginePreference?: GraphEnginePreference;
+  mapLayout?: MapLayoutPreference;
 };
 
-type GraphEnginePreference = "auto" | "forces" | "static25D" | "staticLinks";
+type MapLayoutPreference = "auto" | "dynamicLinks" | "dates" | "scalableLinks";
 
 type GraphNoteNode = {
   id: string;
@@ -67,7 +67,7 @@ type GraphLink = {
 - `id` must be stable for the same note across sessions.
 - `date` must be a single canonical note date in ISO 8601 format when provided.
 - `size` must be a non-negative integer measured in bytes.
-- `enginePreference`, when provided, must be one of: `auto`, `forces`, `static25D`, `staticLinks`.
+- `mapLayout`, when provided, must be one of: `auto`, `dynamicLinks`, `dates`, `scalableLinks`.
 - Producer rule: `vault.noteCount` should equal `notes.length` for every emitted payload.
 - Unknown fields must be safely ignored by consumers.
 
@@ -78,7 +78,7 @@ type GraphLink = {
 - Invalid envelopes are rejected with explicit, non-fatal error reporting.
 - Unity runtime ingest is fail-soft: it treats `vault.noteCount` as informational (uses `notes` as source of truth).
 - Unity runtime ingest is fail-soft for unresolved links: missing endpoints are tolerated at ingest and dropped later during edge resolution.
-- `enginePreference` is optional and controls the preferred runtime map engine selection when the consumer supports it.
+- `mapLayout` is optional and controls the preferred runtime map layout selection when the consumer supports it.
 
 ## Unity Runtime Usage Reference
 - Unity-side field-to-behavior mapping, runtime defaults, and ingestion-specific fallbacks are documented in `unity/ReverySkyMap/docs/DATA_CONTRACT.md` under `Runtime Field Usage (Unity)`.
@@ -88,5 +88,5 @@ type GraphLink = {
 - `notes[].date` uses `frontmatter.date`, then `frontmatter.created`, then `frontmatter.created_at`, then file creation time. Missing, blank, or invalid candidates are skipped, and the field is omitted when no valid source exists.
 - `notes[].tags` are produced by merging inline tags and frontmatter tags, then normalizing and deduplicating the result.
 - `notes[].size` is emitted as file size in bytes.
-- `enginePreference`, when present, is a plugin-owned runtime hint and travels with the effective graph payload.
+- `mapLayout`, when present, is a plugin-owned runtime hint and travels with the effective graph payload.
 - `vault.noteCount` reflects the emitted `notes.length` for the filtered payload.

@@ -12,10 +12,10 @@ public class Cartographer : MonoBehaviour
   [SerializeField] private FocusNode focusNode;
 
   [Header("Engines")]
-  [SerializeField] private MonoBehaviour forcesEngineBehaviour;
-  [SerializeField] private MonoBehaviour static25DEngineBehaviour;
-  [SerializeField] private MonoBehaviour staticLinksEngineBehaviour;
-  [SerializeField] private CartographerEngine defaultEngine = CartographerEngine.Auto;
+  [SerializeField] private MonoBehaviour dynamicLinksEngineBehaviour;
+  [SerializeField] private MonoBehaviour datesEngineBehaviour;
+  [SerializeField] private MonoBehaviour scalableLinksEngineBehaviour;
+  [SerializeField] private MapLayoutMode defaultEngine = MapLayoutMode.Auto;
 
   [Tooltip("Auto/Forces: large graphs use the static-slot engine; small graphs use Forces. Static25D and StaticLinks stay explicit.")]
   [SerializeField] private int autoSwitchThreshold = 500;
@@ -38,16 +38,16 @@ public class Cartographer : MonoBehaviour
   public float BoundRadius => _activeEngine != null ? _activeEngine.BoundRadius : 10f;
   public Vector3 Pivot => _activeEngine != null ? _activeEngine.Pivot : transform.position;
 
-  private ICartographerEngine _forcesEngine;
-  private ICartographerEngine _static25DEngine;
-  private ICartographerEngine _staticLinksEngine;
+  private ICartographerEngine _dynamicLinksEngine;
+  private ICartographerEngine _datesEngine;
+  private ICartographerEngine _scalableLinksEngine;
   private ICartographerEngine _activeEngine;
 
   public ICartographerEngine ActiveEngine => _activeEngine;
-  public ICartographerEngine StaticSlotEngine => _staticLinksEngine;
-  public Cartographer25DEngine Static25DEngine => (Cartographer25DEngine)_static25DEngine;
+  public ICartographerEngine StaticSlotEngine => _scalableLinksEngine;
+  public Cartographer25DEngine Static25DEngine => (Cartographer25DEngine)_datesEngine;
 
-  public event Action<CartographerEngine> OnEngineChanged;
+  public event Action<MapLayoutMode> OnEngineChanged;
 
   private void Awake()
   {
@@ -55,9 +55,9 @@ public class Cartographer : MonoBehaviour
       Debug.LogError("More than one instance of Cartographer");
     I = this;
 
-    _forcesEngine = forcesEngineBehaviour as ICartographerEngine;
-    _static25DEngine = static25DEngineBehaviour as ICartographerEngine;
-    _staticLinksEngine = staticLinksEngineBehaviour as ICartographerEngine;
+    _dynamicLinksEngine = dynamicLinksEngineBehaviour as ICartographerEngine;
+    _datesEngine = datesEngineBehaviour as ICartographerEngine;
+    _scalableLinksEngine = scalableLinksEngineBehaviour as ICartographerEngine;
   }
 
   private void Start()
@@ -65,7 +65,7 @@ public class Cartographer : MonoBehaviour
 #if UNITY_EDITOR
     sampleDataGenerator?.TryInjectSampleDataIfNeeded();
 #endif
-    RebuildGraph(MapRuntimeContext.EnginePreference);
+    RebuildGraph(MapRuntimeContext.MapLayoutPreference);
 
     MapRuntimeContext.OnNotesChanged += HandleRuntimeNotesChanged;
     if (changeViewControl != null)
@@ -89,7 +89,7 @@ public class Cartographer : MonoBehaviour
       _activeEngine.Tick(Time.deltaTime);
   }
 
-  private void RebuildGraph(CartographerEngine enginePreferred)
+  private void RebuildGraph(MapLayoutMode layoutPreference)
   {
     var noteList = MapRuntimeContext.Notes ?? new List<NoteData>();
 
@@ -103,13 +103,13 @@ public class Cartographer : MonoBehaviour
     }
 
     SetCurrentView(CurrentView);
-    BuildGraph(noteList, enginePreferred);
+    BuildGraph(noteList, layoutPreference);
     SetCameraFocus();
   }
 
-  private void BuildGraph(List<NoteData> notes, CartographerEngine enginePreferred)
+  private void BuildGraph(List<NoteData> notes, MapLayoutMode layoutPreference)
   {
-    var engine = ResolveModeByNotesCount(notes.Count, enginePreferred);
+    var engine = ResolveModeByNotesCount(notes.Count, layoutPreference);
     SwitchEngine(engine);
 
     if (_activeEngine == null) 
@@ -131,27 +131,27 @@ public class Cartographer : MonoBehaviour
       $"[Cartographer] Graph built in {stopwatch.Elapsed.TotalMilliseconds:F1} ms (notes={notes.Count}, engine={_activeEngine.EngineType})");
   }
 
-  private CartographerEngine ResolveModeByNotesCount(int notesCount, CartographerEngine enginePreferred)
+  private MapLayoutMode ResolveModeByNotesCount(int notesCount, MapLayoutMode layoutPreference)
   {
-    if (defaultEngine != CartographerEngine.Auto)
+    if (defaultEngine != MapLayoutMode.Auto)
       return defaultEngine;
 
-    if (enginePreferred == CartographerEngine.Static25D || enginePreferred == CartographerEngine.StaticLinks)
-      return enginePreferred;
+    if (layoutPreference == MapLayoutMode.Dates || layoutPreference == MapLayoutMode.ScalableLinks)
+      return layoutPreference;
 
     var isLargeGraph = notesCount > autoSwitchThreshold;
     return isLargeGraph
-      ? CartographerEngine.StaticLinks
-      : CartographerEngine.Forces;
+      ? MapLayoutMode.ScalableLinks
+      : MapLayoutMode.DynamicLinks;
   }
 
-  private void SwitchEngine(CartographerEngine resolvedMode)
+  private void SwitchEngine(MapLayoutMode resolvedMode)
   {
     var next = resolvedMode switch
     {
-      CartographerEngine.Static25D => _static25DEngine,
-      CartographerEngine.StaticLinks => _staticLinksEngine,
-      _ => _forcesEngine
+      MapLayoutMode.Dates => _datesEngine,
+      MapLayoutMode.ScalableLinks => _scalableLinksEngine,
+      _ => _dynamicLinksEngine
     };
     if (next == null) return;
 
@@ -252,6 +252,6 @@ public class Cartographer : MonoBehaviour
 
   private void HandleRuntimeNotesChanged()
   {
-    RebuildGraph(MapRuntimeContext.EnginePreference);
+    RebuildGraph(MapRuntimeContext.MapLayoutPreference);
   }
 }

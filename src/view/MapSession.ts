@@ -7,15 +7,15 @@ import type {
   WorkspaceLeaf
 } from "obsidian";
 import type {
-  GraphEnginePreference,
+  MapLayoutPreference,
   GraphPayload,
   NoteFocusPayload,
   NoteOpenPayload
 } from "../bridge/BridgeTypes";
 import {
-  DEFAULT_ENGINE_PREFERENCE,
-  normalizeGraphEnginePreference
-} from "../bridge/EnginePreference";
+  DEFAULT_MAP_LAYOUT_PREFERENCE,
+  normalizeMapLayoutPreference
+} from "../bridge/LayoutPreference";
 import { GraphPathFilter, type ParsedPathFilter, type PathFilterParseResult } from "../graph/GraphPathFilter";
 
 const GRAPH_REFRESH_DEBOUNCE_MS = 250;
@@ -26,13 +26,13 @@ const MAX_TAG_SUGGESTIONS = 200;
 export type MapViewState = {
   pathFilterQuery?: unknown;
   showTags?: unknown;
-  enginePreference?: unknown;
+  mapLayout?: unknown;
 };
 
 export type MapFilterUiState = {
   pathFilterQuery: string;
   showTags: boolean;
-  enginePreference: GraphEnginePreference;
+  mapLayout: MapLayoutPreference;
   pathFilterParseValid: boolean;
   pathFilterMessage: string;
 };
@@ -96,7 +96,7 @@ export class MapSession {
   private leafTrackingRegistered = false;
   private pathFilterQuery = "";
   private showTags = true;
-  private enginePreference: GraphEnginePreference = DEFAULT_ENGINE_PREFERENCE;
+  private mapLayout: MapLayoutPreference = DEFAULT_MAP_LAYOUT_PREFERENCE;
   private activePathFilter: ParsedPathFilter | null = null;
   private pathFilterParseValid = true;
   private pathFilterMessage = "";
@@ -116,7 +116,7 @@ export class MapSession {
     return {
       pathFilterQuery: this.pathFilterQuery,
       showTags: this.showTags,
-      enginePreference: this.enginePreference
+      mapLayout: this.mapLayout
     };
   }
 
@@ -125,10 +125,10 @@ export class MapSession {
     const nextQuery =
       typeof nextState.pathFilterQuery === "string" ? nextState.pathFilterQuery : "";
     const nextShowTags = typeof nextState.showTags === "boolean" ? nextState.showTags : true;
-    const nextEnginePreference = normalizeGraphEnginePreference(nextState.enginePreference);
+    const nextLayoutPreference = normalizeMapLayoutPreference(nextState.mapLayout);
     this.pathFilterQuery = nextQuery;
     this.showTags = nextShowTags;
-    this.enginePreference = nextEnginePreference;
+    this.mapLayout = nextLayoutPreference;
     this.applyParsedFilterResult(GraphPathFilter.parsePathQuery(nextQuery));
   }
 
@@ -185,8 +185,8 @@ export class MapSession {
     this.emitGraphFromSource();
   }
 
-  setEnginePreference(enginePreference: unknown): void {
-    this.enginePreference = normalizeGraphEnginePreference(enginePreference);
+  setMapLayoutPreference(mapLayout: unknown): void {
+    this.mapLayout = normalizeMapLayoutPreference(mapLayout);
     this.emitGraphFromSource();
   }
 
@@ -194,7 +194,7 @@ export class MapSession {
     return {
       pathFilterQuery: this.pathFilterQuery,
       showTags: this.showTags,
-      enginePreference: this.enginePreference,
+      mapLayout: this.mapLayout,
       pathFilterParseValid: this.pathFilterParseValid,
       pathFilterMessage: this.pathFilterMessage
     };
@@ -550,7 +550,7 @@ export class MapSession {
     const tagsFiltered = this.applyTagsVisibilityFilter(pathFiltered);
     return {
       ...tagsFiltered,
-      enginePreference: this.enginePreference
+      mapLayout: this.mapLayout
     };
   }
 

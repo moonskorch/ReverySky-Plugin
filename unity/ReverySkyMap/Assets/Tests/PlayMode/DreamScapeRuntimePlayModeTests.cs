@@ -51,7 +51,7 @@ public class MapRuntimePlayModeTests
   }
 
   [UnityTest]
-  public IEnumerator RuntimeGraphSet_EnginePreferenceSwitchesActiveCartographerEngine()
+  public IEnumerator RuntimeGraphSet_LayoutPreferenceSwitchesActiveCartographerLayout()
   {
     using var logProbe = new RuntimeLogProbe();
     yield return LoadTargetScene();
@@ -59,22 +59,22 @@ public class MapRuntimePlayModeTests
     Cartographer cartographer = UnityEngine.Object.FindFirstObjectByType<Cartographer>();
     Assert.That(cartographer, Is.Not.Null);
     Assert.That(cartographer.StaticSlotEngine, Is.Not.Null);
-    CartographerEngine staticSlotEngineType = cartographer.StaticSlotEngine.EngineType;
+    MapLayoutMode scalableLinksEngineType = cartographer.StaticSlotEngine.EngineType;
 
-    var bridgeObject = new GameObject("ObsidianBridgeEnginePreferencePlayModeTest");
+    var bridgeObject = new GameObject("ObsidianBridgeLayoutPreferencePlayModeTest");
     var bridge = bridgeObject.AddComponent<ObsidianBridge>();
 
-    bridge.OnGraphSet(ForcesEnginePreferencePayload);
+    bridge.OnGraphSet(DynamicLinksLayoutPreferencePayload);
     yield return WaitFrames(4);
-    Assert.That(MapRuntimeContext.EnginePreference, Is.EqualTo(CartographerEngine.Forces));
+    Assert.That(MapRuntimeContext.MapLayoutPreference, Is.EqualTo(MapLayoutMode.DynamicLinks));
     Assert.That(cartographer.ActiveEngine, Is.Not.Null);
-    Assert.That(cartographer.ActiveEngine.EngineType, Is.EqualTo(CartographerEngine.Forces));
+    Assert.That(cartographer.ActiveEngine.EngineType, Is.EqualTo(MapLayoutMode.DynamicLinks));
 
-    bridge.OnGraphSet(StaticLinksEnginePreferencePayload);
+    bridge.OnGraphSet(ScalableLinksLayoutPreferencePayload);
     yield return WaitFrames(4);
-    Assert.That(MapRuntimeContext.EnginePreference, Is.EqualTo(staticSlotEngineType));
+    Assert.That(MapRuntimeContext.MapLayoutPreference, Is.EqualTo(scalableLinksEngineType));
     Assert.That(cartographer.ActiveEngine, Is.Not.Null);
-    Assert.That(cartographer.ActiveEngine.EngineType, Is.EqualTo(staticSlotEngineType));
+    Assert.That(cartographer.ActiveEngine.EngineType, Is.EqualTo(scalableLinksEngineType));
     Assert.That(cartographer.ActiveEngine, Is.SameAs(cartographer.StaticSlotEngine));
 
     UnityEngine.Object.Destroy(bridgeObject);
@@ -124,7 +124,7 @@ public class MapRuntimePlayModeTests
 
   private static IEnumerator PrepareRuntimeWithDeterministicPayload()
   {
-    MapRuntimeContext.EnginePreference = CartographerEngine.StaticLinks;
+    MapRuntimeContext.MapLayoutPreference = MapLayoutMode.ScalableLinks;
     MapRuntimeContext.SetTagNames(new Dictionary<int, string>());
     MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>());
     MapRuntimeContext.SetNotes(new List<NoteData>());
@@ -298,8 +298,8 @@ public class MapRuntimePlayModeTests
     "{\"sourceId\":\"v2\",\"targetId\":\"v3\",\"weight\":1.0}" +
     "]}}";
 
-  private const string ForcesEnginePreferencePayload =
-    "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"enginePreference\":\"forces\",\"notes\":[" +
+  private const string DynamicLinksLayoutPreferencePayload =
+    "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"mapLayout\":\"dynamicLinks\",\"notes\":[" +
     "{\"id\":\"e1\",\"path\":\"engine/e1.md\",\"title\":\"Engine 1\",\"tags\":[\"engine\"],\"date\":\"2025-04-01T00:00:00Z\",\"size\":111}," +
     "{\"id\":\"e2\",\"path\":\"engine/e2.md\",\"title\":\"Engine 2\",\"tags\":[\"engine\"],\"date\":\"2025-04-03T00:00:00Z\",\"size\":222}," +
     "{\"id\":\"e3\",\"path\":\"engine/e3.md\",\"title\":\"Engine 3\",\"tags\":[\"engine\"],\"date\":\"2025-04-05T00:00:00Z\",\"size\":333}" +
@@ -308,8 +308,8 @@ public class MapRuntimePlayModeTests
     "{\"sourceId\":\"e2\",\"targetId\":\"e3\",\"weight\":1.0}" +
     "]}}";
 
-  private const string StaticLinksEnginePreferencePayload =
-    "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"enginePreference\":\"staticLinks\",\"notes\":[" +
+  private const string ScalableLinksLayoutPreferencePayload =
+    "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"mapLayout\":\"scalableLinks\",\"notes\":[" +
     "{\"id\":\"e1\",\"path\":\"engine/e1.md\",\"title\":\"Engine 1\",\"tags\":[\"engine\"],\"date\":\"2025-04-01T00:00:00Z\",\"size\":111}," +
     "{\"id\":\"e2\",\"path\":\"engine/e2.md\",\"title\":\"Engine 2\",\"tags\":[\"engine\"],\"date\":\"2025-04-03T00:00:00Z\",\"size\":222}," +
     "{\"id\":\"e3\",\"path\":\"engine/e3.md\",\"title\":\"Engine 3\",\"tags\":[\"engine\"],\"date\":\"2025-04-05T00:00:00Z\",\"size\":333}" +

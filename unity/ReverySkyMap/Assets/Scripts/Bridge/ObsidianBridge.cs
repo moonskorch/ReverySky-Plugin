@@ -75,7 +75,7 @@ public class ObsidianBridge : MonoBehaviour
       return;
     }
 
-    MapRuntimeContext.EnginePreference = ParseEnginePreference(envelope.payload.enginePreference);
+    MapRuntimeContext.MapLayoutPreference = ParseMapLayoutPreference(envelope.payload.mapLayout);
 
     var notes = envelope.payload.notes ?? Array.Empty<GraphNote>();
     var links = envelope.payload.links ?? Array.Empty<GraphLink>();
@@ -214,21 +214,21 @@ public class ObsidianBridge : MonoBehaviour
     return TryParseIso(value, out var dt) ? dt : DateTime.MinValue;
   }
 
-  private static CartographerEngine ParseEnginePreference(string value)
+  private static MapLayoutMode ParseMapLayoutPreference(string value)
   {
     if (string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase))
-      return CartographerEngine.Auto;
+      return MapLayoutMode.Auto;
 
-    if (string.Equals(value, "forces", StringComparison.OrdinalIgnoreCase))
-      return CartographerEngine.Forces;
+    if (string.Equals(value, "dynamicLinks", StringComparison.OrdinalIgnoreCase))
+      return MapLayoutMode.DynamicLinks;
 
-    if (string.Equals(value, "static25D", StringComparison.OrdinalIgnoreCase))
-      return CartographerEngine.Static25D;
+    if (string.Equals(value, "dates", StringComparison.OrdinalIgnoreCase))
+      return MapLayoutMode.Dates;
 
-    if (string.Equals(value, "staticLinks", StringComparison.OrdinalIgnoreCase))
-      return CartographerEngine.StaticLinks;
+    if (string.Equals(value, "scalableLinks", StringComparison.OrdinalIgnoreCase))
+      return MapLayoutMode.ScalableLinks;
 
-    return CartographerEngine.Auto;
+    return MapLayoutMode.Auto;
   }
 
   private static bool TryParseIso(string value, out DateTime dt)
@@ -272,7 +272,7 @@ public class ObsidianBridge : MonoBehaviour
   {
     public GraphNote[] notes;
     public GraphLink[] links;
-    public string enginePreference;
+    public string mapLayout;
   }
 
   [Serializable]

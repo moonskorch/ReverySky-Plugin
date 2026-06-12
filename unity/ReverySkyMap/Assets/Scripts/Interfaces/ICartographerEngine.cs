@@ -10,7 +10,7 @@ public interface ICartographerEngine
   float BoundRadius { get; }
   Vector3 Pivot { get; }
 
-  CartographerEngine EngineType { get; }
+  MapLayoutMode EngineType { get; }
   ScapeCameraWarper ScapeWarper { get; }
   IReadOnlyList<Star> Stars { get; }
   Star FindStarByNoteId(string noteId);

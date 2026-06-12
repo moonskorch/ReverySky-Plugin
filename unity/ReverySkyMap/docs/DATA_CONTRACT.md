@@ -43,10 +43,10 @@ type GraphPayload = {
   };
   notes: GraphNoteNode[];
   links: GraphLink[];
-  enginePreference?: GraphEnginePreference;
+  mapLayout?: MapLayoutPreference;
 };
 
-type GraphEnginePreference = "auto" | "forces" | "static25D" | "staticLinks";
+type MapLayoutPreference = "auto" | "dynamicLinks" | "dates" | "scalableLinks";
 
 type GraphNoteNode = {
   id: string;
@@ -71,7 +71,7 @@ type GraphLink = {
 - `id` is required and stable across updates.
 - `path` is vault-relative with `/` separators.
 - Links with missing note ids are tolerated at ingest and dropped later during Forces edge resolution.
-- `enginePreference`, when provided, must be one of: `auto`, `forces`, `static25D`, `staticLinks`.
+- `mapLayout`, when provided, must be one of: `auto`, `dynamicLinks`, `dates`, `scalableLinks`.
 - Unknown fields are ignored, not fatal.
 
 ## Runtime Field Usage (Unity)
@@ -90,8 +90,8 @@ Current runtime behavior snapshot for Unity ingestion and map interaction:
   - there is no semantic cutoff that treats all dates before a chosen year as undated.
 - `notes[].size` -> star scale factor via runtime percentile statistics.
   - fallback: negative size maps to `0`.
-- `enginePreference` -> preferred runtime engine mode for the next graph build.
-  - expected mapping: `auto` = threshold-based selection (`Forces` for small graphs, `StaticLinks` for large graphs), `forces` = links map preference with the same large-graph fallback to `StaticLinks`, `static25D` = explicit dates map preference, `staticLinks` = explicit static links map preference.
+- `mapLayout` -> preferred runtime map layout for the next graph build.
+  - expected mapping: `auto` = threshold-based selection (`DynamicLinks` for small graphs, `ScalableLinks` for large graphs), `dynamicLinks` = links map preference with the same large-graph fallback to `ScalableLinks`, `dates` = explicit dates map preference, `scalableLinks` = explicit scalable links map preference.
 - `links[].sourceId` and `links[].targetId` -> note-note edges in Forces engine.
   - gate: empty ids and self-links are dropped during bridge mapping; missing runtime node ids are dropped by Forces edge resolution.
 - `links[].weight` -> Forces spring rest length (`idealEdgeLen / sqrt(weight)`).

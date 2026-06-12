@@ -35,7 +35,7 @@ function makePathPayload(): GraphPayload {
       { sourceId: "daily", targetId: "project", kind: "resolved" },
       { sourceId: "project", targetId: "archive", kind: "resolved" }
     ],
-    enginePreference: "auto"
+    mapLayout: "auto"
   };
 }
 
@@ -137,7 +137,7 @@ describe("MapFilterPanelController", () => {
     await session.setState({
       pathFilterQuery: "tag:#project",
       showTags: false,
-      enginePreference: "static25D"
+      mapLayout: "dates"
     });
 
     const controller = new MapFilterPanelController(session);
@@ -151,7 +151,8 @@ describe("MapFilterPanelController", () => {
 
     expect(searchInput.value).toBe("tag:#project");
     expect(tagsToggle.getAttribute("aria-checked")).toBe("false");
-    expect(engineSelect.value).toBe("static25D");
+    expect(engineSelect.value).toBe("dates");
+    expect(container.textContent).toContain("Map layout");
     expect(message.textContent).toBe("");
   });
 });

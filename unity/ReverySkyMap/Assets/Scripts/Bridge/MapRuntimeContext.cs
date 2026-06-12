@@ -24,7 +24,7 @@ public static class MapRuntimeContext
 
   public static string CurrentNoteId { get; set; } = string.Empty;
 
-  public static CartographerEngine EnginePreference { get; set; } = CartographerEngine.Auto;
+  public static MapLayoutMode MapLayoutPreference { get; set; } = MapLayoutMode.Auto;
 
   public static event Action<string, string> OnOpenNoteRequested;
   public static event Action OnNotesChanged;

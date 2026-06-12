@@ -82,23 +82,23 @@ public class ObsidianBridgeEditModeTests
   }
 
   [Test]
-  public void OnGraphSet_EnginePreference_MapsToRuntimeEnginePreference()
+  public void OnGraphSet_LayoutPreference_MapsToRuntimeLayoutPreference()
   {
-    bridge.OnGraphSet(TestPayloads.EnginePreferenceForcesPayload);
-    Assert.That(MapRuntimeContext.EnginePreference, Is.EqualTo(CartographerEngine.Forces));
+    bridge.OnGraphSet(TestPayloads.LayoutPreferenceDynamicLinksPayload);
+    Assert.That(MapRuntimeContext.MapLayoutPreference, Is.EqualTo(MapLayoutMode.DynamicLinks));
 
-    bridge.OnGraphSet(TestPayloads.EnginePreferenceStatic25DPayload);
-    Assert.That(MapRuntimeContext.EnginePreference, Is.EqualTo(CartographerEngine.Static25D));
+    bridge.OnGraphSet(TestPayloads.LayoutPreferenceDatesPayload);
+    Assert.That(MapRuntimeContext.MapLayoutPreference, Is.EqualTo(MapLayoutMode.Dates));
 
-    bridge.OnGraphSet(TestPayloads.EnginePreferenceStaticLinksPayload);
-    Assert.That(MapRuntimeContext.EnginePreference, Is.EqualTo(CartographerEngine.StaticLinks));
+    bridge.OnGraphSet(TestPayloads.LayoutPreferenceScalableLinksPayload);
+    Assert.That(MapRuntimeContext.MapLayoutPreference, Is.EqualTo(MapLayoutMode.ScalableLinks));
 
-    bridge.OnGraphSet(TestPayloads.EnginePreferenceInvalidPayload);
-    Assert.That(MapRuntimeContext.EnginePreference, Is.EqualTo(CartographerEngine.Auto));
+    bridge.OnGraphSet(TestPayloads.LayoutPreferenceInvalidPayload);
+    Assert.That(MapRuntimeContext.MapLayoutPreference, Is.EqualTo(MapLayoutMode.Auto));
   }
 
   [Test]
-  public void ResolveModeByNotesCount_UsesStaticLinksForLargeAutoAndForcesGraphs()
+  public void ResolveModeByNotesCount_UsesScalableLinksForLargeAutoAndDynamicLinksGraphs()
   {
     var cartographerObject = new GameObject("CartographerResolveModeTests");
     try
@@ -108,13 +108,13 @@ public class ObsidianBridgeEditModeTests
 
       Assert.That(resolveMode, Is.Not.Null);
 
-      var autoLarge = (CartographerEngine)resolveMode.Invoke(cartographer, new object[] { 501, CartographerEngine.Auto });
-      var forcesLarge = (CartographerEngine)resolveMode.Invoke(cartographer, new object[] { 501, CartographerEngine.Forces });
-      var forcesSmall = (CartographerEngine)resolveMode.Invoke(cartographer, new object[] { 500, CartographerEngine.Forces });
+      var autoLarge = (MapLayoutMode)resolveMode.Invoke(cartographer, new object[] { 501, MapLayoutMode.Auto });
+      var dynamicLinksLarge = (MapLayoutMode)resolveMode.Invoke(cartographer, new object[] { 501, MapLayoutMode.DynamicLinks });
+      var dynamicLinksSmall = (MapLayoutMode)resolveMode.Invoke(cartographer, new object[] { 500, MapLayoutMode.DynamicLinks });
 
-      Assert.That(autoLarge, Is.EqualTo(CartographerEngine.StaticLinks));
-      Assert.That(forcesLarge, Is.EqualTo(CartographerEngine.StaticLinks));
-      Assert.That(forcesSmall, Is.EqualTo(CartographerEngine.Forces));
+      Assert.That(autoLarge, Is.EqualTo(MapLayoutMode.ScalableLinks));
+      Assert.That(dynamicLinksLarge, Is.EqualTo(MapLayoutMode.ScalableLinks));
+      Assert.That(dynamicLinksSmall, Is.EqualTo(MapLayoutMode.DynamicLinks));
     }
     finally
     {
@@ -123,32 +123,32 @@ public class ObsidianBridgeEditModeTests
   }
 
   [Test]
-  public void ResolveModeByNotesCount_KeepsExplicitStaticSlotPreference()
+  public void ResolveModeByNotesCount_KeepsExplicitDatesAndScalableLinksPreferences()
   {
     var cartographerObject = new GameObject("CartographerResolveExplicitModeTests");
-    var static25DEngineObject = new GameObject("CartographerResolveExplicitStatic25DTests");
+    var datesEngineObject = new GameObject("CartographerResolveExplicitDatesTests");
     try
     {
       var cartographer = cartographerObject.AddComponent<Cartographer>();
-      var static25DEngine = static25DEngineObject.AddComponent<Cartographer25DEngine>();
+      var datesEngine = datesEngineObject.AddComponent<Cartographer25DEngine>();
       var resolveMode = typeof(Cartographer).GetMethod("ResolveModeByNotesCount", BindingFlags.Instance | BindingFlags.NonPublic);
-      FieldInfo static25DEngineField = typeof(Cartographer).GetField("_static25DEngine", BindingFlags.Instance | BindingFlags.NonPublic);
+      FieldInfo datesEngineField = typeof(Cartographer).GetField("_datesEngine", BindingFlags.Instance | BindingFlags.NonPublic);
 
       Assert.That(resolveMode, Is.Not.Null);
-      Assert.That(static25DEngineField, Is.Not.Null);
+      Assert.That(datesEngineField, Is.Not.Null);
 
-      static25DEngineField.SetValue(cartographer, static25DEngine);
+      datesEngineField.SetValue(cartographer, datesEngine);
 
-      var static25D = (CartographerEngine)resolveMode.Invoke(cartographer, new object[] { 1, CartographerEngine.Static25D });
-      var staticLinks = (CartographerEngine)resolveMode.Invoke(cartographer, new object[] { 1, CartographerEngine.StaticLinks });
+      var dates = (MapLayoutMode)resolveMode.Invoke(cartographer, new object[] { 1, MapLayoutMode.Dates });
+      var scalableLinks = (MapLayoutMode)resolveMode.Invoke(cartographer, new object[] { 1, MapLayoutMode.ScalableLinks });
 
-      Assert.That(static25D, Is.EqualTo(cartographer.Static25DEngine.EngineType));
-      Assert.That(staticLinks, Is.EqualTo(CartographerEngine.StaticLinks));
+      Assert.That(dates, Is.EqualTo(cartographer.Static25DEngine.EngineType));
+      Assert.That(scalableLinks, Is.EqualTo(MapLayoutMode.ScalableLinks));
     }
     finally
     {
       Object.DestroyImmediate(cartographerObject);
-      Object.DestroyImmediate(static25DEngineObject);
+      Object.DestroyImmediate(datesEngineObject);
     }
   }
 
@@ -284,7 +284,7 @@ public class ObsidianBridgeEditModeTests
 
   private static void ResetRuntimeContext()
   {
-    MapRuntimeContext.EnginePreference = CartographerEngine.Auto;
+    MapRuntimeContext.MapLayoutPreference = MapLayoutMode.Auto;
     MapRuntimeContext.CurrentNoteId = string.Empty;
     MapRuntimeContext.SetTagNames(new Dictionary<int, string>());
     MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>());
@@ -338,23 +338,23 @@ public class ObsidianBridgeEditModeTests
       "{\"id\":\"f2\",\"path\":\"fallback/f2.md\",\"tags\":[\"solo\"],\"size\":5}" +
       "],\"links\":[]}}";
 
-    public const string EnginePreferenceForcesPayload =
-      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"enginePreference\":\"forces\",\"notes\":[" +
-      "{\"id\":\"e1\",\"path\":\"engine/forces.md\",\"title\":\"Forces\",\"tags\":[],\"date\":\"2025-01-01T00:00:00Z\",\"size\":1}" +
+    public const string LayoutPreferenceDynamicLinksPayload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"mapLayout\":\"dynamicLinks\",\"notes\":[" +
+      "{\"id\":\"e1\",\"path\":\"engine/dynamicLinks.md\",\"title\":\"DynamicLinks\",\"tags\":[],\"date\":\"2025-01-01T00:00:00Z\",\"size\":1}" +
       "],\"links\":[]}}";
 
-    public const string EnginePreferenceStatic25DPayload =
-      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"enginePreference\":\"static25D\",\"notes\":[" +
-      "{\"id\":\"e2\",\"path\":\"engine/static25D.md\",\"title\":\"Static25D\",\"tags\":[],\"date\":\"2025-01-01T00:00:00Z\",\"size\":1}" +
+    public const string LayoutPreferenceDatesPayload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"mapLayout\":\"dates\",\"notes\":[" +
+      "{\"id\":\"e2\",\"path\":\"engine/dates.md\",\"title\":\"Dates\",\"tags\":[],\"date\":\"2025-01-01T00:00:00Z\",\"size\":1}" +
       "],\"links\":[]}}";
 
-    public const string EnginePreferenceStaticLinksPayload =
-      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"enginePreference\":\"staticLinks\",\"notes\":[" +
-      "{\"id\":\"e4\",\"path\":\"engine/staticLinks.md\",\"title\":\"StaticLinks\",\"tags\":[],\"date\":\"2025-01-01T00:00:00Z\",\"size\":1}" +
+    public const string LayoutPreferenceScalableLinksPayload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"mapLayout\":\"scalableLinks\",\"notes\":[" +
+      "{\"id\":\"e4\",\"path\":\"engine/scalableLinks.md\",\"title\":\"ScalableLinks\",\"tags\":[],\"date\":\"2025-01-01T00:00:00Z\",\"size\":1}" +
       "],\"links\":[]}}";
 
-    public const string EnginePreferenceInvalidPayload =
-      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"enginePreference\":\"unsupported\",\"notes\":[" +
+    public const string LayoutPreferenceInvalidPayload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"mapLayout\":\"unsupported\",\"notes\":[" +
       "{\"id\":\"e3\",\"path\":\"engine/auto.md\",\"title\":\"Auto\",\"tags\":[],\"date\":\"2025-01-01T00:00:00Z\",\"size\":1}" +
       "],\"links\":[]}}";
 

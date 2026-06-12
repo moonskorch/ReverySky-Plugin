@@ -364,7 +364,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     }
   }
 
-  public CartographerEngine EngineType => CartographerEngine.StaticLinks;
+  public MapLayoutMode EngineType => MapLayoutMode.ScalableLinks;
   public bool RequiresTick => _constructionActive || _remainingRefinementPasses > 0 ||
     (_continuousLinkRefinement && _graphHasNodes);
   public float BoundRadius => _navigationRadius;

@@ -52,7 +52,7 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
     public Vector2 noteAnchorXY;
   }
 
-  public CartographerEngine EngineType => CartographerEngine.Static25D;
+  public MapLayoutMode EngineType => MapLayoutMode.Dates;
   public bool RequiresTick => false;
   public void Tick(float dt) { }
 

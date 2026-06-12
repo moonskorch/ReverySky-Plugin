@@ -37,7 +37,7 @@ describe("UnityIframeBridge", () => {
     const postMessage = vi.fn();
     const iframeWindow = { postMessage } as unknown as Window;
     const payload = makeValidPayload();
-    payload.enginePreference = "forces";
+    payload.mapLayout = "dynamicLinks";
 
     bridge.attach(iframeWindow, {});
     bridge.sendGraphSet(payload);
@@ -47,7 +47,7 @@ describe("UnityIframeBridge", () => {
     expect(targetOrigin).toBe("*");
     expect(message.type).toBe("graph:set");
     expect(message.protocolVersion).toBe(BRIDGE_PROTOCOL_VERSION);
-    expect((message.payload as GraphPayload).enginePreference).toBe("forces");
+    expect((message.payload as GraphPayload).mapLayout).toBe("dynamicLinks");
     bridge.detach();
   });
 

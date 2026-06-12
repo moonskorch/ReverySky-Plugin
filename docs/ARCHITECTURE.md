@@ -81,7 +81,7 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 3. `src/view/MapView.ts` -> `session.setBridgeReady(true)` -> `session.flushOrRefresh()`
    Starts the first graph emission or flushes the latest queued graph if refresh work already happened before the handshake.
 4. `src/view/MapSession.ts` -> `refreshGraphNow()` -> `emitGraphFromSource()`
-   Rebuilds the source graph, applies the active filter, applies `showTags`, and includes `enginePreference`.
+   Rebuilds the source graph, applies the active filter, applies `showTags`, and includes `mapLayout`.
 5. `src/graph/VaultGraphBuilder.ts` -> `build(app)`
    Reads markdown files from the vault, derives stable note ids, normalizes tags and paths, and builds links from `metadataCache.resolvedLinks`.
 6. `src/view/MapView.ts` -> `bridge.sendGraphSet(outgoingPayload)`
@@ -92,8 +92,8 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 ### Path 3. Vault or UI change -> filtered graph refresh
 1. `MapSession` registers vault and workspace listeners during startup, and `MapFilterPanelController` registers filter-panel DOM listeners when the view renders.
 2. A graph-significant change happens:
-   vault metadata changes, path filter input changes, tag visibility toggles, or engine preference changes.
-3. `src/view/MapFilterPanelController.ts` updates session-owned state through `MapSession.setFilterQuery()`, `setShowTags()`, or `setEnginePreference()`.
+   vault metadata changes, path filter input changes, tag visibility toggles, or map layout changes.
+3. `src/view/MapFilterPanelController.ts` updates session-owned state through `MapSession.setFilterQuery()`, `setShowTags()`, or `MapSession.setMapLayoutPreference()`.
 4. `src/view/MapSession.ts` re-enters `emitGraphFromSource()`.
 5. `src/graph/GraphPathFilter.ts`
    Parses the query and returns the filtered `GraphPayload` subset.
@@ -158,7 +158,7 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 - The effective graph after filters is owned by `MapSession`.
   The session emits the filtered payload that Unity receives through the shell view.
 
-- `pathFilterQuery`, `showTags`, and `enginePreference` are owned by `MapSession`.
+- `pathFilterQuery`, `showTags`, and `mapLayout` are owned by `MapSession`.
   They are persisted as view state and re-applied on open.
 
 - The most recently closed map-view state is owned by `ReverySkyMapPlugin`.
@@ -186,7 +186,7 @@ Important current contract facts:
 - plugin-to-runtime messages are `graph:set` and `note:focus`;
 - `path` values must stay vault-relative and use `/` separators;
 - `graph:set` carries the effective filtered graph;
-- `enginePreference` is an optional plugin-owned runtime hint;
+- `mapLayout` is an optional plugin-owned runtime hint;
 - invalid outgoing payloads are rejected before dispatch;
 - invalid incoming bridge messages are ignored with non-fatal error reporting.
 
@@ -242,7 +242,7 @@ Detailed commands live in `docs/VERIFICATION.md`. This section only maps the mai
 
 - Map state persistence across close and reopen
   Automated checks: `npm run test`, especially `tests/main.test.ts`
-  Manual checks: set filters, tags visibility, and engine preference; close the map through the ribbon toggle; reopen it; then repeat after restarting Obsidian
+  Manual checks: set filters, tags visibility, and map layout; close the map through the ribbon toggle; reopen it; then repeat after restarting Obsidian
 
 - Visual plugin UI states
   Automated checks: `npm run test:ui-visual` when UI changed
