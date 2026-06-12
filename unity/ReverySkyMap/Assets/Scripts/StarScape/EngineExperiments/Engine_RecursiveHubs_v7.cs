@@ -143,11 +143,6 @@ public class Engine_RecursiveHubs_v7 : MonoBehaviour, ICartographerEngine
   [SerializeField] private bool pruneLongNonBackboneEdges = true;
   [SerializeField, Min(1f)] private float nonBackboneMaxRestLengthMultiplier = 3.0f;
 
-  [Header("Large Graph Visual Cost")]
-  [SerializeField] private LargeGraphVisualPolicy largeGraphVisualPolicy = LargeGraphVisualPolicy.DisableSpin;
-  [SerializeField, Range(100, 20000)] private int largeGraphVisualThreshold = 1600;
-  [SerializeField] private bool logOptimizationSummary = true;
-
   private const float GOLDEN_ANGLE_RAD = 2.39996323f;
   private const float GOLDEN_RATIO_CONJUGATE = 0.61803398875f;
   private const float MIN_SQR_DISTANCE = 0.000001f;
@@ -645,20 +640,7 @@ public class Engine_RecursiveHubs_v7 : MonoBehaviour, ICartographerEngine
       ? PruneLongNonBackboneLines()
       : 0;
 
-    int disabledSpin = 0;
-    int disabledBillboards = 0;
-    if (_nodes.Count >= largeGraphVisualThreshold)
-      ApplyLargeGraphVisualPolicy(out disabledSpin, out disabledBillboards);
-
     _postBuildOptimized = true;
-
-    if (logOptimizationSummary)
-    {
-      UnityEngine.Debug.Log(
-        $"[RecursiveHubs/v7] Post-build optimization edgeBudget={_lastResolvedEdgeBudget}, " +
-        $"culledLongLines={culledLines}, disabledSpin={disabledSpin}, " +
-        $"disabledBillboards={disabledBillboards}");
-    }
   }
 
   private int PruneLongNonBackboneLines()
@@ -714,39 +696,6 @@ public class Engine_RecursiveHubs_v7 : MonoBehaviour, ICartographerEngine
       Mathf.Max(1f, nonBackboneMaxRestLengthMultiplier);
   }
 
-  private void ApplyLargeGraphVisualPolicy(
-    out int disabledSpin,
-    out int disabledBillboards)
-  {
-    disabledSpin = 0;
-    disabledBillboards = 0;
-
-    if (largeGraphVisualPolicy == LargeGraphVisualPolicy.PreserveVisuals || layoutParent == null)
-      return;
-
-    var spinComponents = layoutParent.GetComponentsInChildren<Spin>(true);
-    for (int i = 0; i < spinComponents.Length; i++)
-    {
-      if (!spinComponents[i].enabled)
-        continue;
-
-      spinComponents[i].enabled = false;
-      disabledSpin++;
-    }
-
-    if (largeGraphVisualPolicy != LargeGraphVisualPolicy.DisableSpinAndBillboards)
-      return;
-
-    var billboardComponents = layoutParent.GetComponentsInChildren<LookAtCamera>(true);
-    for (int i = 0; i < billboardComponents.Length; i++)
-    {
-      if (!billboardComponents[i].enabled)
-        continue;
-
-      billboardComponents[i].enabled = false;
-      disabledBillboards++;
-    }
-  }
   public void ClearGraph()
   {
     for (int i = 0; i < _lineBindings.Count; i++)

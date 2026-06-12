@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 4893932606377265402}
   - component: {fileID: 7247308075277404508}
   - component: {fileID: 4709714922754719655}
+  - component: {fileID: 7512095086579032814}
   m_Layer: 0
   m_Name: Title
   m_TagString: Untagged
@@ -189,12 +190,26 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2774144331844689961}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f6f2828d3a131304e8fa8e727f7b582e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LookAtCamera
   mode: 2
+--- !u!114 &7512095086579032814
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2774144331844689961}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 76b436cc017de664d88238d5cef83c5c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::StarDetailVisibility
+  spin: {fileID: 7505739204612041368}
+  lookAtCamera: {fileID: 4709714922754719655}
 --- !u!1 &7720539063730227376
 GameObject:
   m_ObjectHideFlags: 0
@@ -206,6 +221,7 @@ GameObject:
   - component: {fileID: 4724834818725577822}
   - component: {fileID: 5357984115519731449}
   - component: {fileID: 4500662623417313281}
+  - component: {fileID: 5266511528653501404}
   m_Layer: 0
   m_Name: Star
   m_TagString: Untagged
@@ -264,6 +280,40 @@ SphereCollider:
   serializedVersion: 3
   m_Radius: 0.6518686
   m_Center: {x: 0, y: 0, z: -0.15186858}
+--- !u!205 &5266511528653501404
+LODGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7720539063730227376}
+  serializedVersion: 2
+  m_LocalReferencePoint: {x: 0, y: 0.227, z: 0}
+  m_Size: 1.454
+  m_FadeMode: 0
+  m_AnimateCrossFading: 1
+  m_LastLODIsBillboard: 0
+  m_LODs:
+  - screenRelativeHeight: 0.05
+    fadeTransitionWidth: 0
+    renderers:
+    - renderer: {fileID: 4893932606377265402}
+    - renderer: {fileID: 7364815335140535274}
+    - renderer: {fileID: 4713359203476564121}
+    - renderer: {fileID: 7946278722044262237}
+    - renderer: {fileID: 1137329581230200672}
+    - renderer: {fileID: 29963520169325578}
+    - renderer: {fileID: 7895208122452391396}
+  - screenRelativeHeight: 0
+    fadeTransitionWidth: 0
+    renderers:
+    - renderer: {fileID: 7364815335140535274}
+    - renderer: {fileID: 4713359203476564121}
+    - renderer: {fileID: 7946278722044262237}
+    - renderer: {fileID: 1137329581230200672}
+    - renderer: {fileID: 29963520169325578}
+    - renderer: {fileID: 7895208122452391396}
+  m_Enabled: 1
 --- !u!1001 &4008444007065997251
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -334,15 +384,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6231364848815133565, guid: 8d3a5937c4bd5354c9162f4f8abaa080, type: 3}
       propertyPath: m_LocalRotation.x
-      value: 0
+      value: -0
       objectReference: {fileID: 0}
     - target: {fileID: 6231364848815133565, guid: 8d3a5937c4bd5354c9162f4f8abaa080, type: 3}
       propertyPath: m_LocalRotation.y
-      value: 0
+      value: -0
       objectReference: {fileID: 0}
     - target: {fileID: 6231364848815133565, guid: 8d3a5937c4bd5354c9162f4f8abaa080, type: 3}
       propertyPath: m_LocalRotation.z
-      value: 0
+      value: -0
       objectReference: {fileID: 0}
     - target: {fileID: 6231364848815133565, guid: 8d3a5937c4bd5354c9162f4f8abaa080, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -375,6 +425,11 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 464120534183017938}
   m_SourcePrefab: {fileID: 100100000, guid: 8d3a5937c4bd5354c9162f4f8abaa080, type: 3}
+--- !u!23 &29963520169325578 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 4020211707994438601, guid: 8d3a5937c4bd5354c9162f4f8abaa080, type: 3}
+  m_PrefabInstance: {fileID: 4008444007065997251}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &659082354581020119 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 4505109801787838996, guid: 8d3a5937c4bd5354c9162f4f8abaa080, type: 3}
@@ -392,7 +447,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 939870698167179087}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 77b2ba35865d5024d9a5cf0fe95f8b47, type: 3}
   m_Name: 
@@ -427,6 +482,11 @@ MonoBehaviour:
     gameObject: {fileID: 3074886807931528454}
   sphere: {fileID: 5104037074636871924}
   crystal: {fileID: 6782085278249563508}
+--- !u!23 &1137329581230200672 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 4064570871882406051, guid: 8d3a5937c4bd5354c9162f4f8abaa080, type: 3}
+  m_PrefabInstance: {fileID: 4008444007065997251}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1746529546589981843 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 3430671752438350672, guid: 8d3a5937c4bd5354c9162f4f8abaa080, type: 3}
@@ -440,6 +500,11 @@ GameObject:
 --- !u!1 &3074886807931528454 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 2093307225010170565, guid: 8d3a5937c4bd5354c9162f4f8abaa080, type: 3}
+  m_PrefabInstance: {fileID: 4008444007065997251}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &4713359203476564121 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 8559633903361435482, guid: 8d3a5937c4bd5354c9162f4f8abaa080, type: 3}
   m_PrefabInstance: {fileID: 4008444007065997251}
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &5104037074636871924 stripped
@@ -465,5 +530,15 @@ Transform:
 --- !u!23 &7364815335140535274 stripped
 MeshRenderer:
   m_CorrespondingSourceObject: {fileID: 5878831460614464553, guid: 8d3a5937c4bd5354c9162f4f8abaa080, type: 3}
+  m_PrefabInstance: {fileID: 4008444007065997251}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &7895208122452391396 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 6499172974413478439, guid: 8d3a5937c4bd5354c9162f4f8abaa080, type: 3}
+  m_PrefabInstance: {fileID: 4008444007065997251}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &7946278722044262237 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 6477866160758405278, guid: 8d3a5937c4bd5354c9162f4f8abaa080, type: 3}
   m_PrefabInstance: {fileID: 4008444007065997251}
   m_PrefabAsset: {fileID: 0}

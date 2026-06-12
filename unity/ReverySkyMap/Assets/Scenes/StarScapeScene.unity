@@ -2288,9 +2288,6 @@ MonoBehaviour:
   maxVisibleTagEdgeRestMultiplier: 2.6
   pruneLongNonBackboneEdges: 1
   nonBackboneMaxRestLengthMultiplier: 3
-  largeGraphVisualPolicy: 1
-  largeGraphVisualThreshold: 1600
-  logOptimizationSummary: 1
 --- !u!1 &1085980073
 GameObject:
   m_ObjectHideFlags: 0
@@ -4268,12 +4265,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
   injectSampleData: 0
-  sampleScenario: 2
+  sampleScenario: 0
   sampleNoteCount: 10000
-  sampleTagPoolSize: 400
+  sampleTagPoolSize: 250
   sampleDateSpanDays: 365
   sampleMaxTagsPerNote: 4
-  sampleExtraLinks: 600
+  sampleExtraLinks: 500
 --- !u!1 &1787028428
 GameObject:
   m_ObjectHideFlags: 0
