@@ -62,7 +62,9 @@ public class Cartographer : MonoBehaviour
 
   private void Start()
   {
+#if UNITY_EDITOR
     sampleDataGenerator?.TryInjectSampleDataIfNeeded();
+#endif
     RebuildGraph(MapRuntimeContext.EnginePreference);
 
     MapRuntimeContext.OnNotesChanged += HandleRuntimeNotesChanged;

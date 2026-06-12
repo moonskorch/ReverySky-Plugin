@@ -43,12 +43,12 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 
 ## Execution Paths
 
-### 1. Scene startup and optional sample data
+### 1. Scene startup and editor-only sample data seed
 
 1. Unity loads `Assets/Scenes/StarScapeScene.unity`.
 2. `ObsidianBridge.EnsureInstance()` in `Assets/Scripts/Bridge/ObsidianBridge.cs` creates a persistent bridge object if the scene does not already contain one.
-3. Scene wiring activates `GameInput`, `CameraOrbitalController`, `FocusNode`, `Cartographer`, the engine components, `ScapeCameraWarper`, `ChangeViewControl`, `RotateCameraUI`, `Notification`, and `SampleDataGenerator`.
-4. `Cartographer.Start()` calls `SampleDataGenerator.TryInjectSampleDataIfNeeded()` when sample injection is enabled and then calls `RebuildGraph(MapRuntimeContext.EnginePreference)`.
+3. Scene wiring activates `GameInput`, `CameraOrbitalController`, `FocusNode`, `Cartographer`, the engine components, `ScapeCameraWarper`, `ChangeViewControl`, `RotateCameraUI`, and `Notification`. `SampleDataGenerator` is retained for editor-only sample seeding, not for shipped runtime fallback.
+4. `Cartographer.Start()` calls `SampleDataGenerator.TryInjectSampleDataIfNeeded()` only inside `UNITY_EDITOR`, then calls `RebuildGraph(MapRuntimeContext.EnginePreference)`.
 5. `Cartographer` subscribes to `MapRuntimeContext.OnNotesChanged` and UI events so later payloads or button clicks can rebuild the active graph.
 
 ### 2. `graph:set` ingestion and graph rebuild
@@ -174,7 +174,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Entry point: `Cartographer.RebuildGraph`
   - Calls / sends to: scene UI object
 - `SampleDataGenerator`
-  - Responsibility: optionally injects a deterministic sample graph when no runtime notes exist.
+  - Responsibility: optionally injects a deterministic sample graph in the Unity Editor when no runtime notes exist.
   - Code anchor: `Assets/Scripts/StarScape/SampleDataGenerator.cs::TryInjectSampleDataIfNeeded`
   - Entry point: `Cartographer.Start()`
   - Calls / sends to: `MapRuntimeContext.SetNotes`, `SetLinks`, `SetTagNames`

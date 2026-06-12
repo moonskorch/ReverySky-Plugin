@@ -79,3 +79,18 @@ Mitigation:
 Verification signal:
 - Parent integration smoke confirms `bridge:ready` and `graph:set` flow.
 - No runtime startup errors in plugin map view.
+
+## R6. Accidental Sample Graph in Release Build
+Risk:
+- Debug sample data is left enabled and masks an empty or filtered real note set in a production build.
+
+Trigger:
+- Scene-side sample injection remains active outside the Unity Editor.
+
+Mitigation:
+- Keep `SampleDataGenerator` injection guarded by `UNITY_EDITOR`.
+- Treat empty `graph:set` payloads as valid runtime input and surface the empty-state UI instead of synthesizing notes.
+
+Verification signal:
+- Player/WebGL builds never execute sample injection.
+- Empty runtime payloads still rebuild to an empty graph state without fallback data.
