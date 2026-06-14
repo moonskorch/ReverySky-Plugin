@@ -1,7 +1,8 @@
 {
   "name": "ReverySkyMap.EditModeTests",
   "references": [
-    "ReverySkyMap.Runtime"
+    "ReverySkyMap.Runtime",
+    "Unity.TextMeshPro"
   ],
   "includePlatforms": [
     "Editor"
