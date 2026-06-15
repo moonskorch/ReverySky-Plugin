@@ -41,6 +41,13 @@ Mitigation:
 - dashboard preview scan is a separate next stage;
 - generated official package stays outside Git.
 
+## Official Spike B cache extraction
+- Spike B embeds a compressed Unity runtime archive in official main.js;
+- the first map open extracts the runtime into `.reverysky-runtime/<version>/`;
+- later opens and later Obsidian restarts reuse the cache without network download;
+- archive validation and cache replacement must stay strict to avoid partial installs;
+- dashboard scan is a separate later stage.
+
 ## 5. Vault Graph Scale
 Risk:
 - Large vaults can increase graph build latency.

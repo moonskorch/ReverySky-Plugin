@@ -4,6 +4,12 @@ import {
   UnityWebglLocalServer,
   type UnityWebglRuntimeSource
 } from "./runtime/UnityWebglLocalServer";
+import {
+  hasEmbeddedUnityRuntimeArchive
+} from "./runtime/EmbeddedUnityRuntimeArchive";
+import {
+  EmbeddedUnityRuntimeInstaller
+} from "./runtime/EmbeddedUnityRuntimeInstaller";
 import { getEmbeddedUnityIndexHtml } from "./runtime/EmbeddedUnityIndexHtml";
 import path from "node:path";
 
@@ -17,6 +23,7 @@ type PersistedPluginData = {
  */
 export default class ReverySkyMapPlugin extends Plugin {
   private unityWebglServer: UnityWebglLocalServer | null = null;
+  private readonly unityRuntimeInstaller = new EmbeddedUnityRuntimeInstaller();
   private lastMapViewState: Record<string, unknown> | null = null;
 
   async onload(): Promise<void> {
@@ -55,16 +62,25 @@ export default class ReverySkyMapPlugin extends Plugin {
    */
   async getUnityRuntimeUrl(): Promise<string> {
     if (!this.unityWebglServer) {
-      const embeddedHtml = getEmbeddedUnityIndexHtml();
-      const runtimeSource: UnityWebglRuntimeSource = embeddedHtml
+      const pluginDir = this.resolvePluginDirectory();
+      const embeddedIndexHtml = getEmbeddedUnityIndexHtml();
+      const runtimeSource: UnityWebglRuntimeSource = hasEmbeddedUnityRuntimeArchive()
         ? {
-            kind: "embedded-index",
-            indexHtml: embeddedHtml
-          }
-        : {
             kind: "directory",
-            rootDir: path.join(this.resolvePluginDirectory(), "unity-webgl")
-          };
+            rootDir: await this.unityRuntimeInstaller.resolveRuntimeDirectory(
+              pluginDir,
+              this.manifest.version
+            )
+          }
+        : embeddedIndexHtml
+          ? {
+              kind: "embedded-index",
+              indexHtml: embeddedIndexHtml
+            }
+          : {
+              kind: "directory",
+              rootDir: path.join(pluginDir, "unity-webgl")
+            };
 
       this.unityWebglServer = new UnityWebglLocalServer(runtimeSource);
     }

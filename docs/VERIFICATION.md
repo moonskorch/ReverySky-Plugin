@@ -22,6 +22,8 @@ Core commands:
 - `npm run build` - WebGL artifact check + TypeScript compile check + production bundle build (`esbuild`) + plugin release artifact check.
 - `npm run build:official` - normal build plus official embedded release packaging and validation.
 - `npm run check:official-release` - validates the official `dist/official` release layout and embedded markers.
+- `npm run build:official:spike-b` - normal build plus Spike B archive packaging and validation.
+- `npm run check:official:spike-b` - validates the official `dist/official-spike-b` release layout and embedded archive markers.
 - `npm run test` - Vitest single-run suite for TS baseline tests.
 - `npm run test:watch` - Vitest watch mode for local iteration.
 - `npm run test:ui-visual` - Playwright visual regression run for `tests/visual`.
@@ -42,6 +44,8 @@ Current TS baseline test suites:
   - validates error path for invalid payload without dispatch;
   - validates `bridge:ready` handling for attached iframe source only;
   - validates ignoring foreign source messages and listener cleanup on `detach()`.
+- `tests/runtime/EmbeddedUnityRuntimeInstaller.test.ts`
+  - validates dev fallback, cache reuse, extraction, SHA checks, and rejected archive entries.
 - `tests/view/MapView.test.ts`
   - validates iframe creation and bridge attach on `onOpen`;
   - validates handshake flow `bridge:ready` -> graph build -> `graph:set`;

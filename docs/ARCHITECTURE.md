@@ -71,6 +71,13 @@ Main system parts:
   - no runtime files are written to disk;
   - no runtime network download is used.
 
+- Official Spike B mode:
+  - official `main.js` contains a compressed Unity runtime archive;
+  - the first map open extracts the runtime into a versioned local cache;
+  - later map opens reuse the cache without re-extracting;
+  - no runtime network download is used;
+  - dashboard scan is a separate later stage.
+
 ## Execution Paths
 Most plugin-side behavior now flows through a small shell in `MapView`, while `src/main.ts` owns plugin lifecycle, view activation, and persistence of the last map-view state. The main entry points are the plugin startup path, the map command, the view startup path, and incoming bridge messages from the runtime. The routes below show how control moves from those entry points through the code.
 

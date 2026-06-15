@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ReverySky Map Runtime</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: radial-gradient(circle at 25% 20%, #213a63 0%, #0c1324 55%, #060a14 100%);
+        color: #dce8ff;
+        font-family: "Segoe UI", Tahoma, sans-serif;
+      }
+
+      .wrap {
+        box-sizing: border-box;
+        width: 100%;
+        height: 100%;
+        display: grid;
+        place-items: center;
+        padding: 16px;
+      }
+
+      .card {
+        width: min(980px, 100%);
+        height: 100%;
+        border: 1px solid rgba(170, 205, 255, 0.35);
+        background: transparent;
+        border-radius: 12px;
+        padding: 0 0 12px;
+        box-sizing: border-box;
+        display: grid;
+        grid-template-rows: 1fr auto;
+        overflow: hidden;
+      }
+
+      .canvas-stack {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+        border: 0;
+        background: linear-gradient(160deg, #0e1a30 0%, #101930 45%, #0a1222 100%);
+      }
+
+      .canvas-stack canvas {
+        position: absolute;
+        inset: 0;
+      }
+
+      #bridge-status {
+        pointer-events: none;
+        font-size: 12px;
+        color: #b9d1ff;
+        opacity: 0.92;
+        border-top: 1px solid rgba(170, 205, 255, 0.35);
+        padding: 8px 14px 0;
+      }
+    </style>
+    <script src="Build/runtime-entry.js"></script>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="card">
+        <div id="canvas-viewport" class="canvas-stack">
+          <canvas id="unity-canvas" aria-label="ReverySky map runtime"></canvas>
+        </div>
+        <div id="bridge-status">Bridge: initializing...</div>
+      </section>
+    </main>
+
+    <script>
+      (function () {
+        const protocolVersion = "2.0.0";
+        const statusEl = document.getElementById("bridge-status");
+        const viewportEl = document.getElementById("canvas-viewport");
+        const canvas = document.getElementById("unity-canvas");
+        const buildPath = "Build/";
+        const buildConfigPath = buildPath + "build-config.json";
+
+        let runtimeMode = "boot";
+        let unityInstance = null;
+        let readySent = false;
+        let latestGraphSetMessage = null;
+        let latestNoteFocusMessage = null;
+
+        function setStatus(text) {
+          statusEl.textContent = text;
+        }
+
+        function sendReady() {
+          if (readySent || !window.parent) {
+            return;
+          }
+
+          readySent = true;
+          window.parent.postMessage(
+            {
+              protocolVersion: protocolVersion,
+              type: "bridge:ready",
+              requestId: "evt_" + Date.now(),
+              payload: {}
+            },
+            "*"
+          );
+        }
+
+        function postNoteOpen(id, path) {
+          if (!window.parent) {
+            return;
+          }
+
+          const noteId = typeof id === "string" ? id : "";
+          const notePath = typeof path === "string" ? path : "";
+          window.parent.postMessage(
+            {
+              protocolVersion: protocolVersion,
+              type: "note:open",
+              requestId: "evt_" + Date.now(),
+              payload: {
+                id: noteId,
+                path: notePath
+              }
+            },
+            "*"
+          );
+        }
+
+        function resizeCanvas() {
+          const ratio = window.devicePixelRatio || 1;
+          const rect = viewportEl.getBoundingClientRect();
+          const nextWidth = Math.max(1, Math.floor(rect.width * ratio));
+          const nextHeight = Math.max(1, Math.floor(rect.height * ratio));
+          if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
+            canvas.width = nextWidth;
+            canvas.height = nextHeight;
+          }
+        }
+
+        async function loadBuildConfig() {
+          const cfgResp = await fetch(buildConfigPath, { cache: "no-store" });
+          if (!cfgResp.ok) {
+            throw new Error("build-config is unavailable");
+          }
+          return cfgResp.json();
+        }
+
+        function tryDispatchGraphSetToUnity(message) {
+          if (!unityInstance || typeof unityInstance.SendMessage !== "function") {
+            return false;
+          }
+
+          try {
+            unityInstance.SendMessage("ObsidianBridge", "OnGraphSet", JSON.stringify(message));
+            return true;
+          } catch (e) {
+            console.warn("[ReverySky] Failed to dispatch graph:set to Unity:", e);
+            return false;
+          }
+        }
+
+        function tryDispatchNoteFocusToUnity(message) {
+          if (!unityInstance || typeof unityInstance.SendMessage !== "function") {
+            return false;
+          }
+
+          try {
+            unityInstance.SendMessage("ObsidianBridge", "OnNoteFocus", JSON.stringify(message));
+            return true;
+          } catch (e) {
+            console.warn("[ReverySky] Failed to dispatch note:focus to Unity:", e);
+            return false;
+          }
+        }
+
+        function applyGraphSet(message) {
+          latestGraphSetMessage = message;
+          const payload = message.payload || { notes: [], links: [] };
+          const noteCount = payload && payload.vault ? payload.vault.noteCount : (payload.notes || []).length;
+          const linkCount = Array.isArray(payload.links) ? payload.links.length : 0;
+
+          if (runtimeMode === "unity" && tryDispatchGraphSetToUnity(message)) {
+            setStatus("Bridge: graph:set -> Unity (" + String(noteCount) + " notes, " + String(linkCount) + " links)");
+            return;
+          }
+
+          setStatus("Bridge: graph:set queued (" + String(noteCount) + " notes, " + String(linkCount) + " links), Unity not ready");
+        }
+
+        function applyNoteFocus(message) {
+          latestNoteFocusMessage = message;
+          const payload = message && message.payload ? message.payload : {};
+          const id = typeof payload.id === "string" ? payload.id : "";
+          const path = typeof payload.path === "string" ? payload.path : "";
+
+          if (runtimeMode === "unity" && tryDispatchNoteFocusToUnity(message)) {
+            setStatus("Bridge: note:focus -> Unity (" + (id || path || "unknown") + ")");
+            return;
+          }
+
+          setStatus("Bridge: note:focus queued, Unity not ready");
+        }
+
+        function handleWebglContextLoss() {
+          runtimeMode = "failed";
+          unityInstance = null;
+          setStatus("WebGL context lost. Reload the map view.");
+        }
+
+        function onBridgeMessage(event) {
+          const data = event && event.data;
+          if (!data || typeof data !== "object") {
+            return;
+          }
+
+          if (data.type === "graph:set") {
+            applyGraphSet(data);
+            return;
+          }
+
+          if (data.type === "note:focus") {
+            applyNoteFocus(data);
+          }
+        }
+
+        async function tryBootUnityRuntime() {
+          const cfg = await loadBuildConfig();
+          const dataUrl = buildPath + cfg.dataFile;
+          const frameworkUrl = buildPath + cfg.frameworkFile;
+          const codeUrl = buildPath + cfg.codeFile;
+
+          if (typeof window.createUnityInstance !== "function") {
+            throw new Error("createUnityInstance is not available");
+          }
+
+          unityInstance = await window.createUnityInstance(
+            canvas,
+            {
+              dataUrl: dataUrl,
+              frameworkUrl: frameworkUrl,
+              codeUrl: codeUrl,
+              streamingAssetsUrl: cfg.streamingAssetsUrl || "StreamingAssets",
+              companyName: cfg.companyName || "MoonSkorch Studio",
+              productName: cfg.productName || "ReverySky Map",
+              productVersion: cfg.productVersion || "0.0.0"
+            },
+            (progress) => {
+              setStatus("Unity: loading " + Math.round(progress * 100) + "%");
+            }
+          );
+
+          runtimeMode = "unity";
+          setStatus("Unity runtime ready");
+          sendReady();
+
+          if (latestGraphSetMessage) {
+            tryDispatchGraphSetToUnity(latestGraphSetMessage);
+          }
+          if (latestNoteFocusMessage) {
+            tryDispatchNoteFocusToUnity(latestNoteFocusMessage);
+          }
+        }
+
+        async function boot() {
+          window.ReverySkyBridgePostNoteOpen = function (noteId, notePath) {
+            postNoteOpen(noteId, notePath);
+          };
+          window.addEventListener("message", onBridgeMessage);
+          canvas.addEventListener("webglcontextlost", (event) => {
+            event.preventDefault();
+            console.warn("[ReverySky] WebGL context lost.");
+            handleWebglContextLoss();
+          });
+          window.addEventListener("resize", () => {
+            resizeCanvas();
+          });
+
+          resizeCanvas();
+
+          try {
+            await tryBootUnityRuntime();
+          } catch (err) {
+            runtimeMode = "failed";
+            setStatus("Unity runtime failed to start. See console.");
+            console.error("[ReverySky] Unity runtime boot failed.", err);
+            sendReady();
+          }
+        }
+
+        boot();
+      })();
+    </script>
+  </body>
+</html>

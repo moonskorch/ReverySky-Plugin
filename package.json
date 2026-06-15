@@ -9,12 +9,18 @@
     "check:plugin-release": "node scripts/check-plugin-release-artifacts.mjs",
     "build": "npm run check:unity-webgl && tsc --noEmit --skipLibCheck && node esbuild.config.mjs production && npm run check:plugin-release",
     "build:official": "node scripts/build-official.mjs",
+    "build:official:spike-b": "powershell -ExecutionPolicy Bypass -File .\\scripts\\build-official-spike-b.ps1",
+    "measure:official:spike-b": "node scripts/measure-official-spike-b-size.mjs",
     "check:official-release": "node scripts/check-official-plugin-release.mjs",
+    "check:official:spike-b": "node scripts/check-official-spike-b-release.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui-visual": "playwright test tests/visual",
     "test:ui-visual:update": "playwright test tests/visual --update-snapshots",
     "test:ui-visual:report": "playwright show-report"
+  },
+  "dependencies": {
+    "tar": "^7.5.16"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",

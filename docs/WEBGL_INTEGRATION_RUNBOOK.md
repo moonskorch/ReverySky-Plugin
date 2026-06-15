@@ -96,7 +96,7 @@ Copy these artifacts:
 2. Run command: `Open ReverySky Map`.
 3. Confirm the view opens and runtime initializes.
 
-## Official in-memory packaging spike
+## Official packaging spikes
 
 From repository root:
 
@@ -116,6 +116,20 @@ For a clean-vault smoke install, copy only:
 - `styles.css`
 
 Do not copy `unity-webgl/` for the official package.
+
+Spike B packaging:
+
+```powershell
+npm.cmd run build:official:spike-b
+```
+
+Output:
+- `dist/official-spike-b/main.js`
+- `dist/official-spike-b/manifest.json`
+- `dist/official-spike-b/styles.css`
+- `dist/official-spike-b-packaging-report.json`
+
+Spike B installs the same three release files into the vault and extracts the embedded runtime into `.reverysky-runtime/<version>/` on first open.
 
 ## Regeneration Rules
 - Re-run Unity export + import script whenever Unity content changes.
