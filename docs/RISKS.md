@@ -34,6 +34,13 @@ Mitigation:
 - Exclude optional large skybox source textures from commits as documented in `unity/ReverySkyMap/Assets/README.txt`.
 - Keep runtime generation script-driven and reproducible.
 
+## Official embedded main.js size
+- Spike A embeds the self-contained Unity WebGL HTML into official main.js;
+- runtime starts lazily when the map view opens;
+- official main.js size and Obsidian startup behavior must be measured;
+- dashboard preview scan is a separate next stage;
+- generated official package stays outside Git.
+
 ## 5. Vault Graph Scale
 Risk:
 - Large vaults can increase graph build latency.

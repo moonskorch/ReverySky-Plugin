@@ -20,6 +20,8 @@ Policy:
 
 Core commands:
 - `npm run build` - WebGL artifact check + TypeScript compile check + production bundle build (`esbuild`) + plugin release artifact check.
+- `npm run build:official` - normal build plus official embedded release packaging and validation.
+- `npm run check:official-release` - validates the official `dist/official` release layout and embedded markers.
 - `npm run test` - Vitest single-run suite for TS baseline tests.
 - `npm run test:watch` - Vitest watch mode for local iteration.
 - `npm run test:ui-visual` - Playwright visual regression run for `tests/visual`.

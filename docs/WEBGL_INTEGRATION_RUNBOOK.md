@@ -96,6 +96,27 @@ Copy these artifacts:
 2. Run command: `Open ReverySky Map`.
 3. Confirm the view opens and runtime initializes.
 
+## Official in-memory packaging spike
+
+From repository root:
+
+```powershell
+npm.cmd run build:official
+```
+
+Output:
+- `dist/official/main.js`
+- `dist/official/manifest.json`
+- `dist/official/styles.css`
+- `dist/official-packaging-report.json`
+
+For a clean-vault smoke install, copy only:
+- `main.js`
+- `manifest.json`
+- `styles.css`
+
+Do not copy `unity-webgl/` for the official package.
+
 ## Regeneration Rules
 - Re-run Unity export + import script whenever Unity content changes.
 - Re-run `npm run build` whenever TypeScript/plugin code changes.

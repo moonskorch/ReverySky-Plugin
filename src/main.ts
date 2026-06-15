@@ -1,6 +1,10 @@
 import { Plugin, WorkspaceLeaf } from "obsidian";
 import { MAP_VIEW_TYPE, MapView } from "./view/MapView";
-import { UnityWebglLocalServer } from "./runtime/UnityWebglLocalServer";
+import {
+  UnityWebglLocalServer,
+  type UnityWebglRuntimeSource
+} from "./runtime/UnityWebglLocalServer";
+import { getEmbeddedUnityIndexHtml } from "./runtime/EmbeddedUnityIndexHtml";
 import path from "node:path";
 
 type PersistedPluginData = {
@@ -51,8 +55,18 @@ export default class ReverySkyMapPlugin extends Plugin {
    */
   async getUnityRuntimeUrl(): Promise<string> {
     if (!this.unityWebglServer) {
-      const pluginDir = this.resolvePluginDirectory();
-      this.unityWebglServer = new UnityWebglLocalServer(path.join(pluginDir, "unity-webgl"));
+      const embeddedHtml = getEmbeddedUnityIndexHtml();
+      const runtimeSource: UnityWebglRuntimeSource = embeddedHtml
+        ? {
+            kind: "embedded-index",
+            indexHtml: embeddedHtml
+          }
+        : {
+            kind: "directory",
+            rootDir: path.join(this.resolvePluginDirectory(), "unity-webgl")
+          };
+
+      this.unityWebglServer = new UnityWebglLocalServer(runtimeSource);
     }
 
     const baseUrl = await this.unityWebglServer.getBaseUrl();

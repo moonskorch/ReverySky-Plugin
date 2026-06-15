@@ -14,6 +14,16 @@ const CONTENT_TYPES: Record<string, string> = {
   ".wasm": "application/wasm"
 };
 
+export type UnityWebglRuntimeSource =
+  | {
+      kind: "directory";
+      rootDir: string;
+    }
+  | {
+      kind: "embedded-index";
+      indexHtml: string;
+    };
+
 /**
  * Serve the generated Unity WebGL export from localhost for the iframe runtime.
  */
@@ -21,10 +31,15 @@ export class UnityWebglLocalServer {
   private server: Server | null = null;
   private baseUrl: string | null = null;
   private startPromise: Promise<string> | null = null;
-  private readonly rootDirResolved: string;
+  private readonly source: UnityWebglRuntimeSource;
 
-  constructor(rootDir: string) {
-    this.rootDirResolved = path.resolve(rootDir);
+  constructor(source: UnityWebglRuntimeSource) {
+    this.source = source.kind === "directory"
+      ? {
+          ...source,
+          rootDir: path.resolve(source.rootDir)
+        }
+      : source;
   }
 
   /**
@@ -99,6 +114,11 @@ export class UnityWebglLocalServer {
       }
 
       const requestUrl = new URL(req.url ?? "/", "http://127.0.0.1");
+      if (this.source.kind === "embedded-index") {
+        await this.handleEmbeddedRequest(requestUrl.pathname, req.method, res);
+        return;
+      }
+
       const safePath = this.resolveRequestPath(requestUrl.pathname);
       if (!safePath) {
         res.statusCode = 400;
@@ -138,6 +158,33 @@ export class UnityWebglLocalServer {
     }
   }
 
+  private async handleEmbeddedRequest(
+    pathnameRaw: string,
+    method: string,
+    res: ServerResponse
+  ): Promise<void> {
+    const pathname = pathnameRaw === "/" ? "/index.html" : pathnameRaw;
+    if (pathname !== "/index.html") {
+      res.statusCode = 404;
+      res.end("Not found");
+      return;
+    }
+
+    const indexHtml = this.source.kind === "embedded-index" ? this.source.indexHtml : "";
+    const contentLength = Buffer.byteLength(indexHtml, "utf8");
+    res.statusCode = 200;
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Content-Length", String(contentLength));
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+
+    if (method === "HEAD") {
+      res.end();
+      return;
+    }
+
+    res.end(indexHtml);
+  }
+
   /**
    * Normalize and validate the path to block traversal outside the export directory.
    */
@@ -148,10 +195,15 @@ export class UnityWebglLocalServer {
       return null;
     }
 
+    if (this.source.kind !== "directory") {
+      return null;
+    }
+
+    const rootDirResolved = this.source.rootDir;
     const relativePath = path.normalize(decoded).replace(/^[\\/]+/, "");
-    const absolutePath = path.resolve(this.rootDirResolved, relativePath);
-    const rootWithSep = this.rootDirResolved.endsWith(path.sep) ? this.rootDirResolved : `${this.rootDirResolved}${path.sep}`;
-    if (absolutePath !== this.rootDirResolved && !absolutePath.startsWith(rootWithSep)) {
+    const absolutePath = path.resolve(rootDirResolved, relativePath);
+    const rootWithSep = rootDirResolved.endsWith(path.sep) ? rootDirResolved : `${rootDirResolved}${path.sep}`;
+    if (absolutePath !== rootDirResolved && !absolutePath.startsWith(rootWithSep)) {
       return null;
     }
     return absolutePath;

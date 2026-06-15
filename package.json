@@ -8,6 +8,8 @@
     "check:unity-webgl": "node scripts/check-unity-webgl-artifacts.mjs",
     "check:plugin-release": "node scripts/check-plugin-release-artifacts.mjs",
     "build": "npm run check:unity-webgl && tsc --noEmit --skipLibCheck && node esbuild.config.mjs production && npm run check:plugin-release",
+    "build:official": "node scripts/build-official.mjs",
+    "check:official-release": "node scripts/check-official-plugin-release.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui-visual": "playwright test tests/visual",

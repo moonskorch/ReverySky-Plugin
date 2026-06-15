@@ -58,6 +58,19 @@ Main system parts:
   Main code: `unity-webgl/`, `unity-webgl/index.template.html`, `scripts/import-unity-webgl.ps1`
   Depends on: Unity WebGL export pipeline
 
+### Official packaging
+
+- Development mode:
+  - generated `unity-webgl/` files remain beside the installed plugin;
+  - `UnityWebglLocalServer` serves runtime files from disk.
+
+- Official Spike A mode:
+  - official `main.js` contains the generated self-contained Unity WebGL index HTML;
+  - `UnityWebglLocalServer` serves `index.html` from memory;
+  - the iframe creates Blob URLs for the embedded Unity runtime;
+  - no runtime files are written to disk;
+  - no runtime network download is used.
+
 ## Execution Paths
 Most plugin-side behavior now flows through a small shell in `MapView`, while `src/main.ts` owns plugin lifecycle, view activation, and persistence of the last map-view state. The main entry points are the plugin startup path, the map command, the view startup path, and incoming bridge messages from the runtime. The routes below show how control moves from those entry points through the code.
 
