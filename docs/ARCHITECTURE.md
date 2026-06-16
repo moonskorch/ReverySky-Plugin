@@ -58,21 +58,21 @@ Main system parts:
   Main code: `unity-webgl/`, `unity-webgl/index.template.html`, `scripts/import-unity-webgl.ps1`
   Depends on: Unity WebGL export pipeline
 
-### Official packaging
+### Packaging modes
 
-- Development mode:
+- `folder-runtime`:
   - generated `unity-webgl/` files remain beside the installed plugin;
   - `UnityWebglLocalServer` serves runtime files from disk.
 
-- Official Spike A mode:
-  - official `main.js` contains the generated self-contained Unity WebGL index HTML;
+- `embedded-html`:
+  - root `main.js` contains the generated self-contained Unity WebGL index HTML;
   - `UnityWebglLocalServer` serves `index.html` from memory;
   - the iframe creates Blob URLs for the embedded Unity runtime;
   - no runtime files are written to disk;
   - no runtime network download is used.
 
-- Official Spike B mode:
-  - official `main.js` contains a compressed Unity runtime archive;
+- `embedded-archive`:
+  - root `main.js` contains a compressed Unity runtime archive;
   - the first map open extracts the runtime into a versioned local cache;
   - later map opens reuse the cache without re-extracting;
   - no runtime network download is used;
@@ -240,10 +240,11 @@ Main repository surfaces:
   Type: generated
 
 Build and import flow:
-1. `npm run build` checks local WebGL artifacts, validates TypeScript, writes `main.js`, and checks release artifacts.
+1. `npm run build` builds the `folder-runtime` package mode, validates TypeScript, writes `main.js`, and checks local runtime artifacts.
 2. Unity exports WebGL from `unity/ReverySkyMap`.
 3. `scripts/import-unity-webgl.ps1` copies the export into `unity-webgl/` and regenerates runtime files used by the plugin.
 4. At runtime the plugin starts `UnityWebglLocalServer`, and the iframe loads the served `index.html`.
+5. Release-shaped package candidates can be built with `npm run package:embedded-html` or `npm run package:embedded-archive`.
 
 ## Verification
 Detailed commands live in `docs/VERIFICATION.md`. This section only maps the main architecture areas to their checks.

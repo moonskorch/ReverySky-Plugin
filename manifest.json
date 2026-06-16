@@ -2,8 +2,8 @@
   "id": "reverysky-map",
   "name": "ReverySky Map",
   "version": "1.1.0",
-  "minAppVersion": "1.7.2",
+  "minAppVersion": "1.12.7",
   "description": "A custom Obsidian view shell for the ReverySky Map plugin.",
-  "author": "ReverySky",
+  "author": "MoonSkorch Studio",
   "isDesktopOnly": true
 }

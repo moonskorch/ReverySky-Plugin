@@ -1,15 +1,19 @@
+/**
+ * Estimates embedded-archive package size from the current Unity WebGL runtime.
+ */
 import { access, copyFile, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
+import { stripPackageModeMarker } from "./package-mode-marker.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
 const distDir = path.join(repoRoot, "dist");
-const reportPath = path.join(distDir, "official-spike-b-size-report.json");
+const reportPath = path.join(distDir, "embedded-archive-size-report.json");
 
 const rootMainJsPath = path.join(repoRoot, "main.js");
 const rootManifestPath = path.join(repoRoot, "manifest.json");
@@ -18,7 +22,7 @@ const buildDir = path.join(repoRoot, "unity-webgl", "Build");
 const streamingAssetsDir = path.join(repoRoot, "unity-webgl", "StreamingAssets");
 
 const wrapperTemplate = [
-  '/* ReverySky Spike B size gate wrapper */',
+  "/* ReverySky package mode: embedded-archive */",
   'globalThis.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_BASE64__ = function () { return ""; };',
   'globalThis.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_SHA256__ = function () { return ""; };'
 ].join("\n") + "\n";
@@ -44,6 +48,21 @@ function toPosixPath(relativePath) {
 
 function calculateBase64Characters(byteLength) {
   return Math.ceil(byteLength / 3) * 4;
+}
+
+function stripEmbeddedArchiveWrapper(source) {
+  return source.replace(
+    /^globalThis\.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_BASE64__ = function \(\) \{\r?\n  return "[A-Za-z0-9+/=]*";\r?\n\};\r?\nglobalThis\.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_SHA256__ = function \(\) \{\r?\n  return "[0-9a-f]{64}";\r?\n\};\r?\n\r?\n/,
+    ""
+  );
+}
+
+async function readNormalMainJsBytes() {
+  const mainJs = stripEmbeddedArchiveWrapper(
+    stripPackageModeMarker(await readFile(rootMainJsPath, "utf8"))
+  );
+
+  return Buffer.byteLength(mainJs, "utf8");
 }
 
 function splitTarPath(fullPath) {
@@ -227,7 +246,7 @@ async function main() {
   await ensureFile(rootStylesPath, "styles.css");
   await ensureFile(path.join(buildDir, "build-config.json"), "unity-webgl/Build/build-config.json");
 
-  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "reverysky-spike-b-size-"));
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "reverysky-embedded-archive-size-"));
   try {
     await stageCompactRuntime(tempRoot);
     const runtimeFiles = await collectFilesRecursive(tempRoot);
@@ -241,21 +260,21 @@ async function main() {
     const archiveBuffer = buildArchiveBuffer(runtimeFiles, fileBuffers);
     const archiveSha256 = createHash("sha256").update(archiveBuffer).digest("hex");
     const archiveBase64Characters = calculateBase64Characters(archiveBuffer.length);
-    const normalMainJsBytes = (await stat(rootMainJsPath)).size;
+    const normalMainJsBytes = await readNormalMainJsBytes();
     const compactRuntimeBytes = runtimeFiles.reduce((total, file) => total + file.bytes, 0);
-    const projectedOfficialMainJsBytes =
+    const projectedPackageMainJsBytes =
       normalMainJsBytes +
       archiveBase64Characters +
       Buffer.byteLength(wrapperTemplate, "utf8") +
       archiveSha256.length;
 
     const report = {
-      mode: "spike-b-size-gate",
+      mode: "embedded-archive-size-gate",
       normalMainJsBytes,
       compactRuntimeBytes,
       archiveTarGzBytes: archiveBuffer.length,
       archiveBase64Characters,
-      projectedOfficialMainJsBytes,
+      projectedPackageMainJsBytes,
       archiveSha256,
       files: runtimeFiles.map((file) => ({
         path: file.path,
@@ -268,13 +287,13 @@ async function main() {
 
     const toMiB = (bytes) => (bytes / (1024 * 1024)).toFixed(2);
     console.log(
-      "[measure:official:spike-b] main=%s MiB compact=%s MiB tar.gz=%s MiB projected=%s MiB",
+      "[measure:embedded-archive] main=%s MiB compact=%s MiB tar.gz=%s MiB projected=%s MiB",
       toMiB(report.normalMainJsBytes),
       toMiB(report.compactRuntimeBytes),
       toMiB(report.archiveTarGzBytes),
-      toMiB(report.projectedOfficialMainJsBytes)
+      toMiB(report.projectedPackageMainJsBytes)
     );
-    console.log(`[measure:official:spike-b] Wrote ${path.relative(repoRoot, reportPath)}`);
+    console.log(`[measure:embedded-archive] Wrote ${path.relative(repoRoot, reportPath)}`);
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }

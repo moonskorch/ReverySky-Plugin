@@ -34,15 +34,15 @@ Mitigation:
 - Exclude optional large skybox source textures from commits as documented in `unity/ReverySkyMap/Assets/README.txt`.
 - Keep runtime generation script-driven and reproducible.
 
-## Official embedded main.js size
-- Spike A embeds the self-contained Unity WebGL HTML into official main.js;
+## Embedded HTML main.js size
+- `embedded-html` embeds the self-contained Unity WebGL HTML into root `main.js`;
 - runtime starts lazily when the map view opens;
-- official main.js size and Obsidian startup behavior must be measured;
+- packaged `main.js` size and Obsidian startup behavior must be measured;
 - dashboard preview scan is a separate next stage;
-- generated official package stays outside Git.
+- generated package output stays outside Git.
 
-## Official Spike B cache extraction
-- Spike B embeds a compressed Unity runtime archive in official main.js;
+## Embedded archive cache extraction
+- `embedded-archive` embeds a compressed Unity runtime archive in root `main.js`;
 - the first map open extracts the runtime into `.reverysky-runtime/<version>/`;
 - later opens and later Obsidian restarts reuse the cache without network download;
 - archive validation and cache replacement must stay strict to avoid partial installs;

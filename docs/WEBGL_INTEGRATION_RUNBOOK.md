@@ -96,40 +96,89 @@ Copy these artifacts:
 2. Run command: `Open ReverySky Map`.
 3. Confirm the view opens and runtime initializes.
 
-## Official packaging spikes
+## Packaging Modes
 
-From repository root:
+The detailed mode reference lives in `docs/PACKAGING_MODES.md`.
+
+Build the local folder-runtime install shape from repository root:
 
 ```powershell
-npm.cmd run build:official
+npm.cmd run package:folder-runtime
 ```
 
 Output:
-- `dist/official/main.js`
-- `dist/official/manifest.json`
-- `dist/official/styles.css`
-- `dist/official-packaging-report.json`
+- `main.js`
+- `manifest.json`
+- `styles.css`
+- `unity-webgl/`
 
-For a clean-vault smoke install, copy only:
+Build an embedded HTML release-shaped package:
+
+```powershell
+npm.cmd run package:embedded-html
+```
+
+Release assets:
 - `main.js`
 - `manifest.json`
 - `styles.css`
 
-Do not copy `unity-webgl/` for the official package.
-
-Spike B packaging:
+Build an embedded archive release-shaped package:
 
 ```powershell
-npm.cmd run build:official:spike-b
+npm.cmd run package:embedded-archive
 ```
 
-Output:
-- `dist/official-spike-b/main.js`
-- `dist/official-spike-b/manifest.json`
-- `dist/official-spike-b/styles.css`
-- `dist/official-spike-b-packaging-report.json`
+Release assets:
+- `main.js`
+- `manifest.json`
+- `styles.css`
 
-Spike B installs the same three release files into the vault and extracts the embedded runtime into `.reverysky-runtime/<version>/` on first open.
+The embedded modes do not require `unity-webgl/` in release assets. Before uploading release assets, open root `main.js` and confirm the first-line package mode marker.
+
+## Release Candidate Preparation
+
+Use this checklist when preparing GitHub release assets for Obsidian dashboard testing.
+
+Current release candidate mode:
+- `embedded-archive`
+
+Before packaging:
+1. Confirm root `manifest.json` version matches the GitHub release tag you plan to upload.
+2. Confirm `versions.json` maps the same manifest version to `manifest.json.minAppVersion`.
+3. Re-run the Unity export/import flow above if Unity runtime content changed.
+
+Build the current release candidate:
+
+```powershell
+npm.cmd run package:release-candidate
+```
+
+Run release-candidate checks:
+
+```powershell
+npm.cmd run check:package:release-candidate
+npm.cmd run test
+```
+
+Optional archive size check:
+
+```powershell
+npm.cmd run measure:embedded-archive
+```
+
+Before upload, verify root `main.js` starts with:
+
+```js
+/* ReverySky package mode: embedded-archive */
+```
+
+Upload these root files as release assets:
+- `main.js`
+- `manifest.json`
+- `styles.css`
+
+Do not upload `unity-webgl/` for the `embedded-archive` release candidate. The runtime archive is embedded into `main.js` and extracted into a versioned local cache on first map open.
 
 ## Regeneration Rules
 - Re-run Unity export + import script whenever Unity content changes.

@@ -1,3 +1,6 @@
+/**
+ * Builds the embedded-archive payload wrapper around the current root main.js.
+ */
 import { createHash } from "node:crypto";
 import {
   access,
@@ -14,14 +17,17 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as tar from "tar";
+import {
+  stripPackageModeMarker,
+  writeRootMainJsWithPackageMode
+} from "./package-mode-marker.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
 
 const distDir = path.join(repoRoot, "dist");
-const officialDir = path.join(distDir, "official-spike-b");
-const packagingReportPath = path.join(distDir, "official-spike-b-packaging-report.json");
+const packagingReportPath = path.join(distDir, "embedded-archive-packaging-report.json");
 const rootMainJsPath = path.join(repoRoot, "main.js");
 const rootManifestPath = path.join(repoRoot, "manifest.json");
 const rootStylesPath = path.join(repoRoot, "styles.css");
@@ -187,12 +193,9 @@ async function main() {
   await ensureFile(rootManifestPath, "manifest.json");
   await ensureFile(rootStylesPath, "styles.css");
 
-  if (await pathExists(officialDir)) {
-    await rm(officialDir, { recursive: true, force: true });
-  }
-  await mkdir(officialDir, { recursive: true });
+  await mkdir(distDir, { recursive: true });
 
-  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "reverysky-official-spike-b-"));
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "reverysky-embedded-archive-"));
   const archivePath = path.join(tempRoot, "runtime.tar.gz");
 
   try {
@@ -202,9 +205,8 @@ async function main() {
     const archiveBuffer = await readFile(archivePath);
     const archiveBase64 = archiveBuffer.toString("base64");
     const archiveSha256 = createHash("sha256").update(archiveBuffer).digest("hex");
-    const normalMainJs = await readFile(rootMainJsPath, "utf8");
-    const officialMainJs = [
-      "/* ReverySky official Spike B embedded Unity runtime archive */",
+    const normalMainJs = stripPackageModeMarker(await readFile(rootMainJsPath, "utf8"));
+    const packageMainJs = [
       "globalThis.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_BASE64__ = function () {",
       `  return ${JSON.stringify(archiveBase64)};`,
       "};",
@@ -215,9 +217,7 @@ async function main() {
       normalMainJs
     ].join("\n");
 
-    await writeFile(path.join(officialDir, "main.js"), officialMainJs, "utf8");
-    await copyFile(rootManifestPath, path.join(officialDir, "manifest.json"));
-    await copyFile(rootStylesPath, path.join(officialDir, "styles.css"));
+    await writeRootMainJsWithPackageMode(repoRoot, "embedded-archive", packageMainJs);
 
     const compactFiles = await Promise.all(
       staged.compactFiles.map(async (file) => ({
@@ -226,17 +226,16 @@ async function main() {
       }))
     );
     const archiveStat = await stat(archivePath);
-    const normalMainJsStat = await stat(rootMainJsPath);
-    const officialMainJsStat = await stat(path.join(officialDir, "main.js"));
+    const packageMainJsStat = await stat(rootMainJsPath);
 
     const report = {
-      mode: "embedded-tar-gz-with-one-time-local-extraction",
+      mode: "embedded-archive",
       generatedDevIndexHtmlBytes: 0,
       compactRuntimeBytes: compactFiles.reduce((total, file) => total + file.bytes, 0),
       archiveTarGzBytes: archiveStat.size,
       archiveBase64Characters: archiveBase64.length,
-      normalMainJsBytes: normalMainJsStat.size,
-      officialMainJsBytes: officialMainJsStat.size,
+      normalMainJsBytes: Buffer.byteLength(normalMainJs, "utf8"),
+      packageMainJsBytes: packageMainJsStat.size,
       archiveSha256,
       files: compactFiles
     };
@@ -245,15 +244,15 @@ async function main() {
 
     const toMiB = (bytes) => (bytes / (1024 * 1024)).toFixed(2);
     console.log(
-      "[build:official:spike-b] compact=%s MiB tar.gz=%s MiB archive-base64=%s MiB root-main=%s MiB official-main=%s MiB",
+      "[package:embedded-archive] compact=%s MiB tar.gz=%s MiB archive-base64=%s MiB normal-main=%s MiB package-main=%s MiB",
       toMiB(report.compactRuntimeBytes),
       toMiB(report.archiveTarGzBytes),
       toMiB(Buffer.byteLength(archiveBase64, "utf8")),
       toMiB(report.normalMainJsBytes),
-      toMiB(report.officialMainJsBytes)
+      toMiB(report.packageMainJsBytes)
     );
-    console.log(`[build:official:spike-b] Wrote ${path.relative(repoRoot, officialDir)}`);
-    console.log(`[build:official:spike-b] Wrote ${path.relative(repoRoot, packagingReportPath)}`);
+    console.log("[package:embedded-archive] Wrote main.js");
+    console.log(`[package:embedded-archive] Wrote ${path.relative(repoRoot, packagingReportPath)}`);
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
@@ -262,6 +261,6 @@ async function main() {
 try {
   await main();
 } catch (error) {
-  console.error(`[build:official:spike-b] ${error instanceof Error ? error.message : String(error)}`);
+  console.error(`[package:embedded-archive] ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
 }

@@ -1,23 +1,27 @@
 /**
- * Verifies that imported Unity WebGL runtime artifacts are present and complete.
+ * Validates root plugin assets and local Unity WebGL files for folder-runtime builds.
  */
-import { access, readdir } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkPackageManifest } from "./check-package-manifest.mjs";
+import { getPackageModeMarker } from "./package-mode-marker.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
+const buildDir = path.join(repoRoot, "unity-webgl", "Build");
 
-const fixedRequiredPaths = [
+const requiredPaths = [
+  "main.js",
+  "manifest.json",
+  "styles.css",
   "unity-webgl/index.html",
   "unity-webgl/Build/build-config.json",
   "unity-webgl/Build/build-config.js",
   "unity-webgl/Build/runtime-entry.js",
   "unity-webgl/Build/runtime-core.js"
 ];
-
-const buildDir = path.join(repoRoot, "unity-webgl", "Build");
 
 async function pathExists(targetPath) {
   try {
@@ -26,6 +30,11 @@ async function pathExists(targetPath) {
   } catch {
     return false;
   }
+}
+
+function fail(message) {
+  console.error(`[check:package:folder-runtime] ${message}`);
+  process.exit(1);
 }
 
 async function countBuildArtifactsByPrefix(prefix) {
@@ -42,13 +51,11 @@ async function countBuildArtifactsByPrefix(prefix) {
 async function main() {
   const missing = [];
   const invalid = [];
-  for (const relativePath of fixedRequiredPaths) {
-    const absolutePath = path.join(repoRoot, relativePath);
-    if (!(await pathExists(absolutePath))) {
+  for (const relativePath of requiredPaths) {
+    if (!(await pathExists(path.join(repoRoot, relativePath)))) {
       missing.push(relativePath);
     }
   }
-
   const runtimeDataCount = await countBuildArtifactsByPrefix("runtime-data.");
   const runtimeCodeCount = await countBuildArtifactsByPrefix("runtime-code.");
   if (runtimeDataCount === 0) {
@@ -61,22 +68,27 @@ async function main() {
   } else if (runtimeCodeCount > 1) {
     invalid.push(`Expected exactly one unity-webgl/Build/runtime-code.* file, found ${runtimeCodeCount}.`);
   }
-
   if (missing.length > 0 || invalid.length > 0) {
-    console.error("[check:unity-webgl] Missing Unity WebGL artifacts:");
-    for (const missingPath of missing) {
-      console.error(`- ${missingPath}`);
+    fail([...missing.map((relativePath) => `Missing required file: ${relativePath}`), ...invalid].join(" "));
+  }
+  await checkPackageManifest(repoRoot, fail);
+
+  const mainJs = await readFile(path.join(repoRoot, "main.js"), "utf8");
+  const firstLine = mainJs.split(/\r?\n/, 1)[0];
+  if (firstLine !== getPackageModeMarker("folder-runtime")) {
+    fail(`Unexpected first-line marker: ${firstLine}`);
+  }
+  for (const marker of [
+    "globalThis.__REVERYSKY_EMBEDDED_UNITY_INDEX_HTML__ =",
+    "globalThis.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_BASE64__ = function",
+    "globalThis.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_SHA256__ = function"
+  ]) {
+    if (mainJs.includes(marker)) {
+      fail(`main.js must not contain embedded runtime marker: ${marker}`);
     }
-    for (const invalidArtifact of invalid) {
-      console.error(`- ${invalidArtifact}`);
-    }
-    console.error(
-      "[check:unity-webgl] Re-import Unity export: powershell -ExecutionPolicy Bypass -File .\\scripts\\import-unity-webgl.ps1 -ExportRoot \"<UnityWebGLExportRoot>\""
-    );
-    process.exit(1);
   }
 
-  console.log("[check:unity-webgl] OK");
+  console.log("[check:package:folder-runtime] OK");
 }
 
 await main();

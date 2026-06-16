@@ -19,11 +19,17 @@ Policy:
 ## Current automated checks in this repository
 
 Core commands:
-- `npm run build` - WebGL artifact check + TypeScript compile check + production bundle build (`esbuild`) + plugin release artifact check.
-- `npm run build:official` - normal build plus official embedded release packaging and validation.
-- `npm run check:official-release` - validates the official `dist/official` release layout and embedded markers.
-- `npm run build:official:spike-b` - normal build plus Spike B archive packaging and validation.
-- `npm run check:official:spike-b` - validates the official `dist/official-spike-b` release layout and embedded archive markers.
+- `npm run build` - aliases to `npm run package:folder-runtime`.
+- `npm run package:folder-runtime` - WebGL artifact check + TypeScript compile check + production bundle build (`esbuild`) + root `main.js` marker + folder-runtime package validation.
+- `npm run package:embedded-html` - normal build plus embedded HTML package creation and validation.
+- `npm run package:embedded-archive` - normal build plus embedded archive package creation and validation.
+- `npm run package:release-candidate` - currently aliases to `npm run package:embedded-archive`.
+- `npm run check:package:folder-runtime` - validates root package files, folder-runtime marker, and required `unity-webgl/` files.
+- `npm run check:package:embedded-html` - validates root package files, embedded-html marker, and embedded HTML payload markers.
+- `npm run check:package:embedded-archive` - validates root package files, embedded-archive marker, embedded archive payload markers, and archive SHA function.
+- `npm run check:release-metadata` - validates repository-level release metadata consistency across `manifest.json`, `package.json`, and `versions.json`.
+- `npm run check:package:release-candidate` - currently validates the embedded-archive package shape, then runs `npm run check:release-metadata`.
+- `npm run measure:embedded-archive` - writes an embedded-archive size report under `dist/`.
 - `npm run test` - Vitest single-run suite for TS baseline tests.
 - `npm run test:watch` - Vitest watch mode for local iteration.
 - `npm run test:ui-visual` - Playwright visual regression run for `tests/visual`.
