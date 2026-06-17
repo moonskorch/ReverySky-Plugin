@@ -10,6 +10,10 @@ type BridgeCallbacks = {
   onError?: (message: string) => void;
 };
 
+const FILTER_MESSAGE_HIDDEN_CLASS = "reverysky-map-filter-message--hidden";
+const FILTER_PANEL_CLOSED_CLASS = "reverysky-map-filter-panel--closed";
+const SUGGESTIONS_HIDDEN_CLASS = "reverysky-map-filter-suggestions--hidden";
+
 function makePayload(): GraphPayload {
   return {
     graphVersion: "0.0.1",
@@ -1071,14 +1075,14 @@ describe("MapView bridge integration", () => {
     const filterMessage = view.contentEl.querySelector(
       ".reverysky-map-filter-message"
     ) as HTMLElement;
-    expect(filterMessage.style.display).toBe("none");
+    expect(filterMessage.classList.contains(FILTER_MESSAGE_HIDDEN_CLASS)).toBe(true);
 
     searchInput.value = 'path:"';
     searchInput.dispatchEvent(new Event("input"));
     vi.advanceTimersByTime(250);
 
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
-    expect(filterMessage.style.display).toBe("none");
+    expect(filterMessage.classList.contains(FILTER_MESSAGE_HIDDEN_CLASS)).toBe(true);
   });
 
   it("toggles tags visibility in outgoing graph payload without rebuilding source graph", async () => {
@@ -1314,17 +1318,17 @@ describe("MapView bridge integration", () => {
     callbacks.onReady?.();
 
     const panel = view.contentEl.querySelector(".reverysky-map-filter-panel") as HTMLElement;
-    expect(panel.style.display).toBe("none");
+    expect(panel.classList.contains(FILTER_PANEL_CLOSED_CLASS)).toBe(true);
 
     const gear = view.contentEl.querySelector(".reverysky-map-filter-toggle") as HTMLButtonElement;
     gear.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-    expect(panel.style.display).toBe("grid");
+    expect(panel.classList.contains(FILTER_PANEL_CLOSED_CLASS)).toBe(false);
 
     const closeButton = view.contentEl.querySelector(
       ".reverysky-map-filter-close"
     ) as HTMLButtonElement;
     closeButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(panel.style.display).toBe("none");
+    expect(panel.classList.contains(FILTER_PANEL_CLOSED_CLASS)).toBe(true);
   });
 
   it("opens and closes filter panel with keyboard activation on focused gear button", async () => {
@@ -1380,17 +1384,17 @@ describe("MapView bridge integration", () => {
     callbacks.onReady?.();
 
     const panel = view.contentEl.querySelector(".reverysky-map-filter-panel") as HTMLElement;
-    expect(panel.style.display).toBe("none");
+    expect(panel.classList.contains(FILTER_PANEL_CLOSED_CLASS)).toBe(true);
 
     const gear = view.contentEl.querySelector(".reverysky-map-filter-toggle") as HTMLButtonElement;
     gear.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
-    expect(panel.style.display).toBe("grid");
+    expect(panel.classList.contains(FILTER_PANEL_CLOSED_CLASS)).toBe(false);
 
     const closeButton = view.contentEl.querySelector(
       ".reverysky-map-filter-close"
     ) as HTMLButtonElement;
     closeButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(panel.style.display).toBe("none");
+    expect(panel.classList.contains(FILTER_PANEL_CLOSED_CLASS)).toBe(true);
   });
 
   it("shows path filter suggestions on focus and applies path operator on option click", async () => {
@@ -1458,10 +1462,10 @@ describe("MapView bridge integration", () => {
     const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
     const suggestions = view.contentEl.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
     expect(suggestions).not.toBeNull();
-    expect(suggestions.style.display).toBe("none");
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
 
     searchInput.dispatchEvent(new Event("focus"));
-    expect(suggestions.style.display).toBe("block");
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(false);
     expect(suggestions.textContent).toContain("Search settings");
     expect(suggestions.textContent).toContain("path: match in file path");
     expect(suggestions.textContent).toContain("date: match note date");
@@ -1473,7 +1477,7 @@ describe("MapView bridge integration", () => {
     pathOption.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
     expect(searchInput.value).toBe("path:");
-    expect(suggestions.style.display).toBe("block");
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(false);
     expect(suggestions.textContent).toContain("Folders");
     expect(suggestions.textContent).toContain("Notes");
     expect(suggestions.textContent).toContain("Dream Notes");
@@ -1484,7 +1488,7 @@ describe("MapView bridge integration", () => {
     expect(dreamOption).toBeDefined();
     dreamOption?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     expect(searchInput.value).toBe("path:\"Dream Notes\"");
-    expect(suggestions.style.display).toBe("none");
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
 
     searchInput.value = "path:Notes";
     searchInput.dispatchEvent(new Event("input"));
@@ -1568,7 +1572,7 @@ describe("MapView bridge integration", () => {
     workOption?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
     expect(searchInput.value).toBe("tag:#work/subtag");
-    expect(suggestions.style.display).toBe("none");
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
 
     vi.advanceTimersByTime(250);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
@@ -1658,7 +1662,7 @@ describe("MapView bridge integration", () => {
     projectOption?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
     expect(searchInput.value).toBe("tag:#work tag:#project");
-    expect(suggestions.style.display).toBe("none");
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
 
     vi.advanceTimersByTime(250);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(3);
@@ -1756,10 +1760,10 @@ describe("MapView bridge integration", () => {
     weekPreset?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
     expect(searchInput.value).toBe("date:>=2026-01-24");
-    expect(suggestions.style.display).toBe("none");
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
 
     searchInput.dispatchEvent(new Event("click"));
-    expect(suggestions.style.display).toBe("block");
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(false);
     expect(suggestions.textContent).toContain("Date presets");
     expect(suggestions.textContent).not.toContain("Search settings");
   });
@@ -2506,11 +2510,11 @@ describe("MapView bridge integration", () => {
     const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
     const suggestions = view.contentEl.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
     searchInput.dispatchEvent(new Event("focus"));
-    expect(suggestions.style.display).toBe("block");
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(false);
 
     searchInput.dispatchEvent(new Event("blur"));
     vi.advanceTimersByTime(120);
-    expect(suggestions.style.display).toBe("none");
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
   });
 
   it("does not emit broken payload when path query is invalid", async () => {

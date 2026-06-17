@@ -42,6 +42,13 @@
   z-index: 1;
 }
 
+.reverysky-map-iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
 .reverysky-map-overlay-controls {
   position: absolute;
   top: 0.5rem;
@@ -67,6 +74,11 @@
   transition: background-color var(--reverysky-transition-fast), border-color var(--reverysky-transition-fast);
 }
 
+.reverysky-map-filter-toggle--hidden {
+  display: none;
+  pointer-events: none;
+}
+
 .reverysky-map-filter-toggle:hover {
   background: color-mix(in srgb, var(--background-secondary) 82%, #000 18%);
   color: var(--text-normal);
@@ -89,6 +101,11 @@
   display: grid;
   gap: var(--size-2-3);
   z-index: 120;
+}
+
+.reverysky-map-filter-panel--closed {
+  display: none;
+  pointer-events: none;
 }
 
 .reverysky-map-filter-header {
@@ -128,7 +145,6 @@
 }
 
 button.reverysky-map-filter-close {
-  all: unset;
   width: 1.75rem;
   height: 1.75rem;
   border-radius: var(--reverysky-chip-radius);
@@ -138,6 +154,10 @@ button.reverysky-map-filter-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  font: inherit;
+  line-height: 1;
+  margin: 0;
+  padding: 0;
   transition: background-color var(--reverysky-transition-fast), color var(--reverysky-transition-fast);
   box-shadow: none;
   border: none;
@@ -233,7 +253,7 @@ button.reverysky-map-filter-close svg {
   box-shadow: none;
 }
 
-.reverysky-map-tags-toggle {
+button.reverysky-map-tags-toggle {
   width: 2.5rem;
   height: 1.5rem;
   border-radius: 999px;
@@ -244,35 +264,35 @@ button.reverysky-map-filter-close svg {
   align-items: center;
   justify-content: flex-start;
   transition: background-color var(--reverysky-transition-fast);
-  box-shadow: none !important;
+  box-shadow: none;
   appearance: none;
   background: linear-gradient(180deg, #dedede 0%, #d0d0d0 100%);
   flex-shrink: 0;
-  outline: none !important;
+  outline: none;
 }
 
-.reverysky-map-tags-toggle:hover,
-.reverysky-map-tags-toggle:focus,
-.reverysky-map-tags-toggle:focus-visible,
-.reverysky-map-tags-toggle:active,
-.reverysky-map-tags-toggle[aria-checked="true"],
-.reverysky-map-tags-toggle[aria-checked="true"]:hover,
-.reverysky-map-tags-toggle[aria-checked="true"]:focus,
-.reverysky-map-tags-toggle[aria-checked="true"]:focus-visible,
-.reverysky-map-tags-toggle[aria-checked="true"]:active {
+button.reverysky-map-tags-toggle:hover,
+button.reverysky-map-tags-toggle:focus,
+button.reverysky-map-tags-toggle:focus-visible,
+button.reverysky-map-tags-toggle:active,
+button.reverysky-map-tags-toggle[aria-checked="true"],
+button.reverysky-map-tags-toggle[aria-checked="true"]:hover,
+button.reverysky-map-tags-toggle[aria-checked="true"]:focus,
+button.reverysky-map-tags-toggle[aria-checked="true"]:focus-visible,
+button.reverysky-map-tags-toggle[aria-checked="true"]:active {
   box-shadow: none;
   outline: none;
   filter: none;
   backdrop-filter: none;
 }
 
-.reverysky-map-tags-toggle[aria-checked="true"] {
+button.reverysky-map-tags-toggle[aria-checked="true"] {
   background: var(--interactive-accent);
   justify-content: flex-end;
   box-shadow: none;
 }
 
-.reverysky-map-tags-toggle-thumb {
+button.reverysky-map-tags-toggle .reverysky-map-tags-toggle-thumb {
   display: block;
   width: 1.125rem;
   height: 1.125rem;
@@ -297,9 +317,22 @@ button.reverysky-map-filter-close svg {
   overflow-y: auto;
 }
 
+.reverysky-map-filter-suggestions--hidden {
+  display: none;
+}
+
 .reverysky-map-filter-message {
   font-size: var(--font-ui-smaller, 0.75rem);
+  color: var(--text-muted);
   opacity: 0.85;
+}
+
+.reverysky-map-filter-message--hidden {
+  display: none;
+}
+
+.reverysky-map-filter-message--invalid {
+  color: var(--text-error);
 }
 
 .reverysky-map-suggestion-title {

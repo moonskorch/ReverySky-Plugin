@@ -62,6 +62,8 @@ function createSession() {
   });
 }
 
+const SUGGESTIONS_HIDDEN_CLASS = "reverysky-map-filter-suggestions--hidden";
+
 describe("MapFilterPanelController", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -83,12 +85,12 @@ describe("MapFilterPanelController", () => {
     const suggestions = container.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
 
     searchInput.dispatchEvent(new Event("focus"));
-    expect(suggestions.style.display).toBe("block");
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(false);
     expect(suggestions.textContent).toContain("Search settings");
 
     searchInput.dispatchEvent(new Event("blur"));
     vi.advanceTimersByTime(120);
-    expect(suggestions.style.display).toBe("none");
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
   });
 
   it("clears query and hides suggestions on Escape", async () => {
@@ -104,12 +106,12 @@ describe("MapFilterPanelController", () => {
     const suggestions = container.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
 
     searchInput.dispatchEvent(new Event("focus"));
-    expect(suggestions.style.display).toBe("block");
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(false);
 
     searchInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     expect(searchInput.value).toBe("");
     expect(session.getState()).toMatchObject({ pathFilterQuery: "" });
-    expect(suggestions.style.display).toBe("none");
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
   });
 
   it("applies operator and value suggestions to the active query", () => {

@@ -96,10 +96,7 @@ export class MapView extends ItemView {
 
     const iframe = document.createElement("iframe");
     iframe.src = `${iframeSrc}?t=${this.now()}`;
-    iframe.style.width = "100%";
-    iframe.style.height = "100%";
-    iframe.style.border = "0";
-    iframe.style.display = "block";
+    iframe.className = "reverysky-map-iframe";
     if (typeof (iframe as ObsidianHTMLElement).setAttr === "function") {
       (iframe as ObsidianHTMLElement).setAttr!("title", "ReverySky Map");
     } else {

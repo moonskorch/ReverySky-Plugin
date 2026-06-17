@@ -132,7 +132,7 @@ export class MapFilterPanelController {
 
     this.filterSuggestionsEl = createChild(filterSearchArea as ObsidianHTMLElement, "div");
     this.filterSuggestionsEl.className = "reverysky-map-filter-suggestions";
-    this.filterSuggestionsEl.style.display = "none";
+    this.filterSuggestionsEl.classList.add("reverysky-map-filter-suggestions--hidden");
 
     this.filterMessageEl = createChild(filterSection as ObsidianHTMLElement, "div");
     this.filterMessageEl.className = "reverysky-map-filter-message";
@@ -249,10 +249,8 @@ export class MapFilterPanelController {
       return;
     }
 
-    this.filterPanelEl.style.display = isOpen ? "grid" : "none";
-    this.filterPanelEl.style.pointerEvents = isOpen ? "auto" : "none";
-    this.filterToggleButtonEl.style.display = isOpen ? "none" : "inline-flex";
-    this.filterToggleButtonEl.style.pointerEvents = isOpen ? "none" : "auto";
+    this.filterPanelEl.classList.toggle("reverysky-map-filter-panel--closed", !isOpen);
+    this.filterToggleButtonEl.classList.toggle("reverysky-map-filter-toggle--hidden", isOpen);
     if (!isOpen) {
       this.hideFilterSuggestions();
     }
@@ -273,7 +271,7 @@ export class MapFilterPanelController {
     this.setFilterPanelOpen(true);
     this.refreshSuggestions();
     this.clearFilterSuggestionsHideTimer();
-    this.filterSuggestionsEl.style.display = "block";
+    this.filterSuggestionsEl.classList.remove("reverysky-map-filter-suggestions--hidden");
   }
 
   private resolveAutoSuggestionMode(): FilterSuggestionMode {
@@ -309,7 +307,7 @@ export class MapFilterPanelController {
     }
 
     this.filterSuggestionMode = 0;
-    this.filterSuggestionsEl.style.display = "none";
+    this.filterSuggestionsEl.classList.add("reverysky-map-filter-suggestions--hidden");
   }
 
   private applyPathSuggestionOperator(): void {
@@ -599,10 +597,11 @@ export class MapFilterPanelController {
     const uiState = this.session.getFilterUiState();
     const hasCustomMessage = uiState.pathFilterMessage.trim().length > 0;
     this.filterMessageEl.textContent = hasCustomMessage ? uiState.pathFilterMessage : "";
-    this.filterMessageEl.style.display = hasCustomMessage ? "block" : "none";
-    this.filterMessageEl.style.color = uiState.pathFilterParseValid
-      ? "var(--text-muted)"
-      : "var(--text-error)";
+    this.filterMessageEl.classList.toggle("reverysky-map-filter-message--hidden", !hasCustomMessage);
+    this.filterMessageEl.classList.toggle(
+      "reverysky-map-filter-message--invalid",
+      !uiState.pathFilterParseValid
+    );
   }
 
   private refreshTagsToggleUi(): void {
