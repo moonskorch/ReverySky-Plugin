@@ -1,11 +1,37 @@
-Third-party visual assets
+Third-party notices
 
 The MIT License in the repository root applies only to the original project code
 and materials owned by MoonSkorch Studio.
 
+Unity software and runtime
+
+This Unity project is built with Unity® software and exported as a Unity WebGL
+build for the ReverySky Obsidian plugin.
+
+The generated WebGL build includes Unity Runtime files. The Unity Editor,
+Unity Runtime, and other Unity software components remain governed by the
+Unity Editor Software Terms and other applicable Unity terms.
+
+ReverySky Map is not sponsored by or affiliated with Unity Technologies or its
+affiliates. Unity and related Unity marks are trademarks or registered
+trademarks of Unity Technologies or its affiliates in the U.S. and elsewhere.
+
+Bundled third-party resources
+
+The Unity project includes TextMesh Pro resource files imported with Unity.
+
+Included notices:
+
+* Assets/TextMesh Pro/Fonts/LiberationSans - OFL.txt
+* Assets/TextMesh Pro/Sprites/EmojiOne Attribution.txt
+
+These resources remain subject to their respective terms.
+
+Excluded third-party visual assets
+
 The following third-party visual assets are intentionally excluded from Git.
-They are used only as embedded components of the built product and remain
-subject to their respective terms.
+They are used only as embedded or incorporated components of the built
+Unity/WebGL output and remain subject to their respective terms.
 
 1. Electric Power Lightning Texture Seamless
    Provider: Textures4Photoshop
@@ -22,13 +48,3 @@ subject to their respective terms.
 
    Licensed under the Standard Unity Asset Store EULA.
    The raw asset files are not distributed in this repository.
-
-3. TextMesh Pro bundled resources
-
-   The Unity project includes TextMesh Pro resource files imported with Unity.
-
-   Included notices:
-   - Assets/TextMesh Pro/Fonts/LiberationSans - OFL.txt
-   - Assets/TextMesh Pro/Sprites/EmojiOne Attribution.txt
-
-   These resources remain subject to their respective terms.

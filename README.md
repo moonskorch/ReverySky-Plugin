@@ -38,13 +38,21 @@ The Map layout control changes how the same vault data is arranged:
 
 The current release candidate build uses the `embedded-archive` package mode. Other package modes and release shapes are documented in [Packaging Modes](docs/PACKAGING_MODES.md).
 
-The Obsidian plugin source code and the Unity project source code are available in this repository. In the `embedded-archive` package mode, the released `main.js` also contains a generated Unity WebGL build archive, including Unity-generated JavaScript, WebAssembly, data files, and runtime assets.
+The [Obsidian plugin source code](src/) and the [Unity project source code](unity/ReverySkyMap/) are available in this repository. 
 
-The Unity engine/runtime is proprietary third-party technology distributed under Unity's terms. The plugin does not download the Unity runtime from the network. On first map open, the embedded runtime archive is extracted into a versioned local cache inside the installed plugin folder:
+The ReverySky Map WebGL view was built with Unity® software and includes Unity-generated WebGL runtime files. ReverySky Map is not sponsored by or affiliated with Unity Technologies or its affiliates. Unity and related Unity marks are trademarks or registered trademarks of Unity Technologies or its affiliates in the U.S. and elsewhere.
+
+The standard Obsidian community plugin release shape is a small set of root release assets: `manifest.json`, `main.js`, and optionally `styles.css`. ReverySky Map also needs a Unity WebGL runtime, including Unity-generated JavaScript, WebAssembly, data files, and visual/runtime assets. To keep the release self-contained in that shape, the `embedded-archive` package mode stores the generated Unity WebGL build archive inside the released `main.js`.
+
+The plugin does not download the Unity runtime from the network. On first map open, it extracts the embedded Unity WebGL archive into a versioned local cache inside the installed plugin folder:
 
 `.obsidian/plugins/reverysky-map/.reverysky-runtime/<version>/`
 
-Later launches reuse that local cache.
+Later launches reuse that cache. A local WebGL host reads the cached runtime files so the iframe can load Unity WebGL from `127.0.0.1`.
+
+Vault notes are handled separately. Vault graph data is collected through Obsidian's vault and metadata APIs, then sent to the Unity runtime through the plugin bridge; the local runtime file access is not used to scan, read, or write vault notes, other user files, or system files outside the installed plugin folder.
+
+If you rely on Obsidian Sync Standard to sync installed plugins, install or update ReverySky Map from the release assets on each device; that plan does not sync files over 5 MB.
 
 See the third-party notices for bundled visual assets and runtime dependencies.
 
