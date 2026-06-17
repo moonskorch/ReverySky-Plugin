@@ -19,7 +19,7 @@ The system has three runtime boundaries:
 Main system parts:
 
 - Obsidian plugin shell
-  Registers the custom view and the `Open ReverySky Map` command, and lazily creates the local WebGL server.
+  Registers the custom view and the `Open map` command, and lazily creates the local WebGL server.
   Main code: `src/main.ts`
   Depends on: Obsidian `Plugin`, `WorkspaceLeaf`, `UnityWebglLocalServer`
 
@@ -83,7 +83,7 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 
 ### Path 1. Command -> view activation -> iframe startup
 1. `src/main.ts` -> `ReverySkyMapPlugin.onload()`
-   Loads persisted `mapViewState`, registers `MAP_VIEW_TYPE`, and registers the `open-reverysky-map` command.
+   Loads persisted `mapViewState`, registers `MAP_VIEW_TYPE`, and registers the `open-map` command.
 2. `src/main.ts` -> command callback -> `activateMapView()`
    Finds an existing map leaf or creates one with `workspace.getRightLeaf(false)` and `leaf.setViewState(...)`, including the last persisted `mapViewState` when available.
 3. Obsidian opens the custom view and calls `src/view/MapView.ts` -> `onOpen()`.

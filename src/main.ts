@@ -40,8 +40,8 @@ export default class ReverySkyMapPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: "open-reverysky-map",
-      name: "Open ReverySky Map",
+      id: "open-map",
+      name: "Open map",
       callback: async () => {
         await this.activateMapView();
       }

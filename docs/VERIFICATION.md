@@ -84,7 +84,7 @@ Additional automated checks when available:
 
 Manual checks:
 - Load plugin in Obsidian dev vault.
-- Open ReverySky Map view.
+- Open the map view.
 - Check developer console.
 
 ## Graph/data changes
@@ -127,7 +127,7 @@ Required checks when relevant:
 
 Manual smoke check:
 1. Open test vault.
-2. Open ReverySky Map view.
+2. Open the map view.
 3. Confirm Unity/WebGL runtime loads.
 4. Confirm bridge:ready.
 5. Confirm graph:set reaches runtime.

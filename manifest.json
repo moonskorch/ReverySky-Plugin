@@ -3,7 +3,7 @@
   "name": "ReverySky Map",
   "version": "1.1.0",
   "minAppVersion": "1.12.7",
-  "description": "A custom Obsidian view shell for the ReverySky Map plugin.",
+  "description": "Explore your vault through an immersive Unity-powered 3D graph.",
   "author": "MoonSkorch Studio",
   "isDesktopOnly": true
 }

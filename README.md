@@ -1,4 +1,38 @@
-ReverySky Map is an Obsidian desktop plugin that renders vault relationships in a Unity WebGL runtime embedded in a custom Obsidian view.
+# ReverySky Map
+
+![ReverySky Map header](docs/assets/reverysky-map-header.png)
+
+ReverySky Map embeds a 3D Unity WebGL map view in Obsidian for inspecting vault structure. It builds the view from Markdown notes, resolved links, tags, note dates, and file metadata, then keeps the runtime in sync with the active filter and focused note.
+
+## Navigation
+
+- Pan: drag the map with the primary mouse button to move the camera focus across the current layout.
+- Zoom: use the vertical slider on the left side of the map, or use the mouse wheel for quick zooming.
+- Rotate: use the on-screen rotate controls, or hold the right mouse button and drag horizontally.
+- Display mode: use the round view button to switch between the standard detailed rendering and a simplified rendering. In link layouts, the standard mode shows tag nodes and link lines; the simplified mode keeps note nodes visible and hides those extra details.
+- Open a note: click a note node in the runtime. The map focuses that node and asks Obsidian to open the matching Markdown file.
+- Follow the active note: when Obsidian focuses a Markdown note, the runtime can focus the matching node in the map.
+- Date navigation: in the `Dates` layout, use the date slider to move along the time axis while keeping pan, zoom, and rotation available.
+
+## Filter
+
+Open the settings panel from the map view to limit which notes are sent to the runtime. The filter box supports:
+
+- `path:` to match notes by vault-relative file path. Folder suggestions are built from the current vault data.
+- `tag:` to match notes by tag. Tag suggestions use tags collected from Markdown metadata and frontmatter.
+- `date:` to match note dates from `date`, `created`, or `created_at` frontmatter, with file creation time as a fallback. Supported forms include exact dates and comparisons such as `date:>=2026-01-01`.
+- A leading `-` to exclude matches, such as `-path:Archive`.
+
+Use `Escape` in the filter box to clear the query. Use the Tags switch to hide tag-derived map structure without changing the current path, date, or tag filter.
+
+## Map Layout
+
+The Map layout control changes how the same vault data is arranged:
+
+- `Dynamic links`: a force-directed layout for link-heavy inspection in vault slices up to 500 notes.
+- `Scalable links`: a more stable layout for larger vault slices and denser link maps.
+- `Dates`: a chronological layout that arranges notes by date and enables the date slider.
+- `Auto`: chooses `Dynamic links` for smaller datasets and switches to `Scalable links` above 500 notes.
 
 ## Runtime and source availability
 
@@ -27,4 +61,3 @@ development.
 
 See [third-party notices](unity/ReverySkyMap/Assets/ThirdPartyNotices.txt) and
 [Unity setup instructions](unity/ReverySkyMap/Assets/README.txt).
-

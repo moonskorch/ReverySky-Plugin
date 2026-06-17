@@ -34,11 +34,11 @@ Files likely affected:
 
 Acceptance criteria:
 - Plugin loads in Obsidian desktop without errors.
-- Command `Open ReverySky Map` opens an empty custom view pane.
+- Command `Open map` opens an empty custom view pane.
 
 Manual test steps:
 1. Load plugin in a dev vault.
-2. Run command `Open ReverySky Map`.
+2. Run command `Open map`.
 3. Confirm custom view opens and survives app reload.
 
 Likely risks:

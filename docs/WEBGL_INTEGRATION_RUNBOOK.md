@@ -93,7 +93,7 @@ Copy these artifacts:
 
 ### 6) Verify runtime in Obsidian
 1. Reload community plugins.
-2. Run command: `Open ReverySky Map`.
+2. Run command: `Open map`.
 3. Confirm the view opens and runtime initializes.
 
 ## Packaging Modes
