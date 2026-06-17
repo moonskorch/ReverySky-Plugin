@@ -36,6 +36,9 @@ Core commands:
 - `npm run test:ui-visual:update` - refresh screenshot baselines when the UI change is intentional.
 - `npm run test:ui-visual:report` - open the latest Playwright report.
 
+Release scanner sanity check:
+- After building an Obsidian dashboard candidate, run `rg -n "process\.env|os\.(hostname|userInfo|networkInterfaces)" main.js` and investigate any matches before upload.
+
 Current TS baseline test suites:
 - `tests/bridge/MessageValidator.test.ts`
   - validates valid payload path;

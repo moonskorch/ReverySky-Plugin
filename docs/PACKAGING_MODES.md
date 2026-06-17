@@ -110,6 +110,7 @@ Behavior:
 - Does not require `unity-webgl/` in the release assets.
 - On first map open, extracts runtime files into a versioned local cache.
 - Later map opens reuse the validated cache when the plugin version and archive SHA match.
+- Runtime extraction imports only `tar/list` and `tar/extract`; production bundling compiles out `tar` test-only env override reads so the release bundle does not read those `process.env` keys.
 
 Observed result:
 - Obsidian starts quickly; the startup-time difference is barely noticeable in manual smoke testing.

@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { access, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import * as tar from "tar";
+import { extract as tarExtract } from "tar/extract";
+import { list as tarList } from "tar/list";
 import {
   getEmbeddedUnityRuntimeArchiveBase64,
   getEmbeddedUnityRuntimeArchiveSha256
@@ -85,7 +86,7 @@ function validateArchiveEntryPath(entryPath: string): void {
 
 async function collectArchiveEntries(archivePath: string): Promise<ReadArchiveEntry[]> {
   const entries: ReadArchiveEntry[] = [];
-  await tar.t({
+  await tarList({
     file: archivePath,
     strict: true,
     preservePaths: true,
@@ -209,7 +210,7 @@ export class EmbeddedUnityRuntimeInstaller {
       const entries = await collectArchiveEntries(archivePath);
       this.validateArchiveEntries(entries);
 
-      await tar.x({
+      await tarExtract({
         file: archivePath,
         cwd: tempRoot,
         strict: true

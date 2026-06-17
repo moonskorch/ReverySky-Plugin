@@ -18,6 +18,11 @@ export async function runEsbuildBuild(production) {
     platform: "node",
     target: "es2020",
     external: ["obsidian", "electron", "@codemirror/state", "@codemirror/view"],
+    define: {
+      "process.env.TESTING_TAR_FAKE_PLATFORM": "undefined",
+      "process.env.__FAKE_PLATFORM__": "undefined",
+      "process.env.__FAKE_FS_O_FILENAME__": "undefined"
+    },
     logLevel: "info",
     sourcemap: production ? false : "inline",
     treeShaking: true,
