@@ -43,7 +43,7 @@ export class MapView extends ItemView {
   ) {
     super(leaf);
     this.bridge = deps.createBridge?.() ?? new UnityIframeBridge();
-    const buildGraph = deps.buildGraph ?? VaultGraphBuilder.build;
+    const buildGraph = deps.buildGraph ?? ((app: App) => VaultGraphBuilder.build(app));
     this.notify = deps.notify ?? ((message: string) => new Notice(message));
     this.now = deps.now ?? Date.now;
     this.session = new MapSession({
@@ -94,11 +94,12 @@ export class MapView extends ItemView {
       return;
     }
 
-    const iframe = document.createElement("iframe");
+    const iframe = container.ownerDocument.createElement("iframe");
     iframe.src = `${iframeSrc}?t=${this.now()}`;
     iframe.className = "reverysky-map-iframe";
-    if (typeof (iframe as ObsidianHTMLElement).setAttr === "function") {
-      (iframe as ObsidianHTMLElement).setAttr!("title", "ReverySky Map");
+    const setIframeAttribute = iframe.setAttr;
+    if (typeof setIframeAttribute === "function") {
+      setIframeAttribute.call(iframe, "title", "ReverySky Map");
     } else {
       iframe.setAttribute("title", "ReverySky Map");
     }

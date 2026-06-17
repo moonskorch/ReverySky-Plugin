@@ -16,7 +16,8 @@ type FilterSuggestionMode = 0 | 1 | 2 | 3;
  * Owns the filter-panel UI state machine and keeps the DOM synchronized with `MapSession`.
  */
 export class MapFilterPanelController {
-  private filterSuggestionsHideTimer: ReturnType<typeof setTimeout> | null = null;
+  private filterSuggestionsHideTimer: number | null = null;
+  private filterSuggestionsHideTimerWindow: Window | null = null;
   private filterMessageEl: HTMLElement | null = null;
   private filterSuggestionsEl: HTMLElement | null = null;
   private filterPanelEl: HTMLElement | null = null;
@@ -58,8 +59,7 @@ export class MapFilterPanelController {
       toggleFilterPanel();
     });
     settingsToggleButton.addEventListener("click", (event) => {
-      const mouseEvent = event as MouseEvent;
-      if (mouseEvent.detail !== 0) {
+      if (event.detail !== 0) {
         return;
       }
       event.preventDefault();
@@ -161,8 +161,7 @@ export class MapFilterPanelController {
     };
     tagsToggleButton.addEventListener("mousedown", toggleTags);
     tagsToggleButton.addEventListener("click", (event) => {
-      const mouseEvent = event as MouseEvent;
-      if (mouseEvent.detail !== 0) {
+      if (event.detail !== 0) {
         return;
       }
       toggleTags(event);
@@ -295,8 +294,11 @@ export class MapFilterPanelController {
 
   private scheduleHideFilterSuggestions(): void {
     this.clearFilterSuggestionsHideTimer();
-    this.filterSuggestionsHideTimer = setTimeout(() => {
+    const timerWindow = this.filterSuggestionsEl?.ownerDocument.defaultView ?? window;
+    this.filterSuggestionsHideTimerWindow = timerWindow;
+    this.filterSuggestionsHideTimer = timerWindow.setTimeout(() => {
       this.filterSuggestionsHideTimer = null;
+      this.filterSuggestionsHideTimerWindow = null;
       this.hideFilterSuggestions();
     }, FILTER_SUGGESTIONS_HIDE_DELAY_MS);
   }
@@ -642,8 +644,9 @@ export class MapFilterPanelController {
       return;
     }
 
-    clearTimeout(this.filterSuggestionsHideTimer);
+    (this.filterSuggestionsHideTimerWindow ?? window).clearTimeout(this.filterSuggestionsHideTimer);
     this.filterSuggestionsHideTimer = null;
+    this.filterSuggestionsHideTimerWindow = null;
   }
 }
 
@@ -655,7 +658,7 @@ function createChild<K extends keyof HTMLElementTagNameMap>(
     return element.createEl(tagName);
   }
 
-  const child = document.createElement(tagName);
+  const child = element.ownerDocument.createElement(tagName);
   element.appendChild(child);
-  return child as HTMLElementTagNameMap[K];
+  return child;
 }

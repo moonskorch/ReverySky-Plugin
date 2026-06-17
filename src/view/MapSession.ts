@@ -89,8 +89,10 @@ export class MapSession {
   private semanticRefreshPending = false;
   private noteSignatureByPath = new Map<string, string>();
   private bridgeReady = false;
-  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
-  private resolveBarrierFallbackTimer: ReturnType<typeof setTimeout> | null = null;
+  private refreshTimer: number | null = null;
+  private refreshTimerWindow: Window | null = null;
+  private resolveBarrierFallbackTimer: number | null = null;
+  private resolveBarrierFallbackTimerWindow: Window | null = null;
   private refreshSubscriptionsRegistered = false;
   private refreshActive = false;
   private leafTrackingRegistered = false;
@@ -100,7 +102,8 @@ export class MapSession {
   private activePathFilter: ParsedPathFilter | null = null;
   private pathFilterParseValid = true;
   private pathFilterMessage = "";
-  private filterInputDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private filterInputDebounceTimer: number | null = null;
+  private filterInputDebounceTimerWindow: Window | null = null;
   private folderPathSuggestions: FolderPathSuggestion[] = [];
   private tagSuggestions: TagSuggestion[] = [];
 
@@ -484,8 +487,11 @@ export class MapSession {
     this.semanticRefreshPending = true;
     this.clearResolveBarrierFallbackTimer();
     // `metadataCache.resolved` is the ideal flush point; fall back if it never arrives.
-    this.resolveBarrierFallbackTimer = setTimeout(() => {
+    const timerWindow = this.getTimerWindow();
+    this.resolveBarrierFallbackTimerWindow = timerWindow;
+    this.resolveBarrierFallbackTimer = timerWindow.setTimeout(() => {
       this.resolveBarrierFallbackTimer = null;
+      this.resolveBarrierFallbackTimerWindow = null;
       if (!this.semanticRefreshPending) {
         return;
       }
@@ -500,8 +506,11 @@ export class MapSession {
       return;
     }
     this.clearRefreshTimer();
-    this.refreshTimer = setTimeout(() => {
+    const timerWindow = this.getTimerWindow();
+    this.refreshTimerWindow = timerWindow;
+    this.refreshTimer = timerWindow.setTimeout(() => {
       this.refreshTimer = null;
+      this.refreshTimerWindow = null;
       this.refreshGraphNow();
     }, GRAPH_REFRESH_DEBOUNCE_MS);
   }
@@ -519,8 +528,11 @@ export class MapSession {
     }
 
     this.clearFilterInputDebounceTimer();
-    this.filterInputDebounceTimer = setTimeout(() => {
+    const timerWindow = this.getTimerWindow();
+    this.filterInputDebounceTimerWindow = timerWindow;
+    this.filterInputDebounceTimer = timerWindow.setTimeout(() => {
       this.filterInputDebounceTimer = null;
+      this.filterInputDebounceTimerWindow = null;
       this.emitGraphFromSource();
     }, FILTER_INPUT_DEBOUNCE_MS);
   }
@@ -924,13 +936,18 @@ export class MapSession {
     return new Date(Date.UTC(targetYear, targetMonth, clampedDay));
   }
 
+  private getTimerWindow(): Window {
+    return window.activeWindow ?? window;
+  }
+
   private clearRefreshTimer(): void {
     if (!this.refreshTimer) {
       return;
     }
 
-    clearTimeout(this.refreshTimer);
+    (this.refreshTimerWindow ?? this.getTimerWindow()).clearTimeout(this.refreshTimer);
     this.refreshTimer = null;
+    this.refreshTimerWindow = null;
   }
 
   private clearResolveBarrierFallbackTimer(): void {
@@ -938,8 +955,9 @@ export class MapSession {
       return;
     }
 
-    clearTimeout(this.resolveBarrierFallbackTimer);
+    (this.resolveBarrierFallbackTimerWindow ?? this.getTimerWindow()).clearTimeout(this.resolveBarrierFallbackTimer);
     this.resolveBarrierFallbackTimer = null;
+    this.resolveBarrierFallbackTimerWindow = null;
   }
 
   private clearFilterInputDebounceTimer(): void {
@@ -947,7 +965,8 @@ export class MapSession {
       return;
     }
 
-    clearTimeout(this.filterInputDebounceTimer);
+    (this.filterInputDebounceTimerWindow ?? this.getTimerWindow()).clearTimeout(this.filterInputDebounceTimer);
     this.filterInputDebounceTimer = null;
+    this.filterInputDebounceTimerWindow = null;
   }
 }
