@@ -56,11 +56,11 @@ async function main() {
     }
   }
 
-  if (mainJs.includes("globalThis.__REVERYSKY_EMBEDDED_UNITY_INDEX_HTML__ =")) {
+  if (mainJs.includes("window.__REVERYSKY_EMBEDDED_UNITY_INDEX_HTML__ =")) {
     fail("main.js must not contain embedded HTML marker.");
   }
 
-  if (!/globalThis\.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_SHA256__ = function/.test(mainJs)) {
+  if (!/window\.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_SHA256__ = function/.test(mainJs)) {
     fail("main.js is missing the archive SHA function.");
   }
 

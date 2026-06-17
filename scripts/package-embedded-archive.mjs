@@ -207,10 +207,10 @@ async function main() {
     const archiveSha256 = createHash("sha256").update(archiveBuffer).digest("hex");
     const normalMainJs = stripPackageModeMarker(await readFile(rootMainJsPath, "utf8"));
     const packageMainJs = [
-      "globalThis.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_BASE64__ = function () {",
+      "window.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_BASE64__ = function () {",
       `  return ${JSON.stringify(archiveBase64)};`,
       "};",
-      "globalThis.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_SHA256__ = function () {",
+      "window.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_SHA256__ = function () {",
       `  return ${JSON.stringify(archiveSha256)};`,
       "};",
       "",

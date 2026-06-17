@@ -85,7 +85,7 @@ async function main() {
 
   const rootMainJs = stripPackageModeMarker(await readFile(rootMainJsPath, "utf8"));
   const banner =
-    `globalThis.__REVERYSKY_EMBEDDED_UNITY_INDEX_HTML__ = ${JSON.stringify(indexHtml)};\n\n`;
+    `window.__REVERYSKY_EMBEDDED_UNITY_INDEX_HTML__ = ${JSON.stringify(indexHtml)};\n\n`;
   const packageMainJs = `${banner}${rootMainJs}`;
 
   await writeRootMainJsWithPackageMode(repoRoot, "embedded-html", packageMainJs);

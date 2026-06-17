@@ -23,8 +23,8 @@ const streamingAssetsDir = path.join(repoRoot, "unity-webgl", "StreamingAssets")
 
 const wrapperTemplate = [
   "/* ReverySky package mode: embedded-archive */",
-  'globalThis.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_BASE64__ = function () { return ""; };',
-  'globalThis.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_SHA256__ = function () { return ""; };'
+  'window.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_BASE64__ = function () { return ""; };',
+  'window.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_SHA256__ = function () { return ""; };'
 ].join("\n") + "\n";
 
 async function pathExists(targetPath) {
@@ -52,7 +52,7 @@ function calculateBase64Characters(byteLength) {
 
 function stripEmbeddedArchiveWrapper(source) {
   return source.replace(
-    /^globalThis\.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_BASE64__ = function \(\) \{\r?\n  return "[A-Za-z0-9+/=]*";\r?\n\};\r?\nglobalThis\.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_SHA256__ = function \(\) \{\r?\n  return "[0-9a-f]{64}";\r?\n\};\r?\n\r?\n/,
+    /^window\.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_BASE64__ = function \(\) \{\r?\n  return "[A-Za-z0-9+/=]*";\r?\n\};\r?\nwindow\.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_SHA256__ = function \(\) \{\r?\n  return "[0-9a-f]{64}";\r?\n\};\r?\n\r?\n/,
     ""
   );
 }

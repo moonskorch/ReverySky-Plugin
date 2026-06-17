@@ -3,7 +3,7 @@ const EMBEDDED_RUNTIME_ARCHIVE_BASE64_KEY =
 const EMBEDDED_RUNTIME_ARCHIVE_SHA256_KEY =
   "__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_SHA256__";
 
-type GlobalWithEmbeddedRuntimeArchive = typeof globalThis & {
+type WindowWithEmbeddedRuntimeArchive = Window & {
   __REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_BASE64__?: unknown;
   __REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_SHA256__?: unknown;
 };
@@ -11,7 +11,7 @@ type GlobalWithEmbeddedRuntimeArchive = typeof globalThis & {
 type EmbeddedRuntimeArchiveGetter = () => unknown;
 
 function readEmbeddedArchiveValue(key: string): string | null {
-  const value = (globalThis as GlobalWithEmbeddedRuntimeArchive)[key as
+  const value = (window as WindowWithEmbeddedRuntimeArchive)[key as
     | typeof EMBEDDED_RUNTIME_ARCHIVE_BASE64_KEY
     | typeof EMBEDDED_RUNTIME_ARCHIVE_SHA256_KEY] as EmbeddedRuntimeArchiveGetter | undefined;
 
@@ -37,10 +37,10 @@ export function getEmbeddedUnityRuntimeArchiveSha256(): string | null {
 
 export function hasEmbeddedUnityRuntimeArchive(): boolean {
   return (
-    typeof (globalThis as GlobalWithEmbeddedRuntimeArchive)[
+    typeof (window as WindowWithEmbeddedRuntimeArchive)[
       EMBEDDED_RUNTIME_ARCHIVE_BASE64_KEY
     ] === "function" &&
-    typeof (globalThis as GlobalWithEmbeddedRuntimeArchive)[
+    typeof (window as WindowWithEmbeddedRuntimeArchive)[
       EMBEDDED_RUNTIME_ARCHIVE_SHA256_KEY
     ] === "function"
   );

@@ -79,9 +79,9 @@ async function main() {
     fail(`Unexpected first-line marker: ${firstLine}`);
   }
   for (const marker of [
-    "globalThis.__REVERYSKY_EMBEDDED_UNITY_INDEX_HTML__ =",
-    "globalThis.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_BASE64__ = function",
-    "globalThis.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_SHA256__ = function"
+    "window.__REVERYSKY_EMBEDDED_UNITY_INDEX_HTML__ =",
+    "window.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_BASE64__ = function",
+    "window.__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_SHA256__ = function"
   ]) {
     if (mainJs.includes(marker)) {
       fail(`main.js must not contain embedded runtime marker: ${marker}`);
