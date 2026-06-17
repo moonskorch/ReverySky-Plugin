@@ -168,5 +168,6 @@ Prefer clearer naming or simpler structure when that solves the problem.
 ## 11. Final response
 
 Use the canonical final report format from `AGENTS.md`.
+In the `Manual checks` section, list the exact owner-facing checks that still need to be performed when the agent cannot run them directly. Do not leave the section empty or only state that manual checks were not run.
 
 Do not add a rollback section by default. Include rollback guidance only when explicitly requested.

@@ -14,6 +14,7 @@ Verification order:
 Policy:
 - For every non-documentation task, automated verification is required.
 - Manual checks complement automated checks and do not replace them.
+- Manual check reporting must list concrete owner actions to perform when the agent cannot run the check directly; do not leave the manual-check section empty or only say that checks were not run.
 - If no suitable automated check exists for changed behavior, add a minimal targeted check when feasible; if not feasible in-task, report the gap and required follow-up.
 
 ## Current automated checks in this repository

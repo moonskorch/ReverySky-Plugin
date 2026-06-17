@@ -48,7 +48,13 @@ export default class ReverySkyMapPlugin extends Plugin {
     });
   }
 
-  async onunload(): Promise<void> {
+  onunload(): void {
+    void this.cleanupOnUnload().catch((error: unknown) => {
+      console.error("Failed to unload ReverySky Map plugin.", error);
+    });
+  }
+
+  private async cleanupOnUnload(): Promise<void> {
     await this.captureAndPersistMapViewState();
     if (this.unityWebglServer) {
       await this.unityWebglServer.stop();
