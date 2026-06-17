@@ -50,7 +50,6 @@ export default class ReverySkyMapPlugin extends Plugin {
 
   async onunload(): Promise<void> {
     await this.captureAndPersistMapViewState();
-    this.app.workspace.detachLeavesOfType(MAP_VIEW_TYPE);
     if (this.unityWebglServer) {
       await this.unityWebglServer.stop();
       this.unityWebglServer = null;

@@ -117,6 +117,34 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
     expect(harness.revealLeaf).toHaveBeenCalledWith(reopenedLeaf);
   });
 
+  it("captures map state during plugin unload without detaching the workspace leaf", async () => {
+    const activeLeaf: MockLeaf = {
+      view: {
+        getState: () => ({
+          pathFilterQuery: "path:Projects",
+          showTags: true,
+          mapLayout: "chronological"
+        })
+      },
+      setViewState: vi.fn()
+    };
+
+    const harness = createPluginHarness({
+      existingLeaves: [activeLeaf]
+    });
+
+    await harness.plugin.onunload();
+
+    expect(harness.saveData).toHaveBeenCalledWith({
+      mapViewState: {
+        pathFilterQuery: "path:Projects",
+        showTags: true,
+        mapLayout: "chronological"
+      }
+    });
+    expect(harness.detachLeavesOfType).not.toHaveBeenCalled();
+  });
+
   it("restores persisted map state loaded during plugin startup", async () => {
     const newLeaf: MockLeaf = {
       setViewState: vi.fn().mockResolvedValue(undefined)

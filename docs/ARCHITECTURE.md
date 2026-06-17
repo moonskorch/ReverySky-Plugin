@@ -133,9 +133,10 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 1. `src/main.ts` -> ribbon callback -> `toggleMapView()`, or `src/main.ts` -> `onunload()`.
 2. `src/main.ts` -> `captureAndPersistMapViewState()`
    Reads `leaf.view.getState()` from the current map leaf when present and writes the result through `saveData(...)`.
-3. `workspace.detachLeavesOfType(MAP_VIEW_TYPE)` removes the active map leaves.
-4. On a later startup or `toggleMapView()` reopen, `ReverySkyMapPlugin.onload()` and `activateMapView()` reuse `lastMapViewState`.
-5. `leaf.setViewState({ type: MAP_VIEW_TYPE, active: true, state })` hands the persisted state back to `MapView`, which then forwards it into `MapSession.setState(...)`.
+3. During an explicit toggle close, `workspace.detachLeavesOfType(MAP_VIEW_TYPE)` removes the active map leaves.
+4. During plugin unload, the plugin leaves existing map leaves attached so Obsidian can preserve their user-chosen workspace location.
+5. On a later startup or `toggleMapView()` reopen, `ReverySkyMapPlugin.onload()` and `activateMapView()` reuse `lastMapViewState`.
+6. `leaf.setViewState({ type: MAP_VIEW_TYPE, active: true, state })` hands the persisted state back to `MapView`, which then forwards it into `MapSession.setState(...)`.
 
 ### Key plugin-side control points
 
