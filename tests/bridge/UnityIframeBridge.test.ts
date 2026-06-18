@@ -31,6 +31,32 @@ function dispatchMessage(data: unknown, source: unknown): void {
   window.dispatchEvent(event);
 }
 
+function createMessageWindow(): Window & {
+  dispatchMessageEvent: (data: unknown, source: unknown) => void;
+  addEventListener: ReturnType<typeof vi.fn>;
+  removeEventListener: ReturnType<typeof vi.fn>;
+} {
+  const target = new EventTarget();
+  const addEventListener = vi.fn(target.addEventListener.bind(target));
+  const removeEventListener = vi.fn(target.removeEventListener.bind(target));
+  return {
+    addEventListener,
+    removeEventListener,
+    dispatchMessageEvent: (data: unknown, source: unknown) => {
+      target.dispatchEvent(
+        new MessageEvent("message", {
+          data,
+          source: source as MessageEventSource
+        })
+      );
+    }
+  } as unknown as Window & {
+    dispatchMessageEvent: (data: unknown, source: unknown) => void;
+    addEventListener: ReturnType<typeof vi.fn>;
+    removeEventListener: ReturnType<typeof vi.fn>;
+  };
+}
+
 describe("UnityIframeBridge", () => {
   it("sends graph:set for valid payload", () => {
     const bridge = new UnityIframeBridge();
@@ -115,6 +141,35 @@ describe("UnityIframeBridge", () => {
 
     expect(onReady).toHaveBeenCalledTimes(1);
     bridge.detach();
+  });
+
+  it("accepts bridge:ready from the popout window that owns the iframe", () => {
+    const bridge = new UnityIframeBridge();
+    const onReady = vi.fn();
+    const iframeWindow = { postMessage: vi.fn() } as unknown as Window;
+    const popoutWindow = createMessageWindow();
+
+    (
+      bridge.attach as unknown as (
+        iframeWindow: Window,
+        callbacks: { onReady?: () => void },
+        messageWindow: Window
+      ) => void
+    )(iframeWindow, { onReady }, popoutWindow);
+
+    expect(popoutWindow.addEventListener).toHaveBeenCalledWith("message", expect.any(Function));
+
+    popoutWindow.dispatchMessageEvent(
+      {
+        type: "bridge:ready",
+        protocolVersion: BRIDGE_PROTOCOL_VERSION
+      },
+      iframeWindow
+    );
+
+    expect(onReady).toHaveBeenCalledTimes(1);
+    bridge.detach();
+    expect(popoutWindow.removeEventListener).toHaveBeenCalledWith("message", expect.any(Function));
   });
 
   it("ignores message from another source", () => {

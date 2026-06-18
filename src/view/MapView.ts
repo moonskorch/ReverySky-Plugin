@@ -35,6 +35,8 @@ export class MapView extends ItemView {
   private readonly session: MapSession;
   private readonly noteOpenRouter: MapNoteOpenRouter;
   private filterPanelController: MapFilterPanelController | null = null;
+  private iframeLoadAbortController: AbortController | null = null;
+  private lifecycleGeneration = 0;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -79,6 +81,7 @@ export class MapView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
+    const lifecycleGeneration = ++this.lifecycleGeneration;
     this.session.start(this.registerEvent.bind(this));
 
     const container = this.contentEl as ObsidianHTMLElement;
@@ -90,7 +93,13 @@ export class MapView extends ItemView {
     try {
       iframeSrc = await this.plugin.getUnityRuntimeUrl();
     } catch (error) {
+      if (lifecycleGeneration !== this.lifecycleGeneration) {
+        return;
+      }
       this.notify(`Failed to start Unity runtime server: ${String(error)}`);
+      return;
+    }
+    if (lifecycleGeneration !== this.lifecycleGeneration) {
       return;
     }
 
@@ -105,32 +114,50 @@ export class MapView extends ItemView {
     }
     iframeHost.appendChild(iframe);
 
+    const iframeLoadAbortController = new AbortController();
+    this.iframeLoadAbortController = iframeLoadAbortController;
     iframe.addEventListener("load", () => {
+      if (lifecycleGeneration !== this.lifecycleGeneration) {
+        return;
+      }
       if (!iframe.contentWindow) {
         this.notify("Failed to access iframe window.");
         return;
       }
 
+      const messageWindow = container.ownerDocument.defaultView ?? window;
       this.bridge.attach(iframe.contentWindow, {
         onReady: () => {
+          if (lifecycleGeneration !== this.lifecycleGeneration) {
+            return;
+          }
           this.session.setBridgeReady(true);
           this.session.flushOrRefresh();
         },
         onNoteOpen: (payload: NoteOpenPayload) => {
+          if (lifecycleGeneration !== this.lifecycleGeneration) {
+            return;
+          }
           void this.noteOpenRouter.openRequestedNote(payload);
         },
         onError: (message: string) => {
+          if (lifecycleGeneration !== this.lifecycleGeneration) {
+            return;
+          }
           this.notify(message);
         }
-      });
-    });
+      }, messageWindow);
+    }, { signal: iframeLoadAbortController.signal });
   }
 
   async onClose(): Promise<void> {
+    this.lifecycleGeneration++;
     this.session.stop();
     this.bridge.detach();
     this.filterPanelController?.dispose();
     this.filterPanelController = null;
+    this.iframeLoadAbortController?.abort();
+    this.iframeLoadAbortController = null;
     emptyElement(this.contentEl as ObsidianHTMLElement);
   }
 }

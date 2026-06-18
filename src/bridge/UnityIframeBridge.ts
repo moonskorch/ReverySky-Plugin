@@ -21,6 +21,7 @@ type BridgeCallbacks = {
  */
 export class UnityIframeBridge {
   private iframeWindow: Window | null = null;
+  private messageWindow: Window | null = null;
   private attached = false;
   private callbacks: BridgeCallbacks = {};
   private readonly onMessageRef = (event: MessageEvent) => this.onMessage(event);
@@ -28,14 +29,15 @@ export class UnityIframeBridge {
   /**
    * Replace any previous iframe listener so only one runtime is active.
    */
-  attach(iframeWindow: Window, callbacks: BridgeCallbacks): void {
+  attach(iframeWindow: Window, callbacks: BridgeCallbacks, messageWindow: Window = window): void {
     if (this.attached) {
       this.detach();
     }
 
     this.iframeWindow = iframeWindow;
+    this.messageWindow = messageWindow;
     this.callbacks = callbacks;
-    window.addEventListener("message", this.onMessageRef);
+    this.messageWindow.addEventListener("message", this.onMessageRef);
     this.attached = true;
   }
 
@@ -44,8 +46,9 @@ export class UnityIframeBridge {
       return;
     }
 
-    window.removeEventListener("message", this.onMessageRef);
+    this.messageWindow?.removeEventListener("message", this.onMessageRef);
     this.iframeWindow = null;
+    this.messageWindow = null;
     this.callbacks = {};
     this.attached = false;
   }

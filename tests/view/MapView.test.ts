@@ -4,6 +4,8 @@ import type { MapViewDependencies } from "../../src/view/MapView";
 
 import { MapView } from "../../src/view/MapView";
 
+type BuildGraphForTest = NonNullable<MapViewDependencies["buildGraph"]>;
+
 type BridgeCallbacks = {
   onReady?: () => void;
   onNoteOpen?: (payload: { id?: string; path?: string }) => void;
@@ -110,7 +112,7 @@ describe("MapView bridge integration", () => {
 
     const deps: MapViewDependencies = {
       createBridge: () => bridge,
-      buildGraph: buildGraph as (app: never) => GraphPayload,
+      buildGraph: buildGraph as BuildGraphForTest,
       notify,
       now: () => 1700000000000
     };
@@ -131,7 +133,7 @@ describe("MapView bridge integration", () => {
     iframe!.dispatchEvent(new Event("load"));
 
     expect(bridge.attach).toHaveBeenCalledTimes(1);
-    expect(bridge.attach).toHaveBeenCalledWith(fakeContentWindow, expect.any(Object));
+    expect(bridge.attach).toHaveBeenCalledWith(fakeContentWindow, expect.any(Object), window);
 
     callbacks.onReady?.();
 
@@ -144,6 +146,215 @@ describe("MapView bridge integration", () => {
     expect(bridge.detach).toHaveBeenCalledTimes(1);
     expect(view.contentEl.childElementCount).toBe(0);
     expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("does not attach bridge when iframe load fires after close", async () => {
+    const app = {
+      marker: "app",
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+    const bridge = {
+      attach: vi.fn(),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+
+    const view = new MapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(makePayload()) as BuildGraphForTest,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    expect(iframe).not.toBeNull();
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+
+    await view.onClose();
+    iframe!.dispatchEvent(new Event("load"));
+
+    expect(bridge.detach).toHaveBeenCalledTimes(1);
+    expect(bridge.attach).not.toHaveBeenCalled();
+  });
+
+  it("does not emit graph when stale bridge ready fires after close", async () => {
+    const app = {
+      marker: "app",
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+    const buildGraph = vi.fn().mockReturnValue(makePayload());
+
+    const view = new MapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: buildGraph as BuildGraphForTest,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    expect(iframe).not.toBeNull();
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    expect(bridge.attach).toHaveBeenCalledTimes(1);
+
+    await view.onClose();
+    callbacks.onReady?.();
+
+    expect(bridge.detach).toHaveBeenCalledTimes(1);
+    expect(buildGraph).not.toHaveBeenCalled();
+    expect(bridge.sendGraphSet).not.toHaveBeenCalled();
+  });
+
+  it("ignores stale focus and bridge callbacks after focus-driven close", async () => {
+    let onActiveLeafChange: ((leaf: unknown) => void) | null = null;
+    const activeLeafA = {
+      view: {
+        getViewType: () => "markdown",
+        file: { path: "Notes/A.md" }
+      }
+    };
+    const activeLeafB = {
+      view: {
+        getViewType: () => "markdown",
+        file: { path: "Notes/B.md" }
+      }
+    };
+    const app = {
+      marker: "app",
+      workspace: {
+        activeLeaf: activeLeafA,
+        getMostRecentLeaf: vi.fn().mockReturnValue(activeLeafA),
+        getLeavesOfType: vi.fn().mockReturnValue([activeLeafA, activeLeafB]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn((eventName: string, callback: (leaf: unknown) => void) => {
+          if (eventName === "active-leaf-change") {
+            onActiveLeafChange = callback;
+          }
+          return { id: `event-${eventName}` };
+        })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn()
+    };
+    const payload = makePayload();
+    payload.vault.noteCount = 2;
+    payload.notes = [
+      {
+        id: "note-a",
+        path: "Notes/A.md",
+        title: "A",
+        tags: [],
+        size: 64
+      },
+      {
+        id: "note-b",
+        path: "Notes/B.md",
+        title: "B",
+        tags: [],
+        size: 64
+      }
+    ];
+    const buildGraph = vi.fn().mockReturnValue(payload);
+
+    const view = new MapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: buildGraph as BuildGraphForTest,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    expect(iframe).not.toBeNull();
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    expect(onActiveLeafChange).toEqual(expect.any(Function));
+    const handleActiveLeafChange = onActiveLeafChange as unknown as (leaf: unknown) => void;
+
+    handleActiveLeafChange(activeLeafB);
+    expect(bridge.sendNoteFocus).toHaveBeenLastCalledWith({
+      id: "note-b",
+      path: "Notes/B.md"
+    });
+
+    bridge.attach.mockClear();
+    bridge.sendGraphSet.mockClear();
+    bridge.sendNoteFocus.mockClear();
+    buildGraph.mockClear();
+
+    await view.onClose();
+    handleActiveLeafChange(activeLeafA);
+    callbacks.onReady?.();
+    iframe!.dispatchEvent(new Event("load"));
+
+    expect(bridge.detach).toHaveBeenCalledTimes(1);
+    expect(bridge.attach).not.toHaveBeenCalled();
+    expect(buildGraph).not.toHaveBeenCalled();
+    expect(bridge.sendGraphSet).not.toHaveBeenCalled();
+    expect(bridge.sendNoteFocus).not.toHaveBeenCalled();
   });
 
   it("opens note on note:open by id with path fallback", async () => {
@@ -195,7 +406,7 @@ describe("MapView bridge integration", () => {
 
     const deps: MapViewDependencies = {
       createBridge: () => bridge,
-      buildGraph: buildGraph as (app: never) => GraphPayload,
+      buildGraph: buildGraph as BuildGraphForTest,
       notify,
       now: () => 1700000000000
     };
@@ -282,7 +493,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -297,7 +508,10 @@ describe("MapView bridge integration", () => {
     iframe!.dispatchEvent(new Event("load"));
     callbacks.onReady?.();
 
-    onActiveLeafChange?.(markdownLeaf);
+    expect(onActiveLeafChange).toEqual(expect.any(Function));
+    const handleActiveLeafChange = onActiveLeafChange as unknown as (leaf: unknown) => void;
+
+    handleActiveLeafChange(markdownLeaf);
     callbacks.onNoteOpen?.({ id: "note_abc" });
     await Promise.resolve();
 
@@ -355,7 +569,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify,
         now: () => 1700000000000
       }
@@ -438,7 +652,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: buildGraph as (app: never) => GraphPayload,
+        buildGraph: buildGraph as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -547,7 +761,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: buildGraph as (app: never) => GraphPayload,
+        buildGraph: buildGraph as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -661,7 +875,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: buildGraph as (app: never) => GraphPayload,
+        buildGraph: buildGraph as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -763,7 +977,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: buildGraph as (app: never) => GraphPayload,
+        buildGraph: buildGraph as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -869,7 +1083,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -889,8 +1103,11 @@ describe("MapView bridge integration", () => {
       path: "Folder/A.md"
     });
 
+    expect(onActiveLeafChange).toEqual(expect.any(Function));
+    const handleActiveLeafChange = onActiveLeafChange as unknown as (leaf: unknown) => void;
+
     vaultCallbacks.create?.({ path: "Folder/New.md" });
-    onActiveLeafChange?.(activeLeafB);
+    handleActiveLeafChange(activeLeafB);
     vi.advanceTimersByTime(250);
 
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
@@ -971,7 +1188,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: buildGraph as (app: never) => GraphPayload,
+        buildGraph: buildGraph as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -1041,7 +1258,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: buildGraph as (app: never) => GraphPayload,
+        buildGraph: buildGraph as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -1127,7 +1344,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: buildGraph as (app: never) => GraphPayload,
+        buildGraph: buildGraph as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -1215,7 +1432,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: buildGraph as (app: never) => GraphPayload,
+        buildGraph: buildGraph as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -1302,7 +1519,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -1368,7 +1585,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -1444,7 +1661,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -1535,7 +1752,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -1619,7 +1836,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -1713,7 +1930,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => Date.UTC(2026, 0, 31, 12, 0, 0)
       }
@@ -1810,7 +2027,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => Date.UTC(2026, 2, 31, 12, 0, 0)
       }
@@ -1881,7 +2098,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => Date.UTC(2026, 3, 15, 12, 0, 0)
       }
@@ -1963,7 +2180,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -2029,7 +2246,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -2100,7 +2317,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => Date.UTC(2026, 3, 15, 12, 0, 0)
       }
@@ -2178,7 +2395,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: buildGraph as (app: never) => GraphPayload,
+        buildGraph: buildGraph as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -2254,7 +2471,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: buildGraph as (app: never) => GraphPayload,
+        buildGraph: buildGraph as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -2337,7 +2554,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: buildGraph as (app: never) => GraphPayload,
+        buildGraph: buildGraph as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -2419,7 +2636,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -2492,7 +2709,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -2556,7 +2773,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -2617,7 +2834,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -2683,7 +2900,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -2751,7 +2968,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
@@ -2815,7 +3032,7 @@ describe("MapView bridge integration", () => {
       plugin as never,
       {
         createBridge: () => bridge,
-        buildGraph: vi.fn().mockReturnValue(makePayload()) as (app: never) => GraphPayload,
+        buildGraph: vi.fn().mockReturnValue(makePayload()) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000
       }
