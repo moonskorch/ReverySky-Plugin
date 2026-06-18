@@ -241,11 +241,11 @@ Main repository surfaces:
   Type: generated
 
 Build and import flow:
-1. `npm run build` builds the `folder-runtime` package mode, validates TypeScript, writes `main.js`, and checks local runtime artifacts.
-2. Unity exports WebGL from `unity/ReverySkyMap`.
-3. `scripts/import-unity-webgl.ps1` copies the export into `unity-webgl/` and regenerates runtime files used by the plugin.
-4. At runtime the plugin starts `UnityWebglLocalServer`, and the iframe loads the served `index.html`.
-5. Release-shaped package candidates can be built with `npm run package:embedded-html` or `npm run package:embedded-archive`.
+1. Unity exports WebGL from `unity/ReverySkyMap`.
+2. `scripts/import-unity-webgl.ps1` copies the export into `unity-webgl/` and regenerates runtime files used by all package modes.
+3. `npm run build` builds the current release candidate from the prepared runtime and writes root `main.js`.
+4. Local folder-runtime installs can be built with `npm run package:folder-runtime`.
+5. Other release-shaped package modes can be built with `npm run package:embedded-html` or `npm run package:embedded-archive`.
 
 ## Verification
 Detailed commands live in `docs/VERIFICATION.md`. This section only maps the main architecture areas to their checks.

@@ -31,7 +31,7 @@
 
 ## Development Commands
 - Install deps: `npm install`
-- Common plugin commands: `npm run dev`, `npm run build`, `npm run test`
+- Common plugin commands: `npm run dev`, `npm run build`, `npm run check`, `npm run test`
 - Full verification command matrix: `docs/VERIFICATION.md`
 - UI visual regression commands: `docs/VERIFICATION.md`
 - Unity export import: `powershell -ExecutionPolicy Bypass -File .\scripts\import-unity-webgl.ps1 -ExportRoot "<UnityWebGLExportRoot>"`
@@ -63,6 +63,7 @@
 ## Working Rules
 - Keep code comments, documentation, and runbooks in English.
 - Keep wording concise, professional, and implementation-focused.
+- Avoid Markdown/text tables in documentation; prefer short bullet lists or explicit per-mode subsections.
 - Prefer existing `src/*` patterns before introducing new abstractions.
 - Do not modify application code when only documentation maintenance is requested.
 - Never create temporary test files in the repository.

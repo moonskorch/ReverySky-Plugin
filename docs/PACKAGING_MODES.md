@@ -138,13 +138,20 @@ npm.cmd run measure:embedded-archive
 
 ## Release Candidate Shortcut
 
-For now:
+Go-to commands:
+
+```powershell
+npm.cmd run build
+npm.cmd run check
+```
+
+For now, `build` calls:
 
 ```powershell
 npm.cmd run package:release-candidate
 ```
 
-This calls:
+`package:release-candidate` calls:
 
 ```powershell
 npm.cmd run package:embedded-archive

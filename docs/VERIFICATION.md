@@ -20,7 +20,8 @@ Policy:
 ## Current automated checks in this repository
 
 Core commands:
-- `npm run build` - aliases to `npm run package:folder-runtime`.
+- `npm run build` - builds the current release candidate; currently aliases to `npm run package:release-candidate`.
+- `npm run check` - validates the current release candidate and runs `npm run test`.
 - `npm run package:folder-runtime` - WebGL artifact check + TypeScript compile check + production bundle build (`esbuild`) + root `main.js` marker + folder-runtime package validation.
 - `npm run package:embedded-html` - normal build plus embedded HTML package creation and validation.
 - `npm run package:embedded-archive` - normal build plus embedded archive package creation and validation.
@@ -36,9 +37,6 @@ Core commands:
 - `npm run test:ui-visual` - Playwright visual regression run for `tests/visual`.
 - `npm run test:ui-visual:update` - refresh screenshot baselines when the UI change is intentional.
 - `npm run test:ui-visual:report` - open the latest Playwright report.
-
-Release scanner sanity check:
-- After building an Obsidian dashboard candidate, run `rg -n "process\.env|os\.(hostname|userInfo|networkInterfaces)" main.js` and investigate any matches before upload.
 
 Current TS baseline test suites:
 - `tests/bridge/MessageValidator.test.ts`

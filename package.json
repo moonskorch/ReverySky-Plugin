@@ -5,9 +5,10 @@
   "description": "ReverySky Map Obsidian plugin",
   "scripts": {
     "dev": "node esbuild.config.mjs",
+    "build": "npm run package:release-candidate",
+    "check": "npm run check:package:release-candidate && npm run test",
     "check:unity-webgl": "node scripts/check-unity-webgl-artifacts.mjs",
     "check:plugin-release": "node scripts/check-plugin-release-artifacts.mjs",
-    "build": "npm run package:folder-runtime",
     "package:folder-runtime": "npm run check:unity-webgl && tsc --noEmit --skipLibCheck && node esbuild.config.mjs production && node scripts/package-mode-marker.mjs folder-runtime && npm run check:package:folder-runtime",
     "package:embedded-html": "npm run check:unity-webgl && tsc --noEmit --skipLibCheck && node esbuild.config.mjs production && node scripts/package-embedded-html.mjs && npm run check:package:embedded-html",
     "package:embedded-archive": "npm run check:unity-webgl && tsc --noEmit --skipLibCheck && node esbuild.config.mjs production && node scripts/package-embedded-archive.mjs && npm run check:package:embedded-archive",
