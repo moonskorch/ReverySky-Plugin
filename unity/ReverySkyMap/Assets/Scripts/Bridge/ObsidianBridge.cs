@@ -8,6 +8,7 @@ public class ObsidianBridge : MonoBehaviour
   private const string ExpectedProtocolVersion = "2.0.0";
   private const string GraphSetMessageType = "graph:set";
   private const string NoteFocusMessageType = "note:focus";
+  private static bool IsRuntimeShuttingDown;
 
 #if UNITY_WEBGL && !UNITY_EDITOR
   [DllImport("__Internal")]
@@ -42,6 +43,9 @@ public class ObsidianBridge : MonoBehaviour
 
   public void OnGraphSet(string json)
   {
+    if (IsRuntimeShuttingDown)
+      return;
+
     MapRuntimeContext.EnableRuntimeMode();
 
     if (string.IsNullOrWhiteSpace(json))
@@ -154,6 +158,9 @@ public class ObsidianBridge : MonoBehaviour
 
   public void OnNoteFocus(string json)
   {
+    if (IsRuntimeShuttingDown)
+      return;
+
     MapRuntimeContext.EnableRuntimeMode();
 
     if (string.IsNullOrWhiteSpace(json))
@@ -199,6 +206,9 @@ public class ObsidianBridge : MonoBehaviour
 
   private static void HandleOpenNoteRequested(string noteId, string notePath)
   {
+    if (IsRuntimeShuttingDown)
+      return;
+
     var safeId = noteId ?? string.Empty;
     var safePath = notePath ?? string.Empty;
 
@@ -207,6 +217,13 @@ public class ObsidianBridge : MonoBehaviour
 #else
     Debug.Log($"[ObsidianBridge] note:open requested (Editor/Non-WebGL): id={safeId}, path={safePath}");
 #endif
+  }
+
+  public void OnRuntimeShutdown(string json)
+  {
+    IsRuntimeShuttingDown = true;
+    MapRuntimeContext.OnOpenNoteRequested -= HandleOpenNoteRequested;
+    Debug.Log("[ObsidianBridge] runtime shutdown requested.");
   }
 
   private static DateTime ParseDate(string value)

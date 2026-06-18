@@ -19,16 +19,48 @@ Fields:
 - `protocolVersion` (required, string)
 - `type` (required, string)
 - `requestId` (optional, string)
-- `payload` (required, object)
+- `payload` (required for payload-carrying messages, omitted for runtime shutdown messages)
 
 ## Message Types
 Plugin -> runtime:
 - `graph:set`: effective filtered graph payload.
 - `note:focus`: current-note focus hint with optional `id` and `path`.
+- `runtime:shutdown`: lifecycle message requesting the iframe runtime wrapper to stop bridge activity before the parent view detaches.
 
 Runtime -> plugin:
 - `bridge:ready`: runtime is initialized and ready to receive payloads.
 - `note:open`: request for Obsidian to open a note by `id` and/or `path`.
+- `runtime:shutdown-complete`: acknowledgement for a matching `runtime:shutdown` request.
+
+## Runtime Shutdown Messages
+`runtime:shutdown` is a bridge/runtime-wrapper lifecycle handshake, not a full Unity engine teardown.
+
+Parent -> runtime:
+
+```json
+{
+  "protocolVersion": "2.0.0",
+  "type": "runtime:shutdown",
+  "requestId": "shutdown_..."
+}
+```
+
+Runtime -> parent:
+
+```json
+{
+  "protocolVersion": "2.0.0",
+  "type": "runtime:shutdown-complete",
+  "requestId": "shutdown_..."
+}
+```
+
+Rules:
+- `requestId` is required for both shutdown messages.
+- The parent only accepts `runtime:shutdown-complete` from the attached iframe source and only when `requestId` matches the pending shutdown.
+- The iframe JS wrapper enters shutdown mode, stops its own outgoing bridge messages, removes its own message, resize, and WebGL context loss listeners, and replies with `runtime:shutdown-complete`.
+- The Unity C# `ObsidianBridge` treats shutdown as a bridge guard: it stops accepting `graph:set` and `note:focus`, and stops sending `note:open`.
+- Shutdown does not call Unity quit APIs, does not destroy Unity scene objects, and does not manually tear down the iframe.
 
 ## Graph Payload
 ```ts
@@ -75,6 +107,7 @@ type GraphLink = {
 - Outgoing `graph:set` payloads are validated before postMessage dispatch.
 - Incoming `bridge:ready` is accepted only when `protocolVersion` matches exactly.
 - Incoming `note:open` is accepted only when `protocolVersion` matches and the payload includes a non-empty `id` or `path`.
+- Incoming `runtime:shutdown-complete` is accepted only when `protocolVersion` matches and `requestId` is a non-empty string matching the pending shutdown request.
 - Invalid envelopes are rejected with explicit, non-fatal error reporting.
 - Unity runtime ingest is fail-soft: it treats `vault.noteCount` as informational (uses `notes` as source of truth).
 - Unity runtime ingest is fail-soft for unresolved links: missing endpoints are tolerated at ingest and dropped later during edge resolution.

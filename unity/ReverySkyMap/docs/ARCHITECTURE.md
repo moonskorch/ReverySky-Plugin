@@ -70,7 +70,14 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 4. In WebGL builds, `ObsidianBridge` forwards the event to JavaScript via `ReverySkyBridgePostNoteOpen(noteId, notePath)`.
 5. Incoming `note:focus` messages call `ObsidianBridge.OnNoteFocus()`, which resolves the note through `Cartographer.FocusRuntimeNote()` and defers focus restore when the graph rebuild has not yet materialized the star.
 
-### 4. Camera and view controls
+### 4. Runtime shutdown guard
+
+1. Before the parent plugin detaches the iframe, the WebGL wrapper receives `runtime:shutdown` and forwards it to `ObsidianBridge.OnRuntimeShutdown(string json)` when the Unity instance can receive messages.
+2. `ObsidianBridge` marks the bridge as shutting down and unsubscribes from `MapRuntimeContext.OnOpenNoteRequested`.
+3. After shutdown starts, `OnGraphSet`, `OnNoteFocus`, and `HandleOpenNoteRequested` return without processing so the closing runtime cannot ingest new graph state, focus notes, or send late `note:open` callbacks.
+4. This is a bridge lifecycle guard only; parent hosting, iframe detachment, and full Unity engine teardown remain outside the Unity project boundary.
+
+### 5. Camera and view controls
 
 1. `GameInput` translates touch and mouse gestures into semantic events such as tap, swipe, pinch, wheel zoom, and right-drag rotation.
 2. `CameraOrbitalController` listens to those events and keeps the camera orbiting around the current pivot.
@@ -83,8 +90,8 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 ### Bridge and runtime state
 
 - `ObsidianBridge`
-  - Responsibility: owns bridge validation, payload normalization, and the WebGL callback back into the parent plugin.
-  - Code anchor: `Assets/Scripts/Bridge/ObsidianBridge.cs::OnGraphSet`, `OnNoteFocus`, `HandleOpenNoteRequested`
+  - Responsibility: owns bridge validation, payload normalization, the shutdown guard, and the WebGL callback back into the parent plugin.
+  - Code anchor: `Assets/Scripts/Bridge/ObsidianBridge.cs::OnGraphSet`, `OnNoteFocus`, `OnRuntimeShutdown`, `HandleOpenNoteRequested`
   - Entry point: bridge messages from the parent runtime
   - Calls / sends to: `MapRuntimeContext`, `Cartographer`, `ReverySkyBridgePostNoteOpen`
 - `MapRuntimeContext`
@@ -191,8 +198,9 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 - `GameInput` treats UI hits as blocked input and only forwards gestures that originate on the map.
 - Bridge contract rules that matter locally:
   - `protocolVersion` must match `2.0.0`.
-  - Accepted message types are `graph:set` and `note:focus`.
+  - Accepted parent-to-Unity message types are `graph:set`, `note:focus`, and `runtime:shutdown`.
   - `graph:set` payloads are already filtered by the parent plugin; Unity does not own vault query logic.
+  - `runtime:shutdown` is a lifecycle guard that stops bridge input and output without calling Unity quit APIs.
   - `path` values are treated as vault-relative and normalized with `/` separators when path lookup is needed.
   - Empty titles fall back to `GameSettings.DefaultTitle`.
   - Negative note sizes clamp to `0`.
@@ -215,7 +223,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 
 - Bridge parsing and runtime mapping:
   - Automated checks: `Assets/Tests/EditMode/ObsidianBridgeEditModeTests.cs`
-  - Manual checks when needed: load the scene and confirm `graph:set` populates notes, links, tags, and focus state without errors
+  - Manual checks when needed: load the scene and confirm `graph:set` populates notes, links, tags, and focus state without errors; in the parent plugin, close and quickly reopen the map view and confirm there are no delayed `note:open` callbacks or bridge errors
 - Engine selection and layout:
   - Automated checks: `Assets/Tests/EditMode/CartographerForcesEngineRadiusEditModeTests.cs`, `Assets/Tests/EditMode/CartographerStaticLinksEngineEditModeTests.cs`, PlayMode engine-preference checks in `Assets/Tests/PlayMode/DreamScapeRuntimePlayModeTests.cs`
   - Manual checks when needed: inspect force layout, static-link slot output, date-range behavior, and the `Static25D` camera slider

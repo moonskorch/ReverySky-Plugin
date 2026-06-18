@@ -38,6 +38,20 @@ export type NoteFocusMessage = {
   payload: NoteFocusPayload;
 };
 
+export type RuntimeShutdownMessage = {
+  protocolVersion: string;
+  type: "runtime:shutdown";
+  requestId: string;
+};
+
+export type RuntimeShutdownCompleteMessage = {
+  protocolVersion: string;
+  type: "runtime:shutdown-complete";
+  requestId: string;
+};
+
+export type ShutdownResult = "complete" | "timeout" | "not-attached" | "superseded";
+
 export type GraphNoteNode = {
   id: string;
   path: string;
@@ -72,5 +86,5 @@ export type GraphSetMessage = {
   payload: GraphPayload;
 };
 
-export type IncomingBridgeMessage = BridgeReadyMessage | NoteOpenMessage;
-export type OutgoingBridgeMessage = GraphSetMessage | NoteFocusMessage;
+export type IncomingBridgeMessage = BridgeReadyMessage | NoteOpenMessage | RuntimeShutdownCompleteMessage;
+export type OutgoingBridgeMessage = GraphSetMessage | NoteFocusMessage | RuntimeShutdownMessage;

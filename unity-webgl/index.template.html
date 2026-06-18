@@ -96,6 +96,7 @@
         let runtimeMode = "boot";
         let unityInstance = null;
         let readySent = false;
+        let isShuttingDown = false;
         let latestGraphSetMessage = null;
         let latestNoteFocusMessage = null;
         let frameworkBlobUrl = null;
@@ -129,7 +130,7 @@
         }
 
         function sendReady() {
-          if (readySent || !window.parent) {
+          if (isShuttingDown || readySent || !window.parent) {
             return;
           }
 
@@ -146,7 +147,7 @@
         }
 
         function postNoteOpen(id, path) {
-          if (!window.parent) {
+          if (isShuttingDown || !window.parent) {
             return;
           }
 
@@ -272,6 +273,10 @@
         }
 
         function applyGraphSet(message) {
+          if (isShuttingDown) {
+            return;
+          }
+
           latestGraphSetMessage = message;
           const payload = message.payload || { notes: [], links: [] };
           const noteCount = payload && payload.vault ? payload.vault.noteCount : (payload.notes || []).length;
@@ -286,6 +291,10 @@
         }
 
         function applyNoteFocus(message) {
+          if (isShuttingDown) {
+            return;
+          }
+
           latestNoteFocusMessage = message;
           const payload = message && message.payload ? message.payload : {};
           const id = typeof payload.id === "string" ? payload.id : "";
@@ -305,9 +314,75 @@
           setStatus("WebGL context lost. Reload the map view.");
         }
 
+        function onWebglContextLost(event) {
+          event.preventDefault();
+          console.warn("[ReverySky] WebGL context lost.");
+          handleWebglContextLoss();
+        }
+
+        function onWindowResize() {
+          resizeCanvas();
+        }
+
+        function postShutdownComplete(requestId) {
+          if (!window.parent) {
+            return;
+          }
+
+          window.parent.postMessage(
+            {
+              protocolVersion: protocolVersion,
+              type: "runtime:shutdown-complete",
+              requestId: typeof requestId === "string" ? requestId : ""
+            },
+            "*"
+          );
+        }
+
+        function beginShutdown(message) {
+          const requestId = message && typeof message.requestId === "string" ? message.requestId : "";
+
+          if (isShuttingDown) {
+            postShutdownComplete(requestId);
+            return;
+          }
+
+          isShuttingDown = true;
+          runtimeMode = "closing";
+          latestGraphSetMessage = null;
+          latestNoteFocusMessage = null;
+          window.ReverySkyBridgePostNoteOpen = function () {};
+          window.removeEventListener("resize", onWindowResize);
+          canvas.removeEventListener("webglcontextlost", onWebglContextLost);
+
+          try {
+            if (unityInstance && typeof unityInstance.SendMessage === "function") {
+              unityInstance.SendMessage("ObsidianBridge", "OnRuntimeShutdown", JSON.stringify({
+                protocolVersion: protocolVersion,
+                type: "runtime:shutdown",
+                requestId: requestId
+              }));
+            }
+          } catch (e) {
+            console.warn("[ReverySky] Failed to notify Unity runtime shutdown:", e);
+          }
+
+          postShutdownComplete(requestId);
+          window.removeEventListener("message", onBridgeMessage);
+        }
+
         function onBridgeMessage(event) {
           const data = event && event.data;
           if (!data || typeof data !== "object") {
+            return;
+          }
+
+          if (data.type === "runtime:shutdown") {
+            beginShutdown(data);
+            return;
+          }
+
+          if (isShuttingDown) {
             return;
           }
 
@@ -362,6 +437,10 @@
             }
           );
 
+          if (isShuttingDown) {
+            return;
+          }
+
           runtimeMode = "unity";
           setStatus("Unity runtime ready");
           sendReady();
@@ -379,14 +458,8 @@
             postNoteOpen(noteId, notePath);
           };
           window.addEventListener("message", onBridgeMessage);
-          canvas.addEventListener("webglcontextlost", (event) => {
-            event.preventDefault();
-            console.warn("[ReverySky] WebGL context lost.");
-            handleWebglContextLoss();
-          });
-          window.addEventListener("resize", () => {
-            resizeCanvas();
-          });
+          canvas.addEventListener("webglcontextlost", onWebglContextLost);
+          window.addEventListener("resize", onWindowResize);
 
           resizeCanvas();
 

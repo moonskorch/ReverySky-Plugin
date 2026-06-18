@@ -2,7 +2,8 @@ import {
   BRIDGE_PROTOCOL_VERSION,
   GraphPayload,
   IncomingBridgeMessage,
-  NoteOpenMessage
+  NoteOpenMessage,
+  RuntimeShutdownCompleteMessage
 } from "./BridgeTypes";
 import {
   formatMapLayoutPreferenceValues,
@@ -129,6 +130,30 @@ export class MessageValidator {
     const path = typeof data.payload.path === "string" ? data.payload.path.trim() : "";
     if (!id && !path) {
       errors.push("incoming note:open payload must include non-empty id or path");
+    }
+
+    return errors;
+  }
+
+  static validateIncomingShutdownCompleteMessage(data: RuntimeShutdownCompleteMessage): string[] {
+    const errors: string[] = [];
+
+    if (!data || typeof data !== "object") {
+      return ["incoming message must be an object"];
+    }
+
+    if (data.type !== "runtime:shutdown-complete") {
+      errors.push("incoming message type must be runtime:shutdown-complete");
+    }
+
+    if (data.protocolVersion !== BRIDGE_PROTOCOL_VERSION) {
+      errors.push(
+        `incoming protocolVersion mismatch: expected ${BRIDGE_PROTOCOL_VERSION}, got ${String(data.protocolVersion)}`
+      );
+    }
+
+    if (!this.isNonEmptyString(data.requestId)) {
+      errors.push("incoming runtime:shutdown-complete requestId must be a non-empty string");
     }
 
     return errors;

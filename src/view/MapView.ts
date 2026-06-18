@@ -10,7 +10,7 @@ import { MapSession } from "./MapSession";
 
 export const MAP_VIEW_TYPE = "reverysky-map-view";
 
-type BridgePort = Pick<UnityIframeBridge, "attach" | "detach" | "sendGraphSet" | "sendNoteFocus">;
+type BridgePort = Pick<UnityIframeBridge, "attach" | "detach" | "shutdown" | "sendGraphSet" | "sendNoteFocus">;
 type ObsidianHTMLElement = HTMLElement & {
   empty?: () => void;
   setAttr?: (name: string, value: string) => void;
@@ -151,13 +151,20 @@ export class MapView extends ItemView {
   }
 
   async onClose(): Promise<void> {
-    this.lifecycleGeneration++;
+    const closeGeneration = ++this.lifecycleGeneration;
     this.session.stop();
-    this.bridge.detach();
     this.filterPanelController?.dispose();
     this.filterPanelController = null;
     this.iframeLoadAbortController?.abort();
     this.iframeLoadAbortController = null;
+
+    await this.bridge.shutdown(300);
+
+    if (closeGeneration !== this.lifecycleGeneration) {
+      return;
+    }
+
+    this.bridge.detach();
     emptyElement(this.contentEl as ObsidianHTMLElement);
   }
 }

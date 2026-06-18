@@ -5,7 +5,9 @@ import {
   GraphPayload,
   GraphSetMessage,
   IncomingBridgeMessage,
-  NoteOpenPayload
+  NoteOpenPayload,
+  RuntimeShutdownMessage,
+  ShutdownResult
 } from "./BridgeTypes";
 import { MessageValidator } from "./MessageValidator";
 
@@ -13,6 +15,12 @@ type BridgeCallbacks = {
   onReady?: () => void;
   onNoteOpen?: (payload: NoteOpenPayload) => void;
   onError?: (message: string) => void;
+};
+
+type PendingShutdown = {
+  requestId: string;
+  resolve: (result: ShutdownResult) => void;
+  timeoutId: ReturnType<typeof setTimeout>;
 };
 
 /**
@@ -24,12 +32,15 @@ export class UnityIframeBridge {
   private messageWindow: Window | null = null;
   private attached = false;
   private callbacks: BridgeCallbacks = {};
+  private pendingShutdown: PendingShutdown | null = null;
   private readonly onMessageRef = (event: MessageEvent) => this.onMessage(event);
 
   /**
    * Replace any previous iframe listener so only one runtime is active.
    */
   attach(iframeWindow: Window, callbacks: BridgeCallbacks, messageWindow: Window = window): void {
+    this.resolvePendingShutdown("superseded");
+
     if (this.attached) {
       this.detach();
     }
@@ -42,6 +53,8 @@ export class UnityIframeBridge {
   }
 
   detach(): void {
+    this.resolvePendingShutdown("superseded");
+
     if (!this.attached) {
       return;
     }
@@ -51,6 +64,39 @@ export class UnityIframeBridge {
     this.messageWindow = null;
     this.callbacks = {};
     this.attached = false;
+  }
+
+  shutdown(timeoutMs = 300): Promise<ShutdownResult> {
+    if (!this.attached || !this.iframeWindow) {
+      return Promise.resolve("not-attached");
+    }
+
+    this.resolvePendingShutdown("superseded");
+
+    const requestId = `shutdown_${Date.now()}`;
+    const message: RuntimeShutdownMessage = {
+      protocolVersion: BRIDGE_PROTOCOL_VERSION,
+      type: "runtime:shutdown",
+      requestId
+    };
+
+    return new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        this.resolvePendingShutdown("timeout");
+      }, timeoutMs);
+
+      this.pendingShutdown = {
+        requestId,
+        resolve,
+        timeoutId
+      };
+
+      try {
+        this.iframeWindow?.postMessage(message, "*");
+      } catch {
+        this.resolvePendingShutdown("timeout");
+      }
+    });
   }
 
   sendGraphSet(payload: GraphPayload): void {
@@ -131,6 +177,29 @@ export class UnityIframeBridge {
         return;
       }
       this.callbacks.onNoteOpen?.(data.payload ?? {});
+      return;
     }
+
+    if (data.type === "runtime:shutdown-complete") {
+      const incomingErrors = MessageValidator.validateIncomingShutdownCompleteMessage(data);
+      if (incomingErrors.length > 0) {
+        return;
+      }
+      if (this.pendingShutdown?.requestId !== data.requestId) {
+        return;
+      }
+      this.resolvePendingShutdown("complete");
+    }
+  }
+
+  private resolvePendingShutdown(result: ShutdownResult): void {
+    const pendingShutdown = this.pendingShutdown;
+    if (!pendingShutdown) {
+      return;
+    }
+
+    clearTimeout(pendingShutdown.timeoutId);
+    this.pendingShutdown = null;
+    pendingShutdown.resolve(result);
   }
 }

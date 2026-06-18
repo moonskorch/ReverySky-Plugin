@@ -87,4 +87,24 @@ describe("MessageValidator", () => {
 
     expect(errors).toContain("incoming note:open payload must include non-empty id or path");
   });
+
+  it("accepts incoming runtime:shutdown-complete with matching protocol and requestId", () => {
+    const errors = MessageValidator.validateIncomingShutdownCompleteMessage({
+      type: "runtime:shutdown-complete",
+      protocolVersion: BRIDGE_PROTOCOL_VERSION,
+      requestId: "shutdown_1700000000000"
+    });
+
+    expect(errors).toEqual([]);
+  });
+
+  it("rejects incoming runtime:shutdown-complete without requestId", () => {
+    const errors = MessageValidator.validateIncomingShutdownCompleteMessage({
+      type: "runtime:shutdown-complete",
+      protocolVersion: BRIDGE_PROTOCOL_VERSION,
+      requestId: ""
+    });
+
+    expect(errors).toContain("incoming runtime:shutdown-complete requestId must be a non-empty string");
+  });
 });

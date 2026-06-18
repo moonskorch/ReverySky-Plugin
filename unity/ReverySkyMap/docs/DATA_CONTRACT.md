@@ -11,6 +11,7 @@ If this file conflicts with canonical contract, canonical contract wins.
 - `protocolVersion` must match expected version exactly.
 - Runtime-ready signal is `bridge:ready`.
 - Runtime ingestion message is `graph:set`.
+- Runtime shutdown message is `runtime:shutdown`.
 
 ## Envelope Shape
 Expected envelope:
@@ -31,6 +32,32 @@ Required fields for Unity ingestion:
 
 Optional field:
 - `requestId` (string)
+
+## Runtime Shutdown Handling
+Unity WebGL shutdown is a bridge/runtime-wrapper lifecycle guard, not a full Unity engine shutdown.
+
+Expected shutdown envelope:
+
+```json
+{
+  "protocolVersion": "2.0.0",
+  "type": "runtime:shutdown",
+  "requestId": "shutdown_..."
+}
+```
+
+Unity-side behavior:
+- The iframe JS wrapper receives `runtime:shutdown`, enters `isShuttingDown`, removes its own bridge listeners, and replies to the parent with `runtime:shutdown-complete`.
+- The iframe JS wrapper forwards shutdown to `ObsidianBridge.OnRuntimeShutdown(string json)` when the Unity instance can receive messages.
+- `ObsidianBridge.OnRuntimeShutdown` marks the bridge as shutting down and unsubscribes from `MapRuntimeContext.OnOpenNoteRequested`.
+- After shutdown, `ObsidianBridge.OnGraphSet` and `ObsidianBridge.OnNoteFocus` return without processing.
+- After shutdown, `HandleOpenNoteRequested` returns without sending `note:open`.
+
+Non-goals:
+- Do not call `Application.Quit()`.
+- Do not call Unity WebGL `Quit()`.
+- Do not destroy Unity scene objects.
+- Do not treat shutdown as graph data cleanup.
 
 ## Payload Subset Used by Unity Runtime
 
@@ -115,6 +142,7 @@ Current runtime behavior snapshot for Unity ingestion and map interaction:
 ## Error Handling Expectations
 - Invalid envelope or protocol mismatch must be rejected gracefully.
 - Repeated `graph:set` calls must rebuild or update runtime state without stale leftovers.
+- `runtime:shutdown` must stop bridge input/output without requiring a Unity engine quit.
 - Errors must be explicit and non-crashing.
 
 ## Baseline Test Payloads (for EditMode tests)

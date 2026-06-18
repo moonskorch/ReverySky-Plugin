@@ -103,7 +103,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePayload();
@@ -143,9 +144,103 @@ describe("MapView bridge integration", () => {
 
     await view.onClose();
 
+    expect(bridge.shutdown).toHaveBeenCalledWith(300);
     expect(bridge.detach).toHaveBeenCalledTimes(1);
+    expect(bridge.shutdown.mock.invocationCallOrder[0]).toBeLessThan(bridge.detach.mock.invocationCallOrder[0]);
     expect(view.contentEl.childElementCount).toBe(0);
     expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("detaches and clears content after shutdown timeout result", async () => {
+    const app = {
+      marker: "app",
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+    const bridge = {
+      attach: vi.fn(),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("timeout")
+    };
+
+    const view = new MapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(makePayload()) as BuildGraphForTest,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    expect(view.contentEl.childElementCount).toBeGreaterThan(0);
+    await view.onClose();
+
+    expect(bridge.shutdown).toHaveBeenCalledWith(300);
+    expect(bridge.detach).toHaveBeenCalledTimes(1);
+    expect(view.contentEl.childElementCount).toBe(0);
+  });
+
+  it("does not let an older pending close detach a newer bridge attachment", async () => {
+    const app = {
+      marker: "app",
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+    let resolveShutdown: ((result: "complete") => void) | null = null;
+    const bridge = {
+      attach: vi.fn(),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn(() => new Promise<"complete">((resolve) => {
+        resolveShutdown = resolve;
+      }))
+    };
+
+    const view = new MapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(makePayload()) as BuildGraphForTest,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+
+    await view.onOpen();
+    const closePromise = view.onClose();
+    await Promise.resolve();
+    expect(bridge.shutdown).toHaveBeenCalledTimes(1);
+    expect(bridge.detach).not.toHaveBeenCalled();
+
+    await view.onOpen();
+    resolveShutdown?.("complete");
+    await closePromise;
+
+    expect(bridge.detach).not.toHaveBeenCalled();
+    expect(view.contentEl.querySelector("iframe")).not.toBeNull();
   });
 
   it("does not attach bridge when iframe load fires after close", async () => {
@@ -166,7 +261,8 @@ describe("MapView bridge integration", () => {
       attach: vi.fn(),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const view = new MapView(
@@ -216,7 +312,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
     const buildGraph = vi.fn().mockReturnValue(makePayload());
 
@@ -288,7 +385,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
     const payload = makePayload();
     payload.vault.noteCount = 2;
@@ -395,7 +493,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePayload();
@@ -481,7 +580,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePayload();
@@ -557,7 +657,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePayload();
@@ -642,7 +743,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePayload();
@@ -751,7 +853,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePayload();
@@ -865,7 +968,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePayload();
@@ -966,7 +1070,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const queuedPayload = makePayload();
@@ -1067,7 +1172,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePayload();
@@ -1163,7 +1269,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payloadBefore = makePayload();
@@ -1248,7 +1355,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -1330,7 +1438,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -1422,7 +1531,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -1510,7 +1620,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -1576,7 +1687,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -1644,7 +1756,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -1743,7 +1856,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -1827,7 +1941,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -1917,7 +2032,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -2015,7 +2131,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -2086,7 +2203,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -2171,7 +2289,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -2237,7 +2356,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -2305,7 +2425,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -2382,7 +2503,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -2454,7 +2576,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -2544,7 +2667,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -2627,7 +2751,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -2700,7 +2825,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -2764,7 +2890,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -2825,7 +2952,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -2891,7 +3019,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -2959,7 +3088,8 @@ describe("MapView bridge integration", () => {
       }),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const payload = makePathPayload();
@@ -3025,7 +3155,8 @@ describe("MapView bridge integration", () => {
       attach: vi.fn(),
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
-      sendNoteFocus: vi.fn()
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
     };
     const view = new MapView(
       { app } as never,

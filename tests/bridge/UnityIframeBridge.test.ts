@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { BRIDGE_PROTOCOL_VERSION, GraphPayload } from "../../src/bridge/BridgeTypes";
 import { UnityIframeBridge } from "../../src/bridge/UnityIframeBridge";
 
@@ -58,6 +58,10 @@ function createMessageWindow(): Window & {
 }
 
 describe("UnityIframeBridge", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("sends graph:set for valid payload", () => {
     const bridge = new UnityIframeBridge();
     const postMessage = vi.fn();
@@ -233,5 +237,153 @@ describe("UnityIframeBridge", () => {
     );
 
     expect(onReady).not.toHaveBeenCalled();
+  });
+
+  it("shutdown sends runtime:shutdown with protocol version and requestId", async () => {
+    const bridge = new UnityIframeBridge();
+    const postMessage = vi.fn();
+    const iframeWindow = { postMessage } as unknown as Window;
+
+    bridge.attach(iframeWindow, {});
+    const shutdownPromise = bridge.shutdown(1000);
+
+    expect(postMessage).toHaveBeenCalledTimes(1);
+    const [message, targetOrigin] = postMessage.mock.calls[0] as [Record<string, unknown>, string];
+    expect(targetOrigin).toBe("*");
+    expect(message.protocolVersion).toBe(BRIDGE_PROTOCOL_VERSION);
+    expect(message.type).toBe("runtime:shutdown");
+    expect(message.requestId).toEqual(expect.stringMatching(/^shutdown_\d+$/));
+
+    dispatchMessage(
+      {
+        type: "runtime:shutdown-complete",
+        protocolVersion: BRIDGE_PROTOCOL_VERSION,
+        requestId: message.requestId
+      },
+      iframeWindow
+    );
+    await expect(shutdownPromise).resolves.toBe("complete");
+    bridge.detach();
+  });
+
+  it("shutdown resolves complete for matching runtime:shutdown-complete from attached iframe source", async () => {
+    const bridge = new UnityIframeBridge();
+    const postMessage = vi.fn();
+    const iframeWindow = { postMessage } as unknown as Window;
+
+    bridge.attach(iframeWindow, {});
+    const shutdownPromise = bridge.shutdown(1000);
+    const [message] = postMessage.mock.calls[0] as [Record<string, unknown>, string];
+
+    dispatchMessage(
+      {
+        type: "runtime:shutdown-complete",
+        protocolVersion: BRIDGE_PROTOCOL_VERSION,
+        requestId: message.requestId
+      },
+      iframeWindow
+    );
+
+    await expect(shutdownPromise).resolves.toBe("complete");
+    bridge.detach();
+  });
+
+  it("shutdown ignores runtime:shutdown-complete from another source", async () => {
+    vi.useFakeTimers();
+    const bridge = new UnityIframeBridge();
+    const postMessage = vi.fn();
+    const iframeWindow = { postMessage } as unknown as Window;
+    const otherSource = { postMessage: vi.fn() };
+
+    bridge.attach(iframeWindow, {});
+    const shutdownPromise = bridge.shutdown(10);
+    const [message] = postMessage.mock.calls[0] as [Record<string, unknown>, string];
+
+    dispatchMessage(
+      {
+        type: "runtime:shutdown-complete",
+        protocolVersion: BRIDGE_PROTOCOL_VERSION,
+        requestId: message.requestId
+      },
+      otherSource
+    );
+    await vi.advanceTimersByTimeAsync(10);
+
+    await expect(shutdownPromise).resolves.toBe("timeout");
+    bridge.detach();
+  });
+
+  it("shutdown ignores mismatched runtime:shutdown-complete requestId", async () => {
+    vi.useFakeTimers();
+    const bridge = new UnityIframeBridge();
+    const postMessage = vi.fn();
+    const iframeWindow = { postMessage } as unknown as Window;
+
+    bridge.attach(iframeWindow, {});
+    const shutdownPromise = bridge.shutdown(10);
+
+    dispatchMessage(
+      {
+        type: "runtime:shutdown-complete",
+        protocolVersion: BRIDGE_PROTOCOL_VERSION,
+        requestId: "shutdown_other"
+      },
+      iframeWindow
+    );
+    await vi.advanceTimersByTimeAsync(10);
+
+    await expect(shutdownPromise).resolves.toBe("timeout");
+    bridge.detach();
+  });
+
+  it("shutdown resolves timeout when no runtime ack arrives", async () => {
+    vi.useFakeTimers();
+    const bridge = new UnityIframeBridge();
+    const iframeWindow = { postMessage: vi.fn() } as unknown as Window;
+
+    bridge.attach(iframeWindow, {});
+    const shutdownPromise = bridge.shutdown(10);
+    await vi.advanceTimersByTimeAsync(10);
+
+    await expect(shutdownPromise).resolves.toBe("timeout");
+    bridge.detach();
+  });
+
+  it("shutdown resolves not-attached when no iframe is attached", async () => {
+    const bridge = new UnityIframeBridge();
+
+    await expect(bridge.shutdown()).resolves.toBe("not-attached");
+  });
+
+  it("attach supersedes a pending shutdown", async () => {
+    const bridge = new UnityIframeBridge();
+    const iframeWindow = { postMessage: vi.fn() } as unknown as Window;
+    const nextIframeWindow = { postMessage: vi.fn() } as unknown as Window;
+
+    bridge.attach(iframeWindow, {});
+    const shutdownPromise = bridge.shutdown(1000);
+    bridge.attach(nextIframeWindow, {});
+
+    await expect(shutdownPromise).resolves.toBe("superseded");
+    bridge.detach();
+  });
+
+  it("detach supersedes a pending shutdown and removes listener from the message window", async () => {
+    const bridge = new UnityIframeBridge();
+    const iframeWindow = { postMessage: vi.fn() } as unknown as Window;
+    const popoutWindow = createMessageWindow();
+
+    (
+      bridge.attach as unknown as (
+        iframeWindow: Window,
+        callbacks: Record<string, never>,
+        messageWindow: Window
+      ) => void
+    )(iframeWindow, {}, popoutWindow);
+    const shutdownPromise = bridge.shutdown(1000);
+    bridge.detach();
+
+    await expect(shutdownPromise).resolves.toBe("superseded");
+    expect(popoutWindow.removeEventListener).toHaveBeenCalledWith("message", expect.any(Function));
   });
 });

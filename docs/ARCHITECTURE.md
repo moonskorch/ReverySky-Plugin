@@ -203,10 +203,11 @@ The canonical plugin-side contract lives in:
 Important current contract facts:
 - protocol version is `2.0.0`;
 - startup order is `bridge:ready` first, then `graph:set`;
-- runtime-to-plugin messages are `bridge:ready` and `note:open`;
-- plugin-to-runtime messages are `graph:set` and `note:focus`;
+- runtime-to-plugin messages are `bridge:ready`, `note:open`, and `runtime:shutdown-complete`;
+- plugin-to-runtime messages are `graph:set`, `note:focus`, and `runtime:shutdown`;
 - `path` values must stay vault-relative and use `/` separators;
 - `graph:set` carries the effective filtered graph;
+- `runtime:shutdown` is a bridge/runtime-wrapper lifecycle handshake, not a full Unity engine shutdown;
 - `mapLayout` is an optional plugin-owned runtime hint;
 - invalid outgoing payloads are rejected before dispatch;
 - invalid incoming bridge messages are ignored with non-fatal error reporting.
