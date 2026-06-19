@@ -63,3 +63,29 @@ Risk:
 Mitigation:
 - Resolve by stable ID first, then path fallback.
 - Keep normalized path conventions consistent across bridge layers.
+
+## 7. External Obsidian Popout ResizeObserver Flood
+
+Risk:
+
+* Obsidian desktop can repeatedly emit `ResizeObserver loop completed with undelivered notifications` after closing a popout window that contains multiple leaves, tabs, or split panes.
+* The issue reproduces without ReverySky enabled, so it appears to be an Obsidian/Electron popout lifecycle issue rather than a ReverySky runtime or bridge issue.
+* The practical impact is not fully confirmed, but a repeated console flood may degrade renderer responsiveness until Obsidian is reloaded.
+
+Observed reproduction:
+
+1. Disable the ReverySky plugin.
+2. Restart Obsidian.
+3. Open a regular Markdown note in a popout window.
+4. Create multiple tabs or split panes inside that popout.
+5. Close the popout.
+6. The main renderer console may repeatedly log:
+   `Uncaught ResizeObserver loop completed with undelivered notifications`
+
+Mitigation:
+
+* Do not treat this as a ReverySky WebGL shutdown or iframe cleanup bug.
+* Do not change Unity runtime shutdown, iframe teardown, or note-opening layout behavior solely to work around this external issue.
+* If users report Obsidian becoming sluggish after closing complex popout layouts, recommend reloading Obsidian.
+* Reconsider a ReverySky-specific workaround only if there are user reports that map popouts commonly trigger this issue in normal use.
+
