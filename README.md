@@ -50,7 +50,7 @@ The plugin does not download the Unity runtime from the network. On first map op
 
 Later launches reuse that cache. A local WebGL host reads the cached runtime files so the iframe can load Unity WebGL from `127.0.0.1`.
 
-Vault notes are handled separately. Vault graph data is collected through Obsidian's vault and metadata APIs, then sent to the Unity runtime through the plugin bridge; the local runtime file access is not used to scan, read, or write vault notes, other user files, or system files outside the installed plugin folder.
+Vault notes are handled separately. The graph builder enumerates Markdown files through Obsidian's vault APIs and uses vault-relative paths plus metadata to build the map payload; the local runtime file access is not used to scan, read, or write vault notes, other user files, or system files outside the installed plugin folder.
 
 If you rely on Obsidian Sync Standard to sync installed plugins, install or update ReverySky Map from the release assets on each device; that plan does not sync files over 5 MB.
 
