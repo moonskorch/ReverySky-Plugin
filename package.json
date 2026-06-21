@@ -1,8 +1,12 @@
 {
   "name": "reverysky-obsidian-plugin",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "description": "ReverySky Map Obsidian plugin",
+  "engines": {
+    "node": "22.18.0",
+    "npm": "10.9.3"
+  },
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "npm run package:release-candidate",

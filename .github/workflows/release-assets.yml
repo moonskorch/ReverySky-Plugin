@@ -1,0 +1,68 @@
+name: Build attested release assets
+
+run-name: Build attested release assets for ${{ inputs.tag }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build-release-assets:
+    name: Build and attest release assets
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build release assets
+        run: npm run build
+
+      - name: Verify release assets
+        run: npm run check
+
+      - name: List release assets
+        run: |
+          ls -lh main.js manifest.json styles.css
+
+      - name: Generate artifact attestations
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css
+
+      - name: Check GitHub CLI
+        run: gh --version
+
+      - name: Create draft GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          gh release create "$TAG" main.js manifest.json styles.css \
+            --verify-tag \
+            --draft \
+            --title "$TAG" \
+            --notes "Attested ReverySky Map release assets."
