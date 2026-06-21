@@ -4,6 +4,36 @@
 
 ReverySky Map embeds a 3D Unity WebGL map view in Obsidian for inspecting vault structure. It builds the view from Markdown notes, resolved links, tags, note dates, and file metadata, then keeps the runtime in sync with the active filter and focused note.
 
+## Installation
+
+You can install ReverySky Map in one of two ways:
+
+### Official release
+
+Once ReverySky Map is available in Obsidian Community plugins, install it from Obsidian:
+
+1. Open **Settings → Community plugins → Browse**.
+2. Search for **ReverySky Map**.
+3. Install and enable the plugin.
+
+### Beta release via BRAT
+
+You can also install the plugin via [BRAT](https://github.com/TfTHacker/obsidian42-brat):
+
+1. Install and enable **BRAT** in Obsidian.
+2. Add this beta plugin repository:
+
+   `https://github.com/moonskorch/ReverySky-Plugin`
+
+3. Enable **ReverySky Map** in Obsidian’s Community plugins settings.
+
+## Opening the map
+
+After enabling the plugin, you can open the map in either way:
+
+- Click the left ribbon button **Toggle ReverySky Map**.
+- Run **ReverySky Map: Open map** from the command palette.
+
 ## Navigation
 
 - Pan: drag the map with the primary mouse button to move the camera focus across the current layout.
@@ -39,6 +69,8 @@ The Map layout control changes how the same vault data is arranged:
 The current release candidate build uses the `embedded-archive` package mode. Other package modes and release shapes are documented in [Packaging Modes](docs/PACKAGING_MODES.md).
 
 The [Obsidian plugin source code](src/) and the [Unity project source code](unity/ReverySkyMap/) are available in this repository. 
+
+Release assets are built and attested by GitHub Actions from tracked repository contents. To make that reproducible without running Unity Editor in GitHub Actions, the compact Unity WebGL runtime input under `unity-webgl/Build/runtime-*` is intentionally tracked after the local Unity export/import workflow.
 
 The ReverySky Map WebGL view was built with Unity® software and includes Unity-generated WebGL runtime files. ReverySky Map is not sponsored by or affiliated with Unity Technologies or its affiliates. Unity and related Unity marks are trademarks or registered trademarks of Unity Technologies or its affiliates in the U.S. and elsewhere.
 

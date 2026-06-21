@@ -35,13 +35,19 @@ function createMessageWindow(): Window & {
   dispatchMessageEvent: (data: unknown, source: unknown) => void;
   addEventListener: ReturnType<typeof vi.fn>;
   removeEventListener: ReturnType<typeof vi.fn>;
+  setTimeout: ReturnType<typeof vi.fn>;
+  clearTimeout: ReturnType<typeof vi.fn>;
 } {
   const target = new EventTarget();
   const addEventListener = vi.fn(target.addEventListener.bind(target));
   const removeEventListener = vi.fn(target.removeEventListener.bind(target));
+  const setTimeout = vi.fn(window.setTimeout.bind(window));
+  const clearTimeout = vi.fn(window.clearTimeout.bind(window));
   return {
     addEventListener,
     removeEventListener,
+    setTimeout,
+    clearTimeout,
     dispatchMessageEvent: (data: unknown, source: unknown) => {
       target.dispatchEvent(
         new MessageEvent("message", {
@@ -54,6 +60,8 @@ function createMessageWindow(): Window & {
     dispatchMessageEvent: (data: unknown, source: unknown) => void;
     addEventListener: ReturnType<typeof vi.fn>;
     removeEventListener: ReturnType<typeof vi.fn>;
+    setTimeout: ReturnType<typeof vi.fn>;
+    clearTimeout: ReturnType<typeof vi.fn>;
   };
 }
 

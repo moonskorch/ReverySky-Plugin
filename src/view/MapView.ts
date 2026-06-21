@@ -106,9 +106,8 @@ export class MapView extends ItemView {
     const iframe = container.ownerDocument.createElement("iframe");
     iframe.src = `${iframeSrc}?t=${this.now()}`;
     iframe.className = "reverysky-map-iframe";
-    const setIframeAttribute = iframe.setAttr;
-    if (typeof setIframeAttribute === "function") {
-      setIframeAttribute.call(iframe, "title", "ReverySky Map");
+    if (typeof iframe.setAttr === "function") {
+      iframe.setAttr("title", "ReverySky Map");
     } else {
       iframe.setAttribute("title", "ReverySky Map");
     }

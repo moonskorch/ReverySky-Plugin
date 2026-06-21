@@ -20,7 +20,8 @@ type BridgeCallbacks = {
 type PendingShutdown = {
   requestId: string;
   resolve: (result: ShutdownResult) => void;
-  timeoutId: ReturnType<typeof setTimeout>;
+  timeoutId: number;
+  timeoutWindow: Window;
 };
 
 /**
@@ -81,14 +82,16 @@ export class UnityIframeBridge {
     };
 
     return new Promise((resolve) => {
-      const timeoutId = setTimeout(() => {
+      const timeoutWindow = this.messageWindow ?? window;
+      const timeoutId = timeoutWindow.setTimeout(() => {
         this.resolvePendingShutdown("timeout");
       }, timeoutMs);
 
       this.pendingShutdown = {
         requestId,
         resolve,
-        timeoutId
+        timeoutId,
+        timeoutWindow
       };
 
       try {
@@ -198,7 +201,7 @@ export class UnityIframeBridge {
       return;
     }
 
-    clearTimeout(pendingShutdown.timeoutId);
+    pendingShutdown.timeoutWindow.clearTimeout(pendingShutdown.timeoutId);
     this.pendingShutdown = null;
     pendingShutdown.resolve(result);
   }
