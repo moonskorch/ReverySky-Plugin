@@ -5,18 +5,29 @@ This runbook defines a reproducible workflow to generate runtime artifacts from 
 
 ## Scope
 - Source repository contains plugin source code, Unity project source, and runtime template.
-- Generated outputs are local build artifacts.
+- Generated outputs are mostly local build artifacts; the compact `embedded-archive` runtime input is tracked intentionally.
 
-## Source and Generated Outputs
+## Source, Tracked Runtime Inputs, and Generated Outputs
 Tracked source files:
 - `src/*`
 - `unity/ReverySkyMap/*` (Unity project source)
 - `unity-webgl/index.template.html`
+- `unity-webgl/index.disk-runtime.template.html`
 - `scripts/import-unity-webgl.ps1`
 
-Generated local artifacts:
+Tracked prebuilt runtime input for `embedded-archive` release builds:
+- `unity-webgl/Build/build-config.json`
+- `unity-webgl/Build/runtime-entry.js`
+- `unity-webgl/Build/runtime-core.js`
+- `unity-webgl/Build/runtime-data.*`
+- `unity-webgl/Build/runtime-code.*`
+
+GitHub Actions builds `main.js` from tracked repository contents. The Unity WebGL runtime inside it is a tracked prebuilt compact runtime input prepared by the local Unity export/import workflow.
+
+Generated local artifacts that remain untracked:
 - `unity-webgl/index.html`
-- `unity-webgl/Build/*`
+- `unity-webgl/Build/build-config.js`
+- original Unity WebGL export files in `unity-webgl/Build/`
 - `unity-webgl/TemplateData/*`
 
 ## Prerequisites
@@ -60,6 +71,34 @@ powershell -ExecutionPolicy Bypass -File .\scripts\import-unity-webgl.ps1 -Expor
 ```
 
 This prepares the generated runtime staging folder used by every package mode.
+
+### What the import step creates
+
+`unity-webgl/` is a staging folder prepared from a Unity WebGL export. It is not a single final package format.
+
+The import script creates several runtime representations from the same Unity build:
+
+- `unity-webgl/index.html`  
+  Generated from `unity-webgl/index.template.html`. Used by `folder-runtime` and `embedded-html`.
+
+- `unity-webgl/Build/runtime-entry.js`, `runtime-core.js`, `runtime-data.*`, `runtime-code.*`  
+  Neutral alias copies of Unity loader/framework/data/wasm files. Used by `embedded-archive`.
+
+- `unity-webgl/Build/build-config.json` and `build-config.js`  
+  Runtime config files generated from the detected Unity build filenames.
+
+- `unity-webgl/TemplateData/`  
+  Optional Unity WebGL template assets, used only by folder-style local runtime installs.
+
+The full staging output remains local generated state. For attested `embedded-archive` release builds, the compact runtime input is intentionally tracked in Git:
+
+- `unity-webgl/Build/build-config.json`
+- `unity-webgl/Build/runtime-entry.js`
+- `unity-webgl/Build/runtime-core.js`
+- `unity-webgl/Build/runtime-data.*`
+- `unity-webgl/Build/runtime-code.*`
+
+This lets GitHub Actions rebuild `main.js` from repository contents and attach artifact attestations to the release assets. The Unity WebGL runtime itself remains a prebuilt input produced by the local Unity export/import workflow.
 
 ### 4) Choose and build one package mode
 Use exactly one build command:
@@ -142,7 +181,7 @@ Detailed package mode reference lives in `docs/PACKAGING_MODES.md`.
 ## Regeneration Rules
 - Re-run Unity export + import script before packaging whenever Unity content changes.
 - Re-run the selected build command whenever TypeScript/plugin code changes.
-- Do not commit generated outputs.
+- Do not commit generated outputs except the tracked compact runtime input required by `embedded-archive` release builds.
 
 ## External Visual Assets Note
 - Some third-party visual source files are intentionally excluded from Git.

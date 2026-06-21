@@ -19,7 +19,7 @@ Before uploading release assets, open root `main.js` and verify its first line:
 ## Shared Rules
 
 - `main.js` is generated and ignored by Git.
-- `unity-webgl/` is generated/imported and ignored by Git.
+- `unity-webgl/` is mostly generated/imported and ignored by Git, except for the tracked compact runtime input used by `embedded-archive`.
 - Root `manifest.json` and `styles.css` are the release/source files.
 - Root `manifest.json` version must match the GitHub release tag used for Obsidian dashboard testing.
 - `dist/` may contain temporary reports or intermediate artifacts, but it is not the primary release output location.
@@ -103,6 +103,27 @@ Release assets:
 - `main.js`
 - `manifest.json`
 - `styles.css`
+
+### Tracked runtime input for attested releases
+
+`embedded-archive` release builds in GitHub Actions use a tracked compact Unity WebGL runtime input:
+
+- `unity-webgl/Build/build-config.json`
+- `unity-webgl/Build/runtime-entry.js`
+- `unity-webgl/Build/runtime-core.js`
+- `unity-webgl/Build/runtime-data.*`
+- `unity-webgl/Build/runtime-code.*`
+
+These files are generated from a Unity WebGL export through `scripts/import-unity-webgl.ps1`, then committed intentionally so GitHub Actions can rebuild `main.js` and attach artifact attestations to the release assets.
+
+GitHub Actions builds `main.js` from tracked repository contents. The Unity WebGL runtime inside it is a tracked prebuilt compact runtime input prepared by the local Unity export/import workflow.
+
+The full generated staging output remains untracked:
+
+- `unity-webgl/index.html`
+- `unity-webgl/Build/build-config.js`
+- original Unity WebGL export files
+- `unity-webgl/TemplateData/`
 
 Behavior:
 - Builds root `main.js`.

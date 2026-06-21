@@ -102,6 +102,9 @@ if ($frameworkFile.Name -match $compressedExtPattern -or $dataFile.Name -match $
 }
 
 # Create neutral alias filenames to reduce false positives from client-side blockers.
+# These runtime-* files are the compact runtime input used by embedded-archive packaging.
+# The original Unity export files may remain in Build/ for local staging, but embedded-archive
+# only needs build-config.json plus runtime-entry/core/data/code.
 $loaderAliasName = "runtime-entry.js"
 $frameworkAliasName = "runtime-core.js"
 $dataAliasName = "runtime-data" + [System.IO.Path]::GetExtension($dataFile.Name)

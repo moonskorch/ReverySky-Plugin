@@ -22,6 +22,7 @@ Policy:
 Core commands:
 - `npm run build` - builds the current release candidate; currently aliases to `npm run package:release-candidate`.
 - `npm run check` - validates the current release candidate and runs `npm run test`.
+- `npm run check:unity-webgl -- embedded-archive` - validates the compact tracked Unity WebGL runtime inputs used by the current `embedded-archive` package mode.
 - `npm run package:folder-runtime` - WebGL artifact check + TypeScript compile check + production bundle build (`esbuild`) + root `main.js` marker + folder-runtime package validation.
 - `npm run package:embedded-html` - normal build plus embedded HTML package creation and validation.
 - `npm run package:embedded-archive` - normal build plus embedded archive package creation and validation.

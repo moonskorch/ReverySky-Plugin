@@ -8,8 +8,13 @@ main.js
 
 # Generated Unity WebGL runtime artifacts
 unity-webgl/index.html
-unity-webgl/Build/
 unity-webgl/TemplateData/
+unity-webgl/Build/*
+!unity-webgl/Build/build-config.json
+!unity-webgl/Build/runtime-entry.js
+!unity-webgl/Build/runtime-core.js
+!unity-webgl/Build/runtime-data.*
+!unity-webgl/Build/runtime-code.*
 
 # Optional large skybox textures are intentionally excluded
 unity/ReverySkyMap/Assets/_Visuals/Nebula Skyboxes/*.exr

@@ -1,0 +1,10 @@
+﻿{
+    "loaderFile":  "runtime-entry.js",
+    "dataFile":  "runtime-data.data",
+    "frameworkFile":  "runtime-core.js",
+    "codeFile":  "runtime-code.wasm",
+    "streamingAssetsUrl":  "StreamingAssets",
+    "companyName":  "MoonSkorch Studio",
+    "productName":  "ReverySky Map",
+    "productVersion":  "0.0.1"
+}
