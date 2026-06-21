@@ -3,7 +3,7 @@ import type { NoteOpenPayload } from "../bridge/BridgeTypes";
 import { MapSession } from "./MapSession";
 
 /**
- * Resolves runtime note-open requests into Obsidian leaf selection and `openLinkText` calls.
+ * Resolves runtime note-open requests and delegates the final navigation choice to Obsidian.
  */
 export class MapNoteOpenRouter {
   constructor(
@@ -25,21 +25,15 @@ export class MapNoteOpenRouter {
       return;
     }
 
-    const targetLeaf = this.session.resolveTargetMarkdownLeaf();
-    const sourcePath = targetLeaf ? this.session.getLeafSourcePath(targetLeaf) : "";
+    const sourcePath = this.session.resolveOpenLinkSourcePath();
     try {
       await this.app.workspace.openLinkText(
         noteFile.path,
         sourcePath,
         false,
-        targetLeaf
-          ? {
-              active: true,
-              group: targetLeaf
-            }
-          : {
-              active: true
-            }
+        {
+          active: true
+        }
       );
     } catch (error) {
       this.notify(`Unable to open note: ${String(error)}`);

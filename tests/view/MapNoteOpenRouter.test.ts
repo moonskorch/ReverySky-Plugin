@@ -73,13 +73,13 @@ describe("MapNoteOpenRouter", () => {
 
     await router.openRequestedNote({ id: "note_1", path: "Fallback/Other.md" });
     expect(openLinkText).toHaveBeenCalledWith("Folder/Note.md", "", false, {
-      active: true,
-      group: activeLeaf
+      active: true
     });
+    expect(openLinkText.mock.calls[0]?.[3]).not.toHaveProperty("group");
     expect(notify).not.toHaveBeenCalled();
   });
 
-  it("does not open note inside map leaf when active leaf is map", async () => {
+  it("uses markdown source path and lets Obsidian choose the target leaf", async () => {
     const markdownLeaf = {
       view: {
         getViewType: () => "markdown",
@@ -115,9 +115,9 @@ describe("MapNoteOpenRouter", () => {
 
     await router.openRequestedNote({ id: "note_1" });
     expect(openLinkText).toHaveBeenCalledWith("Folder/Note.md", "Folder/Context.md", false, {
-      active: true,
-      group: markdownLeaf
+      active: true
     });
+    expect(openLinkText.mock.calls[0]?.[3]).not.toHaveProperty("group");
   });
 
   it("notifies on missing id/path or missing file", async () => {

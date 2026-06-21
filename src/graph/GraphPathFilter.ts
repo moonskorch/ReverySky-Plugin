@@ -1,4 +1,4 @@
-import type { GraphLink, GraphNoteNode, GraphPayload } from "../bridge/BridgeTypes";
+import type { GraphNoteNode, GraphPayload } from "../bridge/BridgeTypes";
 
 export type ParsedPathFilter = {
   includeTerms: string[];

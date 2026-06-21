@@ -89,3 +89,17 @@ Mitigation:
 * If users report Obsidian becoming sluggish after closing complex popout layouts, recommend reloading Obsidian.
 * Reconsider a ReverySky-specific workaround only if there are user reports that map popouts commonly trigger this issue in normal use.
 
+## 8. Native Note Open Routing with Popout Windows
+
+Risk:
+
+* Note clicks from the Unity WebGL map are delivered through an iframe bridge, so Obsidian may not treat the map view as the active workspace leaf before `app.workspace.openLinkText(...)` runs.
+* When popout windows are present, Obsidian may route the native open action to whichever workspace context it currently considers active.
+* This can make map node clicks open notes in either the main workspace or a popout window, depending on Obsidian's active workspace state.
+
+Mitigation:
+
+* Keep note opening delegated to Obsidian with `app.workspace.openLinkText(...)`.
+* Do not use `OpenViewState.group` for note opening; that field is tied to workspace grouping behavior and can create linked-pane side effects.
+* Do not force `workspace.setActiveLeaf(...)` solely to steer main-window versus popout routing unless user reports show the native behavior is worse than the focus-state risk.
+* Keep active-note tracking global so markdown navigation inside popout windows can still update map focus.

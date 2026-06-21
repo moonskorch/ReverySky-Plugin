@@ -1,10 +1,11 @@
-import type {
-  App,
-  CachedMetadata,
-  EventRef,
-  TAbstractFile,
-  TFile,
-  WorkspaceLeaf
+import {
+  MarkdownView,
+  type App,
+  type CachedMetadata,
+  type EventRef,
+  type TAbstractFile,
+  type TFile,
+  type WorkspaceLeaf
 } from "obsidian";
 import type {
   MapLayoutPreference,
@@ -327,15 +328,19 @@ export class MapSession {
     return null;
   }
 
-  resolveTargetMarkdownLeaf(): WorkspaceLeaf | null {
+  resolveOpenLinkSourcePath(): string {
+    return this.getLeafSourcePath(this.resolveOpenLinkSourceLeaf());
+  }
+
+  private resolveOpenLinkSourceLeaf(): WorkspaceLeaf | null {
     const workspace = this.app.workspace;
     if (!workspace) {
       return null;
     }
 
-    const activeLeaf = workspace.activeLeaf ?? null;
-    if (this.isMarkdownLeaf(activeLeaf)) {
-      return activeLeaf;
+    const activeMarkdownLeaf = this.getActiveMarkdownLeaf();
+    if (this.isMarkdownLeaf(activeMarkdownLeaf)) {
+      return activeMarkdownLeaf;
     }
 
     if (this.isMarkdownLeaf(this.lastMarkdownLeaf)) {
@@ -351,7 +356,7 @@ export class MapSession {
     return null;
   }
 
-  getLeafSourcePath(leaf: WorkspaceLeaf | null): string {
+  private getLeafSourcePath(leaf: WorkspaceLeaf | null): string {
     const view = (leaf?.view as { file?: { path?: string } } | null) ?? null;
     const path = view?.file?.path;
     return typeof path === "string" ? path : "";
@@ -456,10 +461,10 @@ export class MapSession {
       return;
     }
 
-    const currentActiveLeaf = workspace.activeLeaf ?? null;
-    if (this.isMarkdownLeaf(currentActiveLeaf)) {
-      this.lastMarkdownLeaf = currentActiveLeaf;
-      this.activeMarkdownPath = this.getLeafSourcePath(currentActiveLeaf);
+    const currentSourceLeaf = this.getActiveMarkdownLeaf();
+    if (this.isMarkdownLeaf(currentSourceLeaf)) {
+      this.lastMarkdownLeaf = currentSourceLeaf;
+      this.activeMarkdownPath = this.getLeafSourcePath(currentSourceLeaf);
     } else {
       this.lastMarkdownLeaf = this.findAnyMarkdownLeaf();
       this.activeMarkdownPath = this.getLeafSourcePath(this.lastMarkdownLeaf);
@@ -477,6 +482,11 @@ export class MapSession {
         }
       })
     );
+  }
+
+  private getActiveMarkdownLeaf(): WorkspaceLeaf | null {
+    const workspace = this.app.workspace as Partial<Pick<App["workspace"], "getActiveViewOfType">>;
+    return workspace.getActiveViewOfType?.(MarkdownView)?.leaf ?? null;
   }
 
   private markSemanticRefreshPending(): void {

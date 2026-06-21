@@ -126,7 +126,7 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 2. `src/bridge/UnityIframeBridge.ts` -> `onMessage()`
    Validates the message and calls `onNoteOpen(payload)`.
 3. `src/view/MapView.ts` -> `MapNoteOpenRouter.openRequestedNote(payload)`
-4. `src/view/MapNoteOpenRouter.ts` resolves the target note by id and path, chooses the target leaf, and calls `app.workspace.openLinkText(...)`.
+4. `src/view/MapNoteOpenRouter.ts` resolves the target note by id and path, passes the current markdown path only as `openLinkText(...)` link context, and leaves final navigation routing to Obsidian.
 5. Control returns to Obsidian, which opens or focuses the requested note.
 
 ### Path 5. Toggle close or plugin unload -> capture map state -> next open restore

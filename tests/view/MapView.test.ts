@@ -532,12 +532,18 @@ describe("MapView bridge integration", () => {
     await Promise.resolve();
 
     expect(openLinkText).toHaveBeenCalledTimes(2);
-    expect(openLinkText.mock.calls[0]?.[0]).toBe("Folder/Note.md");
-    expect(openLinkText.mock.calls[1]?.[0]).toBe("Fallback/Other.md");
+    expect(openLinkText).toHaveBeenNthCalledWith(1, "Folder/Note.md", "", false, {
+      active: true
+    });
+    expect(openLinkText).toHaveBeenNthCalledWith(2, "Fallback/Other.md", "", false, {
+      active: true
+    });
+    expect(openLinkText.mock.calls[0]?.[3]).not.toHaveProperty("group");
+    expect(openLinkText.mock.calls[1]?.[3]).not.toHaveProperty("group");
     expect(notify).not.toHaveBeenCalled();
   });
 
-  it("does not open note inside map leaf when active leaf is map", async () => {
+  it("delegates note:open from map leaf without forcing a workspace group", async () => {
     const markdownLeaf = {
       view: {
         getViewType: () => "markdown"
@@ -615,12 +621,10 @@ describe("MapView bridge integration", () => {
     callbacks.onNoteOpen?.({ id: "note_abc" });
     await Promise.resolve();
 
-    expect(openLinkText).toHaveBeenCalledTimes(1);
-    expect(openLinkText.mock.calls[0]?.[0]).toBe("Folder/Note.md");
-    expect(openLinkText.mock.calls[0]?.[3]).toMatchObject({
-      active: true,
-      group: markdownLeaf
+    expect(openLinkText).toHaveBeenCalledWith("Folder/Note.md", "", false, {
+      active: true
     });
+    expect(openLinkText.mock.calls[0]?.[3]).not.toHaveProperty("group");
   });
 
   it("falls back to native openLinkText when no markdown leaf exists", async () => {
