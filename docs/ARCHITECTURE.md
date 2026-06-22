@@ -78,6 +78,70 @@ Main system parts:
   - no runtime network download is used;
   - dashboard scan is a separate later stage.
 
+## Runtime Hosting vs Bridge Messaging
+
+ReverySky Map uses two separate communication paths. They should not be treated as one system.
+
+### 1. Local HTTP hosting
+
+`UnityWebglLocalServer` only serves the Unity WebGL runtime files to the iframe.
+
+It exposes a loopback URL such as:
+
+```
+http://127.0.0.1:<port>/index.html
+```
+
+The iframe loads this URL as a normal web page. The local server may serve files such as:
+
+- `index.html`
+- `Build/runtime-entry.js`
+- `Build/*.wasm`
+- `Build/*.data`
+- `Build/*.js`
+- `TemplateData/*`
+
+The local HTTP server does not build the note graph, does not send `graph:set`, and does not update the Unity scene. Its responsibility is file delivery for the WebGL runtime.
+
+### 2. Bridge messaging after Unity loads
+
+After the iframe page loads and the Unity WebGL runtime starts, live note data travels through the bridge, not through the local HTTP server.
+
+The bridge path is:
+
+- Obsidian plugin TypeScript
+- iframe window via `postMessage`
+- JavaScript wrapper inside `index.html`
+- Unity C# via `unityInstance.SendMessage(...)`
+- `ObsidianBridge.cs`
+- `MapRuntimeContext`
+
+The reverse path for runtime events is:
+
+- Unity C# `ObsidianBridge`
+- JavaScript callback exposed on `window`
+- `window.parent.postMessage(...)`
+- Obsidian plugin TypeScript
+
+### Bridge implementation files
+
+The bridge is implemented across several runtime boundaries:
+
+- `src/view/MapView.ts` - creates the iframe and attaches the bridge to `iframe.contentWindow`.
+- `src/bridge/UnityIframeBridge.ts` - sends plugin-to-runtime messages and receives runtime-to-plugin messages.
+- `unity-webgl/index.template.html` and `unity-webgl/index.disk-runtime.template.html` - contain the iframe JavaScript wrapper. This wrapper listens for `postMessage` events, calls `unityInstance.SendMessage(...)`, and posts runtime events back to `window.parent`.
+- `unity/ReverySkyMap/Assets/Scripts/Bridge/ObsidianBridge.cs` - Unity-side bridge component. It receives graph and focus messages from JavaScript, normalizes payloads, updates `MapRuntimeContext`, and forwards note-open events back to the iframe JavaScript wrapper.
+
+### ObsidianBridge lifetime
+
+`ObsidianBridge` is a runtime-created service object, not a scene-authored visual object. `ObsidianBridge.EnsureInstance()` creates a persistent GameObject named `ObsidianBridge` before scene load when one does not already exist.
+
+This name is part of the JavaScript-to-Unity bridge contract because the iframe wrapper calls:
+
+`unityInstance.SendMessage("ObsidianBridge", "OnGraphSet", json)`.
+
+The object is intentionally kept independent from a specific scene so the WebGL bridge is available early and survives scene changes.
+
 ## Execution Paths
 Most plugin-side behavior now flows through a small shell in `MapView`, while `src/main.ts` owns plugin lifecycle, view activation, and persistence of the last map-view state. The main entry points are the plugin startup path, the map command, the view startup path, and incoming bridge messages from the runtime. The routes below show how control moves from those entry points through the code.
 

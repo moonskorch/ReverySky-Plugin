@@ -34,6 +34,12 @@ After enabling the plugin, you can open the map in either way:
 - Click the left ribbon button **Toggle ReverySky Map**.
 - Run **ReverySky Map: Open map** from the command palette.
 
+## Visual quality
+
+Visual quality depends on your display resolution, screen scaling, graphics driver, and the GPU used by Obsidian. For the clearest image, keep your graphics driver up to date and let Obsidian use a high-performance GPU when your device offers one.
+
+On dual-GPU laptops, this is usually set in your system graphics settings.
+
 ## Navigation
 
 - Pan: drag the map with the primary mouse button to move the camera focus across the current layout.
@@ -93,6 +99,8 @@ See the third-party notices for bundled visual assets and runtime dependencies.
 Original source code and project-owned materials are licensed under the
 [MIT License](LICENSE.md).
 
+Created and maintained by MoonSkorch Studio.
+
 ## Third-party visual assets
 
 The built plugin uses several third-party visual assets. Their raw source files
@@ -101,3 +109,9 @@ development.
 
 See [third-party notices](unity/ReverySkyMap/Assets/ThirdPartyNotices.txt) and
 [Unity setup instructions](unity/ReverySkyMap/Assets/README.txt).
+
+## Contact
+
+- Bug reports and technical problems: use GitHub Issues.
+- Feedback, ideas, questions, feature suggestions, and general discussion: use GitHub Discussions.
+- For anything else, or if you prefer to contact me directly, email `reverysky.journal@proton.me`.

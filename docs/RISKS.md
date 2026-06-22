@@ -103,3 +103,125 @@ Mitigation:
 * Do not use `OpenViewState.group` for note opening; that field is tied to workspace grouping behavior and can create linked-pane side effects.
 * Do not force `workspace.setActiveLeaf(...)` solely to steer main-window versus popout routing unless user reports show the native behavior is worse than the focus-state risk.
 * Keep active-note tracking global so markdown navigation inside popout windows can still update map focus.
+
+## Architecture Risks and Hardening Plan
+
+The core architecture is intentional: ReverySky Map embeds a Unity WebGL runtime inside an Obsidian plugin and sends live graph data across several runtime boundaries.
+
+The documentation now explicitly separates local WebGL hosting from bridge messaging. The remaining risks are not about understanding the architecture, but about keeping the cross-runtime bridge stable as the project evolves.
+
+### 1. Cross-runtime bridge failures can be hard to localize
+
+The live graph path crosses several handoff points:
+
+- Obsidian plugin TypeScript
+- iframe window via `postMessage`
+- iframe JavaScript wrapper
+- Unity via `unityInstance.SendMessage(...)`
+- Unity C# `ObsidianBridge`
+- `MapRuntimeContext`
+
+Risk:
+
+* A broken update may look like “Unity did not refresh”, while the actual failure can be in graph emission, message validation, iframe delivery, wrapper code, JavaScript-to-Unity dispatch, or Unity C# ingest.
+
+Hardening:
+
+* Keep the bridge path documented as a sequence, not as one generic “bridge”.
+* Keep boundary-level diagnostics clear enough to identify where the message stopped:
+
+  * plugin emitted `graph:set`;
+  * iframe wrapper received it;
+  * iframe wrapper dispatched it to Unity;
+  * Unity C# accepted or rejected it;
+  * `MapRuntimeContext` updated.
+
+### 2. Iframe wrapper logic can drift between templates
+
+The iframe JavaScript wrapper is part of the bridge. It receives `postMessage` events, calls `unityInstance.SendMessage(...)`, and posts runtime events back to the parent plugin window.
+
+Risk:
+
+* If similar wrapper logic exists in more than one HTML template, package modes can diverge.
+* One template may handle `graph:set`, `note:focus`, `bridge:ready`, `note:open`, or shutdown differently from another.
+
+Hardening:
+
+* Prefer one maintained source for shared iframe bridge behavior when practical.
+* Until then, every wrapper change must review all HTML templates that contain bridge logic.
+* Keep wrapper responsibilities narrow:
+
+  * receive parent messages;
+  * forward supported messages to Unity;
+  * send runtime events back to the parent.
+
+### 3. JavaScript-to-Unity calls depend on string contract names
+
+The iframe wrapper calls Unity through string-based `SendMessage` calls, for example:
+
+`unityInstance.SendMessage("ObsidianBridge", "OnGraphSet", json)`
+
+Risk:
+
+* Renaming the Unity GameObject or public C# bridge methods can break runtime communication.
+* TypeScript tests and TypeScript compilation will not catch these Unity string-contract breaks.
+
+Hardening:
+
+* Treat these names as part of the runtime bridge contract:
+
+  * `ObsidianBridge`;
+  * `OnGraphSet`;
+  * `OnNoteFocus`;
+  * `OnRuntimeShutdown`.
+* Change them only together with:
+
+  * iframe wrapper updates;
+  * Unity C# updates;
+  * architecture/data-contract docs;
+  * manual bridge verification.
+
+### 4. Runtime-created `ObsidianBridge` can be accidentally duplicated or moved into scene ownership
+
+`ObsidianBridge` is intentionally created as a runtime service object before scene load. It is not a scene-authored visual object.
+
+Risk:
+
+* A future Unity refactor may add a scene-authored `ObsidianBridge` while auto-creation still exists.
+* That can create duplicate bridge objects or make bridge availability depend on a specific scene.
+
+Hardening:
+
+* Keep `ObsidianBridge` as a runtime-created service object unless the architecture is deliberately changed.
+* If it becomes scene-authored later, redesign the auto-creation path at the same time.
+* Preserve early bridge availability before graph payloads can be dispatched.
+
+### 5. Source/template/generated boundaries around WebGL runtime must stay explicit
+
+The architecture depends on several different file roles:
+
+- Unity source project
+- WebGL export
+- `unity-webgl` templates
+- generated runtime files
+- packaged plugin output
+
+Risk:
+
+* Future changes can accidentally edit generated runtime output instead of source or templates.
+* Bridge wrapper fixes can be made in the wrong file and lost on the next import/build.
+* Unity-side changes can be present in source but missing from the packaged WebGL runtime.
+
+Hardening:
+
+* Keep source, template, generated runtime, and packaged output roles explicit in reviews.
+* Prefer source/template changes plus regeneration over direct edits to generated runtime files.
+* After Unity-side bridge changes, verify that the WebGL export/import path was run and the packaged runtime contains the expected bridge behavior.
+
+### Hardening priorities
+
+1. Keep the bridge path easy to diagnose at runtime.
+2. Reduce or carefully synchronize duplicated iframe wrapper logic.
+3. Treat JavaScript-to-Unity names as stable contract names.
+4. Preserve the intended lifetime of the runtime-created `ObsidianBridge`.
+5. Keep WebGL source, templates, generated files, and package output clearly separated.
