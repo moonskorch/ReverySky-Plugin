@@ -20,21 +20,19 @@
         box-sizing: border-box;
         width: 100%;
         height: 100%;
-        display: grid;
-        place-items: center;
-        padding: 16px;
+        display: block;
+        padding: 0;
       }
 
       .card {
-        width: min(980px, 100%);
+        width: 100%;
         height: 100%;
-        border: 1px solid rgba(170, 205, 255, 0.35);
+        border: 0;
         background: transparent;
-        border-radius: 12px;
-        padding: 0 0 12px;
+        border-radius: 0;
+        padding: 0;
         box-sizing: border-box;
-        display: grid;
-        grid-template-rows: 1fr auto;
+        display: block;
         overflow: hidden;
       }
 
@@ -42,6 +40,10 @@
         position: relative;
         width: 100%;
         height: 100%;
+      }
+
+      #bridge-status {
+        display: none;
       }
 
       canvas {
@@ -58,14 +60,7 @@
         inset: 0;
       }
 
-      #bridge-status {
-        pointer-events: none;
-        font-size: 12px;
-        color: #b9d1ff;
-        opacity: 0.92;
-        border-top: 1px solid rgba(170, 205, 255, 0.35);
-        padding: 8px 14px 0;
-      }
+
     </style>
     <script src="Build/runtime-entry.js"></script>
   </head>
@@ -135,6 +130,30 @@
             },
             "*"
           );
+        }
+
+        function logCanvasSize(label, includeDrawingBuffer) {
+          const rect = viewportEl.getBoundingClientRect();
+          let drawingBufferWidth = null;
+          let drawingBufferHeight = null;
+
+          if (includeDrawingBuffer) {
+            const gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
+            drawingBufferWidth = gl ? gl.drawingBufferWidth : null;
+            drawingBufferHeight = gl ? gl.drawingBufferHeight : null;
+          }
+
+          console.log("[ReverySky]", label, {
+            dpr: window.devicePixelRatio,
+            viewportCssWidth: rect.width,
+            viewportCssHeight: rect.height,
+            canvasWidth: canvas.width,
+            canvasHeight: canvas.height,
+            drawingBufferWidth: drawingBufferWidth,
+            drawingBufferHeight: drawingBufferHeight,
+            screenWidth: window.screen.width,
+            screenHeight: window.screen.height
+          });
         }
 
         function resizeCanvas() {
@@ -327,7 +346,8 @@
               streamingAssetsUrl: cfg.streamingAssetsUrl || "StreamingAssets",
               companyName: cfg.companyName || "MoonSkorch Studio",
               productName: cfg.productName || "ReverySky Map",
-              productVersion: cfg.productVersion || "0.0.0"
+              productVersion: cfg.productVersion || "0.0.0",
+              devicePixelRatio: window.devicePixelRatio || 1
             },
             (progress) => {
               setStatus("Unity: loading " + Math.round(progress * 100) + "%");
@@ -359,9 +379,11 @@
           window.addEventListener("resize", onWindowResize);
 
           resizeCanvas();
+          logCanvasSize("before Unity boot", false);
 
           try {
             await tryBootUnityRuntime();
+            logCanvasSize("after Unity boot", true);
           } catch (err) {
             runtimeMode = "failed";
             setStatus("Unity runtime failed to start. See console.");
