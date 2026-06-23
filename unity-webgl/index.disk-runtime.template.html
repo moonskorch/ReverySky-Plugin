@@ -43,7 +43,41 @@
       }
 
       #bridge-status {
-        display: none;
+        position: absolute;
+        left: 0.75rem;
+        top: 0.75rem;
+        z-index: 30;
+        display: inline-block;
+        width: fit-content;
+        max-width: min(50vw, 34rem);
+        pointer-events: none;
+        box-sizing: border-box;
+        padding: 0.32rem 0.46rem;
+        border-radius: 0.45rem;
+        background: rgba(8, 12, 23, 0.14);
+        color: #dce8ff;
+        box-shadow: 0 0.18rem 0.6rem rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+      }
+
+      .bridge-status-table {
+        display: block;
+      }
+
+      .bridge-status-row {
+        display: block;
+      }
+
+      .bridge-status-value {
+        display: block;
+        color: rgba(242, 246, 255, 0.96);
+        font-size: 0.8rem;
+        font-weight: 500;
+        line-height: 1.28;
+        letter-spacing: 0.01em;
+        word-break: break-word;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
       }
 
       canvas {
@@ -69,15 +103,21 @@
       <section class="card">
         <div id="canvas-viewport" class="canvas-stack">
           <canvas id="unity-canvas" aria-label="ReverySky map runtime"></canvas>
+          <div id="bridge-status" role="status" aria-live="polite" aria-atomic="true">
+            <div class="bridge-status-table">
+              <div class="bridge-status-row">
+                <div class="bridge-status-value" id="bridge-status-value">Bridge: initializing...</div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div id="bridge-status">Bridge: initializing...</div>
       </section>
     </main>
 
     <script>
       (function () {
         const protocolVersion = "2.0.0";
-        const statusEl = document.getElementById("bridge-status");
+        const statusValueEl = document.getElementById("bridge-status-value");
         const viewportEl = document.getElementById("canvas-viewport");
         const canvas = document.getElementById("unity-canvas");
         const buildPath = "Build/";
@@ -91,7 +131,9 @@
         let latestNoteFocusMessage = null;
 
         function setStatus(text) {
-          statusEl.textContent = text;
+          if (statusValueEl) {
+            statusValueEl.textContent = text;
+          }
         }
 
         function sendReady() {
@@ -130,30 +172,6 @@
             },
             "*"
           );
-        }
-
-        function logCanvasSize(label, includeDrawingBuffer) {
-          const rect = viewportEl.getBoundingClientRect();
-          let drawingBufferWidth = null;
-          let drawingBufferHeight = null;
-
-          if (includeDrawingBuffer) {
-            const gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
-            drawingBufferWidth = gl ? gl.drawingBufferWidth : null;
-            drawingBufferHeight = gl ? gl.drawingBufferHeight : null;
-          }
-
-          console.log("[ReverySky]", label, {
-            dpr: window.devicePixelRatio,
-            viewportCssWidth: rect.width,
-            viewportCssHeight: rect.height,
-            canvasWidth: canvas.width,
-            canvasHeight: canvas.height,
-            drawingBufferWidth: drawingBufferWidth,
-            drawingBufferHeight: drawingBufferHeight,
-            screenWidth: window.screen.width,
-            screenHeight: window.screen.height
-          });
         }
 
         function resizeCanvas() {
@@ -379,11 +397,9 @@
           window.addEventListener("resize", onWindowResize);
 
           resizeCanvas();
-          logCanvasSize("before Unity boot", false);
 
           try {
             await tryBootUnityRuntime();
-            logCanvasSize("after Unity boot", true);
           } catch (err) {
             runtimeMode = "failed";
             setStatus("Unity runtime failed to start. See console.");

@@ -43,7 +43,41 @@
       }
 
       #bridge-status {
-        display: none;
+        position: absolute;
+        left: 0.75rem;
+        top: 0.75rem;
+        z-index: 30;
+        display: inline-block;
+        width: fit-content;
+        max-width: min(50vw, 34rem);
+        pointer-events: none;
+        box-sizing: border-box;
+        padding: 0.32rem 0.46rem;
+        border-radius: 0.45rem;
+        background: rgba(8, 12, 23, 0.14);
+        color: #dce8ff;
+        box-shadow: 0 0.18rem 0.6rem rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+      }
+
+      .bridge-status-table {
+        display: block;
+      }
+
+      .bridge-status-row {
+        display: block;
+      }
+
+      .bridge-status-value {
+        display: block;
+        color: rgba(242, 246, 255, 0.96);
+        font-size: 0.8rem;
+        font-weight: 500;
+        line-height: 1.28;
+        letter-spacing: 0.01em;
+        word-break: break-word;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
       }
 
       canvas {
@@ -68,8 +102,14 @@
       <section class="card">
         <div id="canvas-viewport" class="canvas-stack">
           <canvas id="unity-canvas" aria-label="ReverySky map runtime"></canvas>
+          <div id="bridge-status" role="status" aria-live="polite" aria-atomic="true">
+            <div class="bridge-status-table">
+              <div class="bridge-status-row">
+                <div class="bridge-status-value" id="bridge-status-value">Bridge: initializing...</div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div id="bridge-status">Bridge: initializing...</div>
       </section>
     </main>
 
@@ -82,7 +122,7 @@
     <script>
       (function () {
         const protocolVersion = "2.0.0";
-        const statusEl = document.getElementById("bridge-status");
+        const statusValueEl = document.getElementById("bridge-status-value");
         const viewportEl = document.getElementById("canvas-viewport");
         const canvas = document.getElementById("unity-canvas");
         const buildPath = "Build/";
@@ -99,7 +139,9 @@
         let codeBlobUrl = null;
 
         function setStatus(text) {
-          statusEl.textContent = text;
+          if (statusValueEl) {
+            statusValueEl.textContent = text;
+          }
         }
 
         function getEmbeddedText(id) {
@@ -425,7 +467,8 @@
               streamingAssetsUrl: cfg.streamingAssetsUrl || "StreamingAssets",
               companyName: cfg.companyName || "MoonSkorch Studio",
               productName: cfg.productName || "ReverySky Map",
-              productVersion: cfg.productVersion || "0.0.0"
+              productVersion: cfg.productVersion || "0.0.0",
+              devicePixelRatio: window.devicePixelRatio || 1
             },
             (progress) => {
               setStatus("Unity: loading " + Math.round(progress * 100) + "%");
@@ -473,5 +516,3 @@
     </script>
   </body>
 </html>
-
-
