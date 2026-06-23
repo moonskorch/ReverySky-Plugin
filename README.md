@@ -36,9 +36,9 @@ After enabling the plugin, you can open the map in either way:
 
 ## Visual quality
 
-Visual quality depends on your display resolution, screen scaling, graphics driver, and the GPU used by Obsidian. For the clearest image, keep your graphics driver up to date and let Obsidian use a high-performance GPU when your device offers one.
+Visual quality depends on your display resolution, screen scaling, graphics driver, and the GPU used by Obsidian. For the clearest image, keep your graphics driver up to date and let Obsidian use a high-performance GPU when your device offers one. On dual-GPU laptops, this is usually set in your system graphics settings.
 
-On dual-GPU laptops, this is usually set in your system graphics settings.
+You can also adjust Render Scale in the plugin settings: higher values sharpen the map but use more GPU power.
 
 ## Navigation
 

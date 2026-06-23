@@ -30,7 +30,8 @@ Risk:
 
 Mitigation:
 - Keep generated outputs out of Git.
-- Keep `unity-webgl/index.html`, `unity-webgl/Build/*`, and `unity-webgl/TemplateData/*` as local generated artifacts.
+- Keep `unity-webgl/index.html`, most `unity-webgl/Build/*`, and `unity-webgl/TemplateData/*` as local generated artifacts.
+- Treat the compact `embedded-archive` runtime input listed in `docs/PACKAGING_MODES.md` as the exception: it is generated/imported, but tracked intentionally for release-candidate builds.
 - Exclude optional large skybox source textures from commits as documented in `unity/ReverySkyMap/Assets/README.txt`.
 - Keep runtime generation script-driven and reproducible.
 
@@ -38,7 +39,7 @@ Mitigation:
 - `embedded-html` embeds the self-contained Unity WebGL HTML into root `main.js`;
 - runtime starts lazily when the map view opens;
 - packaged `main.js` size and Obsidian startup behavior must be measured;
-- dashboard preview scan is a separate next stage;
+- dashboard submission and scan status are tracked separately from package-mode behavior;
 - generated package output stays outside Git.
 
 ## Embedded archive cache extraction
@@ -46,7 +47,7 @@ Mitigation:
 - the first map open extracts the runtime into `.reverysky-runtime/<version>/`;
 - later opens and later Obsidian restarts reuse the cache without network download;
 - archive validation and cache replacement must stay strict to avoid partial installs;
-- dashboard scan is a separate later stage.
+- `embedded-archive` is the current release-shaped candidate, while dashboard submission and scan status are tracked separately.
 
 ## 5. Vault Graph Scale
 Risk:
@@ -204,6 +205,7 @@ The architecture depends on several different file roles:
 - WebGL export
 - `unity-webgl` templates
 - generated runtime files
+- tracked compact runtime input for `embedded-archive`
 - packaged plugin output
 
 Risk:
@@ -211,10 +213,12 @@ Risk:
 * Future changes can accidentally edit generated runtime output instead of source or templates.
 * Bridge wrapper fixes can be made in the wrong file and lost on the next import/build.
 * Unity-side changes can be present in source but missing from the packaged WebGL runtime.
+* The tracked compact runtime input can be mistaken for disposable local output, breaking release-candidate builds that rebuild `main.js` from repository contents.
 
 Hardening:
 
 * Keep source, template, generated runtime, and packaged output roles explicit in reviews.
+* Preserve the tracked compact runtime input required by `embedded-archive` unless the Unity WebGL export/import workflow intentionally refreshes it.
 * Prefer source/template changes plus regeneration over direct edits to generated runtime files.
 * After Unity-side bridge changes, verify that the WebGL export/import path was run and the packaged runtime contains the expected bridge behavior.
 

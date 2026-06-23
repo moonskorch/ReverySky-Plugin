@@ -21,7 +21,7 @@ Before uploading release assets, open root `main.js` and verify its first line:
 - `main.js` is generated and ignored by Git.
 - `unity-webgl/` is mostly generated/imported and ignored by Git, except for the tracked compact runtime input used by `embedded-archive`.
 - Root `manifest.json` and `styles.css` are the release/source files.
-- Root `manifest.json` version must match the GitHub release tag used for Obsidian dashboard testing.
+- Root `manifest.json` version must match the GitHub release tag used for release metadata.
 - `dist/` may contain temporary reports or intermediate artifacts, but it is not the primary release output location.
 
 ## folder-runtime
@@ -91,7 +91,7 @@ npm.cmd run check:package:embedded-html
 
 Purpose:
 - Obsidian release-shaped package candidate.
-- Current preferred Obsidian dashboard scan candidate.
+- Current preferred release-shaped candidate. Dashboard submission and scan status are tracked separately.
 
 Build command:
 
@@ -135,7 +135,7 @@ Behavior:
 
 Observed result:
 - Obsidian starts quickly; the startup-time difference is barely noticeable in manual smoke testing.
-- This is the current release candidate for Obsidian dashboard testing.
+- This is the current release candidate package mode.
 
 Verification:
 

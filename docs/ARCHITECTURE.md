@@ -7,6 +7,7 @@ Current in-scope behavior:
 - open a dedicated map view from an Obsidian command;
 - build a graph from markdown files and resolved links;
 - let the view filter the effective graph before sending it to Unity;
+- persist map view preferences across close and reopen;
 - host the local WebGL runtime on `127.0.0.1`;
 - round-trip note selection between Obsidian and the Unity runtime.
 
@@ -29,7 +30,7 @@ Main system parts:
   Depends on: `MapSession`, `MapFilterPanelController`, `MapNoteOpenRouter`, `UnityIframeBridge`
 
 - Map session and filter UI
-  Owns persisted map state, graph refresh timing, focus precedence, filter derivation, and the transient filter-panel interaction state.
+  Owns persisted map state, graph refresh timing, focus precedence, filter derivation, render-scale preference, and the transient filter-panel interaction state.
   Main code: `src/view/MapSession.ts`, `src/view/MapFilterPanelController.ts`
   Depends on: `VaultGraphBuilder`, `GraphPathFilter`, Obsidian workspace APIs, browser DOM events
 
@@ -44,18 +45,18 @@ Main system parts:
   Depends on: browser `postMessage`, protocol version `2.0.0`
 
 - Local WebGL host
-  Serves `unity-webgl/` over loopback HTTP and rejects path traversal or unsupported methods.
-  Main code: `src/runtime/UnityWebglLocalServer.ts`
-  Depends on: Node `http`, `fs`, `path`
+  Serves the selected Unity runtime source over loopback HTTP and rejects path traversal or unsupported methods.
+  Main code: `src/runtime/UnityWebglLocalServer.ts`, `src/runtime/EmbeddedUnityRuntimeInstaller.ts`, `src/runtime/EmbeddedUnityRuntimeArchive.ts`, `src/runtime/EmbeddedUnityIndexHtml.ts`
+  Depends on: Node `http`, `fs`, `path`, embedded runtime payload helpers
 
 - Unity runtime source
   Receives graph payloads, owns runtime graph state, rebuilds the scene, focuses notes, and requests note opening back in Obsidian.
-  Main code: `unity/ReverySkyMap/Assets/Scripts/Bridge/*.cs`, `unity/ReverySkyMap/Assets/Scripts/DreamScape/*.cs`
+  Main code: `unity/ReverySkyMap/Assets/Scripts/Bridge/*.cs`, `unity/ReverySkyMap/Assets/Scripts/StarScape/*.cs`, `unity/ReverySkyMap/Assets/Scripts/Interfaces/*.cs`
   Depends on: `MapRuntimeContext`, `ObsidianBridge`, `Cartographer`, `FocusNode`
 
 - Generated WebGL package
-  Delivers the compiled runtime and host page used by the iframe.
-  Main code: `unity-webgl/`, `unity-webgl/index.template.html`, `scripts/import-unity-webgl.ps1`
+  Delivers the compiled runtime and host page used by the iframe. Most of `unity-webgl/` is generated staging output, while the compact `embedded-archive` runtime input under `unity-webgl/Build/runtime-*` and `build-config.json` is tracked intentionally.
+  Main code: `unity-webgl/`, `unity-webgl/index.template.html`, `unity-webgl/index.disk-runtime.template.html`, `scripts/import-unity-webgl.ps1`
   Depends on: Unity WebGL export pipeline
 
 ### Packaging modes
@@ -74,9 +75,9 @@ Main system parts:
 - `embedded-archive`:
   - root `main.js` contains a compressed Unity runtime archive;
   - the first map open extracts the runtime into a versioned local cache;
-  - later map opens reuse the cache without re-extracting;
+  - later map opens reuse the cache when plugin version and archive SHA match;
   - no runtime network download is used;
-  - dashboard scan is a separate later stage.
+  - this is the current release-shaped candidate; dashboard submission and scan status are tracked separately.
 
 ## Runtime Hosting vs Bridge Messaging
 
@@ -84,7 +85,7 @@ ReverySky Map uses two separate communication paths. They should not be treated 
 
 ### 1. Local HTTP hosting
 
-`UnityWebglLocalServer` only serves the Unity WebGL runtime files to the iframe.
+`UnityWebglLocalServer` only serves the selected Unity runtime source to the iframe. That source can be the local `unity-webgl/` folder for `folder-runtime`, an in-memory embedded `index.html` for `embedded-html`, or an extracted `.reverysky-runtime/<version>/unity-webgl` cache for `embedded-archive`.
 
 It exposes a loopback URL such as:
 
@@ -92,16 +93,20 @@ It exposes a loopback URL such as:
 http://127.0.0.1:<port>/index.html
 ```
 
-The iframe loads this URL as a normal web page. The local server may serve files such as:
+The iframe loads this URL as a normal web page. `MapView.createRuntimeIframeSrc(...)` appends a cache-busting `t` query parameter and the current `renderScale` view preference before the iframe navigates.
+
+The local server may serve files such as:
 
 - `index.html`
 - `Build/runtime-entry.js`
-- `Build/*.wasm`
-- `Build/*.data`
+- `Build/runtime-code.wasm`
+- `Build/runtime-data.data`
 - `Build/*.js`
 - `TemplateData/*`
 
 The local HTTP server does not build the note graph, does not send `graph:set`, and does not update the Unity scene. Its responsibility is file delivery for the WebGL runtime.
+
+`renderScale` is also not bridge data. It is a startup hint in the iframe URL. The runtime wrapper reads it from the query string and passes the effective device pixel ratio into `createUnityInstance(...)`.
 
 ### 2. Bridge messaging after Unity loads
 
@@ -152,10 +157,12 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
    Finds an existing map leaf or creates one with `workspace.getRightLeaf(false)` and `leaf.setViewState(...)`, including the last persisted `mapViewState` when available.
 3. Obsidian opens the custom view and calls `src/view/MapView.ts` -> `onOpen()`.
 4. `MapView.onOpen()` starts `MapSession`, creates `MapFilterPanelController`, and calls `plugin.getUnityRuntimeUrl()`.
-5. `src/main.ts` -> `getUnityRuntimeUrl()` lazily creates `UnityWebglLocalServer`, then calls `getBaseUrl()`.
+5. `src/main.ts` -> `getUnityRuntimeUrl()` chooses the runtime source:
+   embedded archive cache through `EmbeddedUnityRuntimeInstaller`, embedded index HTML through `EmbeddedUnityIndexHtml`, or local `unity-webgl/` directory for folder runtime.
+   It then lazily creates `UnityWebglLocalServer` and calls `getBaseUrl()`.
 6. `src/runtime/UnityWebglLocalServer.ts` -> `getBaseUrl()` -> `startServer()`
    Starts a loopback HTTP server and returns `http://127.0.0.1:<port>/index.html`.
-7. `MapView.onOpen()` creates the iframe with that URL and waits for the iframe `load` event.
+7. `MapView.onOpen()` creates the iframe with that URL, cache-busting `t`, and the session `renderScale`, then waits for the iframe `load` event.
 8. On iframe load, `MapView.onOpen()` calls `bridge.attach(iframe.contentWindow, callbacks)`.
 
 ### Path 2. Handshake -> graph build -> postMessage -> Unity ingest
@@ -185,6 +192,8 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 7. `src/bridge/UnityIframeBridge.ts` -> `sendGraphSet()`
    Sends the effective graph that Unity should render now.
 
+Render-scale changes are intentionally different from graph-significant changes. `MapFilterPanelController` calls `MapSession.setRenderScale()`, which updates persisted state and UI restart guidance without re-emitting `graph:set`; the new scale is applied the next time the iframe is created.
+
 ### Path 4. Unity note-open request -> Obsidian note open
 1. Unity sends `note:open`.
 2. `src/bridge/UnityIframeBridge.ts` -> `onMessage()`
@@ -201,6 +210,7 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 4. During plugin unload, the plugin leaves existing map leaves attached so Obsidian can preserve their user-chosen workspace location.
 5. On a later startup or `toggleMapView()` reopen, `ReverySkyMapPlugin.onload()` and `activateMapView()` reuse `lastMapViewState`.
 6. `leaf.setViewState({ type: MAP_VIEW_TYPE, active: true, state })` hands the persisted state back to `MapView`, which then forwards it into `MapSession.setState(...)`.
+7. Persisted view state currently includes `pathFilterQuery`, `showTags`, `mapLayout`, and `renderScale`.
 
 ### Key plugin-side control points
 
@@ -211,7 +221,7 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
   Owns the shell execution paths after the view exists: iframe startup, bridge wiring, and collaborator orchestration.
 
 - `src/view/MapSession.ts` -> `MapSession`
-  Owns persisted map state, graph refresh timing, graph emission, and note-focus precedence.
+  Owns persisted map state, graph refresh timing, graph emission, note-focus precedence, and render-scale restart tracking.
 
 - `src/view/MapFilterPanelController.ts` -> `MapFilterPanelController`
   Owns filter-panel DOM creation, suggestion rendering, and UI-only interaction state.
@@ -243,8 +253,11 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 - The effective graph after filters is owned by `MapSession`.
   The session emits the filtered payload that Unity receives through the shell view.
 
-- `pathFilterQuery`, `showTags`, and `mapLayout` are owned by `MapSession`.
+- `pathFilterQuery`, `showTags`, `mapLayout`, and `renderScale` are owned by `MapSession`.
   They are persisted as view state and re-applied on open.
+
+- `renderScale` is applied at iframe startup, not through the bridge.
+  `MapSession` tracks the selected value and whether it differs from the currently applied iframe value so the UI can ask the user to reopen the map.
 
 - The most recently closed map-view state is owned by `ReverySkyMapPlugin`.
   It is stored as plugin data under `mapViewState`, then handed back into a newly created map leaf on the next open.
@@ -255,8 +268,8 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 - Runtime notes, links, selected note, and graph layout are owned by the Unity runtime.
   They are stored in `MapRuntimeContext` and consumed by `Cartographer`.
 
-- WebGL file serving is owned by `UnityWebglLocalServer`.
-  The runtime is hosted locally, not from an external site.
+- WebGL runtime serving is owned by `UnityWebglLocalServer`.
+  The runtime is hosted locally from the selected runtime source, not from an external site.
 
 ### Bridge contract
 The canonical plugin-side contract lives in:
@@ -273,6 +286,7 @@ Important current contract facts:
 - `graph:set` carries the effective filtered graph;
 - `runtime:shutdown` is a bridge/runtime-wrapper lifecycle handshake, not a full Unity engine shutdown;
 - `mapLayout` is an optional plugin-owned runtime hint;
+- `renderScale` is a plugin-owned iframe startup hint and does not belong to the bridge payload contract;
 - invalid outgoing payloads are rejected before dispatch;
 - invalid incoming bridge messages are ignored with non-fatal error reporting.
 
@@ -293,12 +307,20 @@ Main repository surfaces:
   Role: tracked host template
   Type: source
 
+- `unity-webgl/index.disk-runtime.template.html`
+  Role: tracked disk-runtime host template for compact archive packaging
+  Type: source
+
 - `unity-webgl/index.html`
   Role: local runtime host page
   Type: generated
 
-- `unity-webgl/Build/*` and `unity-webgl/TemplateData/*`
-  Role: WebGL export artifacts
+- `unity-webgl/Build/build-config.json`, `runtime-entry.js`, `runtime-core.js`, `runtime-data.*`, and `runtime-code.*`
+  Role: compact Unity runtime input for `embedded-archive` release builds
+  Type: tracked generated input
+
+- other `unity-webgl/Build/*` files and `unity-webgl/TemplateData/*`
+  Role: local WebGL export staging artifacts
   Type: generated
 
 - `main.js`
@@ -308,7 +330,7 @@ Main repository surfaces:
 Build and import flow:
 1. Unity exports WebGL from `unity/ReverySkyMap`.
 2. `scripts/import-unity-webgl.ps1` copies the export into `unity-webgl/` and regenerates runtime files used by all package modes.
-3. `npm run build` builds the current release candidate from the prepared runtime and writes root `main.js`.
+3. `npm run build` builds the current `embedded-archive` release candidate from the prepared runtime and writes root `main.js`.
 4. Local folder-runtime installs can be built with `npm run package:folder-runtime`.
 5. Other release-shaped package modes can be built with `npm run package:embedded-html` or `npm run package:embedded-archive`.
 
@@ -329,11 +351,11 @@ Detailed commands live in `docs/VERIFICATION.md`. This section only maps the mai
 
 - Map state persistence across close and reopen
   Automated checks: `npm run test`, especially `tests/main.test.ts`
-  Manual checks: set filters, tags visibility, and map layout; close the map through the ribbon toggle; reopen it; then repeat after restarting Obsidian
+  Manual checks: set filters, tags visibility, map layout, and render scale; close the map through the ribbon toggle; reopen it; then repeat after restarting Obsidian
 
 - Visual plugin UI states
   Automated checks: `npm run test:ui-visual` when UI changed
-  Manual checks: review screenshots for search/filter controls and toggles
+  Manual checks: review screenshots for search/filter controls, toggles, layout selector, and render-scale slider
 
 - Unity runtime source changes
   Automated checks: Unity-side tests when available
@@ -343,4 +365,4 @@ Detailed commands live in `docs/VERIFICATION.md`. This section only maps the mai
 - There is no repository-defined CI, so architecture regressions depend on local verification discipline.
 - TypeScript tests cover the plugin side well enough to show intent, but they do not prove the packaged Unity WebGL build is fresh.
 - Unity runtime quality depends on a new export plus a correct `scripts/import-unity-webgl.ps1` import step after Unity-side changes.
-- The repository contains both source-of-truth docs and generated runtime assets; future work must keep those boundaries explicit to avoid editing generated files as if they were source.
+- The repository contains source-of-truth docs, generated runtime assets, and tracked generated runtime inputs for `embedded-archive`; future work must keep those boundaries explicit to avoid editing the wrong surface.

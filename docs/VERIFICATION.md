@@ -40,25 +40,42 @@ Core commands:
 - `npm run test:ui-visual:report` - open the latest Playwright report.
 
 Current TS baseline test suites:
+- `tests/main.test.ts`
+  - validates plugin lifecycle, map view activation, toggle behavior, persisted map-view state, and runtime URL resolution.
 - `tests/bridge/MessageValidator.test.ts`
   - validates valid payload path;
   - validates invalid payload path (date, noteCount mismatch, invalid weight, empty required fields);
   - validates protocol mismatch rejection for incoming `bridge:ready`.
+- `tests/bridge/UnityIframeBridge.test.ts`
+  - validates outgoing `graph:set` dispatch for valid payload;
+  - validates error path for invalid payload without dispatch;
+  - validates `bridge:ready`, `note:open`, and shutdown acknowledgement handling for the attached iframe source;
+  - validates ignoring foreign source messages and listener cleanup on `detach()`.
+- `tests/graph/VaultGraphBuilder.test.ts`
+  - validates graph extraction from Obsidian vault files and metadata cache.
+- `tests/graph/GraphPathFilter.test.ts`
+  - validates path, date, tag, and unsupported-token filter behavior.
 - `tests/graph/GraphNormalizer.test.ts`
   - validates path normalization (`\` -> `/`);
   - validates tag normalization (trim + `#` removal);
   - validates empty tag removal and deduplication.
-- `tests/bridge/UnityIframeBridge.test.ts`
-  - validates outgoing `graph:set` dispatch for valid payload;
-  - validates error path for invalid payload without dispatch;
-  - validates `bridge:ready` handling for attached iframe source only;
-  - validates ignoring foreign source messages and listener cleanup on `detach()`.
 - `tests/runtime/EmbeddedUnityRuntimeInstaller.test.ts`
   - validates dev fallback, cache reuse, extraction, SHA checks, and rejected archive entries.
+- `tests/runtime/EmbeddedUnityIndexHtml.test.ts`
+  - validates embedded-index detection and fallback behavior.
+- `tests/runtime/UnityWebglLocalServer.test.ts`
+  - validates directory and embedded-index hosting behavior, method handling, content types, and path traversal protection.
 - `tests/view/MapView.test.ts`
   - validates iframe creation and bridge attach on `onOpen`;
   - validates handshake flow `bridge:ready` -> graph build -> `graph:set`;
-  - validates `detach()` and container cleanup on `onClose`.
+  - validates `detach()` and container cleanup on `onClose`;
+  - validates persisted state handoff and render-scale query startup behavior.
+- `tests/view/MapSession.test.ts`
+  - validates session state normalization, graph refresh timing, filtering, focus precedence, and render-scale reopen state.
+- `tests/view/MapFilterPanelController.test.ts`
+  - validates settings panel controls, suggestions, map layout selection, tags toggle, and render-scale slider UI state.
+- `tests/view/MapNoteOpenRouter.test.ts`
+  - validates note-open payload resolution and Obsidian workspace routing handoff.
 
 Current visual regression suites:
 - `tests/visual/engine-dropdown.spec.ts`

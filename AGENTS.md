@@ -12,7 +12,8 @@
 - TypeScript plugin code in `src/` bundled with `esbuild`.
 - Obsidian plugin manifest in `manifest.json`, generated entry output `main.js`.
 - Unity source project in `unity/ReverySkyMap` (Unity `6000.3.8f1`).
-- Local runtime artifacts and template in `unity-webgl/`.
+- Local runtime artifacts and templates in `unity-webgl/`.
+- Compact Unity WebGL runtime input for `embedded-archive` release builds is generated/imported, but tracked intentionally.
 - PowerShell automation for WebGL import in `scripts/import-unity-webgl.ps1`.
 
 ## Repository Structure
@@ -22,8 +23,9 @@
 - `src/graph/`: vault graph extraction and normalization.
 - `src/runtime/`: local HTTP server for Unity WebGL assets.
 - `unity/ReverySkyMap/`: Unity project source used to build WebGL export.
-- `unity-webgl/index.template.html`: tracked runtime host template.
-- `unity-webgl/index.html`, `unity-webgl/Build/*`, `unity-webgl/TemplateData/*`: generated local artifacts.
+- `unity-webgl/index.template.html`, `unity-webgl/index.disk-runtime.template.html`: tracked runtime host templates.
+- `unity-webgl/Build/build-config.json`, `runtime-entry.js`, `runtime-core.js`, `runtime-data.*`, `runtime-code.*`: tracked compact runtime input for `embedded-archive`.
+- `unity-webgl/index.html`, other `unity-webgl/Build/*`, `unity-webgl/TemplateData/*`: generated local artifacts.
 - `docs/`: architecture, data contract, risks, MVP plan, verification, and runbooks.
 - `docs/BUGS_AND_FEATURES.md`: post-MVP backlog for confirmed bugs and feature slices.
 - `.local-notes/`: local private notes; may be checked during task execution.
@@ -99,7 +101,7 @@
 - If new files larger than 100 MB are discovered, add them to this denylist.
 
 ## Safety And Approvals
-- Treat generated artifacts as build outputs unless explicitly marked as source.
+- Treat generated artifacts as build outputs unless explicitly marked as source or tracked compact runtime input.
 - Keep references, caches, and environment-specific files out of commits.
 - `reference/ReverySky` is for targeted comparison or selective fragment adaptation only.
 - Do not use it for rollback, reset, or bulk-copy into `unity/ReverySkyMap`.
