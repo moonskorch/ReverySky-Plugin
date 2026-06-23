@@ -122,6 +122,7 @@
         const canvas = document.getElementById("unity-canvas");
         const buildPath = "Build/";
         const buildConfigPath = buildPath + "build-config.json";
+        const renderScale = getRenderScale();
 
         let runtimeMode = "boot";
         let unityInstance = null;
@@ -134,6 +135,19 @@
           if (statusValueEl) {
             statusValueEl.textContent = text;
           }
+        }
+
+        function getRenderScale() {
+          const value = Number(new URLSearchParams(window.location.search).get("renderScale"));
+          if (!Number.isFinite(value)) {
+            return 1;
+          }
+          const rounded = Math.round(value * 10) / 10;
+          return rounded >= 0.5 && rounded <= 1.5 ? rounded : 1;
+        }
+
+        function getEffectiveDevicePixelRatio() {
+          return (window.devicePixelRatio || 1) * renderScale;
         }
 
         function sendReady() {
@@ -175,7 +189,7 @@
         }
 
         function resizeCanvas() {
-          const ratio = window.devicePixelRatio || 1;
+          const ratio = getEffectiveDevicePixelRatio();
           const rect = viewportEl.getBoundingClientRect();
           const nextWidth = Math.max(1, Math.floor(rect.width * ratio));
           const nextHeight = Math.max(1, Math.floor(rect.height * ratio));
@@ -362,7 +376,7 @@
               companyName: cfg.companyName || "MoonSkorch Studio",
               productName: cfg.productName || "ReverySky Map",
               productVersion: cfg.productVersion || "0.0.0",
-              devicePixelRatio: window.devicePixelRatio || 1
+              devicePixelRatio: getEffectiveDevicePixelRatio()
             },
             (progress) => {
               setStatus("Unity: loading " + Math.round(progress * 100) + "%");

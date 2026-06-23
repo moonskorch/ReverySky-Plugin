@@ -32,7 +32,9 @@ export default class ReverySkyMapPlugin extends Plugin {
 
     this.registerView(
       MAP_VIEW_TYPE,
-      (leaf: WorkspaceLeaf) => new MapView(leaf, this)
+      (leaf: WorkspaceLeaf) => new MapView(leaf, this, {
+        initialState: this.lastMapViewState ? { ...this.lastMapViewState } : null
+      })
     );
 
     this.addRibbonIcon("sparkles", "Toggle ReverySky Map", async () => {

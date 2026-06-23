@@ -58,6 +58,31 @@ function makePathPayload(): GraphPayload {
   };
 }
 
+function createSessionForStateTests(options?: {
+  sendGraph?: ReturnType<typeof vi.fn>;
+}) {
+  return new MapSession({
+    app: {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+      },
+      workspace: {
+        activeLeaf: null,
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    } as never,
+    buildGraph: vi.fn().mockReturnValue(makePayload()) as (app: never) => GraphPayload,
+    now: () => 1700000000000,
+    sendGraph: options?.sendGraph ?? vi.fn(),
+    sendFocus: vi.fn()
+  });
+}
+
 describe("MapSession", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -65,6 +90,51 @@ describe("MapSession", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("normalizes and restores render scale state", async () => {
+    const session = createSessionForStateTests();
+    expect(session.getState()).toMatchObject({ renderScale: 1 });
+    expect(session.getFilterUiState()).toMatchObject({
+      renderScale: 1,
+      renderScaleRestartRequired: false
+    });
+
+    await session.setState({ renderScale: 1.24 });
+    expect(session.getState()).toMatchObject({ renderScale: 1.2 });
+
+    await session.setState({ renderScale: 0.5 });
+    expect(session.getState()).toMatchObject({ renderScale: 0.5 });
+
+    await session.setState({ renderScale: 1.5 });
+    expect(session.getState()).toMatchObject({ renderScale: 1.5 });
+
+    await session.setState({ renderScale: 2 });
+    expect(session.getState()).toMatchObject({ renderScale: 1 });
+
+    await session.setState({ renderScale: "sharp" });
+    expect(session.getState()).toMatchObject({ renderScale: 1 });
+  });
+
+  it("tracks render scale restart state without re-emitting graph data", async () => {
+    const sendGraph = vi.fn();
+    const session = createSessionForStateTests({ sendGraph });
+    session.start(() => undefined);
+
+    session.setRenderScale(1.2);
+
+    expect(sendGraph).not.toHaveBeenCalled();
+    expect(session.getState()).toMatchObject({ renderScale: 1.2 });
+    expect(session.getFilterUiState()).toMatchObject({
+      renderScale: 1.2,
+      renderScaleRestartRequired: true
+    });
+
+    session.setRenderScale(1);
+    expect(session.getFilterUiState()).toMatchObject({
+      renderScale: 1,
+      renderScaleRestartRequired: false
+    });
   });
 
   it("does not refresh when only frontmatter date changes and tags/links stay stable", () => {

@@ -253,6 +253,45 @@ button.reverysky-map-filter-close svg {
   box-shadow: none;
 }
 
+.reverysky-map-render-scale-section {
+  margin-top: 0.25rem;
+}
+
+.reverysky-map-render-scale-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.reverysky-map-render-scale-value {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small, 0.875rem);
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.reverysky-map-filter-panel input.reverysky-map-render-scale-input[type="range"] {
+  box-sizing: border-box;
+  display: block;
+  flex: 1 1 auto;
+  inline-size: 100% !important;
+  justify-self: stretch;
+  max-width: 100% !important;
+  min-width: 0;
+  width: 100% !important;
+}
+
+.reverysky-map-render-scale-message {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller, 0.75rem);
+  line-height: 1.25;
+}
+
+.reverysky-map-render-scale-message--hidden {
+  display: none;
+}
+
 button.reverysky-map-tags-toggle {
   width: 2.5rem;
   height: 1.5rem;

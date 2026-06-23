@@ -139,8 +139,10 @@ describe("MapFilterPanelController", () => {
     await session.setState({
       pathFilterQuery: "tag:#project",
       showTags: false,
-      mapLayout: "dates"
+      mapLayout: "dates",
+      renderScale: 1.2
     });
+    session.start(() => undefined);
 
     const controller = new MapFilterPanelController(session);
     const container = document.createElement("div");
@@ -149,12 +151,41 @@ describe("MapFilterPanelController", () => {
     const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
     const tagsToggle = container.querySelector(".reverysky-map-tags-toggle") as HTMLButtonElement;
     const engineSelect = container.querySelector(".reverysky-map-engine-select") as HTMLSelectElement;
+    const renderScaleInput = container.querySelector(".reverysky-map-render-scale-input") as HTMLInputElement;
+    const renderScaleValue = container.querySelector(".reverysky-map-render-scale-value") as HTMLElement;
+    const renderScaleMessage = container.querySelector(".reverysky-map-render-scale-message") as HTMLElement;
     const message = container.querySelector(".reverysky-map-filter-message") as HTMLElement;
 
     expect(searchInput.value).toBe("tag:#project");
     expect(tagsToggle.getAttribute("aria-checked")).toBe("false");
     expect(engineSelect.value).toBe("dates");
+    expect(renderScaleInput.min).toBe("0.5");
+    expect(renderScaleInput.max).toBe("1.5");
+    expect(renderScaleInput.step).toBe("0.1");
+    expect(renderScaleInput.value).toBe("1.2");
+    expect(renderScaleValue.textContent).toBe("1.2x");
+    expect(renderScaleMessage.textContent).toBe("");
     expect(container.textContent).toContain("Map layout");
     expect(message.textContent).toBe("");
+  });
+
+  it("updates render scale from the slider and shows reopen guidance", () => {
+    const session = createSession();
+    session.start(() => undefined);
+    const controller = new MapFilterPanelController(session);
+    const container = document.createElement("div");
+    controller.render(container);
+
+    const renderScaleInput = container.querySelector(".reverysky-map-render-scale-input") as HTMLInputElement;
+    const renderScaleValue = container.querySelector(".reverysky-map-render-scale-value") as HTMLElement;
+    const renderScaleMessage = container.querySelector(".reverysky-map-render-scale-message") as HTMLElement;
+
+    renderScaleInput.value = "1.3";
+    renderScaleInput.dispatchEvent(new Event("input"));
+
+    expect(session.getState()).toMatchObject({ renderScale: 1.3 });
+    expect(renderScaleValue.textContent).toBe("1.3x");
+    expect(renderScaleMessage.textContent).toBe("Reopen the map view to apply.");
+    expect(renderScaleMessage.classList.contains("reverysky-map-render-scale-message--hidden")).toBe(false);
   });
 });

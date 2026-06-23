@@ -24,16 +24,23 @@ const GRAPH_RESOLVE_BARRIER_FALLBACK_MS = 700;
 const FILTER_INPUT_DEBOUNCE_MS = 250;
 const MAX_FOLDER_SUGGESTIONS = 80;
 const MAX_TAG_SUGGESTIONS = 200;
+export const DEFAULT_RENDER_SCALE = 1;
+export const MIN_RENDER_SCALE = 0.5;
+export const MAX_RENDER_SCALE = 1.5;
+export const RENDER_SCALE_STEP = 0.1;
 export type MapViewState = {
   pathFilterQuery?: unknown;
   showTags?: unknown;
   mapLayout?: unknown;
+  renderScale?: unknown;
 };
 
 export type MapFilterUiState = {
   pathFilterQuery: string;
   showTags: boolean;
   mapLayout: MapLayoutPreference;
+  renderScale: number;
+  renderScaleRestartRequired: boolean;
   pathFilterParseValid: boolean;
   pathFilterMessage: string;
 };
@@ -100,6 +107,8 @@ export class MapSession {
   private pathFilterQuery = "";
   private showTags = true;
   private mapLayout: MapLayoutPreference = DEFAULT_MAP_LAYOUT_PREFERENCE;
+  private renderScale = DEFAULT_RENDER_SCALE;
+  private appliedRenderScale = DEFAULT_RENDER_SCALE;
   private activePathFilter: ParsedPathFilter | null = null;
   private pathFilterParseValid = true;
   private pathFilterMessage = "";
@@ -120,7 +129,8 @@ export class MapSession {
     return {
       pathFilterQuery: this.pathFilterQuery,
       showTags: this.showTags,
-      mapLayout: this.mapLayout
+      mapLayout: this.mapLayout,
+      renderScale: this.renderScale
     };
   }
 
@@ -133,6 +143,7 @@ export class MapSession {
     this.pathFilterQuery = nextQuery;
     this.showTags = nextShowTags;
     this.mapLayout = nextLayoutPreference;
+    this.renderScale = normalizeRenderScale(nextState.renderScale);
     this.applyParsedFilterResult(GraphPathFilter.parsePathQuery(nextQuery));
   }
 
@@ -141,6 +152,7 @@ export class MapSession {
     this.ensureRefreshSubscriptions(registerEvent);
     this.refreshActive = true;
     this.bridgeReady = false;
+    this.appliedRenderScale = this.renderScale;
     this.pendingGraphPayload = null;
     this.pendingFocusPayload = null;
     this.lastDispatchedFocusKey = "";
@@ -194,11 +206,21 @@ export class MapSession {
     this.emitGraphFromSource();
   }
 
+  setRenderScale(renderScale: unknown): void {
+    this.renderScale = normalizeRenderScale(renderScale);
+  }
+
+  getRenderScale(): number {
+    return this.renderScale;
+  }
+
   getFilterUiState(): MapFilterUiState {
     return {
       pathFilterQuery: this.pathFilterQuery,
       showTags: this.showTags,
       mapLayout: this.mapLayout,
+      renderScale: this.renderScale,
+      renderScaleRestartRequired: this.renderScale !== this.appliedRenderScale,
       pathFilterParseValid: this.pathFilterParseValid,
       pathFilterMessage: this.pathFilterMessage
     };
@@ -979,4 +1001,17 @@ export class MapSession {
     this.filterInputDebounceTimer = null;
     this.filterInputDebounceTimerWindow = null;
   }
+}
+
+export function normalizeRenderScale(value: unknown): number {
+  const numericValue = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return DEFAULT_RENDER_SCALE;
+  }
+
+  const rounded = Math.round(numericValue * 10) / 10;
+  if (rounded < MIN_RENDER_SCALE || rounded > MAX_RENDER_SCALE) {
+    return DEFAULT_RENDER_SCALE;
+  }
+  return rounded;
 }

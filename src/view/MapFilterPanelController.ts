@@ -1,6 +1,11 @@
 import { SearchComponent, setIcon } from "obsidian";
 import { MAP_LAYOUT_PREFERENCE_OPTIONS } from "../bridge/LayoutPreference";
-import { MapSession } from "./MapSession";
+import {
+  MAX_RENDER_SCALE,
+  MIN_RENDER_SCALE,
+  MapSession,
+  RENDER_SCALE_STEP
+} from "./MapSession";
 
 const FILTER_SUGGESTIONS_HIDE_DELAY_MS = 120;
 
@@ -24,6 +29,9 @@ export class MapFilterPanelController {
   private filterToggleButtonEl: HTMLButtonElement | null = null;
   private tagsToggleButtonEl: HTMLButtonElement | null = null;
   private layoutDropdownEl: HTMLSelectElement | null = null;
+  private renderScaleInputEl: HTMLInputElement | null = null;
+  private renderScaleValueEl: HTMLElement | null = null;
+  private renderScaleMessageEl: HTMLElement | null = null;
   private filterSuggestionMode: FilterSuggestionMode = 0;
   private searchComponent: SearchComponent | null = null;
   private filterPanelOpen = false;
@@ -190,6 +198,37 @@ export class MapFilterPanelController {
       this.refreshLayoutDropdownUi();
     });
 
+    const renderScaleSection = createChild(filterContainer as ObsidianHTMLElement, "div");
+    renderScaleSection.className =
+      "reverysky-map-filter-section reverysky-map-filter-control-group reverysky-map-render-scale-section";
+
+    const renderScaleHeader = createChild(renderScaleSection as ObsidianHTMLElement, "div");
+    renderScaleHeader.className = "reverysky-map-render-scale-header";
+
+    const renderScaleTitle = createChild(renderScaleHeader as ObsidianHTMLElement, "div");
+    renderScaleTitle.className = "reverysky-map-filter-field-label";
+    renderScaleTitle.textContent = "Render scale";
+
+    this.renderScaleValueEl = createChild(renderScaleHeader as ObsidianHTMLElement, "div");
+    this.renderScaleValueEl.className = "reverysky-map-render-scale-value";
+
+    const renderScaleInput = createChild(renderScaleSection as ObsidianHTMLElement, "input");
+    renderScaleInput.type = "range";
+    renderScaleInput.min = String(MIN_RENDER_SCALE);
+    renderScaleInput.max = String(MAX_RENDER_SCALE);
+    renderScaleInput.step = String(RENDER_SCALE_STEP);
+    renderScaleInput.className = "reverysky-map-render-scale-input";
+    renderScaleInput.setAttribute("aria-label", "Render scale");
+    this.renderScaleInputEl = renderScaleInput;
+    renderScaleInput.addEventListener("input", () => {
+      this.session.setRenderScale(renderScaleInput.value);
+      this.refreshRenderScaleUi();
+    });
+
+    this.renderScaleMessageEl = createChild(renderScaleSection as ObsidianHTMLElement, "div");
+    this.renderScaleMessageEl.className =
+      "reverysky-map-render-scale-message reverysky-map-render-scale-message--hidden";
+
     this.setFilterPanelOpen(false);
     this.syncFromSession();
     return iframeHost;
@@ -200,6 +239,7 @@ export class MapFilterPanelController {
     this.refreshFilterMessage();
     this.refreshTagsToggleUi();
     this.refreshLayoutDropdownUi();
+    this.refreshRenderScaleUi();
   }
 
   refreshSuggestions(): void {
@@ -238,6 +278,9 @@ export class MapFilterPanelController {
     this.filterToggleButtonEl = null;
     this.tagsToggleButtonEl = null;
     this.layoutDropdownEl = null;
+    this.renderScaleInputEl = null;
+    this.renderScaleValueEl = null;
+    this.renderScaleMessageEl = null;
     this.filterSuggestionMode = 0;
     this.filterPanelOpen = false;
   }
@@ -627,6 +670,30 @@ export class MapFilterPanelController {
     }
 
     this.layoutDropdownEl.value = uiState.mapLayout;
+  }
+
+  private refreshRenderScaleUi(): void {
+    if (!this.renderScaleInputEl || !this.renderScaleValueEl || !this.renderScaleMessageEl) {
+      return;
+    }
+
+    const uiState = this.session.getFilterUiState();
+    const formattedValue = this.formatRenderScale(uiState.renderScale);
+    if (this.renderScaleInputEl.value !== formattedValue) {
+      this.renderScaleInputEl.value = formattedValue;
+    }
+    this.renderScaleValueEl.textContent = `${formattedValue}x`;
+
+    const restartRequired = uiState.renderScaleRestartRequired;
+    this.renderScaleMessageEl.textContent = restartRequired ? "Reopen the map view to apply." : "";
+    this.renderScaleMessageEl.classList.toggle(
+      "reverysky-map-render-scale-message--hidden",
+      !restartRequired
+    );
+  }
+
+  private formatRenderScale(value: number): string {
+    return value.toFixed(1);
   }
 
   private formatPathFilterTerm(folderPath: string): string {

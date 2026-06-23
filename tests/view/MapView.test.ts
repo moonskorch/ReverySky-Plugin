@@ -123,7 +123,9 @@ describe("MapView bridge integration", () => {
 
     const iframe = view.contentEl.querySelector("iframe");
     expect(iframe).not.toBeNull();
-    expect(iframe?.getAttribute("src")).toBe("http://127.0.0.1:7777/index.html?t=1700000000000");
+    expect(iframe?.getAttribute("src")).toBe(
+      "http://127.0.0.1:7777/index.html?t=1700000000000&renderScale=1"
+    );
 
     const fakeContentWindow = { postMessage: vi.fn() } as unknown as Window;
     Object.defineProperty(iframe!, "contentWindow", {
@@ -3040,14 +3042,19 @@ describe("MapView bridge integration", () => {
     );
 
     await view.setState({
-      mapLayout: "dates"
+      mapLayout: "dates",
+      renderScale: 1.2
     });
     expect(view.getState()).toMatchObject({
-      mapLayout: "dates"
+      mapLayout: "dates",
+      renderScale: 1.2
     });
 
     await view.onOpen();
     const iframe = view.contentEl.querySelector("iframe");
+    expect(iframe?.getAttribute("src")).toBe(
+      "http://127.0.0.1:7777/index.html?t=1700000000000&renderScale=1.2"
+    );
     Object.defineProperty(iframe!, "contentWindow", {
       value: { postMessage: vi.fn() } as unknown as Window,
       configurable: true
@@ -3062,6 +3069,102 @@ describe("MapView bridge integration", () => {
       ".reverysky-map-engine-select"
     ) as HTMLSelectElement;
     expect(engineSelect.value).toBe("dates");
+  });
+
+  it("uses persisted render scale before creating iframe", async () => {
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+    const bridge = {
+      attach: vi.fn(),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
+    };
+
+    const view = new MapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(makePathPayload()) as BuildGraphForTest,
+        notify: vi.fn(),
+        now: () => 1700000000000,
+        initialState: { renderScale: 1.5 }
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    expect(iframe?.getAttribute("src")).toBe(
+      "http://127.0.0.1:7777/index.html?t=1700000000000&renderScale=1.5"
+    );
+  });
+
+  it("does not override restored view state with initial plugin snapshot", async () => {
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+    const bridge = {
+      attach: vi.fn(),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
+    };
+
+    const view = new MapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(makePathPayload()) as BuildGraphForTest,
+        notify: vi.fn(),
+        now: () => 1700000000000,
+        initialState: { renderScale: 1.5 }
+      }
+    );
+
+    await view.setState({ renderScale: 1.2 });
+    await view.onOpen();
+
+    const iframe = view.contentEl.querySelector("iframe");
+    expect(iframe?.getAttribute("src")).toBe(
+      "http://127.0.0.1:7777/index.html?t=1700000000000&renderScale=1.2"
+    );
   });
 
   it("restores tag filter query from view state", async () => {

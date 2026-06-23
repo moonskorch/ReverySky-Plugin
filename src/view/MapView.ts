@@ -21,6 +21,7 @@ export type MapViewDependencies = {
   buildGraph?: (app: App) => GraphPayload;
   notify?: (message: string) => void;
   now?: () => number;
+  initialState?: Record<string, unknown> | null;
 };
 
 /**
@@ -37,6 +38,8 @@ export class MapView extends ItemView {
   private filterPanelController: MapFilterPanelController | null = null;
   private iframeLoadAbortController: AbortController | null = null;
   private lifecycleGeneration = 0;
+  private hasReceivedViewState = false;
+  private readonly initialState: Record<string, unknown> | null;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -48,6 +51,7 @@ export class MapView extends ItemView {
     const buildGraph = deps.buildGraph ?? ((app: App) => VaultGraphBuilder.build(app));
     this.notify = deps.notify ?? ((message: string) => new Notice(message));
     this.now = deps.now ?? Date.now;
+    this.initialState = deps.initialState ? { ...deps.initialState } : null;
     this.session = new MapSession({
       app: this.app,
       buildGraph,
@@ -76,12 +80,17 @@ export class MapView extends ItemView {
   }
 
   async setState(state: unknown): Promise<void> {
+    this.hasReceivedViewState = true;
     await this.session.setState(state);
     this.filterPanelController?.syncFromSession();
   }
 
   async onOpen(): Promise<void> {
     const lifecycleGeneration = ++this.lifecycleGeneration;
+    const initialState = this.getInitialViewState();
+    if (initialState) {
+      await this.session.setState(initialState);
+    }
     this.session.start(this.registerEvent.bind(this));
 
     const container = this.contentEl as ObsidianHTMLElement;
@@ -104,7 +113,7 @@ export class MapView extends ItemView {
     }
 
     const iframe = container.ownerDocument.createElement("iframe");
-    iframe.src = `${iframeSrc}?t=${this.now()}`;
+    iframe.src = this.createRuntimeIframeSrc(iframeSrc, this.now());
     iframe.className = "reverysky-map-iframe";
     if (typeof iframe.setAttr === "function") {
       iframe.setAttr("title", "ReverySky Map");
@@ -165,6 +174,17 @@ export class MapView extends ItemView {
 
     this.bridge.detach();
     emptyElement(this.contentEl as ObsidianHTMLElement);
+  }
+
+  private getInitialViewState(): Record<string, unknown> | null {
+    return this.hasReceivedViewState ? null : this.initialState;
+  }
+
+  private createRuntimeIframeSrc(iframeSrc: string, cacheBust: number): string {
+    const url = new URL(iframeSrc);
+    url.searchParams.set("t", String(cacheBust));
+    url.searchParams.set("renderScale", String(this.session.getRenderScale()));
+    return url.toString();
   }
 }
 
