@@ -11,7 +11,7 @@
         width: 100%;
         height: 100%;
         overflow: hidden;
-        background: radial-gradient(circle at 25% 20%, #213a63 0%, #0c1324 55%, #060a14 100%);
+        background: #231f20;
         color: #dce8ff;
         font-family: "Segoe UI", Tahoma, sans-serif;
       }
@@ -42,7 +42,7 @@
         height: 100%;
       }
 
-      #bridge-status {
+      #map-status {
         position: absolute;
         left: 0.75rem;
         top: 0.75rem;
@@ -61,15 +61,15 @@
         -webkit-backdrop-filter: blur(6px);
       }
 
-      .bridge-status-table {
+      .map-status-content {
         display: block;
       }
 
-      .bridge-status-row {
+      .map-status-line {
         display: block;
       }
 
-      .bridge-status-value {
+      .map-status-value {
         display: block;
         color: rgba(242, 246, 255, 0.96);
         font-size: 0.8rem;
@@ -86,7 +86,7 @@
         height: 100%;
         border-radius: 0;
         border: 0;
-        background: linear-gradient(160deg, #0e1a30 0%, #101930 45%, #0a1222 100%);
+        background: #231f20;
       }
 
       .canvas-stack canvas {
@@ -103,10 +103,10 @@
       <section class="card">
         <div id="canvas-viewport" class="canvas-stack">
           <canvas id="unity-canvas" aria-label="ReverySky map runtime"></canvas>
-          <div id="bridge-status" role="status" aria-live="polite" aria-atomic="true">
-            <div class="bridge-status-table">
-              <div class="bridge-status-row">
-                <div class="bridge-status-value" id="bridge-status-value">Bridge: initializing...</div>
+          <div id="map-status" role="status" aria-live="polite" aria-atomic="true">
+            <div class="map-status-content">
+              <div class="map-status-line">
+                <div class="map-status-value" id="map-status-value">Bridge: initializing...</div>
               </div>
             </div>
           </div>
@@ -117,7 +117,7 @@
     <script>
       (function () {
         const protocolVersion = "2.0.0";
-        const statusValueEl = document.getElementById("bridge-status-value");
+        const statusValueEl = document.getElementById("map-status-value");
         const viewportEl = document.getElementById("canvas-viewport");
         const canvas = document.getElementById("unity-canvas");
         const buildPath = "Build/";
@@ -232,11 +232,11 @@
           const linkCount = Array.isArray(payload.links) ? payload.links.length : 0;
 
           if (runtimeMode === "unity" && tryDispatchGraphSetToUnity(message)) {
-            setStatus("Bridge: graph:set -> Unity (" + String(noteCount) + " notes, " + String(linkCount) + " links)");
+            setStatus(String(noteCount) + " notes, " + String(linkCount) + " links");
             return;
           }
 
-          setStatus("Bridge: graph:set queued (" + String(noteCount) + " notes, " + String(linkCount) + " links), Unity not ready");
+          setStatus("Loading: " + String(noteCount) + " notes, " + String(linkCount) + " links");
         }
 
         function applyNoteFocus(message) {
@@ -250,11 +250,8 @@
           const path = typeof payload.path === "string" ? payload.path : "";
 
           if (runtimeMode === "unity" && tryDispatchNoteFocusToUnity(message)) {
-            setStatus("Bridge: note:focus -> Unity (" + (id || path || "unknown") + ")");
             return;
           }
-
-          setStatus("Bridge: note:focus queued, Unity not ready");
         }
 
         function handleWebglContextLoss() {
