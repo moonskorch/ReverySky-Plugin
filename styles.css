@@ -271,15 +271,15 @@ button.reverysky-map-filter-close svg {
   white-space: nowrap;
 }
 
-.reverysky-map-filter-panel input.reverysky-map-render-scale-input[type="range"] {
+.reverysky-map-root .reverysky-map-filter-panel input.reverysky-map-render-scale-input[type="range"] {
   box-sizing: border-box;
   display: block;
   flex: 1 1 auto;
-  inline-size: 100% !important;
+  inline-size: 100%;
   justify-self: stretch;
-  max-width: 100% !important;
+  max-width: 100%;
   min-width: 0;
-  width: 100% !important;
+  width: 100%;
 }
 
 .reverysky-map-render-scale-message {

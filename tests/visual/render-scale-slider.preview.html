@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Render Scale Slider Preview</title>
+    <link rel="stylesheet" href="../../styles.css" />
+    <style>
+      :root {
+        color-scheme: light;
+        --background-primary: #f8f8f8;
+        --background-secondary: #f8f8f8;
+        --background-modifier-border: #dddddd;
+        --background-modifier-border-hover: #c7c7c7;
+        --background-modifier-hover: #ececec;
+        --text-normal: #222222;
+        --text-muted: #555555;
+        --font-ui-small: 21px;
+        --font-ui-smaller: 13px;
+        --font-ui-medium: 21px;
+        --input-height: 1.5rem;
+        --size-2-3: 0.5rem;
+        --size-4-3: 0.875rem;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      body {
+        padding: 0;
+        box-sizing: border-box;
+        background: #f8f8f8;
+        font-family: Arial, sans-serif;
+        color: #222222;
+      }
+
+      .visual-stage {
+        position: relative;
+        width: 584px;
+        height: 80px;
+        overflow: visible;
+        background: #f8f8f8;
+      }
+
+      .visual-panel-shell {
+        width: 100%;
+        height: 100%;
+      }
+
+      .visual-panel-shell .reverysky-map-filter-panel {
+        position: static;
+        width: 100%;
+        max-height: none;
+        overflow: visible;
+        box-sizing: border-box;
+        background: #f8f8f8;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+        padding: 20px 6px 0;
+      }
+
+      .visual-panel-shell .reverysky-map-render-scale-section {
+        display: grid;
+        gap: 0;
+        width: 100%;
+      }
+
+      .visual-panel-shell .reverysky-map-render-scale-header {
+        align-items: baseline;
+      }
+
+      .visual-panel-shell input[type="range"] {
+        appearance: none;
+        background: transparent;
+        height: 28px;
+        margin: -5px 0 0;
+        padding: 0;
+      }
+
+      .visual-panel-shell input[type="range"]::-webkit-slider-runnable-track {
+        height: 6px;
+        background: #e8e8e8;
+        border-radius: 999px;
+      }
+
+      .visual-panel-shell input[type="range"]::-webkit-slider-thumb {
+        appearance: none;
+        width: 31px;
+        height: 31px;
+        margin-top: -12.5px;
+        border: 1px solid #d7d7d7;
+        border-radius: 999px;
+        background: #ffffff;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
+      }
+
+      .visual-obsidian-style-conflict .reverysky-map-filter-panel input[type="range"] {
+        inline-size: 11rem;
+        max-width: 11rem;
+        width: 11rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="visual-stage" data-visual-stage>
+      <div class="reverysky-map-root visual-panel-shell visual-obsidian-style-conflict">
+        <div class="reverysky-map-filter-panel">
+          <div
+            class="reverysky-map-filter-section reverysky-map-filter-control-group reverysky-map-render-scale-section"
+          >
+            <div class="reverysky-map-render-scale-header">
+              <div class="reverysky-map-filter-field-label">Render scale</div>
+              <div class="reverysky-map-render-scale-value">1.5x</div>
+            </div>
+            <input
+              class="reverysky-map-render-scale-input"
+              type="range"
+              min="0.5"
+              max="1.5"
+              step="0.1"
+              value="1.5"
+              aria-label="Render scale"
+            />
+            <div class="reverysky-map-render-scale-message reverysky-map-render-scale-message--hidden">
+              Unity runtime reload required
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
