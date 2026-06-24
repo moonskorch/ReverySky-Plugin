@@ -94,3 +94,28 @@ Mitigation:
 Verification signal:
 - Player/WebGL builds never execute sample injection.
 - Empty runtime payloads still rebuild to an empty graph state without fallback data.
+
+## R7. Nebula skybox compression
+
+`Nebula_03_Cubemap.exr` is excluded from Git, so its import settings must be restored manually.
+
+Release baseline for WebGL / Obsidian desktop:
+
+Nebula_03_Cubemap:
+Texture Shape: Cube
+Max Size: 2048
+Generate Mipmap: Off
+Filter Mode: Bilinear
+Compression: High Quality
+Use Crunch Compression: Off
+Web Override: Off
+
+Player Settings / Web:
+Texture compression format: DXT
+HDR Cubemap Encoding: Normal Quality
+
+Expected result:
+
+2048x2048 RGBA Compressed DXT5|BC3 sRGB
+RGBM encoded
+approximately 24 MB
