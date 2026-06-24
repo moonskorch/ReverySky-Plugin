@@ -233,7 +233,7 @@ button.reverysky-map-filter-close svg {
   padding: 0.375rem 2.25rem 0.375rem 0.875rem;
   border: 0;
   border-radius: var(--reverysky-control-radius);
-  background-color: transparent;
+  background-color: var(--background-primary);
   color: var(--text-normal);
   box-shadow: none;
   appearance: none;
@@ -249,8 +249,13 @@ button.reverysky-map-filter-close svg {
 .reverysky-map-engine-select:focus-visible,
 .reverysky-map-engine-select:active {
   outline: none;
-  background-color: transparent;
+  background-color: var(--background-primary);
   box-shadow: none;
+}
+
+.reverysky-map-engine-select option {
+  background-color: var(--background-primary);
+  color: var(--text-normal);
 }
 
 .reverysky-map-render-scale-section {
