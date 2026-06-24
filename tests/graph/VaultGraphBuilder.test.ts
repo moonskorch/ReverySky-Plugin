@@ -1,13 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 import { VaultGraphBuilder } from "../../src/graph/VaultGraphBuilder";
 
 function makeStableId(path: string): string {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < path.length; i++) {
-    hash ^= path.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return `note_${(hash >>> 0).toString(16).padStart(8, "0")}`;
+  const digest = createHash("sha256").update(path).digest();
+  return `note_${digest.subarray(0, 12).toString("base64url")}`;
 }
 
 function makeFile(path: string, stat: { ctime: number; mtime: number; size?: number }) {
@@ -47,6 +44,8 @@ describe("VaultGraphBuilder", () => {
     const payload = VaultGraphBuilder.build(app as never);
     expect(payload.notes).toHaveLength(1);
     expect(payload.notes[0]?.id).toBe(makeStableId("Folder/Note.md"));
+    expect(payload.notes[0]?.id).toBe("note_JfPTXjx4_ogWzWa-");
+    expect(payload.notes[0]?.id).toMatch(/^note_[A-Za-z0-9_-]{16}$/);
     expect(payload.notes[0]?.id).not.toBe("custom-frontmatter-id");
   });
 

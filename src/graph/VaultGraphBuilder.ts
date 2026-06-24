@@ -1,4 +1,5 @@
 import type { App, CachedMetadata, TFile } from "obsidian";
+import { createHash } from "node:crypto";
 import { GraphLink, GraphNoteNode, GraphPayload } from "../bridge/BridgeTypes";
 import { GraphNormalizer } from "./GraphNormalizer";
 
@@ -164,15 +165,11 @@ export class VaultGraphBuilder {
   }
 
   /**
-   * Use a deterministic hash so ids stay stable even if note order changes.
+   * Use a 96-bit path digest so ids stay compact while making collisions impractical.
    */
   private static makeStableId(path: string): string {
-    let hash = 0x811c9dc5;
-    for (let i = 0; i < path.length; i++) {
-      hash ^= path.charCodeAt(i);
-      hash = Math.imul(hash, 0x01000193);
-    }
-    return `note_${(hash >>> 0).toString(16).padStart(8, "0")}`;
+    const digest = createHash("sha256").update(path).digest();
+    return `note_${digest.subarray(0, 12).toString("base64url")}`;
   }
 
   /**

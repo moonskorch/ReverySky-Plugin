@@ -96,6 +96,12 @@ public class ObsidianBridge : MonoBehaviour
       if (note == null)
         continue;
 
+      if (string.IsNullOrWhiteSpace(note.id) || string.IsNullOrWhiteSpace(note.path))
+      {
+        Debug.LogWarning("[ObsidianBridge] Skipping graph note with missing id or path.");
+        continue;
+      }
+
       var tagIds = new List<int>();
       if (note.tags != null)
       {
@@ -118,7 +124,7 @@ public class ObsidianBridge : MonoBehaviour
 
       runtimeNotes.Add(new NoteData
       {
-        Id = note.id ?? string.Empty,
+        Id = note.id,
         Name = string.IsNullOrWhiteSpace(note.title) ? GameSettings.DefaultTitle : note.title,
         Path = note.path,
         DateTime = ParseDate(note.date),

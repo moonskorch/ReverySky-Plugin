@@ -198,6 +198,21 @@ public class ObsidianBridgeEditModeTests
   }
 
   [Test]
+  public void OnGraphSet_MalformedNotes_SkipsNotesWithoutRequiredIdentityFields()
+  {
+    LogAssert.Expect(LogType.Warning, new Regex("\\[ObsidianBridge\\] Skipping graph note with missing id or path\\."));
+    LogAssert.Expect(LogType.Warning, new Regex("\\[ObsidianBridge\\] Skipping graph note with missing id or path\\."));
+
+    bridge.OnGraphSet(TestPayloads.MalformedNotesPayload);
+
+    Assert.That(MapRuntimeContext.Notes, Has.Count.EqualTo(1));
+    Assert.That(MapRuntimeContext.FindNoteById("valid"), Is.Not.Null);
+    Assert.That(MapRuntimeContext.FindNoteById("missingPath"), Is.Null);
+    Assert.That(MapRuntimeContext.FindNoteById(""), Is.Null);
+    Assert.That(MapRuntimeContext.FindNoteById("valid")?.DirectLinkCount, Is.EqualTo(0));
+  }
+
+  [Test]
   public void OnGraphSet_EmptyAndInvalidPayload_AreHandledGracefully()
   {
     bridge.OnGraphSet(string.Empty);
@@ -378,6 +393,15 @@ public class ObsidianBridgeEditModeTests
       "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"notes\":[" +
       "{\"id\":\"b1\",\"path\":\"y/b1.md\",\"title\":\"B1\",\"tags\":[\"solo\"],\"date\":\"2025-02-01T00:00:00Z\",\"size\":15}" +
       "],\"links\":[]}}";
+
+    public const string MalformedNotesPayload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"notes\":[" +
+      "{\"id\":\"valid\",\"path\":\"valid/path.md\",\"title\":\"Valid\",\"tags\":[],\"size\":1}," +
+      "{\"id\":\"\",\"path\":\"invalid/empty-id.md\",\"title\":\"Empty Id\",\"tags\":[],\"size\":1}," +
+      "{\"id\":\"missingPath\",\"path\":\"\",\"title\":\"Empty Path\",\"tags\":[],\"size\":1}" +
+      "],\"links\":[" +
+      "{\"sourceId\":\"valid\",\"targetId\":\"missingPath\",\"weight\":1}" +
+      "]}}";
 
     public const string FallbacksPayload =
       "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"notes\":[" +
