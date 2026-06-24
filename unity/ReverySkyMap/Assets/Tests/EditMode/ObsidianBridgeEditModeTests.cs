@@ -52,6 +52,8 @@ public class ObsidianBridgeEditModeTests
     Assert.That(noteTwo.DateTime, Is.EqualTo(System.DateTime.Parse("2025-01-02T00:00:00Z", null, System.Globalization.DateTimeStyles.RoundtripKind)));
     Assert.That(noteOne.Length, Is.EqualTo(42));
     Assert.That(noteTwo.Length, Is.EqualTo(0));
+    Assert.That(noteOne.DirectLinkCount, Is.EqualTo(1));
+    Assert.That(noteTwo.DirectLinkCount, Is.EqualTo(1));
     Assert.That(noteOne.TagIds, Has.Count.EqualTo(2));
     Assert.That(noteTwo.TagIds, Has.Count.EqualTo(2));
     Assert.That(noteOne.TagIds[1], Is.EqualTo(noteTwo.TagIds[0]));
@@ -62,6 +64,17 @@ public class ObsidianBridgeEditModeTests
     Assert.That(MapRuntimeContext.GetTagName(alphaTagId), Is.EqualTo("alpha"));
     Assert.That(MapRuntimeContext.GetTagName(betaTagId), Is.EqualTo("beta"));
     Assert.That(MapRuntimeContext.GetTagName(gammaTagId), Is.EqualTo("gamma"));
+  }
+
+  [Test]
+  public void OnGraphSet_DirectLinkCount_UsesUniqueRuntimeNoteNeighbors()
+  {
+    bridge.OnGraphSet(TestPayloads.DirectLinkCountPayload);
+
+    Assert.That(MapRuntimeContext.FindNoteById("n1")?.DirectLinkCount, Is.EqualTo(2));
+    Assert.That(MapRuntimeContext.FindNoteById("n2")?.DirectLinkCount, Is.EqualTo(1));
+    Assert.That(MapRuntimeContext.FindNoteById("n3")?.DirectLinkCount, Is.EqualTo(1));
+    Assert.That(MapRuntimeContext.FindNoteById("n4")?.DirectLinkCount, Is.EqualTo(0));
   }
 
   [Test]
@@ -150,6 +163,21 @@ public class ObsidianBridgeEditModeTests
       Object.DestroyImmediate(cartographerObject);
       Object.DestroyImmediate(datesEngineObject);
     }
+  }
+
+  [Test]
+  public void StarVisual_ResolveCrystalTypeByDirectLinkCount_MapsExpectedBuckets()
+  {
+    MethodInfo resolver = typeof(StarVisual).GetMethod(
+      "ResolveCrystalTypeByDirectLinkCount",
+      BindingFlags.Static | BindingFlags.NonPublic);
+
+    Assert.That(resolver, Is.Not.Null);
+    Assert.That(ResolveCrystalType(resolver, -1), Is.EqualTo(CrystalType.Value1));
+    Assert.That(ResolveCrystalType(resolver, 0), Is.EqualTo(CrystalType.Value1));
+    Assert.That(ResolveCrystalType(resolver, 1), Is.EqualTo(CrystalType.Value2));
+    Assert.That(ResolveCrystalType(resolver, 2), Is.EqualTo(CrystalType.Value3));
+    Assert.That(ResolveCrystalType(resolver, 10), Is.EqualTo(CrystalType.Value3));
   }
 
   [Test]
@@ -305,6 +333,11 @@ public class ObsidianBridgeEditModeTests
     singletonBackingField?.SetValue(null, value);
   }
 
+  private static CrystalType ResolveCrystalType(MethodInfo resolver, int directLinkCount)
+  {
+    return (CrystalType)resolver.Invoke(null, new object[] { directLinkCount });
+  }
+
   private static class TestPayloads
   {
     public const string MinimalGraphSetPayload =
@@ -325,6 +358,20 @@ public class ObsidianBridgeEditModeTests
       "],\"links\":[" +
       "{\"sourceId\":\"a1\",\"targetId\":\"a2\",\"weight\":1}," +
       "{\"sourceId\":\"a2\",\"targetId\":\"a3\",\"weight\":2}" +
+      "]}}";
+
+    public const string DirectLinkCountPayload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"notes\":[" +
+      "{\"id\":\"n1\",\"path\":\"links/n1.md\",\"title\":\"N1\",\"tags\":[],\"size\":1}," +
+      "{\"id\":\"n2\",\"path\":\"links/n2.md\",\"title\":\"N2\",\"tags\":[],\"size\":1}," +
+      "{\"id\":\"n3\",\"path\":\"links/n3.md\",\"title\":\"N3\",\"tags\":[],\"size\":1}," +
+      "{\"id\":\"n4\",\"path\":\"links/n4.md\",\"title\":\"N4\",\"tags\":[],\"size\":1}" +
+      "],\"links\":[" +
+      "{\"sourceId\":\"n1\",\"targetId\":\"n2\",\"weight\":1}," +
+      "{\"sourceId\":\"n2\",\"targetId\":\"n1\",\"weight\":1}," +
+      "{\"sourceId\":\"n1\",\"targetId\":\"n3\",\"weight\":1}," +
+      "{\"sourceId\":\"n1\",\"targetId\":\"missing\",\"weight\":1}," +
+      "{\"sourceId\":\"n3\",\"targetId\":\"n3\",\"weight\":1}" +
       "]}}";
 
     public const string RepeatApplyPayloadB =

@@ -16,8 +16,6 @@ public class StarVisual : MonoBehaviour
   [SerializeField] private GameObject sphere;
   [SerializeField] private GameObject crystal;
 
-  private const CrystalType FixedCrystalType = CrystalType.Value3;
-
   private void Start()
   {
     star.OnDataChanged += UpdateVisual;
@@ -83,10 +81,11 @@ public class StarVisual : MonoBehaviour
     crystal.SetActive(show);
     if (!show) return;
 
-    var hasFixedCore = crystalTypeVisualMap.Any(x => x.crystalType == FixedCrystalType);
-    var selectedCore = hasFixedCore
-      ? FixedCrystalType
-      : crystalTypeVisualMap.FirstOrDefault()?.crystalType ?? CrystalType.Unknown;
+    var selectedCore = ResolveCrystalTypeByDirectLinkCount(star.Data.DirectLinkCount);
+    var hasSelectedCore = crystalTypeVisualMap.Any(x => x.crystalType == selectedCore);
+    if (!hasSelectedCore)
+      // Prefab variants can lag code buckets; keep a visible core instead of hiding the section.
+      selectedCore = crystalTypeVisualMap.FirstOrDefault()?.crystalType ?? CrystalType.Unknown;
 
     foreach (var crystalPair in crystalTypeVisualMap)
     {
@@ -122,5 +121,16 @@ public class StarVisual : MonoBehaviour
 
       return hash;
     }
+  }
+
+  private static CrystalType ResolveCrystalTypeByDirectLinkCount(int directLinkCount)
+  {
+    if (directLinkCount <= 0)
+      return CrystalType.Value1;
+
+    if (directLinkCount == 1)
+      return CrystalType.Value2;
+
+    return CrystalType.Value3;
   }
 }

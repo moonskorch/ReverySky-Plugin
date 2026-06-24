@@ -129,6 +129,8 @@ Current runtime behavior snapshot for Unity ingestion and map interaction:
 - `NoteData.SphereType` is forced to `Unknown` at bridge mapping time.
 - `NoteData.ScapeView` is initialized to `Planets` at bridge mapping time.
 - Runtime tag ids (`TagIds`) and `tagId -> name` dictionary are derived locally from incoming `tags[]`.
+- `NoteData.DirectLinkCount` is derived locally from unique direct note-note neighbors in `MapRuntimeContext.Links`.
+- Star core visuals map `DirectLinkCount` to crystal buckets: 0 -> `Value1`, 1 -> `Value2`, 2+ -> `Value3`.
 
 ### Temporary State
 - `NoteData.CrystalType = Unknown` for bridge-ingested notes is currently retained for legacy visual compatibility only.

@@ -40,6 +40,7 @@ public static class MapRuntimeContext
   {
     IsRuntimeMode = true;
     Notes = notes ?? new List<NoteData>();
+    ApplyDirectLinkCounts();
     NotesVersion++;
     OnNotesChanged?.Invoke();
   }
@@ -90,5 +91,73 @@ public static class MapRuntimeContext
     CurrentNoteId = note.Id ?? string.Empty;
     Debug.Log($"[MapRuntimeContext] Open note requested: id={note.Id}, path={note.Path}");
     OnOpenNoteRequested?.Invoke(note.Id ?? string.Empty, note.Path ?? string.Empty);
+  }
+
+  /// <summary>
+  /// Derives each note's direct-note neighbor count from the current runtime links.
+  /// Uses a temporary neighbor index so duplicate or reciprocal links count as one neighbor,
+  /// then stores only the final count on NoteData to avoid keeping a second graph source of truth.
+  /// </summary>
+  private static void ApplyDirectLinkCounts()
+  {
+    if (Notes == null || Notes.Count == 0)
+      return;
+
+    var noteIds = new HashSet<string>(StringComparer.Ordinal);
+    foreach (var note in Notes)
+    {
+      if (note != null && !string.IsNullOrWhiteSpace(note.Id))
+        noteIds.Add(note.Id);
+    }
+
+    // Count direct note-note neighbors only; tag edges are built separately by layout engines.
+    var neighborIdsByNoteId = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+
+    if (Links != null)
+    {
+      foreach (var link in Links)
+      {
+        // Links to notes outside the effective graph must not inflate visible star brightness.
+        if (link == null ||
+            !noteIds.Contains(link.SourceId ?? string.Empty) ||
+            !noteIds.Contains(link.TargetId ?? string.Empty))
+        {
+          continue;
+        }
+
+        AddNeighbor(neighborIdsByNoteId, link.SourceId, link.TargetId);
+        AddNeighbor(neighborIdsByNoteId, link.TargetId, link.SourceId);
+      }
+    }
+
+    foreach (var note in Notes)
+    {
+      if (note == null)
+        continue;
+
+      if (string.IsNullOrWhiteSpace(note.Id) ||
+          !neighborIdsByNoteId.TryGetValue(note.Id, out var neighborIds))
+      {
+        note.DirectLinkCount = 0;
+      }
+      else
+      {
+        note.DirectLinkCount = neighborIds.Count;
+      }
+    }
+  }
+
+  private static void AddNeighbor(
+    Dictionary<string, HashSet<string>> neighborIdsByNoteId,
+    string noteId,
+    string neighborId)
+  {
+    if (!neighborIdsByNoteId.TryGetValue(noteId, out var neighborIds))
+    {
+      neighborIds = new HashSet<string>(StringComparer.Ordinal);
+      neighborIdsByNoteId[noteId] = neighborIds;
+    }
+
+    neighborIds.Add(neighborId);
   }
 }

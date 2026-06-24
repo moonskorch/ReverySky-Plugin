@@ -12,6 +12,7 @@ public class NoteData
   public string Path {  get; set; } = null;
   public DateTime DateTime { get; set; } = DateTime.MinValue;
   public int Length { get; set; } = 0;
+  public int DirectLinkCount { get; set; } = 0;
   public CrystalType CrystalType { get; set; } = CrystalType.Unknown;
   public SphereType SphereType { get; set; } = SphereType.Unknown;
   public List<int> TagIds { get; set; } = new();

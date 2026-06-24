@@ -14,10 +14,10 @@ public class MapRuntimePlayModeTests
 
   // Baseline signature for the deterministic payload in this scene.
   // Values are intentionally tolerant and paired with structural asserts to reduce flakiness.
-  private const float BaselineLumaMean = 0.107f;
+  private const float BaselineLumaMean = 0.086f;
   private const float BaselineLumaStd = 0.042f;
   private const float BaselineEdgeEnergy = 0.006f;
-  private const float BaselineSaturationMean = 0.396f;
+  private const float BaselineSaturationMean = 0.435f;
 
   private const float ToleranceLumaMean = 0.020f;
   private const float ToleranceLumaStd = 0.020f;
