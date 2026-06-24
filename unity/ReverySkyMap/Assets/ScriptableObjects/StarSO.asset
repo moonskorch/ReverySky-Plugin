@@ -17,4 +17,4 @@ MonoBehaviour:
   maxScale: 1.6
   shortNotePercentile: 0.1
   longNotePercentile: 0.85
-  minSignificantLengthDiff: 50
+  minSignificantLengthDiff: 128

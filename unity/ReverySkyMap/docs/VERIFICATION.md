@@ -65,8 +65,8 @@ testFilter: "ObsidianBridgeEditModeTests"
   1. `run_tests` with `testMode=PlayMode` (or agreed smoke filter).
   2. Baseline scope filter examples:
 ```powershell
-testFilter: "MapRuntimePlayModeTests.RuntimeBootstrap_LoadsSceneAndAppliesPayloadWithoutCriticalErrors"
-testFilter: "MapRuntimePlayModeTests.VisualGuard_SnapshotAndStructuralInvariants_AreStable"
+testFilter: "StarScapeRuntimePlayModeTests.RuntimeBootstrap_LoadsSceneAndAppliesPayloadWithoutCriticalErrors"
+testFilter: "StarScapeRuntimePlayModeTests.VisualGuard_SnapshotAndStructuralInvariants_AreStable"
 ```
 - Editor UI:
   1. Open `Window > General > Test Runner`.

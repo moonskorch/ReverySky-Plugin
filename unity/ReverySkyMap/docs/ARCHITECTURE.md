@@ -225,10 +225,10 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Automated checks: `Assets/Tests/EditMode/ObsidianBridgeEditModeTests.cs`
   - Manual checks when needed: load the scene and confirm `graph:set` populates notes, links, tags, and focus state without errors; in the parent plugin, close and quickly reopen the map view and confirm there are no delayed `note:open` callbacks or bridge errors
 - Engine selection and layout:
-  - Automated checks: `Assets/Tests/EditMode/CartographerForcesEngineRadiusEditModeTests.cs`, `Assets/Tests/EditMode/CartographerStaticLinksEngineEditModeTests.cs`, PlayMode engine-preference checks in `Assets/Tests/PlayMode/DreamScapeRuntimePlayModeTests.cs`
+  - Automated checks: `Assets/Tests/EditMode/CartographerForcesEngineRadiusEditModeTests.cs`, `Assets/Tests/EditMode/CartographerScalableLinksEngineEditModeTests.cs`, PlayMode engine-preference checks in `Assets/Tests/PlayMode/StarScapeRuntimePlayModeTests.cs`
   - Manual checks when needed: inspect force layout, static-link slot output, date-range behavior, and the `Static25D` camera slider
 - PlayMode bootstrap and visual stability:
-  - Automated checks: `Assets/Tests/PlayMode/DreamScapeRuntimePlayModeTests.cs` (`MapRuntimePlayModeTests`)
+  - Automated checks: `Assets/Tests/PlayMode/StarScapeRuntimePlayModeTests.cs` (`StarScapeRuntimePlayModeTests`)
   - Manual checks when needed: open `Assets/Scenes/StarScapeScene.unity`, enter Play mode, and confirm no missing scripts or critical console errors
 
 Use `docs/VERIFICATION.md` for the exact check order, MCP-first policy, and fallback rules.
