@@ -10,6 +10,7 @@ export class VaultGraphBuilder {
     const files = app.vault.getMarkdownFiles();
     const notes = files
       .map((file) => VaultGraphBuilder.toNoteNode(app, file))
+      .filter((note): note is GraphNoteNode => note !== null)
       .sort((a, b) => a.path.localeCompare(b.path));
     const links = VaultGraphBuilder.buildLinks(app, notes);
 
@@ -78,7 +79,12 @@ export class VaultGraphBuilder {
   /**
    * Merge frontmatter, inline tags, and file metadata into the compact node shape Unity needs.
    */
-  private static toNoteNode(app: App, file: TFile): GraphNoteNode {
+  private static toNoteNode(app: App, file: TFile): GraphNoteNode | null {
+    const path = GraphNormalizer.normalizePath(file.path);
+    if (!path.trim()) {
+      return null;
+    }
+
     const cache = app.metadataCache.getFileCache(file);
     const frontmatter = cache?.frontmatter;
 
@@ -90,8 +96,8 @@ export class VaultGraphBuilder {
     const date = VaultGraphBuilder.getCanonicalNoteDate(frontmatter, file);
 
     return {
-      id: VaultGraphBuilder.makeStableId(file.path),
-      path: GraphNormalizer.normalizePath(file.path),
+      id: VaultGraphBuilder.makeStableId(path),
+      path,
       title: file.basename,
       tags,
       size: VaultGraphBuilder.getNoteSizeBytes(file),

@@ -76,10 +76,79 @@ describe("VaultGraphBuilder", () => {
     const payload = VaultGraphBuilder.build(app as never);
     expect(payload.notes).toHaveLength(1);
     expect(payload.notes[0]).toMatchObject({
+      id: makeStableId("Folder/Note.md"),
       path: "Folder/Note.md",
       tags: ["inline", "second", "third", "fourth"],
       date: "2026-02-03T00:00:00.000Z",
       size: 321
+    });
+  });
+
+  it("filters files with empty normalized paths instead of emitting invalid notes", () => {
+    const validFile = makeFile("Folder/Valid.md", {
+      ctime: Date.UTC(2026, 0, 1),
+      mtime: Date.UTC(2026, 0, 2),
+      size: 123
+    });
+    const emptyPathFile = makeFile("   ", {
+      ctime: Date.UTC(2026, 0, 1),
+      mtime: Date.UTC(2026, 0, 2),
+      size: 456
+    });
+
+    const app = {
+      vault: {
+        getMarkdownFiles: () => [emptyPathFile, validFile]
+      },
+      metadataCache: {
+        getFileCache: () => ({
+          frontmatter: {}
+        }),
+        resolvedLinks: {
+          "": {
+            "Folder/Valid.md": 1
+          },
+          "Folder/Valid.md": {
+            "   ": 1
+          }
+        }
+      }
+    };
+
+    const payload = VaultGraphBuilder.build(app as never);
+    expect(payload.vault.noteCount).toBe(1);
+    expect(payload.notes).toHaveLength(1);
+    expect(payload.notes[0]).toMatchObject({
+      id: makeStableId("Folder/Valid.md"),
+      path: "Folder/Valid.md"
+    });
+    expect(payload.links).toEqual([]);
+  });
+
+  it("preserves significant whitespace in real file paths", () => {
+    const file = makeFile(" Folder/Note.md", {
+      ctime: Date.UTC(2026, 0, 1),
+      mtime: Date.UTC(2026, 0, 2),
+      size: 123
+    });
+
+    const app = {
+      vault: {
+        getMarkdownFiles: () => [file]
+      },
+      metadataCache: {
+        getFileCache: () => ({
+          frontmatter: {}
+        }),
+        resolvedLinks: {}
+      }
+    };
+
+    const payload = VaultGraphBuilder.build(app as never);
+    expect(payload.notes).toHaveLength(1);
+    expect(payload.notes[0]).toMatchObject({
+      id: makeStableId(" Folder/Note.md"),
+      path: " Folder/Note.md"
     });
   });
 
