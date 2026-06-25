@@ -371,23 +371,22 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
   public void Tick(float dt)
   {
-    if (_constructionActive || _remainingRefinementPasses > 0)
+    if (_constructionActive)
     {
-      TickCore(dt);
+      TickConstruction();
+      TryApplyPostBuildOptimizations();
+      return;
+    }
+
+    if (_remainingRefinementPasses > 0)
+    {
+      TickFiniteRefinement();
       TryApplyPostBuildOptimizations();
       return;
     }
 
     if (_continuousLinkRefinement && _graphHasNodes && _linesInstantiated)
-    {
-      int passCount = Mathf.Max(1, refinementPassesPerFrame);
-      for (int i = 0; i < passCount; i++)
-        RunRefinementPass();
-
-      UpdateVisualPositions();
-      UpdateLinePositions();
-      UpdateNavigationBounds();
-    }
+      TickContinuousRefinement();
 
     TryApplyPostBuildOptimizations();
   }
@@ -413,26 +412,24 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     TryApplyPostBuildOptimizations();
   }
 
-  private void TickCore(float dt)
+  private void TickConstruction()
   {
-    if (_constructionActive)
+    int batches = Mathf.Max(1, constructionBatchesPerFrame);
+    int budget = Mathf.Max(1, _resolvedConstructionNodesPerFrame);
+
+    for (int i = 0; i < batches && _constructionActive; i++)
     {
-      int batches = Mathf.Max(1, constructionBatchesPerFrame);
-      int budget = Mathf.Max(1, _resolvedConstructionNodesPerFrame);
+      PlaceConstructionBatch(budget);
+      InstantiatePlacedNodesWithoutVisuals();
+      UpdateNavigationBounds();
 
-      for (int i = 0; i < batches && _constructionActive; i++)
-      {
-        PlaceConstructionBatch(budget);
-        InstantiatePlacedNodesWithoutVisuals();
-        UpdateNavigationBounds();
-
-        if (_placedCount >= _nodes.Count)
-          CompleteConstruction();
-      }
-
-      return;
+      if (_placedCount >= _nodes.Count)
+        CompleteConstruction();
     }
+  }
 
+  private void TickFiniteRefinement()
+  {
     if (_remainingRefinementPasses <= 0)
       return;
 
@@ -457,6 +454,17 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
         $"[RecursiveHubs/v7] Refinement completed passes={_completedRefinementPasses}, " +
         $"separationChecks={_separationPairChecks}, navigationRadius={_navigationRadius:F1}");
     }
+  }
+
+  private void TickContinuousRefinement()
+  {
+    int passCount = Mathf.Max(1, refinementPassesPerFrame);
+    for (int i = 0; i < passCount; i++)
+      RunRefinementPass();
+
+    UpdateVisualPositions();
+    UpdateLinePositions();
+    UpdateNavigationBounds();
   }
 
   private void BuildGraphCore(List<NoteData> notes)
