@@ -116,8 +116,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
   [Header("Link Timing")]
   [SerializeField] private AnimationLifetime linkRefinementLifetime = AnimationLifetime.Timed;
-  [Tooltip("Continuous mode keeps RequiresTick true and keeps applying refinement passes.")]
-  [SerializeField] private bool keepLinksAliveForever;
 
   [Header("Line LOD")]
   [SerializeField] private EdgeBudgetMode edgeBudgetMode = EdgeBudgetMode.AdaptiveByNodeCount;
@@ -410,8 +408,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     ConfigureConstructionTimingAfterBuild();
     _continuousLinkRefinement =
       _graphHasNodes &&
-      linkRefinementLifetime == AnimationLifetime.Endless &&
-      keepLinksAliveForever;
+      linkRefinementLifetime == AnimationLifetime.Endless;
 
     TryApplyPostBuildOptimizations();
   }

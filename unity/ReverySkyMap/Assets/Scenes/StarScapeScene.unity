@@ -1555,7 +1555,6 @@ MonoBehaviour:
   endlessConstructionNodesPerFrame: 120
   timingFrameRate: 30
   linkRefinementLifetime: 1
-  keepLinksAliveForever: 0
   edgeBudgetMode: 1
   manualVisibleEdges: 900
   smallGraphVisibleEdges: 420

@@ -66,9 +66,53 @@ public class CartographerScalableLinksEngineEditModeTests
     Assert.That(float.IsInfinity(four.Engine.BoundRadius), Is.False);
   }
 
+  [Test]
+  public void BuildGraph_TimedLinkRefinement_EventuallyStopsTicking()
+  {
+    using var scope = CreateEngineScope(
+      BuildTaglessNotes(16),
+      new List<MapRuntimeContext.RuntimeNoteLink>(),
+      engineScope =>
+      {
+        engineScope.SetAnimationLifetime("linkRefinementLifetime", "Timed");
+        engineScope.SetPrivateFieldForTest("linkRefinementPasses", 2);
+        engineScope.SetPrivateFieldForTest("refinementPassesPerFrame", 1);
+      });
+
+    Assert.That(scope.Engine.RequiresTick, Is.True);
+
+    for (int i = 0; i < 4 && scope.Engine.RequiresTick; i++)
+      scope.Engine.Tick(1f / 30f);
+
+    Assert.That(scope.Engine.RequiresTick, Is.False);
+  }
+
+  [Test]
+  public void BuildGraph_EndlessLinkRefinement_KeepsTickingAfterFinitePasses()
+  {
+    var graph = BuildTaglessComponentsGraph(16);
+    using var scope = CreateEngineScope(
+      graph.Notes,
+      graph.Links,
+      engineScope =>
+      {
+        engineScope.SetAnimationLifetime("linkRefinementLifetime", "Endless");
+        engineScope.SetPrivateFieldForTest("linkRefinementPasses", 2);
+        engineScope.SetPrivateFieldForTest("refinementPassesPerFrame", 1);
+      });
+
+    Assert.That(scope.Engine.RequiresTick, Is.True);
+
+    for (int i = 0; i < 4; i++)
+      scope.Engine.Tick(1f / 30f);
+
+    Assert.That(scope.Engine.RequiresTick, Is.True);
+  }
+
   private static EngineScope CreateEngineScope(
     IReadOnlyList<NoteData> notes,
-    IReadOnlyList<MapRuntimeContext.RuntimeNoteLink> links)
+    IReadOnlyList<MapRuntimeContext.RuntimeNoteLink> links,
+    Action<EngineScope> configureBeforeBuild = null)
   {
     var runtimeNotes = notes != null
       ? new List<NoteData>(notes)
@@ -83,6 +127,7 @@ public class CartographerScalableLinksEngineEditModeTests
 
     var scope = new EngineScope(CreateStarTemplatePrefab());
     scope.ConfigureForDeterministicEditMode();
+    configureBeforeBuild?.Invoke(scope);
     scope.Engine.BuildGraph(runtimeNotes);
     return scope;
   }
@@ -186,7 +231,16 @@ public class CartographerScalableLinksEngineEditModeTests
       SetPrivateField("linkRefinementLifetime", ParseNestedEnum("AnimationLifetime", "Instant"));
       SetPrivateField("constructionAnimationSeconds", 0f);
       SetPrivateField("linkRefinementPasses", 24);
-      SetPrivateField("keepLinksAliveForever", false);
+    }
+
+    public void SetAnimationLifetime(string fieldName, string value)
+    {
+      SetPrivateField(fieldName, ParseNestedEnum("AnimationLifetime", value));
+    }
+
+    public void SetPrivateFieldForTest(string fieldName, object value)
+    {
+      SetPrivateField(fieldName, value);
     }
 
     public void Dispose()
