@@ -414,7 +414,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
   private void TickConstruction()
   {
-    int batches = Mathf.Max(1, constructionBatchesPerFrame);
+    int batches = constructionBatchesPerFrame;
     int budget = Mathf.Max(1, _resolvedConstructionNodesPerFrame);
 
     for (int i = 0; i < batches && _constructionActive; i++)
@@ -435,7 +435,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
     int passBudget = Mathf.Min(
       _remainingRefinementPasses,
-      Mathf.Max(1, refinementPassesPerFrame));
+      refinementPassesPerFrame);
 
     for (int i = 0; i < passBudget; i++)
     {
@@ -458,7 +458,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
   private void TickContinuousRefinement()
   {
-    int passCount = Mathf.Max(1, refinementPassesPerFrame);
+    int passCount = refinementPassesPerFrame;
     for (int i = 0; i < passCount; i++)
       RunRefinementPass();
 
@@ -530,9 +530,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   private void ConfigureLineBudgetBeforeBuild(int noteCount)
   {
     _visibleEdgeBudget = Mathf.Max(0, ResolveEdgeBudget(noteCount));
-    backboneBudgetRatio = Mathf.Clamp01(backboneBudgetRatio);
-    directLinkBudgetRatio = Mathf.Clamp01(directLinkBudgetRatio);
-    maxVisibleTagEdgeRestMultiplier = Mathf.Max(1f, maxVisibleTagEdgeRestMultiplier);
   }
 
   private int ResolveEdgeBudget(int noteCount)
@@ -552,8 +549,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
   private void ConfigureConstructionTimingBeforeBuild(int noteCount)
   {
-    constructionBatchesPerFrame = Mathf.Max(1, constructionBatchesPerFrame);
-
     bool animate =
       constructionLifetime != AnimationLifetime.Instant &&
       constructionAnimationSeconds > 0f;
@@ -594,9 +589,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
   private void ConfigureLinkTimingBeforeBuild()
   {
-    int safePassesPerFrame = Mathf.Max(1, refinementPassesPerFrame);
-    refinementPassesPerFrame = safePassesPerFrame;
-
     switch (linkRefinementLifetime)
     {
       case AnimationLifetime.Instant:
@@ -987,16 +979,14 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     if (_components.Count == 0)
       return;
 
-    float safeMinimumDistance = Mathf.Max(0.1f, minimumNodeDistance);
-    float safeSpacingFactor = Mathf.Max(0.1f, nodeSpacingFactor);
     float cursor = 0f;
 
     for (int componentIndex = 0; componentIndex < _components.Count; componentIndex++)
     {
       var component = _components[componentIndex];
       component.Radius = Mathf.Max(
-        safeMinimumDistance * 3f,
-        safeSpacingFactor *
+        minimumNodeDistance * 3f,
+        nodeSpacingFactor *
         Mathf.Pow(Mathf.Max(1, component.Nodes.Count), 1f / 3f) *
         Mathf.Max(0.2f, componentRadiusFactor));
 
@@ -1010,7 +1000,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       float distance =
         cursor +
         component.Radius +
-        safeMinimumDistance * Mathf.Max(0.5f, componentGapFactor);
+        minimumNodeDistance * Mathf.Max(0.5f, componentGapFactor);
 
       component.Center =
         FibonacciSpherePoint(componentIndex - 1, _components.Count - 1) *
@@ -1022,7 +1012,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
   private void InitializeStructuralRoots()
   {
-    _packingOffsets = BuildPackingOffsets(Mathf.Clamp(maxPlacementAttempts, 8, 768));
+    _packingOffsets = BuildPackingOffsets(maxPlacementAttempts);
 
     for (int componentIndex = 0; componentIndex < _components.Count; componentIndex++)
     {
@@ -1032,7 +1022,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       for (int rootOffset = 0; rootOffset < roots.Count; rootOffset++)
       {
         int rootIndex = roots[rootOffset];
-        float rootDistance = component.Radius * Mathf.Clamp(rootSpreadRatio, 0.05f, 0.98f);
+        float rootDistance = component.Radius * rootSpreadRatio;
         Vector3 preferredPosition = roots.Count <= 1
           ? component.Center
           : component.Center + FibonacciSpherePoint(rootOffset, roots.Count) * rootDistance;
@@ -1090,7 +1080,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
       MarkExcludedNearRoot(
         candidate,
-        Mathf.Clamp(rootExclusionGraphDepth, 0, 5),
+        rootExclusionGraphDepth,
         excluded,
         visitMarks,
         visitDepths,
@@ -1387,16 +1377,14 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       _adjacency[childIndex].Count >=
       Mathf.Max(2, childHubDegreeThreshold);
 
-    float safeMinimumDistance = Mathf.Max(0.1f, minimumNodeDistance);
-
     float baseDistance =
-      safeMinimumDistance *
+      minimumNodeDistance *
       (isHubLike
         ? Mathf.Max(0.1f, hubChildDistanceFactor)
         : Mathf.Max(0.1f, leafChildDistanceFactor));
 
     float reservation =
-      safeMinimumDistance *
+      minimumNodeDistance *
       Mathf.Max(0f, childReservationFactor) *
       Mathf.Pow(Mathf.Max(1, _adjacency[childIndex].Count), 1f / 3f);
 
@@ -1405,7 +1393,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       reservation);
 
     float siblingShell =
-      safeMinimumDistance *
+      minimumNodeDistance *
       Mathf.Max(0f, siblingShellFactor) *
       Mathf.Pow(parent.AssignedChildCount + 1f, 1f / 3f);
 
@@ -1459,8 +1447,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     string nodeKey,
     int salt)
   {
-    float safeCellSize = Mathf.Max(0.1f, minimumNodeDistance);
-    Vector3Int origin = ToCell(preferredPosition, safeCellSize);
+    Vector3Int origin = ToCell(preferredPosition, minimumNodeDistance);
 
     int offsetCount = _packingOffsets.Count;
     int shift = offsetCount > 1
@@ -1479,10 +1466,10 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
       Vector3 organicOffset =
         StableDirection(nodeKey, salt + 37) *
-        safeCellSize *
+        minimumNodeDistance *
         0.18f;
 
-      return CellCenter(candidateCell, safeCellSize) + organicOffset;
+      return CellCenter(candidateCell, minimumNodeDistance) + organicOffset;
     }
 
     _placementFallbacks++;
@@ -1490,10 +1477,10 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     Vector3 fallbackPosition =
       preferredPosition +
       StableDirection(nodeKey, salt + 71) *
-      safeCellSize *
+      minimumNodeDistance *
       (_placementFallbacks + 1);
 
-    _placementCells.Add(ToCell(fallbackPosition, safeCellSize));
+    _placementCells.Add(ToCell(fallbackPosition, minimumNodeDistance));
     return fallbackPosition;
   }
 
@@ -1541,8 +1528,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     ApplyLinkContractionCorrections();
     ApplyCorrections();
 
-    int guardPasses = Mathf.Clamp(separationPassesPerRefinement, 0, 8);
-    for (int pass = 0; pass < guardPasses; pass++)
+    for (int pass = 0; pass < separationPassesPerRefinement; pass++)
       ApplySeparationPass();
   }
 
@@ -1550,9 +1536,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   {
     if (_allEdges.Count == 0)
       return;
-
-    float safeLinkPull = Mathf.Clamp01(linkPull);
-    float safeMaxMove = Mathf.Max(0.01f, maxMovePerPass);
 
     for (int edgeIndex = 0; edgeIndex < _allEdges.Count; edgeIndex++)
     {
@@ -1576,8 +1559,8 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
         : 0.42f;
 
       float move = Mathf.Min(
-        safeMaxMove,
-        extension * safeLinkPull * weightScale);
+        maxMovePerPass,
+        extension * linkPull * weightScale);
 
       Vector3 correction = delta / distance * (move * 0.5f);
 
@@ -1593,11 +1576,9 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     Array.Clear(_corrections, 0, _corrections.Length);
     Array.Clear(_correctionCounts, 0, _correctionCounts.Length);
 
-    float localMinimum = Mathf.Max(0.01f, minimumNodeDistance);
-    float clusterGuard = localMinimum * Mathf.Max(1f, clusterGuardDistanceFactor);
-    float rootGuard = localMinimum * Mathf.Max(1f, rootGuardDistanceFactor);
+    float clusterGuard = minimumNodeDistance * Mathf.Max(1f, clusterGuardDistanceFactor);
+    float rootGuard = minimumNodeDistance * Mathf.Max(1f, rootGuardDistanceFactor);
     float gridSize = rootGuard;
-    int safeMaxChecks = Mathf.Max(1, maxSeparationChecksPerNode);
 
     BuildSeparationGrid(gridSize);
 
@@ -1607,15 +1588,15 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       Vector3Int origin = ToCell(node.LocalPosition, gridSize);
       int checks = 0;
 
-      for (int x = -1; x <= 1 && checks < safeMaxChecks; x++)
-        for (int y = -1; y <= 1 && checks < safeMaxChecks; y++)
-          for (int z = -1; z <= 1 && checks < safeMaxChecks; z++)
+      for (int x = -1; x <= 1 && checks < maxSeparationChecksPerNode; x++)
+        for (int y = -1; y <= 1 && checks < maxSeparationChecksPerNode; y++)
+          for (int z = -1; z <= 1 && checks < maxSeparationChecksPerNode; z++)
           {
             if (!_separationGrid.TryGetValue(origin + new Vector3Int(x, y, z), out var bucket))
               continue;
 
             for (int bucketOffset = 0;
-                 bucketOffset < bucket.Count && checks < safeMaxChecks;
+                 bucketOffset < bucket.Count && checks < maxSeparationChecksPerNode;
                  bucketOffset++)
             {
               int otherIndex = bucket[bucketOffset];
@@ -1624,7 +1605,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
               checks++;
               _separationPairChecks++;
-              ApplyPairSeparation(nodeIndex, otherIndex, localMinimum, clusterGuard, rootGuard);
+              ApplyPairSeparation(nodeIndex, otherIndex, minimumNodeDistance, clusterGuard, rootGuard);
             }
           }
     }
@@ -1683,8 +1664,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
   private void ApplyCorrections()
   {
-    float safeMaxMove = Mathf.Max(0.01f, maxMovePerPass);
-
     for (int nodeIndex = 0; nodeIndex < _nodes.Count; nodeIndex++)
     {
       int correctionCount = _correctionCounts[nodeIndex];
@@ -1695,8 +1674,8 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       if (correction.sqrMagnitude <= MIN_SQR_DISTANCE)
         continue;
 
-      if (correction.magnitude > safeMaxMove)
-        correction = correction.normalized * safeMaxMove;
+      if (correction.magnitude > maxMovePerPass)
+        correction = correction.normalized * maxMovePerPass;
 
       _nodes[nodeIndex].LocalPosition += correction;
     }
@@ -1833,12 +1812,12 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       return;
 
     int backboneBudget = Mathf.Clamp(
-      Mathf.RoundToInt(_visibleEdgeBudget * Mathf.Clamp01(backboneBudgetRatio)),
+      Mathf.RoundToInt(_visibleEdgeBudget * backboneBudgetRatio),
       0,
       _visibleEdgeBudget);
 
     int directBudget = Mathf.Clamp(
-      Mathf.RoundToInt(_visibleEdgeBudget * Mathf.Clamp01(directLinkBudgetRatio)),
+      Mathf.RoundToInt(_visibleEdgeBudget * directLinkBudgetRatio),
       0,
       _visibleEdgeBudget - backboneBudget);
 
@@ -1904,7 +1883,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
     float maxLength =
       Mathf.Max(0.01f, noteTagRestLength) *
-      Mathf.Max(1f, maxVisibleTagEdgeRestMultiplier);
+      maxVisibleTagEdgeRestMultiplier;
 
     return EdgeLengthSqr(edge) <= maxLength * maxLength;
   }
