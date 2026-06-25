@@ -1550,7 +1550,6 @@ MonoBehaviour:
   rootGuardDistanceFactor: 5
   maxSeparationChecksPerNode: 180
   tagScale: 0.7
-  maxVisibleEdges: 1500
   constructionLifetime: 1
   constructionAnimationSeconds: 3
   endlessConstructionNodesPerFrame: 120

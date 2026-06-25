@@ -187,7 +187,6 @@ public class CartographerScalableLinksEngineEditModeTests
       SetPrivateField("constructionAnimationSeconds", 0f);
       SetPrivateField("linkRefinementPasses", 24);
       SetPrivateField("keepLinksAliveForever", false);
-      SetPrivateField("maxVisibleEdges", 0);
     }
 
     public void Dispose()

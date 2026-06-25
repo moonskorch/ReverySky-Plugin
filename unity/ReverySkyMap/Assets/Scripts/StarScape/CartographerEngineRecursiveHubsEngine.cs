@@ -105,7 +105,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
   [Header("Visual")]
   [SerializeField, Min(0.01f)] private float tagScale = 0.7f;
-  [SerializeField, Min(0)] private int maxVisibleEdges = 1500;
 
   [Header("Construction Timing")]
   [SerializeField] private AnimationLifetime constructionLifetime = AnimationLifetime.Timed;
@@ -179,7 +178,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   private bool _continuousLinkRefinement;
   private bool _graphHasNodes;
   private bool _postBuildOptimized;
-  private int _lastResolvedEdgeBudget;
+  private int _visibleEdgeBudget;
   private readonly HashSet<Vector3Int> _placementCells = new();
   private List<Vector3Int> _packingOffsets = new();
 
@@ -525,9 +524,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
   private void ConfigureLineBudgetBeforeBuild(int noteCount)
   {
-    _lastResolvedEdgeBudget = ResolveEdgeBudget(noteCount);
-
-    maxVisibleEdges = _lastResolvedEdgeBudget;
+    _visibleEdgeBudget = Mathf.Max(0, ResolveEdgeBudget(noteCount));
     backboneBudgetRatio = Mathf.Clamp01(backboneBudgetRatio);
     directLinkBudgetRatio = Mathf.Clamp01(directLinkBudgetRatio);
     maxVisibleTagEdgeRestMultiplier = Mathf.Max(1f, maxVisibleTagEdgeRestMultiplier);
@@ -1832,19 +1829,18 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
   private void InstantiateLines()
   {
-    if (_linesInstantiated || edgePrefab == null || maxVisibleEdges <= 0)
+    if (_linesInstantiated || edgePrefab == null || _visibleEdgeBudget <= 0)
       return;
 
-    int safeBudget = Mathf.Max(0, maxVisibleEdges);
     int backboneBudget = Mathf.Clamp(
-      Mathf.RoundToInt(safeBudget * Mathf.Clamp01(backboneBudgetRatio)),
+      Mathf.RoundToInt(_visibleEdgeBudget * Mathf.Clamp01(backboneBudgetRatio)),
       0,
-      safeBudget);
+      _visibleEdgeBudget);
 
     int directBudget = Mathf.Clamp(
-      Mathf.RoundToInt(safeBudget * Mathf.Clamp01(directLinkBudgetRatio)),
+      Mathf.RoundToInt(_visibleEdgeBudget * Mathf.Clamp01(directLinkBudgetRatio)),
       0,
-      safeBudget - backboneBudget);
+      _visibleEdgeBudget - backboneBudget);
 
     var orderedBackbone = _backboneEdges
       .OrderBy(edge => edge.Kind == EdgeKind.DirectNoteLink ? 0 : 1)
@@ -1881,19 +1877,19 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
     added += InstantiateLinesFromEdges(
       orderedDirectLinks,
-      Mathf.Min(directBudget, safeBudget - added),
+      Mathf.Min(directBudget, _visibleEdgeBudget - added),
       instantiatedPairs);
 
     added += InstantiateLinesFromEdges(
       orderedTagEdges,
-      safeBudget - added,
+      _visibleEdgeBudget - added,
       instantiatedPairs);
 
-    if (added < safeBudget)
+    if (added < _visibleEdgeBudget)
     {
       InstantiateLinesFromEdges(
         orderedDirectLinks,
-        safeBudget - added,
+        _visibleEdgeBudget - added,
         instantiatedPairs);
     }
 
