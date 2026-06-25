@@ -43,8 +43,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   [SerializeField] private LineRenderer edgePrefab;
 
   [Header("Progressive construction")]
-  [Tooltip("When true, roots and frontier waves appear over frames.")]
-  [SerializeField] private bool animateConstruction = true;
   [SerializeField, Range(1, 4096)] private int nodesPerConstructionFrame = 420;
   [SerializeField, Range(1, 16)] private int constructionBatchesPerFrame = 1;
 
@@ -90,8 +88,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   [SerializeField, Min(0f)] private float frontierDepthPenalty = 0.12f;
 
   [Header("Post-placement link refinement")]
-  [Tooltip("When true, links pull progressively after all nodes have been placed.")]
-  [SerializeField] private bool animateRefinement = true;
   [FormerlySerializedAs("refinementPasses")]
   [SerializeField, Range(0, 512)] private int linkRefinementPasses = 128;
   [SerializeField, Range(1, 12)] private int refinementPassesPerFrame = 1;
@@ -160,6 +156,8 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   private long _separationPairChecks;
   private bool _constructionActive;
   private bool _linesInstantiated;
+  private bool _animateConstruction;
+  private bool _animateRefinement;
 
   private readonly List<Node> _nodes = new();
   private readonly List<Edge> _tagEdges = new();
@@ -493,7 +491,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     seedStopwatch.Stop();
 
     var constructionStopwatch = Stopwatch.StartNew();
-    if (animateConstruction)
+    if (_animateConstruction)
     {
       _constructionActive = _placedCount < _nodes.Count;
       InstantiatePlacedNodesWithoutVisuals();
@@ -561,7 +559,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     if (constructionLifetime == AnimationLifetime.Endless)
       animate = true;
 
-    animateConstruction = animate;
+    _animateConstruction = animate;
 
     int estimatedNodes = Mathf.Max(1, noteCount);
     nodesPerConstructionFrame = ResolveConstructionNodesPerFrame(estimatedNodes);
@@ -600,16 +598,16 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     switch (linkRefinementLifetime)
     {
       case AnimationLifetime.Instant:
-        animateRefinement = false;
+        _animateRefinement = false;
         break;
 
       case AnimationLifetime.Endless:
-        animateRefinement = true;
+        _animateRefinement = true;
         break;
 
       case AnimationLifetime.Timed:
       default:
-        animateRefinement = true;
+        _animateRefinement = true;
         break;
     }
   }
@@ -1509,7 +1507,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     InstantiateLines();
     UpdateNavigationBounds();
 
-    if (animateRefinement)
+    if (_animateRefinement)
     {
       _remainingRefinementPasses = linkRefinementPasses;
     }

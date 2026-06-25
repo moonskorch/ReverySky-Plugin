@@ -1505,7 +1505,6 @@ MonoBehaviour:
   layoutParent: {fileID: 1327961058}
   tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
   edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
-  animateConstruction: 1
   nodesPerConstructionFrame: 420
   constructionBatchesPerFrame: 1
   nodeSpacingFactor: 8.1
@@ -1539,7 +1538,6 @@ MonoBehaviour:
   frontierTargetScoreWeight: 5.2
   frontierRelationWeight: 1.25
   frontierDepthPenalty: 0.12
-  animateRefinement: 1
   linkRefinementPasses: 128
   refinementPassesPerFrame: 1
   linkPull: 0.085
