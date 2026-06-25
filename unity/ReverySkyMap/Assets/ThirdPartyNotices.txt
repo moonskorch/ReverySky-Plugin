@@ -20,10 +20,26 @@ Bundled third-party resources
 
 The Unity project includes TextMesh Pro resource files imported with Unity.
 
+Bundled fonts:
+
+1. Liberation Sans
+   Used as the primary TextMesh Pro font asset for map labels.
+
+   License:
+   SIL Open Font License, Version 1.1.
+
+2. Noto Emoji
+   Copyright 2013 Google LLC.
+
+   Used as a TextMesh Pro fallback font for monochrome emoji and symbol
+   rendering in map labels.
+
+   License:
+   SIL Open Font License, Version 1.1.
+
 Included notices:
 
-* Assets/TextMesh Pro/Fonts/LiberationSans - OFL.txt
-* Assets/TextMesh Pro/Sprites/EmojiOne Attribution.txt
+* Assets/TextMesh Pro/Fonts/OFL-1.1.txt
 
 These resources remain subject to their respective terms.
 

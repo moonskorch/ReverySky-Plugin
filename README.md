@@ -40,6 +40,10 @@ Visual quality depends on your display resolution, screen scaling, graphics driv
 
 You can also adjust Render Scale in the plugin settings: higher values sharpen the map but use more GPU power.
 
+### Character support
+
+Map note titles support Latin text with accents, Cyrillic text, common symbols, and monochrome emoji.
+
 ## Navigation
 
 - Pan: drag the map with the primary mouse button to move the camera focus across the current layout.
