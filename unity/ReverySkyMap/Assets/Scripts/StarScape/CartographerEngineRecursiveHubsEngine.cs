@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// Standalone RecursiveHubs layout for medium and large note graphs.
@@ -91,7 +92,8 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   [Header("Post-placement link refinement")]
   [Tooltip("When true, links pull progressively after all nodes have been placed.")]
   [SerializeField] private bool animateRefinement = true;
-  [SerializeField, Range(0, 128)] private int refinementPasses = 20;
+  [FormerlySerializedAs("refinementPasses")]
+  [SerializeField, Range(0, 512)] private int linkRefinementPasses = 128;
   [SerializeField, Range(1, 12)] private int refinementPassesPerFrame = 1;
   [SerializeField, Range(0f, 1f)] private float linkPull = 0.085f;
   [SerializeField, Min(0.01f)] private float maxMovePerPass = 0.58f;
@@ -120,12 +122,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
   [Header("Link Timing")]
   [SerializeField] private AnimationLifetime linkRefinementLifetime = AnimationLifetime.Timed;
-  [Tooltip("Used when linkRefinementLifetime is Timed. 0 computes the configured passes immediately.")]
-  [SerializeField, Min(0f)] private float linkRefinementSeconds = 3.5f;
-  [Tooltip("How many refinement passes to run immediately when link animation is Instant.")]
-  [SerializeField, Range(0, 512)] private int instantLinkRefinementPasses = 24;
-  [Tooltip("Warmup passes before the endless spring loop continues forever.")]
-  [SerializeField, Range(0, 512)] private int endlessLinkWarmupPasses = 24;
   [Tooltip("Continuous mode keeps RequiresTick true and keeps applying refinement passes.")]
   [SerializeField] private bool keepLinksAliveForever;
 
@@ -605,28 +601,15 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     {
       case AnimationLifetime.Instant:
         animateRefinement = false;
-        refinementPasses = Mathf.Max(0, instantLinkRefinementPasses);
         break;
 
       case AnimationLifetime.Endless:
         animateRefinement = true;
-        refinementPasses = Mathf.Max(0, endlessLinkWarmupPasses);
         break;
 
       case AnimationLifetime.Timed:
       default:
-        if (linkRefinementSeconds <= 0f)
-        {
-          animateRefinement = false;
-          refinementPasses = Mathf.Max(0, instantLinkRefinementPasses);
-          break;
-        }
-
-        float frames =
-          Mathf.Max(1f, linkRefinementSeconds * Mathf.Max(1f, timingFrameRate));
-        int passes = Mathf.CeilToInt(frames * safePassesPerFrame);
         animateRefinement = true;
-        refinementPasses = Mathf.Max(1, passes);
         break;
     }
   }
@@ -1526,14 +1509,13 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     InstantiateLines();
     UpdateNavigationBounds();
 
-    int safeRefinementPasses = Mathf.Clamp(refinementPasses, 0, 128);
     if (animateRefinement)
     {
-      _remainingRefinementPasses = safeRefinementPasses;
+      _remainingRefinementPasses = linkRefinementPasses;
     }
     else
     {
-      for (int i = 0; i < safeRefinementPasses; i++)
+      for (int i = 0; i < linkRefinementPasses; i++)
       {
         RunRefinementPass();
         _completedRefinementPasses++;

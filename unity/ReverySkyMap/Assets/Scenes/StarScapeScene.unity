@@ -1540,10 +1540,10 @@ MonoBehaviour:
   frontierRelationWeight: 1.25
   frontierDepthPenalty: 0.12
   animateRefinement: 1
-  refinementPasses: 20
+  linkRefinementPasses: 128
   refinementPassesPerFrame: 1
   linkPull: 0.085
-  maxMovePerPass: 0.58
+  maxMovePerPass: 0.5
   noteTagRestLength: 8.6
   directLinkRestLength: 7.2
   minimumDirectLinkRestLength: 3.5
@@ -1559,9 +1559,6 @@ MonoBehaviour:
   endlessConstructionNodesPerFrame: 120
   timingFrameRate: 30
   linkRefinementLifetime: 1
-  linkRefinementSeconds: 20
-  instantLinkRefinementPasses: 24
-  endlessLinkWarmupPasses: 24
   keepLinksAliveForever: 0
   edgeBudgetMode: 1
   manualVisibleEdges: 900
@@ -2638,7 +2635,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
   injectSampleData: 0
   sampleScenario: 2
-  sampleNoteCount: 200
+  sampleNoteCount: 2000
   sampleTagPoolSize: 30
   sampleDateSpanDays: 365
   sampleMaxTagsPerNote: 4

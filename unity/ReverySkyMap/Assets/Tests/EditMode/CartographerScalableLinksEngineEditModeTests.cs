@@ -185,7 +185,7 @@ public class CartographerScalableLinksEngineEditModeTests
       SetPrivateField("constructionLifetime", ParseNestedEnum("AnimationLifetime", "Instant"));
       SetPrivateField("linkRefinementLifetime", ParseNestedEnum("AnimationLifetime", "Instant"));
       SetPrivateField("constructionAnimationSeconds", 0f);
-      SetPrivateField("linkRefinementSeconds", 0f);
+      SetPrivateField("linkRefinementPasses", 24);
       SetPrivateField("keepLinksAliveForever", false);
       SetPrivateField("maxVisibleEdges", 0);
     }
