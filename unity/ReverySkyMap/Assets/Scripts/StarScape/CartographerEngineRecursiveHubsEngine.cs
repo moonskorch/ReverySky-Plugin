@@ -611,19 +611,17 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     if (_postBuildOptimized || !_graphHasNodes || !_linesInstantiated)
       return;
 
-    int culledLines = pruneLongNonBackboneEdges
-      ? PruneLongNonBackboneLines()
-      : 0;
+    if (pruneLongNonBackboneEdges)
+      PruneLongNonBackboneLines();
 
     _postBuildOptimized = true;
   }
 
-  private int PruneLongNonBackboneLines()
+  private void PruneLongNonBackboneLines()
   {
     var backbonePairs = BuildBackbonePairSet();
     float maxLength = ResolveMaxNonBackboneLineLength();
     float maxLengthSqr = maxLength * maxLength;
-    int removed = 0;
 
     for (int i = _lineBindings.Count - 1; i >= 0; i--)
     {
@@ -647,10 +645,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
       Destroy(binding.Line.gameObject);
       _lineBindings.RemoveAt(i);
-      removed++;
     }
-
-    return removed;
   }
 
   private HashSet<long> BuildBackbonePairSet()
