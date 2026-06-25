@@ -43,7 +43,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   [SerializeField] private LineRenderer edgePrefab;
 
   [Header("Progressive construction")]
-  [SerializeField, Range(1, 4096)] private int nodesPerConstructionFrame = 420;
   [SerializeField, Range(1, 16)] private int constructionBatchesPerFrame = 1;
 
   [Header("Initial structural scale")]
@@ -149,6 +148,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   private int _maxHierarchyDepth;
   private int _placementFallbacks;
   private int _constructionWaves;
+  private int _resolvedConstructionNodesPerFrame;
   private int _remainingRefinementPasses;
   private int _completedRefinementPasses;
   private long _frontierPushes;
@@ -422,7 +422,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     if (_constructionActive)
     {
       int batches = Mathf.Max(1, constructionBatchesPerFrame);
-      int budget = Mathf.Max(1, nodesPerConstructionFrame);
+      int budget = Mathf.Max(1, _resolvedConstructionNodesPerFrame);
 
       for (int i = 0; i < batches && _constructionActive; i++)
       {
@@ -562,7 +562,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     _animateConstruction = animate;
 
     int estimatedNodes = Mathf.Max(1, noteCount);
-    nodesPerConstructionFrame = ResolveConstructionNodesPerFrame(estimatedNodes);
+    _resolvedConstructionNodesPerFrame = ResolveConstructionNodesPerFrame(estimatedNodes);
   }
 
   private void ConfigureConstructionTimingAfterBuild()
@@ -571,7 +571,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     if (actualNodes <= 0)
       return;
 
-    nodesPerConstructionFrame = ResolveConstructionNodesPerFrame(actualNodes);
+    _resolvedConstructionNodesPerFrame = ResolveConstructionNodesPerFrame(actualNodes);
   }
 
   private int ResolveConstructionNodesPerFrame(int nodeCount)
