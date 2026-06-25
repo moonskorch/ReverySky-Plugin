@@ -76,6 +76,7 @@ public class CartographerScalableLinksEngineEditModeTests
       {
         engineScope.SetAnimationLifetime("linkRefinementLifetime", "Timed");
         engineScope.SetPrivateFieldForTest("linkRefinementPasses", 2);
+        engineScope.SetPrivateFieldForTest("refinementFinishTaperFraction", 0f);
         engineScope.SetPrivateFieldForTest("refinementPassesPerFrame", 1);
       });
 
@@ -98,6 +99,7 @@ public class CartographerScalableLinksEngineEditModeTests
       {
         engineScope.SetAnimationLifetime("linkRefinementLifetime", "Endless");
         engineScope.SetPrivateFieldForTest("linkRefinementPasses", 2);
+        engineScope.SetPrivateFieldForTest("refinementFinishTaperFraction", 0f);
         engineScope.SetPrivateFieldForTest("refinementPassesPerFrame", 1);
       });
 
@@ -106,6 +108,87 @@ public class CartographerScalableLinksEngineEditModeTests
     for (int i = 0; i < 4; i++)
       scope.Engine.Tick(1f / 30f);
 
+    Assert.That(scope.Engine.RequiresTick, Is.True);
+  }
+
+  [Test]
+  public void BuildGraph_TimedLinkRefinementTaper_ResolvesExtraPasses()
+  {
+    using var scope = CreateEngineScope(
+      BuildTaglessNotes(16),
+      new List<MapRuntimeContext.RuntimeNoteLink>(),
+      engineScope =>
+      {
+        engineScope.SetAnimationLifetime("linkRefinementLifetime", "Timed");
+        engineScope.SetPrivateFieldForTest("linkRefinementPasses", 10);
+        engineScope.SetPrivateFieldForTest("refinementFinishTaperFraction", 0.4f);
+        engineScope.SetPrivateFieldForTest("refinementPassesPerFrame", 1);
+      });
+
+    TickUntilStopped(scope);
+
+    Assert.That(scope.GetPrivateFieldForTest<int>("_resolvedLinkRefinementPasses"), Is.EqualTo(13));
+    Assert.That(scope.GetPrivateFieldForTest<int>("_resolvedLinkRefinementTaperPasses"), Is.EqualTo(5));
+    Assert.That(scope.GetPrivateFieldForTest<int>("_completedRefinementPasses"), Is.EqualTo(13));
+    Assert.That(scope.GetPrivateFieldForTest<int>("_remainingRefinementPasses"), Is.EqualTo(0));
+    Assert.That(scope.Engine.RequiresTick, Is.False);
+  }
+
+  [Test]
+  public void BuildGraph_TimedLinkRefinementTaperDisabled_KeepsRawPassCount()
+  {
+    using var scope = CreateEngineScope(
+      BuildTaglessNotes(16),
+      new List<MapRuntimeContext.RuntimeNoteLink>(),
+      engineScope =>
+      {
+        engineScope.SetAnimationLifetime("linkRefinementLifetime", "Timed");
+        engineScope.SetPrivateFieldForTest("linkRefinementPasses", 10);
+        engineScope.SetPrivateFieldForTest("refinementFinishTaperFraction", 0f);
+        engineScope.SetPrivateFieldForTest("refinementPassesPerFrame", 1);
+      });
+
+    TickUntilStopped(scope);
+
+    Assert.That(scope.GetPrivateFieldForTest<int>("_resolvedLinkRefinementPasses"), Is.EqualTo(10));
+    Assert.That(scope.GetPrivateFieldForTest<int>("_resolvedLinkRefinementTaperPasses"), Is.EqualTo(0));
+    Assert.That(scope.GetPrivateFieldForTest<int>("_completedRefinementPasses"), Is.EqualTo(10));
+  }
+
+  [Test]
+  public void BuildGraph_InstantLinkRefinementTaper_DoesNotExpandPassCount()
+  {
+    using var scope = CreateEngineScope(
+      BuildTaglessNotes(16),
+      new List<MapRuntimeContext.RuntimeNoteLink>(),
+      engineScope =>
+      {
+        engineScope.SetAnimationLifetime("linkRefinementLifetime", "Instant");
+        engineScope.SetPrivateFieldForTest("linkRefinementPasses", 10);
+        engineScope.SetPrivateFieldForTest("refinementFinishTaperFraction", 0.4f);
+      });
+
+    Assert.That(scope.Engine.RequiresTick, Is.False);
+    Assert.That(scope.GetPrivateFieldForTest<int>("_resolvedLinkRefinementPasses"), Is.EqualTo(10));
+    Assert.That(scope.GetPrivateFieldForTest<int>("_resolvedLinkRefinementTaperPasses"), Is.EqualTo(0));
+    Assert.That(scope.GetPrivateFieldForTest<int>("_completedRefinementPasses"), Is.EqualTo(10));
+  }
+
+  [Test]
+  public void BuildGraph_EndlessLinkRefinementTaper_DoesNotExpandFinitePassCount()
+  {
+    using var scope = CreateEngineScope(
+      BuildTaglessNotes(16),
+      new List<MapRuntimeContext.RuntimeNoteLink>(),
+      engineScope =>
+      {
+        engineScope.SetAnimationLifetime("linkRefinementLifetime", "Endless");
+        engineScope.SetPrivateFieldForTest("linkRefinementPasses", 10);
+        engineScope.SetPrivateFieldForTest("refinementFinishTaperFraction", 0.4f);
+      });
+
+    Assert.That(scope.GetPrivateFieldForTest<int>("_resolvedLinkRefinementPasses"), Is.EqualTo(10));
+    Assert.That(scope.GetPrivateFieldForTest<int>("_resolvedLinkRefinementTaperPasses"), Is.EqualTo(0));
     Assert.That(scope.Engine.RequiresTick, Is.True);
   }
 
@@ -130,6 +213,14 @@ public class CartographerScalableLinksEngineEditModeTests
     configureBeforeBuild?.Invoke(scope);
     scope.Engine.BuildGraph(runtimeNotes);
     return scope;
+  }
+
+  private static void TickUntilStopped(EngineScope scope, int maxTicks = 512)
+  {
+    for (int i = 0; i < maxTicks && scope.Engine.RequiresTick; i++)
+      scope.Engine.Tick(1f / 30f);
+
+    Assert.That(scope.Engine.RequiresTick, Is.False);
   }
 
   private static List<NoteData> BuildTaglessNotes(int count)
@@ -241,6 +332,13 @@ public class CartographerScalableLinksEngineEditModeTests
     public void SetPrivateFieldForTest(string fieldName, object value)
     {
       SetPrivateField(fieldName, value);
+    }
+
+    public T GetPrivateFieldForTest<T>(string fieldName)
+    {
+      FieldInfo field = typeof(CartographerEngineRecursiveHubsEngine).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+      Assert.That(field, Is.Not.Null, $"Missing field {fieldName}.");
+      return (T)field.GetValue(Engine);
     }
 
     public void Dispose()

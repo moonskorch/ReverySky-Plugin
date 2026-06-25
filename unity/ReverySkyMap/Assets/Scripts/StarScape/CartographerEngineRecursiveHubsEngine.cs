@@ -90,6 +90,8 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   [FormerlySerializedAs("refinementPasses")]
   [SerializeField, Range(0, 512)] private int linkRefinementPasses = 128;
   [SerializeField, Range(1, 12)] private int refinementPassesPerFrame = 1;
+  [Tooltip("Fraction of timed link refinement spent tapering maxMovePerPass toward zero. 0 disables taper. Example: 0.3 means the last 30% of the timed refinement slows down.")]
+  [SerializeField, Range(0f, 0.9f)] private float refinementFinishTaperFraction = 0.3f;
   [SerializeField, Range(0f, 1f)] private float linkPull = 0.085f;
   [SerializeField, Min(0.01f)] private float maxMovePerPass = 0.58f;
   [SerializeField, Min(0.01f)] private float noteTagRestLength = 8.6f;
@@ -148,6 +150,8 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   private int _resolvedConstructionNodesPerFrame;
   private int _remainingRefinementPasses;
   private int _completedRefinementPasses;
+  private int _resolvedLinkRefinementPasses;
+  private int _resolvedLinkRefinementTaperPasses;
   private long _frontierPushes;
   private long _frontierPops;
   private long _separationPairChecks;
@@ -604,6 +608,39 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
         _animateRefinement = true;
         break;
     }
+
+    ResolveLinkRefinementPassPlan();
+  }
+
+  private void ResolveLinkRefinementPassPlan()
+  {
+    if (linkRefinementPasses <= 0)
+    {
+      _resolvedLinkRefinementPasses = 0;
+      _resolvedLinkRefinementTaperPasses = 0;
+      return;
+    }
+
+    if (linkRefinementLifetime != AnimationLifetime.Timed)
+    {
+      _resolvedLinkRefinementPasses = linkRefinementPasses;
+      _resolvedLinkRefinementTaperPasses = 0;
+      return;
+    }
+
+    if (refinementFinishTaperFraction <= 0f)
+    {
+      _resolvedLinkRefinementPasses = linkRefinementPasses;
+      _resolvedLinkRefinementTaperPasses = 0;
+      return;
+    }
+
+    float divisor = 1f - refinementFinishTaperFraction * 0.5f;
+    int actualPasses = Mathf.CeilToInt(linkRefinementPasses / divisor);
+    int taperPasses = Mathf.RoundToInt(actualPasses * refinementFinishTaperFraction);
+
+    _resolvedLinkRefinementPasses = actualPasses;
+    _resolvedLinkRefinementTaperPasses = taperPasses;
   }
 
   private void TryApplyPostBuildOptimizations()
@@ -1493,11 +1530,11 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
     if (_animateRefinement)
     {
-      _remainingRefinementPasses = linkRefinementPasses;
+      _remainingRefinementPasses = _resolvedLinkRefinementPasses;
     }
     else
     {
-      for (int i = 0; i < linkRefinementPasses; i++)
+      for (int i = 0; i < _resolvedLinkRefinementPasses; i++)
       {
         RunRefinementPass();
         _completedRefinementPasses++;
@@ -1513,6 +1550,8 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       $"[RecursiveHubs/v7] Construction completed placed={_placedCount}/{_nodes.Count}, " +
       $"waves={_constructionWaves}, roots={_rootCount}, backboneEdges={_backboneEdges.Count}, " +
       $"remainingRefinementPasses={_remainingRefinementPasses}, visibleEdges={_lineBindings.Count}, " +
+      $"targetFullPasses={linkRefinementPasses}, resolvedPasses={_resolvedLinkRefinementPasses}, " +
+      $"taperPasses={_resolvedLinkRefinementTaperPasses}, taperFraction={refinementFinishTaperFraction:F2}, " +
       $"navigationRadius={_navigationRadius:F1}");
   }
 
@@ -1532,10 +1571,43 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       ApplySeparationPass();
   }
 
+  private float ResolveCurrentMaxMovePerPass()
+  {
+    float baseMaxMove = Mathf.Max(0f, maxMovePerPass);
+
+    if (linkRefinementLifetime != AnimationLifetime.Timed ||
+        _resolvedLinkRefinementPasses <= 0 ||
+        _resolvedLinkRefinementTaperPasses <= 0)
+    {
+      return baseMaxMove;
+    }
+
+    int currentPass = _completedRefinementPasses + 1;
+    int taperStartPass =
+      _resolvedLinkRefinementPasses -
+      _resolvedLinkRefinementTaperPasses +
+      1;
+
+    if (currentPass < taperStartPass)
+      return baseMaxMove;
+
+    if (_resolvedLinkRefinementTaperPasses <= 1)
+      return 0f;
+
+    float progress =
+      (currentPass - taperStartPass) /
+      (float)(_resolvedLinkRefinementTaperPasses - 1);
+
+    float multiplier = 1f - Mathf.SmoothStep(0f, 1f, progress);
+    return baseMaxMove * multiplier;
+  }
+
   private void ApplyLinkContractionCorrections()
   {
     if (_allEdges.Count == 0)
       return;
+
+    float currentMaxMove = ResolveCurrentMaxMovePerPass();
 
     for (int edgeIndex = 0; edgeIndex < _allEdges.Count; edgeIndex++)
     {
@@ -1559,7 +1631,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
         : 0.42f;
 
       float move = Mathf.Min(
-        maxMovePerPass,
+        currentMaxMove,
         extension * linkPull * weightScale);
 
       Vector3 correction = delta / distance * (move * 0.5f);
@@ -1664,6 +1736,8 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
   private void ApplyCorrections()
   {
+    float currentMaxMove = ResolveCurrentMaxMovePerPass();
+
     for (int nodeIndex = 0; nodeIndex < _nodes.Count; nodeIndex++)
     {
       int correctionCount = _correctionCounts[nodeIndex];
@@ -1674,8 +1748,10 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       if (correction.sqrMagnitude <= MIN_SQR_DISTANCE)
         continue;
 
-      if (correction.magnitude > maxMovePerPass)
-        correction = correction.normalized * maxMovePerPass;
+      if (correction.magnitude > currentMaxMove)
+        correction = currentMaxMove > 0f
+          ? correction.normalized * currentMaxMove
+          : Vector3.zero;
 
       _nodes[nodeIndex].LocalPosition += correction;
     }

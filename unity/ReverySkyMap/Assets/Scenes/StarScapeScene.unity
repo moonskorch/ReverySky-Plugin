@@ -1539,6 +1539,7 @@ MonoBehaviour:
   frontierDepthPenalty: 0.12
   linkRefinementPasses: 128
   refinementPassesPerFrame: 1
+  refinementFinishTaperFraction: 0.3
   linkPull: 0.085
   maxMovePerPass: 0.5
   noteTagRestLength: 8.6
@@ -2629,8 +2630,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
   injectSampleData: 0
-  sampleScenario: 2
-  sampleNoteCount: 2000
+  sampleScenario: 1
+  sampleNoteCount: 2500
   sampleTagPoolSize: 30
   sampleDateSpanDays: 365
   sampleMaxTagsPerNote: 4
