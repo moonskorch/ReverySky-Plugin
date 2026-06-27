@@ -22,6 +22,7 @@ import { GraphPathFilter, type ParsedPathFilter, type PathFilterParseResult } fr
 const GRAPH_REFRESH_DEBOUNCE_MS = 250;
 const GRAPH_RESOLVE_BARRIER_FALLBACK_MS = 700;
 const FILTER_INPUT_DEBOUNCE_MS = 250;
+const FOCUS_COALESCE_WINDOW_MS = 100;
 const MAX_FOLDER_SUGGESTIONS = 80;
 const MAX_TAG_SUGGESTIONS = 200;
 export const DEFAULT_RENDER_SCALE = 1;
@@ -88,11 +89,14 @@ export class MapSession {
   private pendingGraphPayload: GraphPayload | null = null;
   private lastMarkdownLeaf: WorkspaceLeaf | null = null;
   private activeMarkdownPath = "";
+  // Focus ordinals compare freshness across competing focus sources.
+  // Active-leaf-change and editor-focus both update this clock, and new-note focus only wins while it is newer.
   private focusOrdinal = 0;
   private activeFocusOrdinal = 0;
   private pendingCreatedFocusOrdinal = 0;
   private pendingCreatedFocusPath: string | null = null;
   private lastDispatchedFocusKey = "";
+  private lastDispatchedFocusAt = 0;
   private semanticRefreshPending = false;
   private noteSignatureByPath = new Map<string, string>();
   private bridgeReady = false;
@@ -154,6 +158,7 @@ export class MapSession {
     this.appliedRenderScale = this.renderScale;
     this.pendingGraphPayload = null;
     this.lastDispatchedFocusKey = "";
+    this.lastDispatchedFocusAt = 0;
     this.pendingCreatedFocusPath = null;
     this.pendingCreatedFocusOrdinal = 0;
     this.semanticRefreshPending = false;
@@ -172,6 +177,7 @@ export class MapSession {
     this.tagSuggestions = [];
     this.pendingGraphPayload = null;
     this.lastDispatchedFocusKey = "";
+    this.lastDispatchedFocusAt = 0;
     this.pendingCreatedFocusPath = null;
     this.pendingCreatedFocusOrdinal = 0;
     this.semanticRefreshPending = false;
@@ -343,6 +349,10 @@ export class MapSession {
     return this.getLeafSourcePath(this.resolveOpenLinkSourceLeaf());
   }
 
+  requestEditorFocus(path: string): void {
+    this.requestMarkdownFocus(path);
+  }
+
   private resolveOpenLinkSourceLeaf(): WorkspaceLeaf | null {
     const workspace = this.app.workspace;
     if (!workspace) {
@@ -485,11 +495,7 @@ export class MapSession {
       workspace.on("active-leaf-change", (leaf) => {
         if (this.isMarkdownLeaf(leaf)) {
           this.lastMarkdownLeaf = leaf;
-          this.activeFocusOrdinal = ++this.focusOrdinal;
-          this.activeMarkdownPath = this.getLeafSourcePath(leaf);
-          if (this.lastGraphPayload) {
-            this.dispatchPreferredFocus(this.lastGraphPayload);
-          }
+          this.requestMarkdownFocus(this.getLeafSourcePath(leaf));
         }
       })
     );
@@ -610,12 +616,20 @@ export class MapSession {
     }
 
     const focusKey = this.toFocusKey(focusPayload);
-    if (focusKey && focusKey === this.lastDispatchedFocusKey) {
+    const dispatchedAt = this.now();
+    // One click can produce both active-leaf-change and editor-focus for the same note.
+    // If they resolve to the same note again within a tiny window, keep only the first send.
+    if (
+      focusKey &&
+      focusKey === this.lastDispatchedFocusKey &&
+      dispatchedAt - this.lastDispatchedFocusAt <= FOCUS_COALESCE_WINDOW_MS
+    ) {
       return;
     }
 
     this.sendFocus(focusPayload);
     this.lastDispatchedFocusKey = focusKey;
+    this.lastDispatchedFocusAt = dispatchedAt;
   }
 
   private resolvePreferredFocusPayload(payload: GraphPayload): NoteFocusPayload | null {
@@ -708,6 +722,21 @@ export class MapSession {
       return "";
     }
     return pathValue.trim().replace(/\\/g, "/");
+  }
+
+  private requestMarkdownFocus(path: string): void {
+    const normalizedPath = this.normalizeVaultPath(path);
+    if (!normalizedPath || !this.isGraphRelevantPath(normalizedPath)) {
+      return;
+    }
+
+    // This becomes the latest active-note source, whether it came from a leaf change or editor focus.
+    this.activeMarkdownPath = normalizedPath;
+    this.activeFocusOrdinal = ++this.focusOrdinal;
+
+    if (this.lastGraphPayload) {
+      this.dispatchPreferredFocus(this.lastGraphPayload);
+    }
   }
 
   private extractFrontmatterTags(frontmatter: unknown): string[] {

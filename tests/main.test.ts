@@ -17,6 +17,7 @@ function createPluginHarness(options?: {
   const existingLeaves = options?.existingLeaves ?? [];
   const rightLeaf = options?.rightLeaf ?? null;
   const registerView = vi.fn();
+  const registerEditorExtension = vi.fn();
   const addRibbonIcon = vi.fn();
   const addCommand = vi.fn();
   const detachLeavesOfType = vi.fn();
@@ -47,6 +48,7 @@ function createPluginHarness(options?: {
     },
     manifest: { id: "reverysky-map" },
     registerView,
+    registerEditorExtension,
     addRibbonIcon,
     addCommand,
     loadData,
@@ -56,6 +58,7 @@ function createPluginHarness(options?: {
   return {
     plugin,
     registerView,
+    registerEditorExtension,
     addRibbonIcon,
     addCommand,
     getLeavesOfType,
@@ -91,6 +94,7 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
     });
 
     await harness.plugin.onload();
+    expect(harness.registerEditorExtension).toHaveBeenCalledTimes(1);
     await (harness.addRibbonIcon.mock.calls[0]?.[2] as () => Promise<void>)();
 
     expect(harness.saveData).toHaveBeenCalledWith({
@@ -173,5 +177,25 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
         mapLayout: "dynamicLinks"
       }
     });
+  });
+
+  it("routes editor focus requests to open map views", async () => {
+    const focusA = vi.fn();
+    const focusB = vi.fn();
+    const mapLeaves = [
+      { view: { requestEditorFocus: focusA } },
+      { view: { requestEditorFocus: focusB } }
+    ];
+    const harness = createPluginHarness({
+      existingLeaves: mapLeaves as never[]
+    });
+
+    await harness.plugin.onload();
+    (harness.plugin as unknown as { requestEditorFocus: (path: string) => void }).requestEditorFocus(
+      "Folder/Note.md"
+    );
+
+    expect(focusA).toHaveBeenCalledWith("Folder/Note.md");
+    expect(focusB).toHaveBeenCalledWith("Folder/Note.md");
   });
 });

@@ -366,6 +366,213 @@ describe("MapSession", () => {
     });
   });
 
+  it("sends editor-focus note focus when the matching note exists in the effective graph", () => {
+    let currentTime = 1700000000000;
+    let onActiveLeafChange: ((leaf: unknown) => void) | null = null;
+    const dailyLeaf = {
+      view: {
+        getViewType: () => "markdown",
+        file: { path: "Notes/Daily/2026-01-01.md" }
+      }
+    };
+    const projectLeaf = {
+      view: {
+        getViewType: () => "markdown",
+        file: { path: "Projects/ReverySky/Spec.md" }
+      }
+    };
+
+    const payload = makePathPayload();
+    const sendGraph = vi.fn();
+    const sendFocus = vi.fn();
+    const session = new MapSession({
+      app: {
+        metadataCache: {
+          on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+        },
+        vault: {
+          on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+        },
+        workspace: {
+          activeLeaf: dailyLeaf,
+          getLeavesOfType: vi.fn().mockReturnValue([dailyLeaf]),
+          iterateAllLeaves: vi.fn(),
+          on: vi.fn((eventName: string, callback: (leaf: unknown) => void) => {
+            if (eventName === "active-leaf-change") {
+              onActiveLeafChange = callback;
+            }
+            return { id: "event-ref" };
+          })
+        }
+      } as never,
+      buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+      now: () => currentTime,
+      sendGraph,
+      sendFocus
+    });
+
+    session.start(() => undefined);
+    session.setBridgeReady(true);
+    session.flushOrRefresh();
+
+    session.requestEditorFocus(projectLeaf.view.file.path);
+
+    expect(sendGraph).toHaveBeenCalledTimes(1);
+    expect(sendFocus).toHaveBeenCalledTimes(1);
+    expect(sendFocus).toHaveBeenLastCalledWith({
+      id: "project",
+      path: "Projects/ReverySky/Spec.md"
+    });
+
+    onActiveLeafChange?.(dailyLeaf);
+    expect(sendFocus).toHaveBeenCalledTimes(2);
+    expect(sendFocus).toHaveBeenLastCalledWith({
+      id: "daily",
+      path: "Notes/Daily/2026-01-01.md"
+    });
+  });
+
+  it("does not send editor focus before the bridge is ready", () => {
+    const payload = makePathPayload();
+    const sendGraph = vi.fn();
+    const sendFocus = vi.fn();
+    const session = new MapSession({
+      app: {
+        metadataCache: {
+          on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+        },
+        vault: {
+          on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+        },
+        workspace: {
+          activeLeaf: null,
+          getLeavesOfType: vi.fn().mockReturnValue([]),
+          iterateAllLeaves: vi.fn(),
+          on: vi.fn().mockReturnValue({ id: "event-ref" })
+        }
+      } as never,
+      buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+      now: () => 1700000000000,
+      sendGraph,
+      sendFocus
+    });
+
+    session.start(() => undefined);
+    session.flushOrRefresh();
+    session.requestEditorFocus("Projects/ReverySky/Spec.md");
+
+    expect(sendGraph).not.toHaveBeenCalled();
+    expect(sendFocus).not.toHaveBeenCalled();
+  });
+
+  it("does not send editor focus when the note is filtered out of the effective graph", () => {
+    vi.useFakeTimers();
+
+    const payload = makePathPayload();
+    const sendGraph = vi.fn();
+    const sendFocus = vi.fn();
+    const session = new MapSession({
+      app: {
+        metadataCache: {
+          on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+        },
+        vault: {
+          on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+        },
+        workspace: {
+          activeLeaf: null,
+          getLeavesOfType: vi.fn().mockReturnValue([]),
+          iterateAllLeaves: vi.fn(),
+          on: vi.fn().mockReturnValue({ id: "event-ref" })
+        }
+      } as never,
+      buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+      now: () => 1700000000000,
+      sendGraph,
+      sendFocus
+    });
+
+    session.start(() => undefined);
+    session.setBridgeReady(true);
+    session.flushOrRefresh();
+
+    session.setFilterQuery("path:Archive");
+    vi.advanceTimersByTime(250);
+    session.requestEditorFocus("Projects/ReverySky/Spec.md");
+
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+    expect(sendFocus).not.toHaveBeenCalled();
+  });
+
+  it("coalesces active-leaf-change and editor-focus updates for one gesture, then allows the next one later", () => {
+    let currentTime = 1700000000000;
+    let onActiveLeafChange: ((leaf: unknown) => void) | null = null;
+    const activeLeaf = {
+      view: {
+        getViewType: () => "markdown",
+        file: { path: "Folder/A.md" }
+      }
+    };
+
+    const payload = makePathPayload();
+    payload.notes = [
+      { id: "a", path: "Folder/A.md", title: "A", tags: [], size: 10 },
+      { id: "b", path: "Folder/B.md", title: "B", tags: [], size: 20 }
+    ];
+    payload.vault.noteCount = payload.notes.length;
+
+    const sendGraph = vi.fn();
+    const sendFocus = vi.fn();
+    const session = new MapSession({
+      app: {
+        metadataCache: {
+          on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+        },
+        vault: {
+          on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+        },
+        workspace: {
+          activeLeaf,
+          getLeavesOfType: vi.fn().mockReturnValue([activeLeaf]),
+          iterateAllLeaves: vi.fn(),
+          on: vi.fn((eventName: string, callback: (leaf: unknown) => void) => {
+            if (eventName === "active-leaf-change") {
+              onActiveLeafChange = callback;
+            }
+            return { id: "event-ref" };
+          })
+        }
+      } as never,
+      buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+      now: () => currentTime,
+      sendGraph,
+      sendFocus
+    });
+
+    session.start(() => undefined);
+    session.setBridgeReady(true);
+    session.flushOrRefresh();
+
+    onActiveLeafChange?.(activeLeaf);
+    expect(sendFocus).toHaveBeenCalledTimes(1);
+    expect(sendFocus).toHaveBeenLastCalledWith({
+      id: "a",
+      path: "Folder/A.md"
+    });
+
+    currentTime += 50;
+    session.requestEditorFocus("Folder/A.md");
+    expect(sendFocus).toHaveBeenCalledTimes(1);
+
+    currentTime += 120;
+    session.requestEditorFocus("Folder/A.md");
+    expect(sendFocus).toHaveBeenCalledTimes(2);
+    expect(sendFocus).toHaveBeenLastCalledWith({
+      id: "a",
+      path: "Folder/A.md"
+    });
+  });
+
   it("preserves focus on active note after rename commit", () => {
     vi.useFakeTimers();
 

@@ -1,5 +1,6 @@
 import { Plugin, WorkspaceLeaf } from "obsidian";
 import { MAP_VIEW_TYPE, MapView } from "./view/MapView";
+import { createMarkdownEditorFocusExtension } from "./view/MarkdownEditorFocus";
 import {
   UnityWebglLocalServer,
   type UnityWebglRuntimeSource
@@ -48,6 +49,12 @@ export default class ReverySkyMapPlugin extends Plugin {
         await this.activateMapView();
       }
     });
+
+    this.registerEditorExtension(
+      createMarkdownEditorFocusExtension((path) => {
+        this.requestEditorFocus(path);
+      })
+    );
   }
 
   onunload(): void {
@@ -126,6 +133,14 @@ export default class ReverySkyMapPlugin extends Plugin {
     }
 
     await this.activateMapView();
+  }
+
+  private requestEditorFocus(path: string): void {
+    const leaves = this.app.workspace.getLeavesOfType(MAP_VIEW_TYPE);
+
+    for (const leaf of leaves) {
+      (leaf.view as MapView | undefined)?.requestEditorFocus(path);
+    }
   }
 
   /**

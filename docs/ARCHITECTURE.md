@@ -34,6 +34,11 @@ Main system parts:
   Main code: `src/view/MapSession.ts`, `src/view/MapFilterPanelController.ts`
   Depends on: `VaultGraphBuilder`, `GraphPathFilter`, Obsidian workspace APIs, browser DOM events
 
+- Markdown editor focus adapter
+  Translates markdown editor focus updates into the same map-focus path used by active-leaf changes.
+  Main code: `src/view/MarkdownEditorFocus.ts`
+  Depends on: CodeMirror `ViewUpdate`, Obsidian `editorInfoField`
+
 - Graph extraction and normalization
   Converts vault files and resolved links into a stable graph payload with normalized paths, tags, dates, and note ids.
   Main code: `src/graph/VaultGraphBuilder.ts`, `src/graph/GraphNormalizer.ts`
@@ -198,7 +203,23 @@ When an incremental Unity engine has not materialized a target star yet, `Cartog
 
 Render-scale changes are intentionally different from graph-significant changes. `MapFilterPanelController` calls `MapSession.setRenderScale()`, which updates persisted state and UI restart guidance without re-emitting `graph:set`; the new scale is applied the next time the iframe is created.
 
-### Path 4. Unity note-open request -> Obsidian note open
+### Path 4. Markdown editor focus -> map focus
+1. `src/main.ts` -> `ReverySkyMapPlugin.onload()` -> `registerEditorExtension(...)`
+   Registers `createMarkdownEditorFocusExtension(...)` once at plugin scope so the plugin can hear focus changes from any open markdown editor.
+2. `src/view/MarkdownEditorFocus.ts` -> `EditorView.updateListener.of(...)`
+   Watches CodeMirror updates and ignores everything except a real markdown-editor focus gain with a resolvable vault path.
+3. `src/main.ts` -> callback -> `requestEditorFocus(path)`
+   Routes the focused path to every open map view of `MAP_VIEW_TYPE`.
+4. `src/view/MapView.ts` -> `requestEditorFocus(path)` -> `MapSession.requestEditorFocus(path)`
+   The view shell does not decide focus policy; it only forwards the signal into session state.
+5. `src/view/MapSession.ts` -> `requestMarkdownFocus(path)` -> `dispatchPreferredFocus(...)`
+   Stores the latest active markdown path, updates the active focus freshness counter, and reuses the same focus-precedence path already used by `active-leaf-change`.
+6. `src/bridge/UnityIframeBridge.ts` -> `sendNoteFocus(...)`
+   Sends `note:focus` only when the current effective graph still contains the matching note.
+
+This path is intentionally separate from graph refresh. It updates the runtime's focus target without rebuilding the graph unless some other change already triggered a refresh.
+
+### Path 5. Unity note-open request -> Obsidian note open
 1. Unity sends `note:open`.
 2. `src/bridge/UnityIframeBridge.ts` -> `onMessage()`
    Validates the message and calls `onNoteOpen(payload)`.
@@ -206,7 +227,7 @@ Render-scale changes are intentionally different from graph-significant changes.
 4. `src/view/MapNoteOpenRouter.ts` resolves the target note from the required `id` and `path`, passes the current markdown path only as `openLinkText(...)` link context, and leaves final navigation routing to Obsidian.
 5. Control returns to Obsidian, which opens or focuses the requested note.
 
-### Path 5. Toggle close or plugin unload -> capture map state -> next open restore
+### Path 6. Toggle close or plugin unload -> capture map state -> next open restore
 1. `src/main.ts` -> ribbon callback -> `toggleMapView()`, or `src/main.ts` -> `onunload()`.
 2. `src/main.ts` -> `captureAndPersistMapViewState()`
    Reads `leaf.view.getState()` from the current map leaf when present and writes the result through `saveData(...)`.
@@ -226,6 +247,9 @@ Render-scale changes are intentionally different from graph-significant changes.
 
 - `src/view/MapSession.ts` -> `MapSession`
   Owns persisted map state, graph refresh timing, graph emission, note-focus precedence, and render-scale restart tracking.
+
+- `src/view/MarkdownEditorFocus.ts` -> `handleMarkdownEditorFocusUpdate(...)`
+  Owns the markdown-editor focus detection logic that feeds the map-focus path.
 
 - `src/view/MapFilterPanelController.ts` -> `MapFilterPanelController`
   Owns filter-panel DOM creation, suggestion rendering, and UI-only interaction state.
@@ -259,6 +283,9 @@ Render-scale changes are intentionally different from graph-significant changes.
 
 - `pathFilterQuery`, `showTags`, `mapLayout`, and `renderScale` are owned by `MapSession`.
   They are persisted as view state and re-applied on open.
+
+- Current markdown editor focus is also owned by `MapSession`.
+  The session records the latest focused markdown path and uses it as the steady-state focus source unless a newer created-note focus is still pending.
 
 - `renderScale` is applied at iframe startup, not through the bridge.
   `MapSession` tracks the selected value and whether it differs from the currently applied iframe value so the UI can ask the user to reopen the map.
@@ -349,9 +376,9 @@ Detailed commands live in `docs/VERIFICATION.md`. This section only maps the mai
   Automated checks: `npm run test`, especially `tests/bridge/*`
   Manual checks: verify `bridge:ready` -> `graph:set` flow in the map view
 
-- View execution paths, filter state, and note-open flow
-  Automated checks: `npm run test`, especially `tests/view/MapView.test.ts`, `tests/view/MapFilterPanelController.test.ts`, and `tests/view/MapNoteOpenRouter.test.ts`
-  Manual checks: open the map, change filters, reopen the map, and open a note from the runtime
+- View execution paths, filter state, editor-focus routing, and note-open flow
+  Automated checks: `npm run test`, especially `tests/view/MapView.test.ts`, `tests/view/MapFilterPanelController.test.ts`, `tests/view/MarkdownEditorFocus.test.ts`, `tests/view/MapSession.test.ts`, and `tests/view/MapNoteOpenRouter.test.ts`
+  Manual checks: open the map, click into a markdown note, change filters, reopen the map, and open a note from the runtime
 
 - Map state persistence across close and reopen
   Automated checks: `npm run test`, especially `tests/main.test.ts`

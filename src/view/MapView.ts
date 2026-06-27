@@ -85,6 +85,10 @@ export class MapView extends ItemView {
     this.filterPanelController?.syncFromSession();
   }
 
+  requestEditorFocus(path: string): void {
+    this.session.requestEditorFocus(path);
+  }
+
   async onOpen(): Promise<void> {
     const lifecycleGeneration = ++this.lifecycleGeneration;
     const initialState = this.getInitialViewState();
