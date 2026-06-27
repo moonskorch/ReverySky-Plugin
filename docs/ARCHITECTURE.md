@@ -178,7 +178,11 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 6. `src/view/MapView.ts` -> `bridge.sendGraphSet(outgoingPayload)`
 7. `src/bridge/UnityIframeBridge.ts` -> `sendGraphSet()`
    Validates the payload with `MessageValidator`, builds a `graph:set` envelope, and calls `iframeWindow.postMessage(...)`.
-8. Unity receives `graph:set`, updates `MapRuntimeContext`, and rebuilds the visible graph through `Cartographer`.
+8. Unity receives `graph:set`, replaces the runtime graph snapshot, rebuilds through `Cartographer`, and restores focus only from `FocusNode.LastSelectedStarId`; missing focus resets the camera.
+
+`graph:set` and `note:focus` are latest-intent messages, not durable queues.
+Before `bridge:ready`, `MapSession` keeps only the latest pending graph payload.
+When an incremental Unity engine has not materialized a target star yet, `Cartographer.FocusRuntimeNote(...)` stores the target in `MapRuntimeContext.PendingFocusNoteId` and `RecursiveHubs` retries it after construction.
 
 ### Path 3. Vault or UI change -> filtered graph refresh
 1. `MapSession` registers vault and workspace listeners during startup, and `MapFilterPanelController` registers filter-panel DOM listeners when the view renders.
@@ -199,7 +203,7 @@ Render-scale changes are intentionally different from graph-significant changes.
 2. `src/bridge/UnityIframeBridge.ts` -> `onMessage()`
    Validates the message and calls `onNoteOpen(payload)`.
 3. `src/view/MapView.ts` -> `MapNoteOpenRouter.openRequestedNote(payload)`
-4. `src/view/MapNoteOpenRouter.ts` resolves the target note by id and path, passes the current markdown path only as `openLinkText(...)` link context, and leaves final navigation routing to Obsidian.
+4. `src/view/MapNoteOpenRouter.ts` resolves the target note from the required `id` and `path`, passes the current markdown path only as `openLinkText(...)` link context, and leaves final navigation routing to Obsidian.
 5. Control returns to Obsidian, which opens or focuses the requested note.
 
 ### Path 5. Toggle close or plugin unload -> capture map state -> next open restore
@@ -265,7 +269,7 @@ Render-scale changes are intentionally different from graph-significant changes.
 - Filter panel visibility, active suggestion pane, and hide-delay timers are owned by `MapFilterPanelController`.
   They are UI-only transient state and are intentionally not persisted in plugin data.
 
-- Runtime notes, links, selected note, and graph layout are owned by the Unity runtime.
+- Runtime notes, links, tag names, runtime mode, pending focus note id, and layout preference are owned by the Unity runtime.
   They are stored in `MapRuntimeContext` and consumed by `Cartographer`.
 
 - WebGL runtime serving is owned by `UnityWebglLocalServer`.
@@ -283,7 +287,7 @@ Important current contract facts:
 - runtime-to-plugin messages are `bridge:ready`, `note:open`, and `runtime:shutdown-complete`;
 - plugin-to-runtime messages are `graph:set`, `note:focus`, and `runtime:shutdown`;
 - `path` values must stay vault-relative and use `/` separators;
-- `graph:set` carries the effective filtered graph;
+- `graph:set` carries the effective filtered graph; focus changes are sent separately via `note:focus`, which must include both `id` and `path`;
 - `runtime:shutdown` is a bridge/runtime-wrapper lifecycle handshake, not a full Unity engine shutdown;
 - `mapLayout` is an optional plugin-owned runtime hint;
 - `renderScale` is a plugin-owned iframe startup hint and does not belong to the bridge payload contract;

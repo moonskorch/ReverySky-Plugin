@@ -89,13 +89,13 @@ describe("UnityIframeBridge", () => {
     bridge.detach();
   });
 
-  it("sends note:focus when id or path is provided", () => {
+  it("sends note:focus when id and path are provided", () => {
     const bridge = new UnityIframeBridge();
     const postMessage = vi.fn();
     const iframeWindow = { postMessage } as unknown as Window;
 
     bridge.attach(iframeWindow, {});
-    bridge.sendNoteFocus({ path: "Folder/Note.md" });
+    bridge.sendNoteFocus({ id: "note_1", path: "Folder/Note.md" });
 
     expect(postMessage).toHaveBeenCalledTimes(1);
     const [message, targetOrigin] = postMessage.mock.calls[0] as [Record<string, unknown>, string];
@@ -105,14 +105,14 @@ describe("UnityIframeBridge", () => {
     bridge.detach();
   });
 
-  it("reports error and does not send note:focus when payload is empty", () => {
+  it("reports error and does not send note:focus when payload is incomplete", () => {
     const bridge = new UnityIframeBridge();
     const postMessage = vi.fn();
     const onError = vi.fn();
     const iframeWindow = { postMessage } as unknown as Window;
 
     bridge.attach(iframeWindow, { onError });
-    bridge.sendNoteFocus({});
+    bridge.sendNoteFocus({ path: "Folder/Note.md" } as never);
 
     expect(postMessage).not.toHaveBeenCalled();
     expect(onError).toHaveBeenCalledTimes(1);

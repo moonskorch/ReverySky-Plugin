@@ -68,7 +68,7 @@ public class FocusNode : MonoBehaviour
 
   public void ResetFocus() 
   {
-    SelectStar(null);
+    selectedStar = null;
     cameraController.ResetToStart();
   }
 

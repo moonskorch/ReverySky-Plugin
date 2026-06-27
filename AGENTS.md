@@ -65,6 +65,7 @@
 ## Working Rules
 - Keep code comments, documentation, and runbooks in English.
 - Keep wording concise, professional, and implementation-focused.
+- Keep analysis brief, code-grounded, and directly tied to the user's question; avoid long speculative narratives.
 - Avoid Markdown/text tables in documentation; prefer short bullet lists or explicit per-mode subsections.
 - Prefer existing `src/*` patterns before introducing new abstractions.
 - Do not modify application code when only documentation maintenance is requested.

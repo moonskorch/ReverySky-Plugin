@@ -8,7 +8,7 @@ type BuildGraphForTest = NonNullable<MapViewDependencies["buildGraph"]>;
 
 type BridgeCallbacks = {
   onReady?: () => void;
-  onNoteOpen?: (payload: { id?: string; path?: string }) => void;
+  onNoteOpen?: (payload: { id: string; path: string }) => void;
   onError?: (message: string) => void;
 };
 
@@ -457,7 +457,7 @@ describe("MapView bridge integration", () => {
     expect(bridge.sendNoteFocus).not.toHaveBeenCalled();
   });
 
-  it("opens note on note:open by id with path fallback", async () => {
+  it("opens note on note:open with strict note identity", async () => {
     const activeLeaf = {
       view: {
         getViewType: () => "markdown"
@@ -524,7 +524,7 @@ describe("MapView bridge integration", () => {
     iframe!.dispatchEvent(new Event("load"));
     callbacks.onReady?.();
 
-    callbacks.onNoteOpen?.({ id: "note_abc" });
+    callbacks.onNoteOpen?.({ id: "note_abc", path: "Folder/Note.md" });
     await Promise.resolve();
 
     callbacks.onNoteOpen?.({
@@ -620,7 +620,7 @@ describe("MapView bridge integration", () => {
     const handleActiveLeafChange = onActiveLeafChange as unknown as (leaf: unknown) => void;
 
     handleActiveLeafChange(markdownLeaf);
-    callbacks.onNoteOpen?.({ id: "note_abc" });
+    callbacks.onNoteOpen?.({ id: "note_abc", path: "Folder/Note.md" });
     await Promise.resolve();
 
     expect(openLinkText).toHaveBeenCalledWith("Folder/Note.md", "", false, {
@@ -691,7 +691,7 @@ describe("MapView bridge integration", () => {
     iframe!.dispatchEvent(new Event("load"));
     callbacks.onReady?.();
 
-    callbacks.onNoteOpen?.({ id: "note_abc" });
+    callbacks.onNoteOpen?.({ id: "note_abc", path: "Folder/Note.md" });
     await Promise.resolve();
 
     expect(openLinkText).toHaveBeenCalledTimes(1);
@@ -1210,9 +1210,11 @@ describe("MapView bridge integration", () => {
     iframe!.dispatchEvent(new Event("load"));
     callbacks.onReady?.();
 
-    expect(bridge.sendNoteFocus).toHaveBeenLastCalledWith({
-      id: "a",
-      path: "Folder/A.md"
+    expect(bridge.sendNoteFocus).not.toHaveBeenCalled();
+    const initialGraphPayload = bridge.sendGraphSet.mock.calls[0]?.[0] as GraphPayload;
+    expect(initialGraphPayload).toEqual({
+      ...payload,
+      mapLayout: "auto"
     });
 
     expect(onActiveLeafChange).toEqual(expect.any(Function));
@@ -1226,6 +1228,11 @@ describe("MapView bridge integration", () => {
     expect(bridge.sendNoteFocus).toHaveBeenLastCalledWith({
       id: "b",
       path: "Folder/B.md"
+    });
+    const refreshedGraphPayload = bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload;
+    expect(refreshedGraphPayload).toEqual({
+      ...payload,
+      mapLayout: "auto"
     });
   });
 
@@ -1316,19 +1323,23 @@ describe("MapView bridge integration", () => {
     iframe!.dispatchEvent(new Event("load"));
     callbacks.onReady?.();
 
-    expect(bridge.sendNoteFocus).toHaveBeenLastCalledWith({
-      id: "old_id",
-      path: "Folder/Old.md"
+    const initialGraphPayload = bridge.sendGraphSet.mock.calls[0]?.[0] as GraphPayload;
+    expect(initialGraphPayload).toEqual({
+      ...payloadBefore,
+      mapLayout: "auto"
     });
+    expect(bridge.sendNoteFocus).not.toHaveBeenCalled();
 
     vaultCallbacks.rename?.({ path: "Folder/New.md" }, "Folder/Old.md");
     vi.advanceTimersByTime(250);
 
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
-    expect(bridge.sendNoteFocus).toHaveBeenLastCalledWith({
-      id: "new_id",
-      path: "Folder/New.md"
+    const renamedGraphPayload = bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload;
+    expect(renamedGraphPayload).toEqual({
+      ...payloadAfter,
+      mapLayout: "auto"
     });
+    expect(bridge.sendNoteFocus).not.toHaveBeenCalled();
   });
 
   it("filters graph:set by path query without rebuilding source graph", async () => {

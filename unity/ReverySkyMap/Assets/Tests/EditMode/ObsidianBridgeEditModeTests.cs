@@ -111,6 +111,54 @@ public class ObsidianBridgeEditModeTests
   }
 
   [Test]
+  public void SetCameraFocus_UsesLastFocusOnlyAndResetsWhenMissing()
+  {
+    var cartographerObject = new GameObject("CartographerResolveFocusTests");
+    var focusObject = new GameObject("CartographerResolveFocusNodeTests");
+    var cameraObject = new GameObject("CartographerResolveFocusCameraTests");
+    try
+    {
+      var cartographer = cartographerObject.AddComponent<Cartographer>();
+      var focusNode = focusObject.AddComponent<FocusNode>();
+      var cameraController = cameraObject.AddComponent<CameraOrbitalController>();
+      SetCartographerSingleton(cartographer);
+      FieldInfo focusField = typeof(Cartographer).GetField("focusNode", BindingFlags.Instance | BindingFlags.NonPublic);
+      FieldInfo cameraField = typeof(FocusNode).GetField("cameraController", BindingFlags.Instance | BindingFlags.NonPublic);
+      MethodInfo focusAfterRebuild = typeof(Cartographer).GetMethod("SetCameraFocus", BindingFlags.Instance | BindingFlags.NonPublic);
+
+      Assert.That(focusField, Is.Not.Null);
+      Assert.That(cameraField, Is.Not.Null);
+      Assert.That(focusAfterRebuild, Is.Not.Null);
+
+      focusField.SetValue(cartographer, focusNode);
+      cameraField.SetValue(focusNode, cameraController);
+      focusNode.LastSelectedStarId = "old";
+
+      var notes = new List<NoteData>
+      {
+        new NoteData { Id = "old", Path = "notes/old.md", DateTime = System.DateTime.Parse("2025-01-01T00:00:00Z") },
+        new NoteData { Id = "active", Path = "notes/active.md", DateTime = System.DateTime.Parse("2025-01-02T00:00:00Z") },
+        new NoteData { Id = "latest", Path = "notes/latest.md", DateTime = System.DateTime.Parse("2025-01-03T00:00:00Z") }
+      };
+
+      focusAfterRebuild.Invoke(cartographer, new object[] { notes });
+      Assert.That(MapRuntimeContext.PendingFocusNoteId, Is.EqualTo("old"));
+
+      notes.RemoveAt(0);
+      MapRuntimeContext.PendingFocusNoteId = string.Empty;
+      focusAfterRebuild.Invoke(cartographer, new object[] { notes });
+      Assert.That(MapRuntimeContext.PendingFocusNoteId, Is.EqualTo(string.Empty));
+      Assert.That(focusNode.LastSelectedStarId, Is.EqualTo("old"));
+    }
+    finally
+    {
+      Object.DestroyImmediate(cartographerObject);
+      Object.DestroyImmediate(focusObject);
+      Object.DestroyImmediate(cameraObject);
+    }
+  }
+
+  [Test]
   public void ResolveModeByNotesCount_UsesScalableLinksForLargeAutoAndDynamicLinksGraphs()
   {
     var cartographerObject = new GameObject("CartographerResolveModeTests");
@@ -261,27 +309,16 @@ public class ObsidianBridgeEditModeTests
   }
 
   [Test]
-  public void OnNoteFocus_WithId_SetsCurrentNoteIdWhenCartographerIsPresent()
+  public void OnNoteFocus_WithId_SetsPendingFocusNoteIdWhenCartographerIsPresent()
   {
     bridge.OnGraphSet(TestPayloads.RepeatApplyPayloadA);
     EnsureCartographerSingleton();
 
-    Assert.That(MapRuntimeContext.CurrentNoteId, Is.EqualTo(string.Empty));
+    Assert.That(MapRuntimeContext.PendingFocusNoteId, Is.EqualTo(string.Empty));
 
     bridge.OnNoteFocus(TestPayloads.NoteFocusByIdPayload);
 
-    Assert.That(MapRuntimeContext.CurrentNoteId, Is.EqualTo("a2"));
-  }
-
-  [Test]
-  public void OnNoteFocus_WithPath_FallsBackToPathResolution()
-  {
-    bridge.OnGraphSet(TestPayloads.RepeatApplyPayloadA);
-    EnsureCartographerSingleton();
-
-    bridge.OnNoteFocus(TestPayloads.NoteFocusByPathPayload);
-
-    Assert.That(MapRuntimeContext.CurrentNoteId, Is.EqualTo("a2"));
+    Assert.That(MapRuntimeContext.PendingFocusNoteId, Is.EqualTo("a2"));
   }
 
   [Test]
@@ -289,12 +326,12 @@ public class ObsidianBridgeEditModeTests
   {
     bridge.OnGraphSet(TestPayloads.RepeatApplyPayloadA);
     EnsureCartographerSingleton();
-    MapRuntimeContext.CurrentNoteId = "a1";
+    MapRuntimeContext.PendingFocusNoteId = "a1";
 
     LogAssert.Expect(LogType.Warning, new Regex("\\[ObsidianBridge\\] Ignoring note:focus due to protocolVersion mismatch\\."));
     bridge.OnNoteFocus(TestPayloads.NoteFocusProtocolMismatchPayload);
 
-    Assert.That(MapRuntimeContext.CurrentNoteId, Is.EqualTo("a1"));
+    Assert.That(MapRuntimeContext.PendingFocusNoteId, Is.EqualTo("a1"));
   }
 
   [Test]
@@ -302,12 +339,12 @@ public class ObsidianBridgeEditModeTests
   {
     bridge.OnGraphSet(TestPayloads.RepeatApplyPayloadA);
     EnsureCartographerSingleton();
-    MapRuntimeContext.CurrentNoteId = "a1";
+    MapRuntimeContext.PendingFocusNoteId = "a1";
 
     LogAssert.Expect(LogType.Warning, new Regex("\\[ObsidianBridge\\] Ignoring note:focus due to message type mismatch\\."));
     bridge.OnNoteFocus(TestPayloads.NoteFocusTypeMismatchPayload);
 
-    Assert.That(MapRuntimeContext.CurrentNoteId, Is.EqualTo("a1"));
+    Assert.That(MapRuntimeContext.PendingFocusNoteId, Is.EqualTo("a1"));
   }
 
   [Test]
@@ -315,20 +352,20 @@ public class ObsidianBridgeEditModeTests
   {
     bridge.OnGraphSet(TestPayloads.RepeatApplyPayloadA);
     EnsureCartographerSingleton();
-    MapRuntimeContext.CurrentNoteId = "a1";
+    MapRuntimeContext.PendingFocusNoteId = "a1";
 
     bridge.OnNoteFocus(TestPayloads.NoteFocusEmptyPayload);
-    Assert.That(MapRuntimeContext.CurrentNoteId, Is.EqualTo("a1"));
+    Assert.That(MapRuntimeContext.PendingFocusNoteId, Is.EqualTo("a1"));
 
     LogAssert.Expect(LogType.Warning, new Regex("\\[ObsidianBridge\\] Invalid note:focus payload:"));
     bridge.OnNoteFocus("{ invalid json");
-    Assert.That(MapRuntimeContext.CurrentNoteId, Is.EqualTo("a1"));
+    Assert.That(MapRuntimeContext.PendingFocusNoteId, Is.EqualTo("a1"));
   }
 
   private static void ResetRuntimeContext()
   {
     MapRuntimeContext.MapLayoutPreference = MapLayoutMode.Auto;
-    MapRuntimeContext.CurrentNoteId = string.Empty;
+    MapRuntimeContext.PendingFocusNoteId = string.Empty;
     MapRuntimeContext.SetTagNames(new Dictionary<int, string>());
     MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>());
     MapRuntimeContext.SetNotes(new List<NoteData>());
@@ -430,16 +467,13 @@ public class ObsidianBridgeEditModeTests
       "],\"links\":[]}}";
 
     public const string NoteFocusByIdPayload =
-      "{\"protocolVersion\":\"2.0.0\",\"type\":\"note:focus\",\"payload\":{\"id\":\"a2\"}}";
-
-    public const string NoteFocusByPathPayload =
-      "{\"protocolVersion\":\"2.0.0\",\"type\":\"note:focus\",\"payload\":{\"path\":\"X\\\\A2.md\"}}";
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"note:focus\",\"payload\":{\"id\":\"a2\",\"path\":\"X/A2.md\"}}";
 
     public const string NoteFocusEmptyPayload =
       "{\"protocolVersion\":\"2.0.0\",\"type\":\"note:focus\",\"payload\":{}}";
 
     public const string NoteFocusProtocolMismatchPayload =
-      "{\"protocolVersion\":\"9.9.9\",\"type\":\"note:focus\",\"payload\":{\"id\":\"a2\"}}";
+      "{\"protocolVersion\":\"9.9.9\",\"type\":\"note:focus\",\"payload\":{\"id\":\"a2\",\"path\":\"X/A2.md\"}}";
 
     public const string NoteFocusTypeMismatchPayload =
       "{\"protocolVersion\":\"2.0.0\",\"type\":\"note:open\",\"payload\":{\"id\":\"a2\"}}";

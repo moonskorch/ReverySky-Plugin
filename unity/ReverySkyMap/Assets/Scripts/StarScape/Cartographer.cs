@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -98,13 +97,13 @@ public class Cartographer : MonoBehaviour
     if (notification != null)
     {
       notification.UpdateNoticeMessage(
-        !noteList.Any(),
+        noteList.Count == 0,
         noEntriesMessage);
     }
 
     SetCurrentView(CurrentView);
     BuildGraph(noteList, layoutPreference);
-    SetCameraFocus();
+    SetCameraFocus(noteList);
   }
 
   private void BuildGraph(List<NoteData> notes, MapLayoutMode layoutPreference)
@@ -171,57 +170,55 @@ public class Cartographer : MonoBehaviour
     _activeEngine?.ApplyView(CurrentView);
   }
 
-  private void SetCameraFocus()
+  private void SetCameraFocus(List<NoteData> visibleNotes)
   {
-    if (!string.IsNullOrWhiteSpace(MapRuntimeContext.CurrentNoteId))
+    if (visibleNotes == null || visibleNotes.Count == 0)
     {
-      var runtimeStar = _activeEngine?.FindStarByNoteId(MapRuntimeContext.CurrentNoteId);
-      MapRuntimeContext.CurrentNoteId = string.Empty;
-      if (runtimeStar != null)
+      focusNode?.ResetFocus();
+      return;
+    }
+
+    var previousFocusId = focusNode?.LastSelectedStarId;
+    if (string.IsNullOrWhiteSpace(previousFocusId))
+    {
+      focusNode?.ResetFocus();
+      return;
+    }
+
+    foreach (var note in visibleNotes)
+    {
+      if (note == null || string.IsNullOrWhiteSpace(note.Id))
+        continue;
+
+      if (string.Equals(note.Id, previousFocusId, StringComparison.Ordinal))
       {
-        StartCoroutine(RestoreFocusNextFrame(runtimeStar));
+        FocusRuntimeNote(note.Id);
         return;
       }
     }
 
-    if (!string.IsNullOrEmpty(focusNode.LastSelectedStarId))
-    {
-      var star = _activeEngine?.FindStarByNoteId(focusNode.LastSelectedStarId);
-      if (star != null) 
-      {
-        StartCoroutine(RestoreFocusNextFrame(star));
-        return;
-      }
-    }
-    
-    if (focusNode != null)
-      focusNode.ResetFocus();
+    focusNode?.ResetFocus();
   }
 
-  public void FocusRuntimeNote(string noteId, string notePath)
+  public void FocusRuntimeNote(string noteId)
   {
-    var resolvedId = noteId;
-    if (string.IsNullOrWhiteSpace(resolvedId))
-    {
-      var byPath = MapRuntimeContext.FindNoteByPath(notePath);
-      resolvedId = byPath?.Id;
-    }
-
-    if (string.IsNullOrWhiteSpace(resolvedId))
+    if (string.IsNullOrWhiteSpace(noteId))
       return;
 
-    var star = _activeEngine?.FindStarByNoteId(resolvedId);
-    if (star != null)
+    var star = _activeEngine?.FindStarByNoteId(noteId);
+    if (star == null)
     {
-      StartCoroutine(RestoreFocusNextFrame(star));
+      // Note is in the note list, but node is not instanciated yet
+      MapRuntimeContext.PendingFocusNoteId = noteId;
       return;
     }
 
-    // Fallback for cases where graph rebuild is in-flight and star is not materialized yet.
-    MapRuntimeContext.CurrentNoteId = resolvedId;
+    StartCoroutine(SetFocusNextFrame(star));
+    if (string.Equals(MapRuntimeContext.PendingFocusNoteId, noteId, StringComparison.Ordinal))
+      MapRuntimeContext.PendingFocusNoteId = string.Empty;
   }
 
-  private IEnumerator RestoreFocusNextFrame(Star star)
+  private IEnumerator SetFocusNextFrame(Star star)
   {
     yield return null;
 

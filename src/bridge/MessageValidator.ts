@@ -126,10 +126,11 @@ export class MessageValidator {
       return errors;
     }
 
-    const id = typeof data.payload.id === "string" ? data.payload.id.trim() : "";
-    const path = typeof data.payload.path === "string" ? data.payload.path.trim() : "";
-    if (!id && !path) {
-      errors.push("incoming note:open payload must include non-empty id or path");
+    if (!this.isNonEmptyString(data.payload.id)) {
+      errors.push("incoming note:open payload.id must be a non-empty string");
+    }
+    if (!this.isNonEmptyString(data.payload.path)) {
+      errors.push("incoming note:open payload.path must be a non-empty string");
     }
 
     return errors;

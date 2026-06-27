@@ -105,7 +105,7 @@ type GraphLink = {
 Current runtime behavior snapshot for Unity ingestion and map interaction:
 
 - `notes[].id` -> node identity, lookup, focus/selection restore, open-note flow, and link endpoint matching.
-- `notes[].path` -> open-note payload path, focus fallback by path, stable visual seed source.
+- `notes[].path` -> open-note payload path and stable visual seed source.
 - `notes[].title` -> star label text.
   - fallback: empty/whitespace title maps to `GameSettings.DefaultTitle` (`"Untitled"`).
 - `notes[].tags[]` -> trimmed runtime tag-id mapping; per-note deduplication is applied later by Forces engine.

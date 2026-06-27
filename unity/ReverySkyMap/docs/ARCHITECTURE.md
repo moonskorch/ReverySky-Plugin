@@ -60,7 +60,8 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 5. `Cartographer.HandleRuntimeNotesChanged()` calls `RebuildGraph(MapRuntimeContext.MapLayoutPreference)`.
 6. `Cartographer.ResolveModeByNotesCount()` uses `defaultEngine` first. Without an override, explicit `Static25D` and `StaticLinks` stay fixed, while `Auto` and `Forces` resolve by note count: small graphs use `Forces`, large graphs use `StaticLinks`.
 7. The chosen engine runs `BuildGraph(notes)`, then `ApplyView(CurrentView)`, and `Cartographer` rebinds any `ScapeCameraWarper` exposed by the active engine.
-8. `Cartographer.SetCameraFocus()` restores the previous selection from `MapRuntimeContext.CurrentNoteId` or `FocusNode.LastSelectedStarId`.
+8. After `BuildGraph()`, `Cartographer` restores focus only from `FocusNode.LastSelectedStarId`; missing focus calls `ResetFocus()`.
+9. Incremental engines retry delayed focus through `MapRuntimeContext.PendingFocusNoteId`.
 
 ### 3. Note focus and open-note callback
 
@@ -69,6 +70,8 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 3. `MapRuntimeContext.OnOpenNoteRequested` reaches `ObsidianBridge.HandleOpenNoteRequested`.
 4. In WebGL builds, `ObsidianBridge` forwards the event to JavaScript via `ReverySkyBridgePostNoteOpen(noteId, notePath)`.
 5. Incoming `note:focus` messages call `ObsidianBridge.OnNoteFocus()`, which resolves the note through `Cartographer.FocusRuntimeNote()` and defers focus restore when the graph rebuild has not yet materialized the star.
+
+`note:focus` is the live-follow path for active note changes without a graph rebuild and carries full note identity.
 
 ### 4. Runtime shutdown guard
 
@@ -95,7 +98,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Entry point: bridge messages from the parent runtime
   - Calls / sends to: `MapRuntimeContext`, `Cartographer`, `ReverySkyBridgePostNoteOpen`
 - `MapRuntimeContext`
-  - Responsibility: owns the live runtime graph snapshot and selection state.
+  - Responsibility: owns the live runtime graph snapshot, pending focus note id, and runtime mode.
   - Code anchor: `Assets/Scripts/Bridge/MapRuntimeContext.cs`
   - Entry point: `SetNotes`, `SetLinks`, `SetTagNames`, `RequestOpenNote`, `EnableRuntimeMode`
   - Calls / sends to: `Cartographer`, `StarSO`, `FocusNode`, `ObsidianBridge`
@@ -108,7 +111,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 ### Graph engines and layout
 
 - `Cartographer`
-  - Responsibility: chooses the active engine, rebuilds the graph, applies the current view, and restores focus.
+  - Responsibility: chooses the active engine, rebuilds the graph, applies the current view, restores focus from the last selected star, and applies pending focus when stars appear asynchronously.
   - Code anchor: `Assets/Scripts/StarScape/Cartographer.cs::Start`, `RebuildGraph`, `BuildGraph`, `FocusRuntimeNote`
   - Entry point: `MapRuntimeContext.OnNotesChanged`, UI events, scene start
   - Calls / sends to: `ICartographerEngine`, `FocusNode`, `Notification`, `ScapeCameraWarper`
@@ -188,9 +191,9 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 
 ## State Ownership and Contracts
 
-- `MapRuntimeContext` is the source of truth for live runtime notes, links, tag names, runtime mode, selected note id, layout preference, and the `NotesVersion` counter.
+- `MapRuntimeContext` is the source of truth for live runtime notes, links, tag names, runtime mode, pending focus note id, layout preference, and the `NotesVersion` counter.
 - `ObsidianBridge` owns bridge validation and all conversion from the JSON envelope into runtime models.
-- `Cartographer` owns engine selection, rebuild timing, current view, and focus restoration.
+- `Cartographer` owns engine selection, rebuild timing, current view, rebuild focus restoration, and pending focus application.
 - `CartographerForcesEngine`, `Cartographer25DEngine`, and the engine assigned to `Cartographer.staticLinksEngineBehaviour` own placement and cleanup of instantiated stars, tags, and edge objects for their respective layout strategies.
 - The current scene wiring assigns the `StaticLinks` slot to the RecursiveHubs baseline under eval, which can continue construction or refinement through `Tick()` after `BuildGraph()`. `Engine_EmptySpheres` remains a static fallback/evaluation engine with EditMode coverage for its radius calculations and static contract.
 - `ScapeCameraWarper` owns the 2.5D warp state and only participates when the active engine is `Static25D`.
@@ -200,6 +203,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - `protocolVersion` must match `2.0.0`.
   - Accepted parent-to-Unity message types are `graph:set`, `note:focus`, and `runtime:shutdown`.
   - `graph:set` payloads are already filtered by the parent plugin; Unity does not own vault query logic.
+  - `graph:set` carries only the filtered graph payload; focus is handled separately through `note:focus`.
   - `runtime:shutdown` is a lifecycle guard that stops bridge input and output without calling Unity quit APIs.
   - `path` values are treated as vault-relative and normalized with `/` separators when path lookup is needed.
   - Empty titles fall back to `GameSettings.DefaultTitle`.

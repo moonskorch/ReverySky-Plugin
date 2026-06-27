@@ -24,12 +24,12 @@ Fields:
 ## Message Types
 Plugin -> runtime:
 - `graph:set`: effective filtered graph payload.
-- `note:focus`: current-note focus hint with optional `id` and `path`.
+- `note:focus`: current-note focus hint with required `id` and `path`.
 - `runtime:shutdown`: lifecycle message requesting the iframe runtime wrapper to stop bridge activity before the parent view detaches.
 
 Runtime -> plugin:
 - `bridge:ready`: runtime is initialized and ready to receive payloads.
-- `note:open`: request for Obsidian to open a note by `id` and/or `path`.
+- `note:open`: request for Obsidian to open a note by required `id` and `path`.
 - `runtime:shutdown-complete`: acknowledgement for a matching `runtime:shutdown` request.
 
 ## Runtime Shutdown Messages
@@ -106,7 +106,7 @@ type GraphLink = {
 ## Validation Requirements
 - Outgoing `graph:set` payloads are validated before postMessage dispatch.
 - Incoming `bridge:ready` is accepted only when `protocolVersion` matches exactly.
-- Incoming `note:open` is accepted only when `protocolVersion` matches and the payload includes a non-empty `id` or `path`.
+- Incoming `note:open` is accepted only when `protocolVersion` matches and the payload includes non-empty `id` and `path`.
 - Incoming `runtime:shutdown-complete` is accepted only when `protocolVersion` matches and `requestId` is a non-empty string matching the pending shutdown request.
 - Invalid envelopes are rejected with explicit, non-fatal error reporting.
 - Unity runtime ingest is fail-soft: it treats `vault.noteCount` as informational (uses `notes` as source of truth).
@@ -122,4 +122,5 @@ type GraphLink = {
 - `notes[].tags` are produced by merging inline tags and frontmatter tags, then normalizing and deduplicating the result.
 - `notes[].size` is emitted as file size in bytes.
 - `mapLayout`, when present, is a plugin-owned runtime hint and travels with the effective graph payload.
+- `note:focus` carries the current note identity separately; `graph:set` stays focused on the graph payload itself.
 - `vault.noteCount` reflects the emitted `notes.length` for the filtered payload.

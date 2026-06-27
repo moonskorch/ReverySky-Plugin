@@ -513,7 +513,7 @@ public class CameraOrbitalController : MonoBehaviour
 
   // TODO
   // Reset selected in focusNode
-  // 2 sliders are too much, change control design for 2.5D engine - probable move zoom to gesture
+  // 2 sliders are too much, change control design for 2.5D engine
   private void HandleDateChanged(float value)
   {
     if (dateSlider == null || !dateSlider.gameObject.activeInHierarchy) return;

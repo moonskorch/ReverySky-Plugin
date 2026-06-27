@@ -86,7 +86,6 @@ export class MapSession {
   private sourceGraphPayload: GraphPayload | null = null;
   private lastGraphPayload: GraphPayload | null = null;
   private pendingGraphPayload: GraphPayload | null = null;
-  private pendingFocusPayload: NoteFocusPayload | null = null;
   private lastMarkdownLeaf: WorkspaceLeaf | null = null;
   private activeMarkdownPath = "";
   private focusOrdinal = 0;
@@ -154,7 +153,6 @@ export class MapSession {
     this.bridgeReady = false;
     this.appliedRenderScale = this.renderScale;
     this.pendingGraphPayload = null;
-    this.pendingFocusPayload = null;
     this.lastDispatchedFocusKey = "";
     this.pendingCreatedFocusPath = null;
     this.pendingCreatedFocusOrdinal = 0;
@@ -173,7 +171,6 @@ export class MapSession {
     this.folderPathSuggestions = [];
     this.tagSuggestions = [];
     this.pendingGraphPayload = null;
-    this.pendingFocusPayload = null;
     this.lastDispatchedFocusKey = "";
     this.pendingCreatedFocusPath = null;
     this.pendingCreatedFocusOrdinal = 0;
@@ -313,14 +310,6 @@ export class MapSession {
       this.pendingGraphPayload = null;
       this.lastGraphPayload = payload;
       this.sendGraph(payload);
-      if (this.pendingFocusPayload) {
-        // Reuse the focus chosen before bridge readiness so late handshakes do not recompute precedence.
-        this.sendFocus(this.pendingFocusPayload);
-        this.lastDispatchedFocusKey = this.toFocusKey(this.pendingFocusPayload);
-        this.pendingFocusPayload = null;
-      } else {
-        this.dispatchPreferredFocus(payload);
-      }
       return;
     }
 
@@ -580,13 +569,11 @@ export class MapSession {
     if (!this.bridgeReady) {
       // Cache the latest effective graph so the runtime receives the freshest snapshot after handshake.
       this.pendingGraphPayload = outgoingPayload;
-      this.pendingFocusPayload = this.resolvePreferredFocusPayload(outgoingPayload);
       return;
     }
 
     this.pendingGraphPayload = null;
     this.sendGraph(outgoingPayload);
-    this.dispatchPreferredFocus(outgoingPayload);
   }
 
   private applyActiveFilters(payload: GraphPayload): GraphPayload {
@@ -614,7 +601,6 @@ export class MapSession {
 
   private dispatchPreferredFocus(payload: GraphPayload): void {
     if (!this.bridgeReady) {
-      this.pendingFocusPayload = this.resolvePreferredFocusPayload(payload);
       return;
     }
 

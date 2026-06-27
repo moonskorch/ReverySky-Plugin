@@ -200,14 +200,14 @@ public class ObsidianBridge : MonoBehaviour
     var payload = envelope?.payload;
     var noteId = payload?.id ?? string.Empty;
     var notePath = payload?.path ?? string.Empty;
-    if (string.IsNullOrWhiteSpace(noteId) && string.IsNullOrWhiteSpace(notePath))
+    if (string.IsNullOrWhiteSpace(noteId) || string.IsNullOrWhiteSpace(notePath))
       return;
 
     var cartographer = Cartographer.I;
     if (cartographer == null)
       return;
 
-    cartographer.FocusRuntimeNote(noteId, notePath);
+    cartographer.FocusRuntimeNote(noteId);
   }
 
   private static void HandleOpenNoteRequested(string noteId, string notePath)
@@ -280,11 +280,11 @@ public class ObsidianBridge : MonoBehaviour
   {
     public string protocolVersion;
     public string type;
-    public NoteFocusPayload payload;
+    public NoteIdentityPayload payload;
   }
 
   [Serializable]
-  private class NoteFocusPayload
+  private class NoteIdentityPayload
   {
     public string id;
     public string path;

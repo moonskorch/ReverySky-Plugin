@@ -15,7 +15,7 @@ export class MapNoteOpenRouter {
   async openRequestedNote(payload: NoteOpenPayload): Promise<void> {
     const resolvedPath = this.session.resolveRequestedPath(payload);
     if (!resolvedPath) {
-      this.notify("Unable to open note: bridge payload did not include a valid note id or path.");
+      this.notify("Unable to open note: bridge payload did not include a valid note id and path.");
       return;
     }
 

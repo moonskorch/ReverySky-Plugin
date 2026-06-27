@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
 /// <summary>
@@ -22,7 +21,7 @@ public static class MapRuntimeContext
   public static bool IsRuntimeMode { get; private set; } = false;
   public static int NotesVersion { get; private set; } = 0;
 
-  public static string CurrentNoteId { get; set; } = string.Empty;
+  public static string PendingFocusNoteId { get; set; } = string.Empty;
 
   public static MapLayoutMode MapLayoutPreference { get; set; } = MapLayoutMode.Auto;
 
@@ -68,19 +67,12 @@ public static class MapRuntimeContext
     if (string.IsNullOrWhiteSpace(noteId))
       return null;
 
-    return Notes.FirstOrDefault(n => n != null && n.Id == noteId);
-  }
-
-  public static NoteData FindNoteByPath(string notePath)
-  {
-    if (string.IsNullOrWhiteSpace(notePath))
-      return null;
-
-    var normalizedPath = notePath.Replace('\\', '/');
-    return Notes.FirstOrDefault(
-      n => n != null &&
-      !string.IsNullOrWhiteSpace(n.Path) &&
-      string.Equals(n.Path.Replace('\\', '/'), normalizedPath, StringComparison.OrdinalIgnoreCase));
+    foreach (var note in Notes)
+    {
+      if (note != null && note.Id == noteId)
+        return note;
+    }
+    return null;
   }
 
   public static void RequestOpenNote(NoteData note)
@@ -88,7 +80,6 @@ public static class MapRuntimeContext
     if (note == null)
       return;
 
-    CurrentNoteId = note.Id ?? string.Empty;
     Debug.Log($"[MapRuntimeContext] Open note requested: id={note.Id}, path={note.Path}");
     OnOpenNoteRequested?.Invoke(note.Id ?? string.Empty, note.Path ?? string.Empty);
   }

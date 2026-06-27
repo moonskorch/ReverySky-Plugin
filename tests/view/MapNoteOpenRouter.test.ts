@@ -142,12 +142,12 @@ describe("MapNoteOpenRouter", () => {
     const notify = vi.fn();
     const router = new MapNoteOpenRouter(app as never, session, notify);
 
-    await router.openRequestedNote({});
-    await router.openRequestedNote({ path: "Missing.md" });
+    await router.openRequestedNote({} as never);
+    await router.openRequestedNote({ id: "missing", path: "Missing.md" });
 
     expect(notify).toHaveBeenNthCalledWith(
       1,
-      "Unable to open note: bridge payload did not include a valid note id or path."
+      "Unable to open note: bridge payload did not include a valid note id and path."
     );
     expect(notify).toHaveBeenNthCalledWith(
       2,

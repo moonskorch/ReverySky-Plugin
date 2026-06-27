@@ -14,15 +14,14 @@ export type BridgeReadyMessage = {
   payload?: Record<string, never>;
 };
 
-export type NoteOpenPayload = {
-  id?: string;
-  path?: string;
+export type NoteIdentityPayload = {
+  id: string;
+  path: string;
 };
 
-export type NoteFocusPayload = {
-  id?: string;
-  path?: string;
-};
+export type NoteOpenPayload = NoteIdentityPayload;
+
+export type NoteFocusPayload = NoteIdentityPayload;
 
 export type NoteOpenMessage = {
   protocolVersion: string;

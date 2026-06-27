@@ -1525,6 +1525,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   {
     _constructionActive = false;
     InstantiatePlacedNodesWithoutVisuals();
+    Cartographer.I?.FocusRuntimeNote(MapRuntimeContext.PendingFocusNoteId);
     InstantiateLines();
     UpdateNavigationBounds();
 

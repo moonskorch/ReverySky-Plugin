@@ -274,7 +274,7 @@ describe("MapSession", () => {
     expect(sendGraph).toHaveBeenCalledWith(queuedPayload);
   });
 
-  it("focuses a newly created note unless user switched to another active note first", () => {
+  it("keeps graph payload focus-free and sends live note focus for active leaf changes", () => {
     vi.useFakeTimers();
 
     let onActiveLeafChange: ((leaf: unknown) => void) | null = null;
@@ -328,12 +328,13 @@ describe("MapSession", () => {
     ];
     payload.vault.noteCount = payload.notes.length;
 
+    const sendGraph = vi.fn();
     const sendFocus = vi.fn();
     const session = new MapSession({
       app: app as never,
       buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
       now: () => 1700000000000,
-      sendGraph: vi.fn(),
+      sendGraph,
       sendFocus
     });
 
@@ -341,18 +342,27 @@ describe("MapSession", () => {
     session.setBridgeReady(true);
     session.flushOrRefresh();
 
-    expect(sendFocus).toHaveBeenLastCalledWith({
-      id: "a",
-      path: "Folder/A.md"
+    expect(sendFocus).not.toHaveBeenCalled();
+    const initialPayload = sendGraph.mock.calls[0]?.[0] as GraphPayload;
+    expect(initialPayload).toEqual({
+      ...payload,
+      mapLayout: "auto"
     });
 
     vaultCallbacks.create?.({ path: "Folder/New.md" });
     onActiveLeafChange?.(activeLeafB);
-    vi.advanceTimersByTime(250);
 
     expect(sendFocus).toHaveBeenLastCalledWith({
       id: "b",
       path: "Folder/B.md"
+    });
+
+    vi.advanceTimersByTime(250);
+
+    const refreshedPayload = sendGraph.mock.calls[1]?.[0] as GraphPayload;
+    expect(refreshedPayload).toEqual({
+      ...payload,
+      mapLayout: "auto"
     });
   });
 
@@ -396,12 +406,13 @@ describe("MapSession", () => {
     ];
     payload.vault.noteCount = payload.notes.length;
 
+    const sendGraph = vi.fn();
     const sendFocus = vi.fn();
     const session = new MapSession({
       app: app as never,
       buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
       now: () => 1700000000000,
-      sendGraph: vi.fn(),
+      sendGraph,
       sendFocus
     });
 
@@ -411,9 +422,11 @@ describe("MapSession", () => {
     vaultCallbacks.rename?.({ path: "Folder/New.md" }, "Folder/Old.md");
     vi.advanceTimersByTime(250);
 
-    expect(sendFocus).toHaveBeenLastCalledWith({
-      id: "new",
-      path: "Folder/New.md"
+    expect(sendFocus).not.toHaveBeenCalled();
+    const sentPayload = sendGraph.mock.calls[0]?.[0] as GraphPayload;
+    expect(sentPayload).toEqual({
+      ...payload,
+      mapLayout: "auto"
     });
   });
 

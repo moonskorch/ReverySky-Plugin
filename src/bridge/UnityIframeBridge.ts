@@ -132,8 +132,8 @@ export class UnityIframeBridge {
 
     const noteId = typeof payload.id === "string" ? payload.id.trim() : "";
     const notePath = typeof payload.path === "string" ? payload.path.trim() : "";
-    if (!noteId && !notePath) {
-      this.callbacks.onError?.("Invalid note focus payload: id or path is required.");
+    if (!noteId || !notePath) {
+      this.callbacks.onError?.("Invalid note focus payload: id and path are required.");
       return;
     }
 
@@ -142,8 +142,8 @@ export class UnityIframeBridge {
       type: "note:focus",
       requestId: `req_${Date.now()}`,
       payload: {
-        id: noteId || undefined,
-        path: notePath || undefined
+        id: noteId,
+        path: notePath
       }
     };
 
@@ -179,7 +179,7 @@ export class UnityIframeBridge {
         this.callbacks.onError?.(`Invalid incoming bridge message: ${incomingErrors.join("; ")}`);
         return;
       }
-      this.callbacks.onNoteOpen?.(data.payload ?? {});
+      this.callbacks.onNoteOpen?.(data.payload);
       return;
     }
 
