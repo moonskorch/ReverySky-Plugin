@@ -158,6 +158,56 @@ public class ObsidianBridgeEditModeTests
     }
   }
 
+  [TestCase(MapLayoutMode.DynamicLinks)]
+  [TestCase(MapLayoutMode.ScalableLinks)]
+  [TestCase(MapLayoutMode.Dates)]
+  public void Focus_AlwaysStaysOnEquatorAndPreservesYawFallback(MapLayoutMode engineType)
+  {
+    var cartographerObject = new GameObject("CameraFocusCartographerTests");
+    var pivotObject = new GameObject("CameraFocusPivotTests");
+    var cameraObject = new GameObject("CameraFocusControllerTests");
+    try
+    {
+      SetCartographerSingleton(null);
+
+      var cartographer = cartographerObject.AddComponent<Cartographer>();
+      var cameraController = cameraObject.AddComponent<CameraOrbitalController>();
+      var pivot = pivotObject.transform;
+      var activeEngine = new TestCartographerEngine(engineType);
+
+      SetCartographerSingleton(cartographer);
+      SetPrivateField(cartographer, "_activeEngine", activeEngine);
+
+      pivot.position = new Vector3(3f, 5f, -2f);
+      cameraController.transform.position = new Vector3(3f, 13f, -2f);
+      cameraController.SetActivePivot(pivot);
+      SetPrivateField(cameraController, "targetPos", new Vector3(3f, 9f, -2f));
+      SetPrivateField(cameraController, "orbitYaw", 37f);
+
+      cameraController.Focus(pivot.position, 6f);
+
+      Vector3 storedTargetPos = GetPrivateField<Vector3>(cameraController, "targetPos");
+      float orbitHeight = GetPrivateField<float>(cameraController, "orbitHeight");
+      float orbitYaw = GetPrivateField<float>(cameraController, "orbitYaw");
+      Vector3 expectedDirection = Quaternion.Euler(0f, 37f, 0f) * Vector3.forward;
+      Vector3 expectedTargetPos = pivot.position + expectedDirection * 6f;
+
+      Assert.That(storedTargetPos.y, Is.EqualTo(pivot.position.y).Within(0.0001f));
+      Assert.That(storedTargetPos.x, Is.EqualTo(expectedTargetPos.x).Within(0.0001f));
+      Assert.That(storedTargetPos.z, Is.EqualTo(expectedTargetPos.z).Within(0.0001f));
+      Assert.That(orbitHeight, Is.EqualTo(0f).Within(0.0001f));
+      Assert.That(orbitYaw, Is.EqualTo(37f).Within(0.0001f));
+    }
+    finally
+    {
+      SetCartographerSingleton(null);
+
+      Object.DestroyImmediate(cartographerObject);
+      Object.DestroyImmediate(pivotObject);
+      Object.DestroyImmediate(cameraObject);
+    }
+  }
+
   [Test]
   public void ResolveModeByNotesCount_UsesScalableLinksForLargeAutoAndDynamicLinksGraphs()
   {
@@ -385,9 +435,60 @@ public class ObsidianBridgeEditModeTests
     singletonBackingField?.SetValue(null, value);
   }
 
+  private static void SetPrivateField(object target, string fieldName, object value)
+  {
+    FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(field, Is.Not.Null, $"Missing field {fieldName}.");
+    field.SetValue(target, value);
+  }
+
+  private static T GetPrivateField<T>(object target, string fieldName)
+  {
+    FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(field, Is.Not.Null, $"Missing field {fieldName}.");
+    return (T)field.GetValue(target);
+  }
+
   private static CrystalType ResolveCrystalType(MethodInfo resolver, int directLinkCount)
   {
     return (CrystalType)resolver.Invoke(null, new object[] { directLinkCount });
+  }
+
+  private sealed class TestCartographerEngine : ICartographerEngine
+  {
+    public TestCartographerEngine(MapLayoutMode engineType)
+    {
+      EngineType = engineType;
+    }
+
+    public bool RequiresTick => false;
+    public float BoundRadius => 1f;
+    public Vector3 Pivot => Vector3.zero;
+    public MapLayoutMode EngineType { get; }
+    public ScapeCameraWarper ScapeWarper => null;
+    public IReadOnlyList<Star> Stars => new List<Star>();
+
+    public Star FindStarByNoteId(string noteId)
+    {
+      return null;
+    }
+
+    public void Tick(float dt) { }
+    public void BuildGraph(List<NoteData> notes) { }
+    public void ClearGraph() { }
+    public void ApplyView(ScapeView view) { }
+
+    public bool TryGetNavigationWorld(Transform tr, out Vector3 pos)
+    {
+      if (tr == null)
+      {
+        pos = default(Vector3);
+        return false;
+      }
+
+      pos = tr.position;
+      return true;
+    }
   }
 
   private static class TestPayloads

@@ -164,7 +164,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Entry point: `GameInput` events
   - Calls / sends to: `CameraOrbitalController`, `MapRuntimeContext`, `Cartographer.I`
 - `CameraOrbitalController`
-  - Responsibility: owns orbit radius, pivot follow, zoom, and date-slider interaction.
+  - Responsibility: owns orbit radius, pivot follow, zoom, and date-slider interaction. Focus placement always flattens onto the pivot's equatorial XZ plane so stars and tags do not inherit vertical drift from the previous focus target.
   - Code anchor: `Assets/Scripts/Camera/CameraOrbitalController.cs::Start`, `Update`, `Focus`, `ResetToStart`
   - Entry point: `GameInput` events, UI sliders, `RotateCameraUI`
   - Calls / sends to: `Cartographer`, `FocusNode`, `ScapeCameraWarper`
@@ -211,6 +211,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Non-positive link weights normalize to `1`.
   - Unknown bridge fields are ignored.
 - `Cartographer.ResolveModeByNotesCount()` uses `defaultEngine` first, then preserves explicit `Static25D` and `StaticLinks`, then resolves `Auto` and `Forces` by the note-count threshold.
+- Camera focus contract: `CameraOrbitalController.Focus()` always flattens the focus direction to the horizontal XZ plane before placing the camera. The resulting camera position keeps the focused pivot's `y`, the orbit stays equatorial, and the rule does not depend on the active engine. `Dates` uses the same universal camera placement rule.
 
 ## Build, Packaging, and Deployment
 
@@ -234,6 +235,9 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 - PlayMode bootstrap and visual stability:
   - Automated checks: `Assets/Tests/PlayMode/StarScapeRuntimePlayModeTests.cs` (`StarScapeRuntimePlayModeTests`)
   - Manual checks when needed: open `Assets/Scenes/StarScapeScene.unity`, enter Play mode, and confirm no missing scripts or critical console errors
+- Interaction and camera:
+  - Automated checks: `Assets/Tests/EditMode/ObsidianBridgeEditModeTests.cs` for universal equatorial focus direction, `Assets/Tests/PlayMode/StarScapeRuntimePlayModeTests.cs` for runtime bootstrap and visual stability
+  - Manual checks when needed: focus stars and tags in `DynamicLinks`, `ScalableLinks`, and `Dates`, then rotate and zoom to confirm the camera stays on the selected pivot's equator and only the horizontal orbit and distance change
 
 Use `docs/VERIFICATION.md` for the exact check order, MCP-first policy, and fallback rules.
 

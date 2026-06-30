@@ -415,31 +415,39 @@ public class CameraOrbitalController : MonoBehaviour
     RebuildOrbitTarget();
   }
 
+  private static Vector3 FlattenFocusDirection(Vector3 direction)
+  {
+    direction.y = 0f;
+    return direction;
+  }
+
   public void Focus(Vector3 targetPos, float selectedDistance)
   {
     Vector3 center = ActivePivotPos;
-    Vector3 dir = (targetPos - center);
+    Vector3 dir = targetPos - center;
 
-    Vector3 cameraPosition;
+    Vector3 cameraDirection;
 
     if (dir.sqrMagnitude < 0.0001f)
     {
-      // if pivot is equal to target (if focus node),
-      // set camera from the side it was already planned to be
-      Vector3 fromTargetToCam = (this.targetPos - targetPos);
-      if (fromTargetToCam.sqrMagnitude < 0.0001f)
-        fromTargetToCam = (transform.position - targetPos);
-      if (fromTargetToCam.sqrMagnitude < 0.0001f)
-        fromTargetToCam = -transform.forward;
+      cameraDirection = FlattenFocusDirection(this.targetPos - targetPos);
 
-      fromTargetToCam.Normalize();
-      cameraPosition = targetPos + fromTargetToCam * selectedDistance;
+      if (cameraDirection.sqrMagnitude < 0.0001f)
+        cameraDirection = FlattenFocusDirection(transform.position - targetPos);
+
+      if (cameraDirection.sqrMagnitude < 0.0001f)
+        cameraDirection = Quaternion.Euler(0f, orbitYaw, 0f) * Vector3.forward;
     }
     else
     {
-      dir.Normalize();
-      cameraPosition = targetPos + dir * selectedDistance;
+      cameraDirection = FlattenFocusDirection(dir);
+
+      if (cameraDirection.sqrMagnitude < 0.0001f)
+        cameraDirection = Quaternion.Euler(0f, orbitYaw, 0f) * Vector3.forward;
     }
+
+    cameraDirection.Normalize();
+    Vector3 cameraPosition = targetPos + cameraDirection * selectedDistance;
 
     orbitPanOffset = Vector3.zero;
     Move(cameraPosition);
