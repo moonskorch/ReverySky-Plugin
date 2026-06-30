@@ -1,6 +1,6 @@
 import { EditorView, type ViewUpdate } from "@codemirror/view";
 import type { Extension } from "@codemirror/state";
-import { editorInfoField, type MarkdownFileInfo } from "obsidian";
+import { editorInfoField } from "obsidian";
 
 export type MarkdownEditorFocusUpdate = Pick<ViewUpdate, "focusChanged" | "state" | "view">;
 
@@ -34,7 +34,7 @@ export function createMarkdownEditorFocusExtension(
 }
 
 function getMarkdownEditorPath(update: MarkdownEditorFocusUpdate): string | null {
-  const info = update.state.field(editorInfoField, false) as MarkdownFileInfo | undefined;
+  const info = update.state.field(editorInfoField, false);
   const path = info?.file?.path?.trim();
 
   if (!path || !path.toLowerCase().endsWith(".md")) {

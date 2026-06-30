@@ -177,7 +177,7 @@ export class MapView extends ItemView {
     }
 
     this.bridge.detach();
-    emptyElement(this.contentEl as ObsidianHTMLElement);
+    emptyElement(this.contentEl);
   }
 
   private getInitialViewState(): Record<string, unknown> | null {
