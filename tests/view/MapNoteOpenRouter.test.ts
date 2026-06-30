@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { GraphPayload } from "../../src/bridge/BridgeTypes";
 import { MapNoteOpenRouter } from "../../src/view/MapNoteOpenRouter";
 import { MapSession } from "../../src/view/MapSession";
+import { makeBuildGraphMock } from "./testUtils";
 
 function makePayload(): GraphPayload {
   return {
@@ -26,7 +27,7 @@ function makePayload(): GraphPayload {
 function createSession(app: unknown, payload: GraphPayload) {
   const session = new MapSession({
     app: app as never,
-    buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+    buildGraph: makeBuildGraphMock(payload),
     now: () => 1700000000000,
     sendGraph: vi.fn(),
     sendFocus: vi.fn()
@@ -113,7 +114,7 @@ describe("MapNoteOpenRouter", () => {
     const session = createSession(app, makePayload());
     const router = new MapNoteOpenRouter(app as never, session, vi.fn());
 
-    await router.openRequestedNote({ id: "note_1" });
+    await router.openRequestedNote({ id: "note_1", path: "Folder/Note.md" });
     expect(openLinkText).toHaveBeenCalledWith("Folder/Note.md", "Folder/Context.md", false, {
       active: true
     });

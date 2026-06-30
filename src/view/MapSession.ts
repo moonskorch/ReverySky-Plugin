@@ -1,11 +1,9 @@
 import {
-  MarkdownView,
   type App,
   type CachedMetadata,
   type EventRef,
   type TAbstractFile,
-  type TFile,
-  type WorkspaceLeaf
+  type TFile
 } from "obsidian";
 import type {
   MapLayoutPreference,
@@ -18,11 +16,11 @@ import {
   normalizeMapLayoutPreference
 } from "../bridge/LayoutPreference";
 import { GraphPathFilter, type ParsedPathFilter, type PathFilterParseResult } from "../graph/GraphPathFilter";
+import { MapFocusController } from "./MapFocusController";
 
 const GRAPH_REFRESH_DEBOUNCE_MS = 250;
 const GRAPH_RESOLVE_BARRIER_FALLBACK_MS = 700;
 const FILTER_INPUT_DEBOUNCE_MS = 250;
-const FOCUS_COALESCE_WINDOW_MS = 100;
 const MAX_FOLDER_SUGGESTIONS = 80;
 const MAX_TAG_SUGGESTIONS = 200;
 export const DEFAULT_RENDER_SCALE = 1;
@@ -75,28 +73,18 @@ export type MapSessionDependencies = {
 
 /**
  * Coordinates the non-DOM map session state that must survive view re-renders:
- * graph refresh timing, persisted filters, and note-focus precedence.
+ * graph refresh timing, persisted filters, and bridge-facing focus coordination.
  */
 export class MapSession {
   private readonly app: App;
   private readonly buildGraph: (app: App) => GraphPayload;
   private readonly now: () => number;
   private readonly sendGraph: (payload: GraphPayload) => void;
-  private readonly sendFocus: (payload: NoteFocusPayload) => void;
+  private readonly focus: MapFocusController;
 
   private sourceGraphPayload: GraphPayload | null = null;
   private lastGraphPayload: GraphPayload | null = null;
   private pendingGraphPayload: GraphPayload | null = null;
-  private lastMarkdownLeaf: WorkspaceLeaf | null = null;
-  private activeMarkdownPath = "";
-  // Focus ordinals compare freshness across competing focus sources.
-  // Active-leaf-change and editor-focus both update this clock, and new-note focus only wins while it is newer.
-  private focusOrdinal = 0;
-  private activeFocusOrdinal = 0;
-  private pendingCreatedFocusOrdinal = 0;
-  private pendingCreatedFocusPath: string | null = null;
-  private lastDispatchedFocusKey = "";
-  private lastDispatchedFocusAt = 0;
   private semanticRefreshPending = false;
   private noteSignatureByPath = new Map<string, string>();
   private bridgeReady = false;
@@ -106,7 +94,6 @@ export class MapSession {
   private resolveBarrierFallbackTimerWindow: Window | null = null;
   private refreshSubscriptionsRegistered = false;
   private refreshActive = false;
-  private leafTrackingRegistered = false;
   private pathFilterQuery = "";
   private showTags = true;
   private mapLayout: MapLayoutPreference = DEFAULT_MAP_LAYOUT_PREFERENCE;
@@ -125,7 +112,11 @@ export class MapSession {
     this.buildGraph = deps.buildGraph;
     this.now = deps.now;
     this.sendGraph = deps.sendGraph;
-    this.sendFocus = deps.sendFocus;
+    this.focus = new MapFocusController({
+      app: this.app,
+      isBridgeReady: () => this.bridgeReady,
+      sendFocus: deps.sendFocus
+    });
   }
 
   getState(): Record<string, unknown> {
@@ -151,19 +142,15 @@ export class MapSession {
   }
 
   start(registerEvent: (eventRef: EventRef) => void): void {
-    this.ensureLeafTracking(registerEvent);
-    this.ensureRefreshSubscriptions(registerEvent);
     this.refreshActive = true;
     this.bridgeReady = false;
     this.appliedRenderScale = this.renderScale;
     this.pendingGraphPayload = null;
-    this.lastDispatchedFocusKey = "";
-    this.lastDispatchedFocusAt = 0;
-    this.pendingCreatedFocusPath = null;
-    this.pendingCreatedFocusOrdinal = 0;
+    this.focus.start(registerEvent);
     this.semanticRefreshPending = false;
     this.clearRefreshTimer();
     this.clearResolveBarrierFallbackTimer();
+    this.ensureRefreshSubscriptions(registerEvent);
   }
 
   stop(): void {
@@ -176,10 +163,7 @@ export class MapSession {
     this.folderPathSuggestions = [];
     this.tagSuggestions = [];
     this.pendingGraphPayload = null;
-    this.lastDispatchedFocusKey = "";
-    this.lastDispatchedFocusAt = 0;
-    this.pendingCreatedFocusPath = null;
-    this.pendingCreatedFocusOrdinal = 0;
+    this.focus.reset();
     this.semanticRefreshPending = false;
     this.lastGraphPayload = null;
   }
@@ -310,6 +294,10 @@ export class MapSession {
     ];
   }
 
+  /**
+   * Prefer reusing already-built graph state.
+   * If a snapshot is queued for bridge readiness, flush it; otherwise reuse the cached source graph or rebuild only when needed.
+   */
   flushOrRefresh(): void {
     if (this.pendingGraphPayload) {
       const payload = this.pendingGraphPayload;
@@ -346,41 +334,11 @@ export class MapSession {
   }
 
   resolveOpenLinkSourcePath(): string {
-    return this.getLeafSourcePath(this.resolveOpenLinkSourceLeaf());
+    return this.focus.resolveOpenLinkSourcePath();
   }
 
   requestEditorFocus(path: string): void {
-    this.requestMarkdownFocus(path);
-  }
-
-  private resolveOpenLinkSourceLeaf(): WorkspaceLeaf | null {
-    const workspace = this.app.workspace;
-    if (!workspace) {
-      return null;
-    }
-
-    const activeMarkdownLeaf = this.getActiveMarkdownLeaf();
-    if (this.isMarkdownLeaf(activeMarkdownLeaf)) {
-      return activeMarkdownLeaf;
-    }
-
-    if (this.isMarkdownLeaf(this.lastMarkdownLeaf)) {
-      return this.lastMarkdownLeaf;
-    }
-
-    const anyMarkdownLeaf = this.findAnyMarkdownLeaf();
-    if (this.isMarkdownLeaf(anyMarkdownLeaf)) {
-      this.lastMarkdownLeaf = anyMarkdownLeaf;
-      return anyMarkdownLeaf;
-    }
-
-    return null;
-  }
-
-  private getLeafSourcePath(leaf: WorkspaceLeaf | null): string {
-    const view = (leaf?.view as { file?: { path?: string } } | null) ?? null;
-    const path = view?.file?.path;
-    return typeof path === "string" ? path : "";
+    this.focus.onMarkdownFocus(path);
   }
 
   private ensureRefreshSubscriptions(registerEvent: (eventRef: EventRef) => void): void {
@@ -429,9 +387,6 @@ export class MapSession {
           if (!this.isGraphRelevantPath(file?.path)) {
             return;
           }
-          const normalizedPath = this.normalizeVaultPath(file.path);
-          this.pendingCreatedFocusPath = normalizedPath;
-          this.pendingCreatedFocusOrdinal = ++this.focusOrdinal;
           this.scheduleGraphRefresh();
         })
       );
@@ -440,7 +395,8 @@ export class MapSession {
           if (!this.isGraphRelevantPath(file?.path)) {
             return;
           }
-          this.noteSignatureByPath.delete(this.normalizeVaultPath(file.path));
+          const normalizedPath = this.normalizeVaultPath(file.path);
+          this.noteSignatureByPath.delete(normalizedPath);
           this.scheduleGraphRefresh();
         })
       );
@@ -450,17 +406,7 @@ export class MapSession {
             return;
           }
           const normalizedOldPath = this.normalizeVaultPath(oldPath);
-          const normalizedNewPath = this.normalizeVaultPath(file?.path);
-
-          // Keep focus stable when the active note itself is being renamed.
-          if (normalizedOldPath && this.normalizeVaultPath(this.activeMarkdownPath) === normalizedOldPath) {
-            this.activeMarkdownPath = normalizedNewPath;
-            this.activeFocusOrdinal = ++this.focusOrdinal;
-          }
-
-          if (this.pendingCreatedFocusPath && this.normalizeVaultPath(this.pendingCreatedFocusPath) === normalizedOldPath) {
-            this.pendingCreatedFocusPath = normalizedNewPath;
-          }
+          this.focus.onRename(oldPath, file?.path);
 
           if (this.isGraphRelevantPath(oldPath)) {
             this.noteSignatureByPath.delete(normalizedOldPath);
@@ -469,41 +415,6 @@ export class MapSession {
         })
       );
     }
-  }
-
-  private ensureLeafTracking(registerEvent: (eventRef: EventRef) => void): void {
-    if (this.leafTrackingRegistered) {
-      return;
-    }
-
-    this.leafTrackingRegistered = true;
-    const workspace = this.app.workspace;
-    if (!workspace) {
-      return;
-    }
-
-    const currentSourceLeaf = this.getActiveMarkdownLeaf();
-    if (this.isMarkdownLeaf(currentSourceLeaf)) {
-      this.lastMarkdownLeaf = currentSourceLeaf;
-      this.activeMarkdownPath = this.getLeafSourcePath(currentSourceLeaf);
-    } else {
-      this.lastMarkdownLeaf = this.findAnyMarkdownLeaf();
-      this.activeMarkdownPath = this.getLeafSourcePath(this.lastMarkdownLeaf);
-    }
-
-    registerEvent(
-      workspace.on("active-leaf-change", (leaf) => {
-        if (this.isMarkdownLeaf(leaf)) {
-          this.lastMarkdownLeaf = leaf;
-          this.requestMarkdownFocus(this.getLeafSourcePath(leaf));
-        }
-      })
-    );
-  }
-
-  private getActiveMarkdownLeaf(): WorkspaceLeaf | null {
-    const workspace = this.app.workspace as Partial<Pick<App["workspace"], "getActiveViewOfType">>;
-    return workspace.getActiveViewOfType?.(MarkdownView)?.leaf ?? null;
   }
 
   private markSemanticRefreshPending(): void {
@@ -564,6 +475,10 @@ export class MapSession {
     }, FILTER_INPUT_DEBOUNCE_MS);
   }
 
+  /**
+   * Turn the cached source graph into the effective outgoing payload by applying filters and layout.
+   * The source graph stays untouched here; only the transport-ready snapshot is produced or queued.
+   */
   private emitGraphFromSource(): void {
     if (!this.sourceGraphPayload) {
       return;
@@ -603,84 +518,6 @@ export class MapSession {
         tags: []
       }))
     };
-  }
-
-  private dispatchPreferredFocus(payload: GraphPayload): void {
-    if (!this.bridgeReady) {
-      return;
-    }
-
-    const focusPayload = this.resolvePreferredFocusPayload(payload);
-    if (!focusPayload) {
-      return;
-    }
-
-    const focusKey = this.toFocusKey(focusPayload);
-    const dispatchedAt = this.now();
-    // One click can produce both active-leaf-change and editor-focus for the same note.
-    // If they resolve to the same note again within a tiny window, keep only the first send.
-    if (
-      focusKey &&
-      focusKey === this.lastDispatchedFocusKey &&
-      dispatchedAt - this.lastDispatchedFocusAt <= FOCUS_COALESCE_WINDOW_MS
-    ) {
-      return;
-    }
-
-    this.sendFocus(focusPayload);
-    this.lastDispatchedFocusKey = focusKey;
-    this.lastDispatchedFocusAt = dispatchedAt;
-  }
-
-  private resolvePreferredFocusPayload(payload: GraphPayload): NoteFocusPayload | null {
-    const preferredPath = this.getPreferredFocusPath();
-    if (!preferredPath) {
-      return null;
-    }
-
-    const normalizedPreferredPath = this.normalizeVaultPath(preferredPath);
-    const byPath =
-      payload.notes.find((note) => this.normalizeVaultPath(note.path) === normalizedPreferredPath) ??
-      null;
-
-    if (this.pendingCreatedFocusPath) {
-      // Once active-note focus catches up, the temporary "new note" preference should stop winning.
-      const createdPath = this.normalizeVaultPath(this.pendingCreatedFocusPath);
-      const activePath = this.normalizeVaultPath(this.activeMarkdownPath);
-      if (!activePath || this.activeFocusOrdinal >= this.pendingCreatedFocusOrdinal || activePath === createdPath) {
-        this.pendingCreatedFocusPath = null;
-        this.pendingCreatedFocusOrdinal = 0;
-      }
-    }
-
-    if (!byPath) {
-      return null;
-    }
-
-    return {
-      id: byPath.id,
-      path: byPath.path
-    };
-  }
-
-  private getPreferredFocusPath(): string {
-    const activePath = this.normalizeVaultPath(this.activeMarkdownPath);
-    const createdPath = this.normalizeVaultPath(this.pendingCreatedFocusPath);
-
-    // Active markdown note is the steady-state source of truth unless a newer created-note focus is still pending.
-    if (activePath && (!createdPath || this.activeFocusOrdinal >= this.pendingCreatedFocusOrdinal)) {
-      return activePath;
-    }
-    if (createdPath) {
-      return createdPath;
-    }
-    return activePath;
-  }
-
-  private toFocusKey(payload: NoteFocusPayload): string {
-    const id = typeof payload.id === "string" ? payload.id.trim() : "";
-    const path = typeof payload.path === "string" ? this.normalizeVaultPath(payload.path) : "";
-    return `${id}|${path}`;
   }
 
   private buildGraphRelevantSignature(cache: CachedMetadata | null): string {
@@ -724,21 +561,6 @@ export class MapSession {
     return pathValue.trim().replace(/\\/g, "/");
   }
 
-  private requestMarkdownFocus(path: string): void {
-    const normalizedPath = this.normalizeVaultPath(path);
-    if (!normalizedPath || !this.isGraphRelevantPath(normalizedPath)) {
-      return;
-    }
-
-    // This becomes the latest active-note source, whether it came from a leaf change or editor focus.
-    this.activeMarkdownPath = normalizedPath;
-    this.activeFocusOrdinal = ++this.focusOrdinal;
-
-    if (this.lastGraphPayload) {
-      this.dispatchPreferredFocus(this.lastGraphPayload);
-    }
-  }
-
   private extractFrontmatterTags(frontmatter: unknown): string[] {
     if (!frontmatter || typeof frontmatter !== "object") {
       return [];
@@ -759,41 +581,6 @@ export class MapSession {
       return false;
     }
     return pathValue.toLowerCase().endsWith(".md");
-  }
-
-  private isMarkdownLeaf(leaf: WorkspaceLeaf | null): leaf is WorkspaceLeaf {
-    if (!leaf) {
-      return false;
-    }
-
-    const viewType = leaf.view?.getViewType?.();
-    if (viewType === "markdown") {
-      return true;
-    }
-
-    const stateType = leaf.getViewState?.().type;
-    return stateType === "markdown";
-  }
-
-  private findAnyMarkdownLeaf(): WorkspaceLeaf | null {
-    const workspace = this.app.workspace;
-    if (!workspace) {
-      return null;
-    }
-
-    const markdownLeaf = workspace.getLeavesOfType("markdown")[0] ?? null;
-    if (this.isMarkdownLeaf(markdownLeaf)) {
-      return markdownLeaf;
-    }
-
-    let fallbackLeaf: WorkspaceLeaf | null = null;
-    workspace.iterateAllLeaves((leaf) => {
-      if (!fallbackLeaf && this.isMarkdownLeaf(leaf)) {
-        fallbackLeaf = leaf;
-      }
-    });
-
-    return fallbackLeaf;
   }
 
   private buildFolderPathSuggestions(payload: GraphPayload): FolderPathSuggestion[] {

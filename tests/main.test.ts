@@ -72,6 +72,9 @@ function createPluginHarness(options?: {
 
 describe("ReverySkyMapPlugin map view state persistence", () => {
   it("captures map state before toggle close and restores it on next open", async () => {
+    const runtimeServer = {
+      stop: vi.fn().mockResolvedValue(undefined)
+    };
     const closingLeaf: MockLeaf = {
       view: {
         getState: () => ({
@@ -94,6 +97,7 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
     });
 
     await harness.plugin.onload();
+    (harness.plugin as unknown as { unityWebglServer: typeof runtimeServer | null }).unityWebglServer = runtimeServer;
     expect(harness.registerEditorExtension).toHaveBeenCalledTimes(1);
     await (harness.addRibbonIcon.mock.calls[0]?.[2] as () => Promise<void>)();
 
@@ -105,6 +109,8 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
       }
     });
     expect(harness.detachLeavesOfType).toHaveBeenCalledWith(MAP_VIEW_TYPE);
+    expect(runtimeServer.stop).toHaveBeenCalledTimes(1);
+    expect((harness.plugin as unknown as { unityWebglServer: unknown }).unityWebglServer).toBeNull();
 
     existingLeaves.length = 0;
     await (harness.addRibbonIcon.mock.calls[0]?.[2] as () => Promise<void>)();
@@ -122,6 +128,9 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
   });
 
   it("captures map state during plugin unload without detaching the workspace leaf", async () => {
+    const runtimeServer = {
+      stop: vi.fn().mockResolvedValue(undefined)
+    };
     const activeLeaf: MockLeaf = {
       view: {
         getState: () => ({
@@ -137,7 +146,10 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
       existingLeaves: [activeLeaf]
     });
 
+    (harness.plugin as unknown as { unityWebglServer: typeof runtimeServer | null }).unityWebglServer = runtimeServer;
     await harness.plugin.onunload();
+    await Promise.resolve();
+    await Promise.resolve();
 
     expect(harness.saveData).toHaveBeenCalledWith({
       mapViewState: {
@@ -147,6 +159,8 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
       }
     });
     expect(harness.detachLeavesOfType).not.toHaveBeenCalled();
+    expect(runtimeServer.stop).toHaveBeenCalledTimes(1);
+    expect((harness.plugin as unknown as { unityWebglServer: unknown }).unityWebglServer).toBeNull();
   });
 
   it("restores persisted map state loaded during plugin startup", async () => {

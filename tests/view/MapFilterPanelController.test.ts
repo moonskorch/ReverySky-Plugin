@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { GraphPayload } from "../../src/bridge/BridgeTypes";
+import type { GraphPayload, NoteFocusPayload } from "../../src/bridge/BridgeTypes";
 import { MapFilterPanelController } from "../../src/view/MapFilterPanelController";
 import { MapSession } from "../../src/view/MapSession";
+import { makeBuildGraphMock, makeVoidCallback } from "./testUtils";
 
 function makePathPayload(): GraphPayload {
   return {
@@ -55,10 +56,10 @@ function createSession() {
         on: vi.fn().mockReturnValue({ id: "event-ref" })
       }
     } as never,
-    buildGraph: vi.fn().mockReturnValue(makePathPayload()) as (app: never) => GraphPayload,
+    buildGraph: makeBuildGraphMock(makePathPayload()),
     now: () => 1700000000000,
-    sendGraph: vi.fn(),
-    sendFocus: vi.fn()
+    sendGraph: makeVoidCallback<[GraphPayload]>(),
+    sendFocus: makeVoidCallback<[NoteFocusPayload]>()
   });
 }
 

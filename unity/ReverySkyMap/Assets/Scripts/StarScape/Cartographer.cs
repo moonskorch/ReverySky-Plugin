@@ -208,7 +208,7 @@ public class Cartographer : MonoBehaviour
     var star = _activeEngine?.FindStarByNoteId(noteId);
     if (star == null)
     {
-      // Note is in the note list, but node is not instanciated yet
+      // The active engine has no instantiated star for this note yet, so keep the latest focus as pending.
       MapRuntimeContext.PendingFocusNoteId = noteId;
       return;
     }

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { GraphPayload } from "../../src/bridge/BridgeTypes";
+import type { GraphPayload, NoteFocusPayload } from "../../src/bridge/BridgeTypes";
+import { makeStableNoteId } from "../../src/graph/VaultGraphBuilder";
 import { MapSession } from "../../src/view/MapSession";
+import { callMaybe, makeBuildGraphMock, makeVoidCallback } from "./testUtils";
 
 function makePayload(): GraphPayload {
   return {
@@ -59,7 +61,7 @@ function makePathPayload(): GraphPayload {
 }
 
 function createSessionForStateTests(options?: {
-  sendGraph?: ReturnType<typeof vi.fn>;
+  sendGraph?: (payload: GraphPayload) => void;
 }) {
   return new MapSession({
     app: {
@@ -76,10 +78,10 @@ function createSessionForStateTests(options?: {
         on: vi.fn().mockReturnValue({ id: "event-ref" })
       }
     } as never,
-    buildGraph: vi.fn().mockReturnValue(makePayload()) as (app: never) => GraphPayload,
+    buildGraph: makeBuildGraphMock(makePayload()),
     now: () => 1700000000000,
-    sendGraph: options?.sendGraph ?? vi.fn(),
-    sendFocus: vi.fn()
+    sendGraph: options?.sendGraph ?? makeVoidCallback<[GraphPayload]>(),
+    sendFocus: makeVoidCallback<[NoteFocusPayload]>()
   });
 }
 
@@ -167,11 +169,11 @@ describe("MapSession", () => {
       }
     };
 
-    const buildGraph = vi.fn().mockReturnValue(makePayload());
+    const buildGraph = makeBuildGraphMock(makePayload());
     const sendGraph = vi.fn();
     const session = new MapSession({
       app: app as never,
-      buildGraph: buildGraph as (app: never) => GraphPayload,
+      buildGraph,
       now: () => 1700000000000,
       sendGraph,
       sendFocus: vi.fn()
@@ -243,11 +245,11 @@ describe("MapSession", () => {
 
     const queuedPayload = makePayload();
     queuedPayload.notes[0].id = "queued";
-    const buildGraph = vi.fn().mockReturnValue(queuedPayload);
+    const buildGraph = makeBuildGraphMock(queuedPayload);
     const sendGraph = vi.fn();
     const session = new MapSession({
       app: app as never,
-      buildGraph: buildGraph as (app: never) => GraphPayload,
+      buildGraph,
       now: () => 1700000000000,
       sendGraph,
       sendFocus: vi.fn()
@@ -274,65 +276,37 @@ describe("MapSession", () => {
     expect(sendGraph).toHaveBeenCalledWith(queuedPayload);
   });
 
-  it("keeps graph payload focus-free and sends live note focus for active leaf changes", () => {
-    vi.useFakeTimers();
-
-    let onActiveLeafChange: ((leaf: unknown) => void) | null = null;
-    const vaultCallbacks: {
-      create?: (file: { path?: string }) => void;
-    } = {};
-
-    const activeLeafA = {
-      view: {
-        getViewType: () => "markdown",
-        file: { path: "Folder/A.md" }
-      }
-    };
-    const activeLeafB = {
-      view: {
-        getViewType: () => "markdown",
-        file: { path: "Folder/B.md" }
-      }
-    };
-
-    const app = {
-      metadataCache: {
-        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
-      },
-      vault: {
-        on: vi.fn((name: "create" | "delete" | "rename", callback: (...args: never[]) => void) => {
-          if (name === "create") {
-            vaultCallbacks.create = callback as typeof vaultCallbacks.create;
-          }
-          return { id: `vault-${name}` };
-        })
-      },
-      workspace: {
-        activeLeaf: activeLeafA,
-        getLeavesOfType: vi.fn().mockReturnValue([activeLeafA]),
-        iterateAllLeaves: vi.fn(),
-        on: vi.fn((eventName: string, callback: (leaf: unknown) => void) => {
-          if (eventName === "active-leaf-change") {
-            onActiveLeafChange = callback;
-          }
-          return { id: "event-ref" };
-        })
-      }
-    };
-
-    const payload = makePayload();
-    payload.notes = [
-      { id: "a", path: "Folder/A.md", title: "A", tags: [], date: "2026-01-01T00:00:00.000Z", size: 10 },
-      { id: "b", path: "Folder/B.md", title: "B", tags: [], date: "2026-01-02T00:00:00.000Z", size: 20 },
-      { id: "new", path: "Folder/New.md", title: "New", tags: [], date: "2026-01-03T00:00:00.000Z", size: 30 }
-    ];
-    payload.vault.noteCount = payload.notes.length;
-
+  it("keeps an ordinary graph refresh focus-free when no focus event occurred", () => {
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
     const session = new MapSession({
-      app: app as never,
-      buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+      app: {
+        metadataCache: {
+          on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+        },
+        vault: {
+          on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+        },
+        workspace: {
+          activeLeaf: {
+            view: {
+              getViewType: () => "markdown",
+              file: { path: "Folder/A.md" }
+            }
+          },
+          getLeavesOfType: vi.fn().mockReturnValue([
+            {
+              view: {
+                getViewType: () => "markdown",
+                file: { path: "Folder/A.md" }
+              }
+            }
+          ]),
+          iterateAllLeaves: vi.fn(),
+          on: vi.fn().mockReturnValue({ id: "event-ref" })
+        }
+      } as never,
+      buildGraph: makeBuildGraphMock(makePayload()),
       now: () => 1700000000000,
       sendGraph,
       sendFocus
@@ -341,34 +315,15 @@ describe("MapSession", () => {
     session.start(() => undefined);
     session.setBridgeReady(true);
     session.flushOrRefresh();
+    session.flushOrRefresh();
 
+    expect(sendGraph).toHaveBeenCalledTimes(2);
     expect(sendFocus).not.toHaveBeenCalled();
-    const initialPayload = sendGraph.mock.calls[0]?.[0] as GraphPayload;
-    expect(initialPayload).toEqual({
-      ...payload,
-      mapLayout: "auto"
-    });
-
-    vaultCallbacks.create?.({ path: "Folder/New.md" });
-    onActiveLeafChange?.(activeLeafB);
-
-    expect(sendFocus).toHaveBeenLastCalledWith({
-      id: "b",
-      path: "Folder/B.md"
-    });
-
-    vi.advanceTimersByTime(250);
-
-    const refreshedPayload = sendGraph.mock.calls[1]?.[0] as GraphPayload;
-    expect(refreshedPayload).toEqual({
-      ...payload,
-      mapLayout: "auto"
-    });
   });
 
   it("sends editor-focus note focus when the matching note exists in the effective graph", () => {
     let currentTime = 1700000000000;
-    let onActiveLeafChange: ((leaf: unknown) => void) | null = null;
+    let onFileOpen: ((file: { path?: string } | null) => void) | null = null;
     const dailyLeaf = {
       view: {
         getViewType: () => "markdown",
@@ -385,27 +340,28 @@ describe("MapSession", () => {
     const payload = makePathPayload();
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+      },
+      workspace: {
+        activeLeaf: dailyLeaf,
+        getLeavesOfType: vi.fn().mockReturnValue([dailyLeaf]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn((eventName: string, callback: (file: { path?: string } | null) => void) => {
+          if (eventName === "file-open") {
+            onFileOpen = callback;
+          }
+          return { id: "event-ref" };
+        })
+      }
+    };
     const session = new MapSession({
-      app: {
-        metadataCache: {
-          on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
-        },
-        vault: {
-          on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
-        },
-        workspace: {
-          activeLeaf: dailyLeaf,
-          getLeavesOfType: vi.fn().mockReturnValue([dailyLeaf]),
-          iterateAllLeaves: vi.fn(),
-          on: vi.fn((eventName: string, callback: (leaf: unknown) => void) => {
-            if (eventName === "active-leaf-change") {
-              onActiveLeafChange = callback;
-            }
-            return { id: "event-ref" };
-          })
-        }
-      } as never,
-      buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+      app: app as never,
+      buildGraph: makeBuildGraphMock(payload),
       now: () => currentTime,
       sendGraph,
       sendFocus
@@ -415,19 +371,20 @@ describe("MapSession", () => {
     session.setBridgeReady(true);
     session.flushOrRefresh();
 
+    app.workspace.activeLeaf = projectLeaf;
     session.requestEditorFocus(projectLeaf.view.file.path);
 
     expect(sendGraph).toHaveBeenCalledTimes(1);
     expect(sendFocus).toHaveBeenCalledTimes(1);
     expect(sendFocus).toHaveBeenLastCalledWith({
-      id: "project",
+      id: makeStableNoteId("Projects/ReverySky/Spec.md"),
       path: "Projects/ReverySky/Spec.md"
     });
 
-    onActiveLeafChange?.(dailyLeaf);
+    callMaybe(onFileOpen, { path: "Notes/Daily/2026-01-01.md" });
     expect(sendFocus).toHaveBeenCalledTimes(2);
     expect(sendFocus).toHaveBeenLastCalledWith({
-      id: "daily",
+      id: makeStableNoteId("Notes/Daily/2026-01-01.md"),
       path: "Notes/Daily/2026-01-01.md"
     });
   });
@@ -451,7 +408,7 @@ describe("MapSession", () => {
           on: vi.fn().mockReturnValue({ id: "event-ref" })
         }
       } as never,
-      buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+      buildGraph: makeBuildGraphMock(payload),
       now: () => 1700000000000,
       sendGraph,
       sendFocus
@@ -465,7 +422,7 @@ describe("MapSession", () => {
     expect(sendFocus).not.toHaveBeenCalled();
   });
 
-  it("does not send editor focus when the note is filtered out of the effective graph", () => {
+  it("sends editor focus even when the note is filtered out because Unity owns pending focus", () => {
     vi.useFakeTimers();
 
     const payload = makePathPayload();
@@ -486,7 +443,7 @@ describe("MapSession", () => {
           on: vi.fn().mockReturnValue({ id: "event-ref" })
         }
       } as never,
-      buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+      buildGraph: makeBuildGraphMock(payload),
       now: () => 1700000000000,
       sendGraph,
       sendFocus
@@ -501,75 +458,10 @@ describe("MapSession", () => {
     session.requestEditorFocus("Projects/ReverySky/Spec.md");
 
     expect(sendGraph).toHaveBeenCalledTimes(2);
-    expect(sendFocus).not.toHaveBeenCalled();
-  });
-
-  it("coalesces active-leaf-change and editor-focus updates for one gesture, then allows the next one later", () => {
-    let currentTime = 1700000000000;
-    let onActiveLeafChange: ((leaf: unknown) => void) | null = null;
-    const activeLeaf = {
-      view: {
-        getViewType: () => "markdown",
-        file: { path: "Folder/A.md" }
-      }
-    };
-
-    const payload = makePathPayload();
-    payload.notes = [
-      { id: "a", path: "Folder/A.md", title: "A", tags: [], size: 10 },
-      { id: "b", path: "Folder/B.md", title: "B", tags: [], size: 20 }
-    ];
-    payload.vault.noteCount = payload.notes.length;
-
-    const sendGraph = vi.fn();
-    const sendFocus = vi.fn();
-    const session = new MapSession({
-      app: {
-        metadataCache: {
-          on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
-        },
-        vault: {
-          on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
-        },
-        workspace: {
-          activeLeaf,
-          getLeavesOfType: vi.fn().mockReturnValue([activeLeaf]),
-          iterateAllLeaves: vi.fn(),
-          on: vi.fn((eventName: string, callback: (leaf: unknown) => void) => {
-            if (eventName === "active-leaf-change") {
-              onActiveLeafChange = callback;
-            }
-            return { id: "event-ref" };
-          })
-        }
-      } as never,
-      buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
-      now: () => currentTime,
-      sendGraph,
-      sendFocus
-    });
-
-    session.start(() => undefined);
-    session.setBridgeReady(true);
-    session.flushOrRefresh();
-
-    onActiveLeafChange?.(activeLeaf);
     expect(sendFocus).toHaveBeenCalledTimes(1);
     expect(sendFocus).toHaveBeenLastCalledWith({
-      id: "a",
-      path: "Folder/A.md"
-    });
-
-    currentTime += 50;
-    session.requestEditorFocus("Folder/A.md");
-    expect(sendFocus).toHaveBeenCalledTimes(1);
-
-    currentTime += 120;
-    session.requestEditorFocus("Folder/A.md");
-    expect(sendFocus).toHaveBeenCalledTimes(2);
-    expect(sendFocus).toHaveBeenLastCalledWith({
-      id: "a",
-      path: "Folder/A.md"
+      id: makeStableNoteId("Projects/ReverySky/Spec.md"),
+      path: "Projects/ReverySky/Spec.md"
     });
   });
 
@@ -617,7 +509,7 @@ describe("MapSession", () => {
     const sendFocus = vi.fn();
     const session = new MapSession({
       app: app as never,
-      buildGraph: vi.fn().mockReturnValue(payload) as (app: never) => GraphPayload,
+      buildGraph: makeBuildGraphMock(payload),
       now: () => 1700000000000,
       sendGraph,
       sendFocus
@@ -629,12 +521,75 @@ describe("MapSession", () => {
     vaultCallbacks.rename?.({ path: "Folder/New.md" }, "Folder/Old.md");
     vi.advanceTimersByTime(250);
 
-    expect(sendFocus).not.toHaveBeenCalled();
     const sentPayload = sendGraph.mock.calls[0]?.[0] as GraphPayload;
     expect(sentPayload).toEqual({
       ...payload,
       mapLayout: "auto"
     });
+    expect(sendFocus).toHaveBeenCalledTimes(1);
+    expect(sendFocus).toHaveBeenLastCalledWith({
+      id: makeStableNoteId("Folder/New.md"),
+      path: "Folder/New.md"
+    });
+  });
+
+  it("clears focus after deleting the active note instead of choosing a replacement", () => {
+    vi.useFakeTimers();
+
+    const vaultCallbacks: {
+      delete?: (file: { path?: string }) => void;
+    } = {};
+
+    const activeLeaf = {
+      view: {
+        getViewType: () => "markdown",
+        file: { path: "Folder/Deleted.md" }
+      }
+    };
+
+    const payload = makePayload();
+    payload.notes = [
+      { id: "replacement", path: "Folder/Replacement.md", title: "Replacement", tags: [], date: "2026-01-03T00:00:00.000Z", size: 30 }
+    ];
+    payload.vault.noteCount = payload.notes.length;
+
+    const sendGraph = vi.fn();
+    const sendFocus = vi.fn();
+    const session = new MapSession({
+      app: {
+        metadataCache: {
+          on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+        },
+        vault: {
+          on: vi.fn((name: "create" | "delete" | "rename", callback: (...args: never[]) => void) => {
+            if (name === "delete") {
+              vaultCallbacks.delete = callback as typeof vaultCallbacks.delete;
+            }
+            return { id: `vault-${name}` };
+          })
+        },
+        workspace: {
+          activeLeaf,
+          getLeavesOfType: vi.fn().mockReturnValue([activeLeaf]),
+          iterateAllLeaves: vi.fn(),
+          on: vi.fn().mockReturnValue({ id: "event-ref" })
+        }
+      } as never,
+      buildGraph: makeBuildGraphMock(payload),
+      now: () => 1700000000000,
+      sendGraph,
+      sendFocus
+    });
+
+    session.start(() => undefined);
+    session.setBridgeReady(true);
+
+    vaultCallbacks.delete?.({ path: "Folder/Deleted.md" });
+    activeLeaf.view.file.path = "Folder/Replacement.md";
+    vi.advanceTimersByTime(250);
+
+    expect(sendGraph).toHaveBeenCalledTimes(1);
+    expect(sendFocus).not.toHaveBeenCalled();
   });
 
   it("restores state and reuses cached source graph for filtered re-emit", async () => {
@@ -657,7 +612,7 @@ describe("MapSession", () => {
           on: vi.fn().mockReturnValue({ id: "event-ref" })
         }
       } as never,
-      buildGraph: buildGraph as (app: never) => GraphPayload,
+      buildGraph,
       now: () => 1700000000000,
       sendGraph,
       sendFocus: vi.fn()
@@ -708,7 +663,7 @@ describe("MapSession", () => {
           on: vi.fn().mockReturnValue({ id: "event-ref" })
         }
       } as never,
-      buildGraph: vi.fn().mockReturnValue(makePayload()) as (app: never) => GraphPayload,
+      buildGraph: makeBuildGraphMock(makePayload()),
       now: () => 1700000000000,
       sendGraph: vi.fn(),
       sendFocus: vi.fn()

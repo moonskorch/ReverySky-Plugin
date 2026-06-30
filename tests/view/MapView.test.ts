@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GraphPayload } from "../../src/bridge/BridgeTypes";
+import { makeStableNoteId } from "../../src/graph/VaultGraphBuilder";
 import type { MapViewDependencies } from "../../src/view/MapView";
 
 import { MapView } from "../../src/view/MapView";
+import { callMaybe } from "./testUtils";
 
 type BuildGraphForTest = NonNullable<MapViewDependencies["buildGraph"]>;
 
@@ -238,7 +240,7 @@ describe("MapView bridge integration", () => {
     expect(bridge.detach).not.toHaveBeenCalled();
 
     await view.onOpen();
-    resolveShutdown?.("complete");
+    callMaybe(resolveShutdown, "complete");
     await closePromise;
 
     expect(bridge.detach).not.toHaveBeenCalled();
@@ -349,7 +351,7 @@ describe("MapView bridge integration", () => {
   });
 
   it("ignores stale focus and bridge callbacks after focus-driven close", async () => {
-    let onActiveLeafChange: ((leaf: unknown) => void) | null = null;
+    let onFileOpen: ((file: { path?: string } | null) => void) | null = null;
     const activeLeafA = {
       view: {
         getViewType: () => "markdown",
@@ -369,9 +371,9 @@ describe("MapView bridge integration", () => {
         getMostRecentLeaf: vi.fn().mockReturnValue(activeLeafA),
         getLeavesOfType: vi.fn().mockReturnValue([activeLeafA, activeLeafB]),
         iterateAllLeaves: vi.fn(),
-        on: vi.fn((eventName: string, callback: (leaf: unknown) => void) => {
-          if (eventName === "active-leaf-change") {
-            onActiveLeafChange = callback;
+        on: vi.fn((eventName: string, callback: (file: { path?: string } | null) => void) => {
+          if (eventName === "file-open") {
+            onFileOpen = callback;
           }
           return { id: `event-${eventName}` };
         })
@@ -431,12 +433,12 @@ describe("MapView bridge integration", () => {
     iframe!.dispatchEvent(new Event("load"));
     callbacks.onReady?.();
 
-    expect(onActiveLeafChange).toEqual(expect.any(Function));
-    const handleActiveLeafChange = onActiveLeafChange as unknown as (leaf: unknown) => void;
+    expect(onFileOpen).toEqual(expect.any(Function));
+    const handleFileOpen = onFileOpen as unknown as (file: { path?: string } | null) => void;
 
-    handleActiveLeafChange(activeLeafB);
+    handleFileOpen({ path: activeLeafB.view.file.path });
     expect(bridge.sendNoteFocus).toHaveBeenLastCalledWith({
-      id: "note-b",
+      id: makeStableNoteId("Notes/B.md"),
       path: "Notes/B.md"
     });
 
@@ -446,7 +448,7 @@ describe("MapView bridge integration", () => {
     buildGraph.mockClear();
 
     await view.onClose();
-    handleActiveLeafChange(activeLeafA);
+    handleFileOpen({ path: activeLeafA.view.file.path });
     callbacks.onReady?.();
     iframe!.dispatchEvent(new Event("load"));
 
@@ -558,7 +560,6 @@ describe("MapView bridge integration", () => {
     };
     const openLinkText = vi.fn().mockResolvedValue(undefined);
 
-    let onActiveLeafChange: ((leaf: unknown) => void) | null = null;
     const app = {
       vault: {
         getAbstractFileByPath: vi.fn((path: string) => (path === "Folder/Note.md" ? { path } : null))
@@ -569,10 +570,7 @@ describe("MapView bridge integration", () => {
         getMostRecentLeaf: vi.fn().mockReturnValue(mapLeaf),
         getLeavesOfType: vi.fn((viewType: string) => (viewType === "markdown" ? [markdownLeaf] : [])),
         iterateAllLeaves: vi.fn(),
-        on: vi.fn((_eventName: string, callback: (leaf: unknown) => void) => {
-          onActiveLeafChange = callback;
-          return { id: "event-ref" };
-        })
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
       }
     };
     const plugin = {
@@ -616,10 +614,6 @@ describe("MapView bridge integration", () => {
     iframe!.dispatchEvent(new Event("load"));
     callbacks.onReady?.();
 
-    expect(onActiveLeafChange).toEqual(expect.any(Function));
-    const handleActiveLeafChange = onActiveLeafChange as unknown as (leaf: unknown) => void;
-
-    handleActiveLeafChange(markdownLeaf);
     callbacks.onNoteOpen?.({ id: "note_abc", path: "Folder/Note.md" });
     await Promise.resolve();
 
@@ -1120,10 +1114,10 @@ describe("MapView bridge integration", () => {
     expect(bridge.sendGraphSet).toHaveBeenCalledWith(queuedPayload);
   });
 
-  it("focuses a newly created note unless user switched to another active note first", async () => {
+  it("keeps create focus-free and follows the active file opened by Obsidian", async () => {
     vi.useFakeTimers();
 
-    let onActiveLeafChange: ((leaf: unknown) => void) | null = null;
+    let onFileOpen: ((file: { path?: string } | null) => void) | null = null;
     const vaultCallbacks: {
       create?: (file: { path?: string }) => void;
     } = {};
@@ -1140,7 +1134,6 @@ describe("MapView bridge integration", () => {
         file: { path: "Folder/B.md" }
       }
     };
-
     const app = {
       metadataCache: {
         on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
@@ -1159,9 +1152,9 @@ describe("MapView bridge integration", () => {
         getMostRecentLeaf: vi.fn().mockReturnValue(activeLeafA),
         getLeavesOfType: vi.fn().mockReturnValue([activeLeafA]),
         iterateAllLeaves: vi.fn(),
-        on: vi.fn((eventName: string, callback: (leaf: unknown) => void) => {
-          if (eventName === "active-leaf-change") {
-            onActiveLeafChange = callback;
+        on: vi.fn((eventName: string, callback: (file: { path?: string } | null) => void) => {
+          if (eventName === "file-open") {
+            onFileOpen = callback;
           }
           return { id: "event-ref" };
         })
@@ -1217,22 +1210,20 @@ describe("MapView bridge integration", () => {
       mapLayout: "auto"
     });
 
-    expect(onActiveLeafChange).toEqual(expect.any(Function));
-    const handleActiveLeafChange = onActiveLeafChange as unknown as (leaf: unknown) => void;
-
     vaultCallbacks.create?.({ path: "Folder/New.md" });
-    handleActiveLeafChange(activeLeafB);
+    expect(bridge.sendNoteFocus).not.toHaveBeenCalled();
+    callMaybe(onFileOpen, { path: activeLeafB.view.file.path });
     vi.advanceTimersByTime(250);
 
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
-    expect(bridge.sendNoteFocus).toHaveBeenLastCalledWith({
-      id: "b",
-      path: "Folder/B.md"
-    });
     const refreshedGraphPayload = bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload;
     expect(refreshedGraphPayload).toEqual({
       ...payload,
       mapLayout: "auto"
+    });
+    expect(bridge.sendNoteFocus).toHaveBeenLastCalledWith({
+      id: makeStableNoteId("Folder/B.md"),
+      path: "Folder/B.md"
     });
   });
 
@@ -1339,7 +1330,11 @@ describe("MapView bridge integration", () => {
       ...payloadAfter,
       mapLayout: "auto"
     });
-    expect(bridge.sendNoteFocus).not.toHaveBeenCalled();
+    expect(bridge.sendNoteFocus).toHaveBeenCalledTimes(1);
+    expect(bridge.sendNoteFocus).toHaveBeenLastCalledWith({
+      id: makeStableNoteId("Folder/New.md"),
+      path: "Folder/New.md"
+    });
   });
 
   it("filters graph:set by path query without rebuilding source graph", async () => {

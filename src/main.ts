@@ -65,10 +65,7 @@ export default class ReverySkyMapPlugin extends Plugin {
 
   private async cleanupOnUnload(): Promise<void> {
     await this.captureAndPersistMapViewState();
-    if (this.unityWebglServer) {
-      await this.unityWebglServer.stop();
-      this.unityWebglServer = null;
-    }
+    await this.stopUnityRuntimeServer();
   }
 
   /**
@@ -129,10 +126,20 @@ export default class ReverySkyMapPlugin extends Plugin {
     if (leaves.length > 0) {
       await this.captureAndPersistMapViewState();
       workspace.detachLeavesOfType(MAP_VIEW_TYPE);
+      await this.stopUnityRuntimeServer();
       return;
     }
 
     await this.activateMapView();
+  }
+
+  private async stopUnityRuntimeServer(): Promise<void> {
+    if (!this.unityWebglServer) {
+      return;
+    }
+
+    await this.unityWebglServer.stop();
+    this.unityWebglServer = null;
   }
 
   private requestEditorFocus(path: string): void {

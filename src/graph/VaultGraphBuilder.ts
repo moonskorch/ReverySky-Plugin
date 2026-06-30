@@ -4,6 +4,14 @@ import { GraphLink, GraphNoteNode, GraphPayload } from "../bridge/BridgeTypes";
 import { GraphNormalizer } from "./GraphNormalizer";
 
 /**
+ * Graph note ids are derived only from normalized vault-relative paths.
+ */
+export function makeStableNoteId(path: string): string {
+  const digest = createHash("sha256").update(path).digest();
+  return `note_${digest.subarray(0, 12).toString("base64url")}`;
+}
+
+/**
  * Build the graph payload from the current vault snapshot for the Unity runtime.
  */
 export class VaultGraphBuilder {
@@ -97,7 +105,7 @@ export class VaultGraphBuilder {
     const date = VaultGraphBuilder.getCanonicalNoteDate(frontmatter, file);
 
     return {
-      id: VaultGraphBuilder.makeStableId(path),
+      id: makeStableNoteId(path),
       path,
       title: file.basename,
       tags,
@@ -162,14 +170,6 @@ export class VaultGraphBuilder {
 
     const d = new Date(ctime);
     return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
-  }
-
-  /**
-   * Use a 96-bit path digest so ids stay compact while making collisions impractical.
-   */
-  private static makeStableId(path: string): string {
-    const digest = createHash("sha256").update(path).digest();
-    return `note_${digest.subarray(0, 12).toString("base64url")}`;
   }
 
   /**
