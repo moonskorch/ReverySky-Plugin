@@ -4,6 +4,8 @@ using UnityEngine;
 
 public interface ICartographerEngine
 {
+  event Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnVisualNodesChanged;
+
   bool RequiresTick { get; }
   void Tick(float dt);
 
@@ -13,6 +15,7 @@ public interface ICartographerEngine
   MapLayoutMode EngineType { get; }
   ScapeCameraWarper ScapeWarper { get; }
   IReadOnlyList<Star> Stars { get; }
+  IReadOnlyList<TagNode> TagNodes { get; }
   Star FindStarByNoteId(string noteId);
 
   void BuildGraph(List<NoteData> notes);

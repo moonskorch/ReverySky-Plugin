@@ -42,6 +42,7 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
 
   private readonly List<Node> _nodes = new();
   private readonly List<Star> _stars = new();
+  private static readonly IReadOnlyList<TagNode> NoTagNodes = Array.Empty<TagNode>();
 
   private struct Node
   {
@@ -56,12 +57,15 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
   public bool RequiresTick => false;
   public void Tick(float dt) { }
 
+  public event Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnVisualNodesChanged;
+
   public float BoundRadius => boundXYRadius;
   public Vector3 Pivot => layoutParent ? layoutParent.position : transform.position;
 
   public ScapeCameraWarper ScapeWarper => scapeWarper;
 
   public IReadOnlyList<Star> Stars => _stars;
+  public IReadOnlyList<TagNode> TagNodes => NoTagNodes;
 
   public float ZMin => -dateDepthRange * 0.5f;
   public float ZMax => dateDepthRange * 0.5f;
@@ -218,6 +222,8 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
 
       hasPrev = true;
     }
+
+    PublishVisualNodesChanged();
   }
 
   public void ClearGraph()
@@ -229,6 +235,7 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
 
     _nodes.Clear();
     _stars.Clear();
+    PublishVisualNodesChanged();
   }
 
   public void ApplyView(ScapeView view)
@@ -305,6 +312,11 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
   {
     return note != null &&
       note.DateTime == DateTime.MinValue;
+  }
+
+  private void PublishVisualNodesChanged()
+  {
+    OnVisualNodesChanged?.Invoke(_stars, TagNodes);
   }
 
   private static float VirtualDayByDate(

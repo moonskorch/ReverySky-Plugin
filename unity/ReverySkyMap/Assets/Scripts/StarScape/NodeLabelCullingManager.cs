@@ -41,14 +41,19 @@ public sealed class NodeLabelCullingManager : MonoBehaviour
     Active = this;
   }
 
-  private void OnEnable()
+  private void Start()
   {
-    Active = this;
     Rebuild();
+
+    Cartographer.I.OnGraphVisualsChanged += RebuildFromVisualNodes;
+    ICartographerEngine engine = Cartographer.I.ActiveEngine;
+    if (engine != null)
+      RebuildFromVisualNodes(engine.Stars, engine.TagNodes);
   }
 
-  private void OnDisable()
+  private void OnDestroy()
   {
+    Cartographer.I.OnGraphVisualsChanged -= RebuildFromVisualNodes;
     DisposeCullingGroup();
     if (Active == this)
       Active = null;
@@ -72,11 +77,36 @@ public sealed class NodeLabelCullingManager : MonoBehaviour
     DisposeCullingGroup();
 
     entries.Clear();
+    var registeredLabelRoots = new HashSet<GameObject>();
     for (int i = 0; i < sceneEntries.Count; i++)
     {
       if (IsUsable(sceneEntries[i]))
-        entries.Add(sceneEntries[i]);
+        AddEntry(sceneEntries[i], registeredLabelRoots);
     }
+
+    EnsureCullingGroup();
+    EnsureSphereCapacity(entries.Count);
+    RebuildDistanceBands();
+    RefreshBoundingSpheres();
+    cullingGroup.SetBoundingSphereCount(entries.Count);
+
+    ApplyCurrentVisibility();
+  }
+
+  public void RebuildFromVisualNodes(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes)
+  {
+    DisposeCullingGroup();
+
+    entries.Clear();
+    var registeredLabelRoots = new HashSet<GameObject>();
+    for (int i = 0; i < sceneEntries.Count; i++)
+    {
+      if (IsUsable(sceneEntries[i]))
+        AddEntry(sceneEntries[i], registeredLabelRoots);
+    }
+
+    AddTargetsFromStars(stars, registeredLabelRoots);
+    AddTargetsFromTagNodes(tagNodes, registeredLabelRoots);
 
     EnsureCullingGroup();
     EnsureSphereCapacity(entries.Count);
@@ -284,6 +314,42 @@ public sealed class NodeLabelCullingManager : MonoBehaviour
   private static bool IsUsable(Entry entry)
   {
     return entry != null && entry.referenceTransform != null && entry.labelRoot != null;
+  }
+
+  private void AddTargetsFromStars(IReadOnlyList<Star> stars, HashSet<GameObject> registeredLabelRoots)
+  {
+    if (stars == null)
+      return;
+
+    for (int i = 0; i < stars.Count; i++)
+      AddTargetFromComponent(stars[i], registeredLabelRoots);
+  }
+
+  private void AddTargetsFromTagNodes(IReadOnlyList<TagNode> tagNodes, HashSet<GameObject> registeredLabelRoots)
+  {
+    if (tagNodes == null)
+      return;
+
+    for (int i = 0; i < tagNodes.Count; i++)
+      AddTargetFromComponent(tagNodes[i], registeredLabelRoots);
+  }
+
+  private void AddTargetFromComponent(Component component, HashSet<GameObject> registeredLabelRoots)
+  {
+    if (component == null)
+      return;
+
+    NodeLabelCullingTarget target = component.GetComponent<NodeLabelCullingTarget>();
+    if (target != null && target.TryCreateEntry(out var entry))
+      AddEntry(entry, registeredLabelRoots);
+  }
+
+  private void AddEntry(Entry entry, HashSet<GameObject> registeredLabelRoots)
+  {
+    if (!IsUsable(entry) || !registeredLabelRoots.Add(entry.labelRoot))
+      return;
+
+    entries.Add(entry);
   }
 
   private void DisposeCullingGroup()

@@ -40,6 +40,7 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
   private readonly List<LineRenderer> _lines = new();
 
   private readonly List<Star> _stars = new();
+  private readonly List<TagNode> _tagNodes = new();
 
   private struct Node
   {
@@ -60,12 +61,14 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
 
   public MapLayoutMode EngineType => MapLayoutMode.DynamicLinks;
   public bool RequiresTick => true;
+  public event Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnVisualNodesChanged;
 
   public float BoundRadius => _boundRadius;
   public Vector3 Pivot => layoutParent ? layoutParent.position : transform.position;
   public ScapeCameraWarper ScapeWarper => null;
 
   public IReadOnlyList<Star> Stars => _stars;
+  public IReadOnlyList<TagNode> TagNodes => _tagNodes;
 
   private void Awake()
   {
@@ -123,6 +126,7 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
         {
           var tag = TagNode.Create(tagNodeTemplate, RandDeterministic(spawnRadius), tagId, layoutParent);
           tag.transform.localScale = Vector3.one * tagScale;
+          _tagNodes.Add(tag);
 
           var tagNode = new Node
           {
@@ -186,6 +190,7 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
     }
 
     UpdateLines();
+    PublishVisualNodesChanged();
   }
 
   public void ClearGraph()
@@ -203,6 +208,8 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
     _edges.Clear();
     _noteLinks.Clear();
     _stars.Clear();
+    _tagNodes.Clear();
+    PublishVisualNodesChanged();
   }
 
   public void Tick(float dt)
@@ -426,5 +433,10 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
       }
       lineIdx++;
     }
+  }
+
+  private void PublishVisualNodesChanged()
+  {
+    OnVisualNodesChanged?.Invoke(_stars, _tagNodes);
   }
 }

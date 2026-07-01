@@ -168,6 +168,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   private readonly List<Component> _components = new();
   private readonly List<LineBinding> _lineBindings = new();
   private readonly List<Star> _stars = new();
+  private readonly List<TagNode> _tagNodes = new();
 
   private List<Neighbor>[] _adjacency = Array.Empty<List<Neighbor>>();
   private bool[] _queuedForPlacement = Array.Empty<bool>();
@@ -362,10 +363,12 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   public MapLayoutMode EngineType => MapLayoutMode.ScalableLinks;
   public bool RequiresTick => _constructionActive || _remainingRefinementPasses > 0 ||
     (_continuousLinkRefinement && _graphHasNodes);
+  public event Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnVisualNodesChanged;
   public float BoundRadius => _navigationRadius;
   public Vector3 Pivot => layoutParent ? layoutParent.TransformPoint(_layoutCenter) : _layoutCenter;
   public ScapeCameraWarper ScapeWarper => null;
   public IReadOnlyList<Star> Stars => _stars;
+  public IReadOnlyList<TagNode> TagNodes => _tagNodes;
 
   private void Awake()
   {
@@ -489,7 +492,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       UpdateNavigationBounds();
       totalStopwatch.Stop();
       UnityEngine.Debug.Log(
-        $"[RecursiveHubs/v7] Built empty graph in {totalStopwatch.Elapsed.TotalMilliseconds:F1} ms. " +
+        $"[RecursiveHubs] Built empty graph in {totalStopwatch.Elapsed.TotalMilliseconds:F1} ms. " +
         $"LogicalMs={logicalStopwatch.Elapsed.TotalMilliseconds:F1}");
       return;
     }
@@ -520,7 +523,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     totalStopwatch.Stop();
 
     UnityEngine.Debug.Log(
-      $"[RecursiveHubs/v7] Started notes={_noteCount}, tags={_nodes.Count - _noteCount}, " +
+      $"[RecursiveHubs] Started notes={_noteCount}, tags={_nodes.Count - _noteCount}, " +
       $"tagEdges={_tagEdges.Count}, noteLinks={_noteLinks.Count}, components={_components.Count}, " +
       $"roots={_rootCount}, placed={_placedCount}/{_nodes.Count}, constructionActive={_constructionActive}, " +
       $"constructionWaves={_constructionWaves}, maxHierarchyDepth={_maxHierarchyDepth}, " +
@@ -722,6 +725,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     _backboneEdges.Clear();
     _components.Clear();
     _stars.Clear();
+    _tagNodes.Clear();
 
     _adjacency = Array.Empty<List<Neighbor>>();
     _queuedForPlacement = Array.Empty<bool>();
@@ -748,6 +752,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     _nextPlacementSequence = 0;
     _layoutCenter = Vector3.zero;
     _navigationRadius = Mathf.Max(0.1f, minimumNavigationRadius);
+    PublishVisualNodesChanged();
   }
 
   public void ApplyView(ScapeView view)
@@ -1525,6 +1530,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   {
     _constructionActive = false;
     InstantiatePlacedNodesWithoutVisuals();
+    PublishVisualNodesChanged();
     Cartographer.I?.FocusRuntimeNote(MapRuntimeContext.PendingFocusNoteId);
     InstantiateLines();
     UpdateNavigationBounds();
@@ -1880,6 +1886,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     {
       node.TagNode.transform.localScale = Vector3.one * tagScale;
       node.TagNode.gameObject.SetActive(_currentView == ScapeView.Planets);
+      _tagNodes.Add(node.TagNode);
     }
   }
 
@@ -2246,5 +2253,10 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   {
     a = (int)(key >> 32);
     b = (int)(key & 0xFFFFFFFFL);
+  }
+
+  private void PublishVisualNodesChanged()
+  {
+    OnVisualNodesChanged?.Invoke(_stars, _tagNodes);
   }
 }

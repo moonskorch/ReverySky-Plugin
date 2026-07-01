@@ -8,44 +8,23 @@ public sealed class NodeLabelCullingTarget : MonoBehaviour
   [SerializeField, Min(0.01f)] private float radius = 1f;
   [SerializeField, Min(0.01f)] private float visibleDistance = 25f;
 
-  private bool registered;
-  private GameObject resolvedLabelRoot;
-
-  private void OnEnable()
+  public bool TryCreateEntry(out NodeLabelCullingManager.Entry entry)
   {
-    Register();
-  }
-
-  private void Start()
-  {
-    Register();
-  }
-
-  private void OnDisable()
-  {
-    if (!registered || NodeLabelCullingManager.Active == null)
-      return;
-
-    NodeLabelCullingManager.Active.Unregister(resolvedLabelRoot);
-    registered = false;
-    resolvedLabelRoot = null;
-  }
-
-  private void Register()
-  {
-    if (registered || NodeLabelCullingManager.Active == null)
-      return;
+    entry = null;
 
     Transform reference = referenceTransform != null ? referenceTransform : transform;
-    resolvedLabelRoot = labelRoot;
-    if (resolvedLabelRoot == null)
-      return;
+    if (reference == null || labelRoot == null)
+      return false;
 
-    registered = NodeLabelCullingManager.Active.Register(
-      reference,
-      resolvedLabelRoot,
-      behavioursWhenVisible,
-      radius,
-      visibleDistance) >= 0;
+    entry = new NodeLabelCullingManager.Entry
+    {
+      referenceTransform = reference,
+      labelRoot = labelRoot,
+      behavioursWhenVisible = behavioursWhenVisible,
+      radius = Mathf.Max(0.01f, radius),
+      visibleDistance = Mathf.Max(0.01f, visibleDistance)
+    };
+
+    return true;
   }
 }

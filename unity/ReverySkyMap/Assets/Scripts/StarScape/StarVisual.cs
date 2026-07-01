@@ -47,23 +47,20 @@ public class StarVisual : MonoBehaviour
 
   private void SetPlanetView()
   {
-    ShowTitle(true);
+    UpdateTitle();
     ShowSphere(true);
-    ShowCrysyal(true);
+    ShowCrystal(true);
   }
 
   private void SetPlainView()
   {
-    ShowTitle(true);
+    UpdateTitle();
     ShowSphere(true);
-    ShowCrysyal(false);
+    ShowCrystal(false);
   }
 
-  private void ShowTitle(bool show)
+  private void UpdateTitle()
   {
-    nameText.gameObject.SetActive(show);
-    if (!show) return;
-
     nameText.text = star.Data.Name;
   }
 
@@ -76,7 +73,7 @@ public class StarVisual : MonoBehaviour
     sphereRenderer.material = sphereMap?.material ?? sphereMaterialCatalog.defaultMaterial;
   }
 
-  private void ShowCrysyal(bool show)
+  private void ShowCrystal(bool show)
   {
     crystal.SetActive(show);
     if (!show) return;

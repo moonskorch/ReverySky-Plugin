@@ -47,6 +47,7 @@ public class Cartographer : MonoBehaviour
   public Cartographer25DEngine Static25DEngine => (Cartographer25DEngine)_datesEngine;
 
   public event Action<MapLayoutMode> OnEngineChanged;
+  public event Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnGraphVisualsChanged;
 
   private void Awake()
   {
@@ -80,6 +81,9 @@ public class Cartographer : MonoBehaviour
     MapRuntimeContext.OnNotesChanged -= HandleRuntimeNotesChanged;
     if (changeViewControl != null)
       changeViewControl.OnChangeScapeView -= CycleView;
+
+    if (_activeEngine != null)
+      _activeEngine.OnVisualNodesChanged -= HandleEngineVisualNodesChanged;
   }
 
   private void Update()
@@ -154,13 +158,17 @@ public class Cartographer : MonoBehaviour
     };
     if (next == null) return;
 
+    if (_activeEngine == next) return;
+
     if (_activeEngine != null && _activeEngine != next) 
     {
+      _activeEngine.OnVisualNodesChanged -= HandleEngineVisualNodesChanged;
       _activeEngine.ClearGraph();
       OnEngineChanged?.Invoke(next.EngineType);
     }
 
     _activeEngine = next;
+    _activeEngine.OnVisualNodesChanged += HandleEngineVisualNodesChanged;
   }
 
   private void CycleView()
@@ -250,5 +258,10 @@ public class Cartographer : MonoBehaviour
   private void HandleRuntimeNotesChanged()
   {
     RebuildGraph(MapRuntimeContext.MapLayoutPreference);
+  }
+
+  private void HandleEngineVisualNodesChanged(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes)
+  {
+    OnGraphVisualsChanged?.Invoke(stars, tagNodes);
   }
 }
