@@ -1,14 +1,13 @@
 using UnityEngine;
 
-public sealed class NodeLabelCullingTarget : MonoBehaviour, INodeDistanceVisibilityConsumer
+public sealed class NodeLabelCullingTarget : MonoBehaviour, INodeDistanceCullingConsumer
 {
   [SerializeField] private Transform referenceTransform;
   [SerializeField] private GameObject labelRoot;
-  [SerializeField] private Behaviour[] behavioursWhenVisible;
   [SerializeField, Min(0.01f)] private float radius = 1f;
   [SerializeField, Min(0.01f)] private float visibleDistance = 25f;
 
-  public bool TryCreateDistanceEntry(out NodeDistanceCullingManager.Entry entry)
+  public bool TryCreateDistanceEntry(Component node, out NodeDistanceCullingManager.Entry entry)
   {
     entry = null;
 
@@ -18,7 +17,7 @@ public sealed class NodeLabelCullingTarget : MonoBehaviour, INodeDistanceVisibil
 
     entry = new NodeDistanceCullingManager.Entry
     {
-      node = this,
+      node = node != null ? node : this,
       referenceTransform = reference,
       consumer = this,
       radius = radius,
@@ -32,15 +31,5 @@ public sealed class NodeLabelCullingTarget : MonoBehaviour, INodeDistanceVisibil
   {
     if (labelRoot != null && labelRoot.activeSelf != visible)
       labelRoot.SetActive(visible);
-
-    if (behavioursWhenVisible == null)
-      return;
-
-    for (int i = 0; i < behavioursWhenVisible.Length; i++)
-    {
-      Behaviour behaviour = behavioursWhenVisible[i];
-      if (behaviour != null)
-        behaviour.enabled = visible;
-    }
   }
 }

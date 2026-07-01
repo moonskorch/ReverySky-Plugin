@@ -207,6 +207,8 @@ GameObject:
   - component: {fileID: 5357984115519731449}
   - component: {fileID: 4500662623417313281}
   - component: {fileID: 253107240935385}
+  - component: {fileID: 6198472612096341011}
+  - component: {fileID: 6198472612096341012}
   m_Layer: 0
   m_Name: Star
   m_TagString: Untagged
@@ -279,10 +281,39 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   referenceTransform: {fileID: 4724834818725577822}
   labelRoot: {fileID: 2774144331844689961}
-  behavioursWhenVisible:
-  - {fileID: 4709714922754719655}
-  - {fileID: 3648089529239117995}
   radius: 1.5
+  visibleDistance: 35
+--- !u!114 &6198472612096341011
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7720539063730227376}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f0cc707da174079b7f35e66ee850c63, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  referenceTransform: {fileID: 4724834818725577822}
+  behaviour: {fileID: 4709714922754719655}
+  radius: 1.5
+  visibleDistance: 35
+--- !u!114 &6198472612096341012
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7720539063730227376}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f0cc707da174079b7f35e66ee850c63, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  referenceTransform: {fileID: 4724834818725577822}
+  behaviour: {fileID: 3648089529239117995}
+  radius: 1
   visibleDistance: 35
 --- !u!1001 &4008444007065997251
 PrefabInstance:
