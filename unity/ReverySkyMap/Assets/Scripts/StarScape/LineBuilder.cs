@@ -28,7 +28,6 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   [SerializeField, Min(0.01f)] private float radius = 1f;
   [SerializeField, Min(0.01f)] private float visibleDistance = 80f;
   [SerializeField, Min(1)] private int maxActiveLines = 200;
-  [SerializeField] private bool logVisibilityTransitions = true;
 
   private readonly Dictionary<Component, string> endpointByNode = new();
   private readonly Dictionary<string, Transform> transformByEndpoint = new(StringComparer.Ordinal);
@@ -37,7 +36,6 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   private readonly HashSet<string> edgeKeys = new(StringComparer.Ordinal);
   private readonly HashSet<string> visibleEndpoints = new(StringComparer.Ordinal);
   private readonly List<string> staleLineKeys = new();
-  private bool warnedMissingLinePrefab;
 
   public void Rebuild()
   {
@@ -52,7 +50,6 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     candidatesByEndpoint.Clear();
     edgeKeys.Clear();
     visibleEndpoints.Clear();
-    warnedMissingLinePrefab = false;
 
     RegisterStarEndpoints(stars);
     RegisterTagEndpoints(tagNodes);
@@ -90,7 +87,6 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
         return;
 
       ShowCandidateLines(endpoint);
-      LogTransition(endpoint, true);
       return;
     }
 
@@ -98,7 +94,6 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
       return;
 
     HideUnneededCandidateLines(endpoint);
-    LogTransition(endpoint, false);
   }
 
   private void LateUpdate()
@@ -270,15 +265,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
       return;
 
     if (linePrefab == null)
-    {
-      if (!warnedMissingLinePrefab)
-      {
-        Debug.LogWarning("[LineBuilder] Cannot draw lines because linePrefab is not assigned.");
-        warnedMissingLinePrefab = true;
-      }
-
       return;
-    }
 
     Transform parent = lineParent != null ? lineParent : transform;
     LineRenderer line = Instantiate(linePrefab, parent);
@@ -315,19 +302,6 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     }
 
     activeLinesByEdgeKey.Clear();
-  }
-
-  private void LogTransition(string endpoint, bool visible)
-  {
-    if (!logVisibilityTransitions)
-      return;
-
-    int candidateCount = candidatesByEndpoint.TryGetValue(endpoint, out var candidates)
-      ? candidates.Count
-      : 0;
-
-    Debug.Log(
-      $"[LineBuilder] {(visible ? "visible" : "hidden")} {endpoint} candidates={candidateCount} visibleEndpoints={visibleEndpoints.Count} activeLines={activeLinesByEdgeKey.Count}");
   }
 
   private static string OtherEndpoint(LineCandidate candidate, string endpoint)
