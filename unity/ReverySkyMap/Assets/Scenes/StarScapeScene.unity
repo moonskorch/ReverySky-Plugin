@@ -1556,8 +1556,8 @@ MonoBehaviour:
   endlessConstructionNodesPerFrame: 120
   timingFrameRate: 30
   linkRefinementLifetime: 1
-  edgeBudgetMode: 1
-  manualVisibleEdges: 900
+  edgeBudgetMode: 0
+  manualVisibleEdges: 0
   smallGraphVisibleEdges: 420
   smallGraphNodeThreshold: 700
   minimumVisibleEdges: 260
@@ -1769,8 +1769,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a21684c91e523714f9d4fcf454100d5e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: ReverySkyMap.Runtime::LineBuilder
+  linePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
+  lineParent: {fileID: 1327961058}
   radius: 1
   visibleDistance: 60
+  maxActiveLines: 200
   logVisibilityTransitions: 1
 --- !u!4 &1217411435
 Transform:
@@ -2679,12 +2682,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
   injectSampleData: 0
-  sampleScenario: 0
-  sampleNoteCount: 5
-  sampleTagPoolSize: 3
+  sampleScenario: 1
+  sampleNoteCount: 2500
+  sampleTagPoolSize: 500
   sampleDateSpanDays: 365
-  sampleMaxTagsPerNote: 2
-  sampleExtraLinks: 2
+  sampleMaxTagsPerNote: 4
+  sampleExtraLinks: 500
 --- !u!1 &1787028428
 GameObject:
   m_ObjectHideFlags: 0

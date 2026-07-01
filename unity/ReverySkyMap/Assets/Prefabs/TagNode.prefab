@@ -101,8 +101,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d69933938ccd110478a5aff8f73163a4, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &4970363305891615080
 GameObject:
   m_ObjectHideFlags: 0
@@ -199,12 +199,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2f0cc707da174079b7f35e66ee850c63, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   referenceTransform: {fileID: 3397622264585741943}
   behaviour: {fileID: 8817344900950793421}
   radius: 1
-  visibleDistance: 125
+  visibleDistance: 200
 --- !u!1001 &4410025161415576194
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -266,7 +266,7 @@ public class Cartographer : MonoBehaviour
 
   private void HandleEngineNodesChanged(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes)
   {
-    lineBuilder?.Rebuild();
+    lineBuilder?.Rebuild(stars, tagNodes);
     cullingManager?.Rebuild(stars, tagNodes, lineBuilder);
     OnGraphVisualsChanged?.Invoke(stars, tagNodes);
   }
