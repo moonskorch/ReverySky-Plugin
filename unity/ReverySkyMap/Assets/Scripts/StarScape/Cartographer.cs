@@ -30,6 +30,8 @@ public class Cartographer : MonoBehaviour
 
   [Header("Debug sample data")]
   [SerializeField] private SampleDataGenerator sampleDataGenerator;
+  [SerializeField] private LineBuilder lineBuilder;
+  [SerializeField] private NodeDistanceCullingManager nodeDistanceCullingManager;
 
   private ScapeView currentView = ScapeView.Planets;
   public ScapeView CurrentView => currentView;
@@ -262,6 +264,8 @@ public class Cartographer : MonoBehaviour
 
   private void HandleEngineVisualNodesChanged(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes)
   {
+    lineBuilder?.Rebuild();
+    nodeDistanceCullingManager?.RebuildFromVisualNodes(stars, tagNodes, lineBuilder);
     OnGraphVisualsChanged?.Invoke(stars, tagNodes);
   }
 }

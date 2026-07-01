@@ -87,19 +87,8 @@ public sealed class NodeDistanceCullingManager : MonoBehaviour
     Active = this;
   }
 
-  private void Start()
-  {
-    Rebuild();
-
-    Cartographer.I.OnGraphVisualsChanged += RebuildFromVisualNodes;
-    ICartographerEngine engine = Cartographer.I.ActiveEngine;
-    if (engine != null)
-      RebuildFromVisualNodes(engine.Stars, engine.TagNodes);
-  }
-
   private void OnDestroy()
   {
-    Cartographer.I.OnGraphVisualsChanged -= RebuildFromVisualNodes;
     DisposeCullingGroup();
     if (Active == this)
       Active = null;
@@ -135,13 +124,21 @@ public sealed class NodeDistanceCullingManager : MonoBehaviour
 
   public void RebuildFromVisualNodes(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes)
   {
+    RebuildFromVisualNodes(stars, tagNodes, null);
+  }
+
+  public void RebuildFromVisualNodes(
+    IReadOnlyList<Star> stars,
+    IReadOnlyList<TagNode> tagNodes,
+    INodeDistanceCullingConsumer extraConsumer)
+  {
     DisposeCullingGroup();
 
     nodeTargets.Clear();
 
     // Cartographer owns graph lifecycle, so culling registrations are rebuilt in one batch.
-    AddTargetsFromStars(stars);
-    AddTargetsFromTagNodes(tagNodes);
+    AddTargetsFromStars(stars, extraConsumer);
+    AddTargetsFromTagNodes(tagNodes, extraConsumer);
 
     EnsureCullingGroup();
     EnsureSphereCapacity(nodeTargets.Count);
@@ -430,25 +427,31 @@ public sealed class NodeDistanceCullingManager : MonoBehaviour
     return -1;
   }
 
-  private void AddTargetsFromStars(IReadOnlyList<Star> stars)
+  private void AddTargetsFromStars(
+    IReadOnlyList<Star> stars,
+    INodeDistanceCullingConsumer extraConsumer)
   {
     if (stars == null)
       return;
 
     for (int i = 0; i < stars.Count; i++)
-      AddTargetFromComponent(stars[i]);
+      AddTargetFromComponent(stars[i], extraConsumer);
   }
 
-  private void AddTargetsFromTagNodes(IReadOnlyList<TagNode> tagNodes)
+  private void AddTargetsFromTagNodes(
+    IReadOnlyList<TagNode> tagNodes,
+    INodeDistanceCullingConsumer extraConsumer)
   {
     if (tagNodes == null)
       return;
 
     for (int i = 0; i < tagNodes.Count; i++)
-      AddTargetFromComponent(tagNodes[i]);
+      AddTargetFromComponent(tagNodes[i], extraConsumer);
   }
 
-  private void AddTargetFromComponent(Component component)
+  private void AddTargetFromComponent(
+    Component component,
+    INodeDistanceCullingConsumer extraConsumer)
   {
     if (component == null)
       return;
@@ -461,6 +464,12 @@ public sealed class NodeDistanceCullingManager : MonoBehaviour
       if (componentBuffer[i] is INodeDistanceCullingConsumer consumer &&
           consumer.TryCreateDistanceEntry(component, out var entry))
         AddEntry(entry);
+    }
+
+    if (extraConsumer != null &&
+        extraConsumer.TryCreateDistanceEntry(component, out var extraEntry))
+    {
+      AddEntry(extraEntry);
     }
   }
 
