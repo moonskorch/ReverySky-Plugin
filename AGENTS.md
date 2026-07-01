@@ -63,7 +63,7 @@
   - `Risks / follow-ups`
 
 ## Working Rules
-- Keep code comments, documentation, and runbooks in English.
+- English only: write code, tests, comments, documentation, runbooks, and user-facing strings in English. No exceptions.
 - Keep wording concise, professional, and implementation-focused.
 - Keep analysis brief, code-grounded, and directly tied to the user's question; avoid long speculative narratives.
 - Avoid Markdown/text tables in documentation; prefer short bullet lists or explicit per-mode subsections.

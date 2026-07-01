@@ -531,7 +531,7 @@ public class CameraOrbitalController : MonoBehaviour
       // Save current world focus point (node)
       Vector3 focusWorld = ActivePivotPos + orbitPanOffset;
 
-      // Reset pivot to сenter without changing panOffset
+      // Reset pivot to center without changing panOffset
       SetActivePivot(null, resetPanOffset: false);
 
       // Compensate offset so that focus in world won't move

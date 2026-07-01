@@ -2244,7 +2244,7 @@ describe("MapView bridge integration", () => {
     callbacks.onReady?.();
 
     const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
-    searchInput.value = 'date:>2026-04-01 path:"Демо/Плагин тесты"';
+    searchInput.value = 'date:>2026-04-01 path:"Demo/Plugin tests"';
     searchInput.dispatchEvent(new Event("input"));
     vi.advanceTimersByTime(250);
 

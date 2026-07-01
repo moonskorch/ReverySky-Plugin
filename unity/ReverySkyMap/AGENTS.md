@@ -37,6 +37,7 @@
   - `../../docs/WEBGL_INTEGRATION_RUNBOOK.md`
 
 ## Workflow
+- English only: write code, tests, comments, documentation, and user-facing strings in English. No exceptions.
 - Use evidence-first decisions: inspect repository and Unity/MCP state before editing.
 - Keep edits small and targeted; avoid broad multi-area changes in one pass.
 - Use `docs/WORKFLOW.md` for execution modes, staged cleanup, and repair flow.
