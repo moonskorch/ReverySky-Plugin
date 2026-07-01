@@ -61,7 +61,7 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
 
   public MapLayoutMode EngineType => MapLayoutMode.DynamicLinks;
   public bool RequiresTick => true;
-  public event Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnVisualNodesChanged;
+  public event Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnNodesChanged;
 
   public float BoundRadius => _boundRadius;
   public Vector3 Pivot => layoutParent ? layoutParent.position : transform.position;
@@ -437,6 +437,6 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
 
   private void PublishVisualNodesChanged()
   {
-    OnVisualNodesChanged?.Invoke(_stars, _tagNodes);
+    OnNodesChanged?.Invoke(_stars, _tagNodes);
   }
 }

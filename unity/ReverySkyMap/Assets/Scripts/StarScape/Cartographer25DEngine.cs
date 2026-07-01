@@ -57,7 +57,7 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
   public bool RequiresTick => false;
   public void Tick(float dt) { }
 
-  public event Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnVisualNodesChanged;
+  public event Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnNodesChanged;
 
   public float BoundRadius => boundXYRadius;
   public Vector3 Pivot => layoutParent ? layoutParent.position : transform.position;
@@ -316,7 +316,7 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
 
   private void PublishVisualNodesChanged()
   {
-    OnVisualNodesChanged?.Invoke(_stars, TagNodes);
+    OnNodesChanged?.Invoke(_stars, TagNodes);
   }
 
   private static float VirtualDayByDate(

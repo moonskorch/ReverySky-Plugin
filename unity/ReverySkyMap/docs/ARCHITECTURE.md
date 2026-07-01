@@ -34,7 +34,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Important dependencies: `EventSystem`, `Camera.main`, `MapRuntimeContext`, `Cartographer.I`, `GameSettings`
 - Visual assets and support objects:
   - Responsibility: provide prefabs, scale calibration, labels, node distance culling, and the optional sample graph injector.
-  - Main code location: `Assets/Scripts/ScriptableObjects/StarSO.cs`, `Assets/Scripts/ScriptableObjects/TagNodeSO.cs`, `Assets/Scripts/StarScape/NodeDistanceCullingManager.cs`, `Assets/Scripts/StarScape/NodeLabelCullingTarget.cs`, `Assets/Scripts/StarScape/NodeBehaviourCullingTarget.cs`, `Assets/Scripts/Notification/Notification.cs`, `Assets/Scripts/StarScape/SampleDataGenerator.cs`
+  - Main code location: `Assets/Scripts/ScriptableObjects/StarSO.cs`, `Assets/Scripts/ScriptableObjects/TagNodeSO.cs`, `Assets/Scripts/StarScape/CullingManager.cs`, `Assets/Scripts/StarScape/LabelCullingTarget.cs`, `Assets/Scripts/StarScape/BehaviourCullingTarget.cs`, `Assets/Scripts/Notification/Notification.cs`, `Assets/Scripts/StarScape/SampleDataGenerator.cs`
   - Important dependencies: `Cartographer.OnGraphVisualsChanged`, `MapRuntimeContext.NotesVersion`, `MapRuntimeContext.HasRuntimeNotes`, prefab assets in `Assets/Prefabs`
 - Automated checks:
   - Responsibility: guard bridge parsing, layout rules, and PlayMode bootstrap/visual stability.
@@ -91,8 +91,8 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 ### 6. Node distance culling
 
 1. `Cartographer` raises `OnGraphVisualsChanged(stars, tagNodes)` after an engine rebuild changes the visible graph objects.
-2. `NodeDistanceCullingManager.RebuildFromVisualNodes(...)` walks the physical `Star` and `TagNode` components supplied by `Cartographer`.
-3. Each node is scanned for `INodeDistanceCullingConsumer` components. Current prefab consumers are `NodeLabelCullingTarget` for label roots and `NodeBehaviourCullingTarget` for one serialized `Behaviour`.
+2. `CullingManager.Rebuild(...)` walks the physical `Star` and `TagNode` components supplied by `Cartographer`.
+3. Each node is scanned for `ICullingConsumer` components. Current prefab consumers are `LabelCullingTarget` for label roots and `BehaviourCullingTarget` for one serialized `Behaviour`.
 4. Each consumer returns an `Entry` request: physical node, reference transform, radius, visible distance, and consumer.
 5. The manager folds those requests into one `NodeTarget` per physical node. Each `NodeTarget` owns one `BoundingSphere` and a list of `Interest` records.
 6. Each `Interest` owns one consumer's visible distance and last-applied visibility state.
@@ -208,8 +208,8 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 - The current scene wiring assigns the `StaticLinks` slot to the RecursiveHubs baseline under eval, which can continue construction or refinement through `Tick()` after `BuildGraph()`. `Engine_EmptySpheres` remains a static fallback/evaluation engine with EditMode coverage for its radius calculations and static contract.
 - `ScapeCameraWarper` owns the 2.5D warp state and only participates when the active engine is `Static25D`.
 - `StarSO` recomputes note-length scale buckets whenever `MapRuntimeContext.NotesVersion` changes.
-- `NodeDistanceCullingManager` owns the shared `CullingGroup` and threshold transitions for graph nodes. Runtime tracking is split into `NodeTarget` and `Interest`: a `NodeTarget` is one physical graph node and one culling sphere, while each `Interest` is one consumer-specific distance rule and last visibility state.
-- `INodeDistanceCullingConsumer` is the prefab-side contract for distance-driven behavior. A consumer describes its own `Entry` request and receives `SetDistanceVisible(node, visible)` only for first application or real threshold changes. Current consumers are `NodeLabelCullingTarget` for label roots and `NodeBehaviourCullingTarget` for one serialized `Behaviour`.
+- `CullingManager` owns the shared `CullingGroup` and threshold transitions for graph nodes. Runtime tracking is split into `NodeTarget` and `Interest`: a `NodeTarget` is one physical graph node and one culling sphere, while each `Interest` is one consumer-specific distance rule and last visibility state.
+- `ICullingConsumer` is the prefab-side contract for distance-driven behavior. A consumer describes its own `Entry` request and receives `SetDistanceVisible(node, visible)` only for first application or real threshold changes. Current consumers are `LabelCullingTarget` for label roots and `BehaviourCullingTarget` for one serialized `Behaviour`.
 - `GameInput` treats UI hits as blocked input and only forwards gestures that originate on the map.
 - Bridge contract rules that matter locally:
   - `protocolVersion` must match `2.0.0`.

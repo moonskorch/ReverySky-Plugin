@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 public class Cartographer : MonoBehaviour
@@ -31,7 +32,8 @@ public class Cartographer : MonoBehaviour
   [Header("Debug sample data")]
   [SerializeField] private SampleDataGenerator sampleDataGenerator;
   [SerializeField] private LineBuilder lineBuilder;
-  [SerializeField] private NodeDistanceCullingManager nodeDistanceCullingManager;
+  [FormerlySerializedAs("nodeDistanceCullingManager")]
+  [SerializeField] private CullingManager cullingManager;
 
   private ScapeView currentView = ScapeView.Planets;
   public ScapeView CurrentView => currentView;
@@ -85,7 +87,7 @@ public class Cartographer : MonoBehaviour
       changeViewControl.OnChangeScapeView -= CycleView;
 
     if (_activeEngine != null)
-      _activeEngine.OnVisualNodesChanged -= HandleEngineVisualNodesChanged;
+      _activeEngine.OnNodesChanged -= HandleEngineNodesChanged;
   }
 
   private void Update()
@@ -164,13 +166,13 @@ public class Cartographer : MonoBehaviour
 
     if (_activeEngine != null && _activeEngine != next) 
     {
-      _activeEngine.OnVisualNodesChanged -= HandleEngineVisualNodesChanged;
+      _activeEngine.OnNodesChanged -= HandleEngineNodesChanged;
       _activeEngine.ClearGraph();
       OnEngineChanged?.Invoke(next.EngineType);
     }
 
     _activeEngine = next;
-    _activeEngine.OnVisualNodesChanged += HandleEngineVisualNodesChanged;
+    _activeEngine.OnNodesChanged += HandleEngineNodesChanged;
   }
 
   private void CycleView()
@@ -262,10 +264,10 @@ public class Cartographer : MonoBehaviour
     RebuildGraph(MapRuntimeContext.MapLayoutPreference);
   }
 
-  private void HandleEngineVisualNodesChanged(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes)
+  private void HandleEngineNodesChanged(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes)
   {
     lineBuilder?.Rebuild();
-    nodeDistanceCullingManager?.RebuildFromVisualNodes(stars, tagNodes, lineBuilder);
+    cullingManager?.Rebuild(stars, tagNodes, lineBuilder);
     OnGraphVisualsChanged?.Invoke(stars, tagNodes);
   }
 }

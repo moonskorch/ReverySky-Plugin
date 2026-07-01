@@ -2,13 +2,13 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-public interface INodeDistanceCullingConsumer
+public interface ICullingConsumer
 {
   /// <summary>
   /// Describes one distance rule requested by this consumer for the supplied graph node.
   /// The manager may merge this request with other consumers on the same physical node.
   /// </summary>
-  bool TryCreateDistanceEntry(Component node, out NodeDistanceCullingManager.Entry entry);
+  bool TryCreateDistanceEntry(Component node, out CullingManager.Entry entry);
 
   /// <summary>
   /// Receives the tracked node identity because some consumers, such as future
@@ -22,7 +22,7 @@ public interface INodeDistanceCullingConsumer
 /// It tracks each physical node once, then applies that node's distance state to
 /// all consumer-specific interests attached to it.
 /// </summary>
-public sealed class NodeDistanceCullingManager : MonoBehaviour
+public sealed class CullingManager : MonoBehaviour
 {
   private const float DefaultDistanceBand = 25f;
 
@@ -37,7 +37,7 @@ public sealed class NodeDistanceCullingManager : MonoBehaviour
     /// </summary>
     public Component node;
     public Transform referenceTransform;
-    public INodeDistanceCullingConsumer consumer;
+    public ICullingConsumer consumer;
     [Min(0.01f)] public float radius = 1f;
     [Min(0.01f)] public float visibleDistance = 25f;
   }
@@ -60,14 +60,14 @@ public sealed class NodeDistanceCullingManager : MonoBehaviour
   /// </summary>
   private sealed class Interest
   {
-    public INodeDistanceCullingConsumer consumer;
+    public ICullingConsumer consumer;
     public float visibleDistance;
     public int maxVisibleDistanceBand;
     public bool hasAppliedVisibility;
     public bool lastVisible;
   }
 
-  public static NodeDistanceCullingManager Active { get; private set; }
+  public static CullingManager Active { get; private set; }
 
   [SerializeField] private Camera targetCamera;
   [SerializeField] private bool requireCameraFrustumVisibility = true;
@@ -122,15 +122,15 @@ public sealed class NodeDistanceCullingManager : MonoBehaviour
     ApplyCurrentVisibility();
   }
 
-  public void RebuildFromVisualNodes(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes)
+  public void Rebuild(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes)
   {
-    RebuildFromVisualNodes(stars, tagNodes, null);
+    Rebuild(stars, tagNodes, null);
   }
 
-  public void RebuildFromVisualNodes(
+  public void Rebuild(
     IReadOnlyList<Star> stars,
     IReadOnlyList<TagNode> tagNodes,
-    INodeDistanceCullingConsumer extraConsumer)
+    ICullingConsumer extraConsumer)
   {
     DisposeCullingGroup();
 
@@ -152,7 +152,7 @@ public sealed class NodeDistanceCullingManager : MonoBehaviour
   public int Register(
     Component node,
     Transform referenceTransform,
-    INodeDistanceCullingConsumer consumer,
+    ICullingConsumer consumer,
     float radius = 1f,
     float visibleDistance = 25f)
   {
@@ -181,7 +181,7 @@ public sealed class NodeDistanceCullingManager : MonoBehaviour
     return index;
   }
 
-  public void Unregister(INodeDistanceCullingConsumer consumer)
+  public void Unregister(ICullingConsumer consumer)
   {
     if (consumer == null)
       return;
@@ -384,7 +384,7 @@ public sealed class NodeDistanceCullingManager : MonoBehaviour
   private int FindConsumerTargetIndex(
     Component node,
     Transform referenceTransform,
-    INodeDistanceCullingConsumer consumer)
+    ICullingConsumer consumer)
   {
     int targetIndex = FindNodeTargetIndex(node, referenceTransform);
     if (targetIndex < 0)
@@ -400,7 +400,7 @@ public sealed class NodeDistanceCullingManager : MonoBehaviour
     return -1;
   }
 
-  private static bool HasInterest(NodeTarget target, INodeDistanceCullingConsumer consumer)
+  private static bool HasInterest(NodeTarget target, ICullingConsumer consumer)
   {
     List<Interest> interests = target.interests;
     for (int i = 0; i < interests.Count; i++)
@@ -429,7 +429,7 @@ public sealed class NodeDistanceCullingManager : MonoBehaviour
 
   private void AddTargetsFromStars(
     IReadOnlyList<Star> stars,
-    INodeDistanceCullingConsumer extraConsumer)
+    ICullingConsumer extraConsumer)
   {
     if (stars == null)
       return;
@@ -440,7 +440,7 @@ public sealed class NodeDistanceCullingManager : MonoBehaviour
 
   private void AddTargetsFromTagNodes(
     IReadOnlyList<TagNode> tagNodes,
-    INodeDistanceCullingConsumer extraConsumer)
+    ICullingConsumer extraConsumer)
   {
     if (tagNodes == null)
       return;
@@ -451,7 +451,7 @@ public sealed class NodeDistanceCullingManager : MonoBehaviour
 
   private void AddTargetFromComponent(
     Component component,
-    INodeDistanceCullingConsumer extraConsumer)
+    ICullingConsumer extraConsumer)
   {
     if (component == null)
       return;
@@ -461,7 +461,7 @@ public sealed class NodeDistanceCullingManager : MonoBehaviour
     component.GetComponents(componentBuffer);
     for (int i = 0; i < componentBuffer.Count; i++)
     {
-      if (componentBuffer[i] is INodeDistanceCullingConsumer consumer &&
+      if (componentBuffer[i] is ICullingConsumer consumer &&
           consumer.TryCreateDistanceEntry(component, out var entry))
         AddEntry(entry);
     }

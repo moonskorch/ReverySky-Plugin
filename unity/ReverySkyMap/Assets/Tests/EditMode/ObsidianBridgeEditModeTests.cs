@@ -468,7 +468,7 @@ public class ObsidianBridgeEditModeTests
     public ScapeCameraWarper ScapeWarper => null;
     public IReadOnlyList<Star> Stars => new List<Star>();
     public IReadOnlyList<TagNode> TagNodes => new List<TagNode>();
-    public event System.Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnVisualNodesChanged;
+    public event System.Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnNodesChanged;
 
     public Star FindStarByNoteId(string noteId)
     {

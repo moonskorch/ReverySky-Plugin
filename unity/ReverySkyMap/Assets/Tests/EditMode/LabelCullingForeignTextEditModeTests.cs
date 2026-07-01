@@ -3,13 +3,13 @@ using NUnit.Framework;
 using TMPro;
 using UnityEngine;
 
-public class NodeLabelCullingForeignTextEditModeTests
+public class LabelCullingForeignTextEditModeTests
 {
   [TestCase("Заметка о звездах")]
   [TestCase("中文节点")]
   public void HiddenLabelRoot_HidesForeignTextAndFallbackChildren(string labelText)
   {
-    GameObject nodeObject = new GameObject("NodeLabelCullingForeignTextNode");
+    GameObject nodeObject = new GameObject("LabelCullingForeignTextNode");
     GameObject labelRoot = new GameObject("ForeignTextRoot");
     GameObject textObject = new GameObject("ForeignText");
     GameObject fallbackRendererObject = new GameObject("FallbackSubmeshProbe");
@@ -24,7 +24,7 @@ public class NodeLabelCullingForeignTextEditModeTests
       TextMeshPro text = textObject.AddComponent<TextMeshPro>();
       text.text = labelText;
 
-      NodeLabelCullingTarget target = nodeObject.AddComponent<NodeLabelCullingTarget>();
+      LabelCullingTarget target = nodeObject.AddComponent<LabelCullingTarget>();
       SetPrivateField(target, "labelRoot", labelRoot);
 
       target.SetDistanceVisible(nodeObject.transform, false);
@@ -45,13 +45,13 @@ public class NodeLabelCullingForeignTextEditModeTests
   [Test]
   public void BehaviourCullingTarget_TogglesSingleBehaviour()
   {
-    GameObject nodeObject = new GameObject("NodeBehaviourCullingTargetNode");
-    GameObject behaviourObject = new GameObject("NodeBehaviourCullingTargetBehaviour");
+    GameObject nodeObject = new GameObject("BehaviourCullingTargetNode");
+    GameObject behaviourObject = new GameObject("BehaviourCullingTargetBehaviour");
 
     try
     {
       ProbeBehaviour behaviour = behaviourObject.AddComponent<ProbeBehaviour>();
-      NodeBehaviourCullingTarget target = nodeObject.AddComponent<NodeBehaviourCullingTarget>();
+      BehaviourCullingTarget target = nodeObject.AddComponent<BehaviourCullingTarget>();
       SetPrivateField(target, "behaviour", behaviour);
 
       target.SetDistanceVisible(nodeObject.transform, false);
@@ -68,15 +68,15 @@ public class NodeLabelCullingForeignTextEditModeTests
   }
 
   [Test]
-  public void DistanceManager_AppliesVisibilityOnlyWhenStateChanges()
+  public void CullingManager_AppliesVisibilityOnlyWhenStateChanges()
   {
-    GameObject managerObject = new GameObject("NodeDistanceCullingTransitionManager");
-    GameObject nodeObject = new GameObject("NodeDistanceCullingTransitionNode");
+    GameObject managerObject = new GameObject("CullingTransitionManager");
+    GameObject nodeObject = new GameObject("CullingTransitionNode");
 
     try
     {
-      NodeDistanceCullingManager manager = managerObject.AddComponent<NodeDistanceCullingManager>();
-      var consumer = new CountingDistanceConsumer();
+      CullingManager manager = managerObject.AddComponent<CullingManager>();
+      var consumer = new CountingCullingConsumer();
       int index = manager.Register(nodeObject.transform, nodeObject.transform, consumer, 1f, 1f);
 
       InvokeApplyVisibilityIfChanged(manager, index, true);
@@ -95,16 +95,16 @@ public class NodeLabelCullingForeignTextEditModeTests
   }
 
   [Test]
-  public void DistanceManager_GroupsMultipleConsumersUnderOneNodeTarget()
+  public void CullingManager_GroupsMultipleConsumersUnderOneNodeTarget()
   {
-    GameObject managerObject = new GameObject("NodeDistanceCullingGroupedManager");
-    GameObject nodeObject = new GameObject("NodeDistanceCullingGroupedNode");
+    GameObject managerObject = new GameObject("CullingGroupedManager");
+    GameObject nodeObject = new GameObject("CullingGroupedNode");
 
     try
     {
-      NodeDistanceCullingManager manager = managerObject.AddComponent<NodeDistanceCullingManager>();
-      var firstConsumer = new CountingDistanceConsumer();
-      var secondConsumer = new CountingDistanceConsumer();
+      CullingManager manager = managerObject.AddComponent<CullingManager>();
+      var firstConsumer = new CountingCullingConsumer();
+      var secondConsumer = new CountingCullingConsumer();
 
       int firstIndex = manager.Register(nodeObject.transform, nodeObject.transform, firstConsumer, 1f, 1f);
       int secondIndex = manager.Register(nodeObject.transform, nodeObject.transform, secondConsumer, 1f, 10f);
@@ -126,23 +126,23 @@ public class NodeLabelCullingForeignTextEditModeTests
     }
   }
 
-  private static void InvokeApplyVisibilityIfChanged(NodeDistanceCullingManager manager, int index, bool visible)
+  private static void InvokeApplyVisibilityIfChanged(CullingManager manager, int index, bool visible)
   {
-    MethodInfo method = typeof(NodeDistanceCullingManager).GetMethod(
+    MethodInfo method = typeof(CullingManager).GetMethod(
       "ApplyVisibilityIfChanged",
       BindingFlags.Instance | BindingFlags.NonPublic);
 
-    Assert.That(method, Is.Not.Null, "NodeDistanceCullingManager.ApplyVisibilityIfChanged was not found.");
+    Assert.That(method, Is.Not.Null, "CullingManager.ApplyVisibilityIfChanged was not found.");
     method.Invoke(manager, new object[] { index, visible });
   }
 
-  private static int GetNodeTargetCount(NodeDistanceCullingManager manager)
+  private static int GetNodeTargetCount(CullingManager manager)
   {
-    FieldInfo field = typeof(NodeDistanceCullingManager).GetField(
+    FieldInfo field = typeof(CullingManager).GetField(
       "nodeTargets",
       BindingFlags.Instance | BindingFlags.NonPublic);
 
-    Assert.That(field, Is.Not.Null, "NodeDistanceCullingManager.nodeTargets was not found.");
+    Assert.That(field, Is.Not.Null, "CullingManager.nodeTargets was not found.");
     object value = field.GetValue(manager);
     Assert.That(value, Is.InstanceOf<System.Collections.ICollection>());
     return ((System.Collections.ICollection)value).Count;
@@ -155,14 +155,14 @@ public class NodeLabelCullingForeignTextEditModeTests
     field.SetValue(target, value);
   }
 
-  private sealed class CountingDistanceConsumer : INodeDistanceCullingConsumer
+  private sealed class CountingCullingConsumer : ICullingConsumer
   {
     public int CallCount { get; private set; }
     public bool LastVisible { get; private set; }
 
     public Component LastNode { get; private set; }
 
-    public bool TryCreateDistanceEntry(Component node, out NodeDistanceCullingManager.Entry entry)
+    public bool TryCreateDistanceEntry(Component node, out CullingManager.Entry entry)
     {
       entry = null;
       return false;

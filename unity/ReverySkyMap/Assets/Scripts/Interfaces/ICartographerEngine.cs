@@ -4,7 +4,7 @@ using UnityEngine;
 
 public interface ICartographerEngine
 {
-  event Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnVisualNodesChanged;
+  event Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnNodesChanged;
 
   bool RequiresTick { get; }
   void Tick(float dt);

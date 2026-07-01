@@ -363,7 +363,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   public MapLayoutMode EngineType => MapLayoutMode.ScalableLinks;
   public bool RequiresTick => _constructionActive || _remainingRefinementPasses > 0 ||
     (_continuousLinkRefinement && _graphHasNodes);
-  public event Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnVisualNodesChanged;
+  public event Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnNodesChanged;
   public float BoundRadius => _navigationRadius;
   public Vector3 Pivot => layoutParent ? layoutParent.TransformPoint(_layoutCenter) : _layoutCenter;
   public ScapeCameraWarper ScapeWarper => null;
@@ -2257,6 +2257,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
   private void PublishVisualNodesChanged()
   {
-    OnVisualNodesChanged?.Invoke(_stars, _tagNodes);
+    OnNodesChanged?.Invoke(_stars, _tagNodes);
   }
 }

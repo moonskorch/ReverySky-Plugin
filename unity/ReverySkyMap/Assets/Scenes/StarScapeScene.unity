@@ -2646,7 +2646,7 @@ MonoBehaviour:
   notification: {fileID: 1893426638}
   sampleDataGenerator: {fileID: 1780593170}
   lineBuilder: {fileID: 1217411434}
-  nodeDistanceCullingManager: {fileID: 1900010003}
+  cullingManager: {fileID: 1900010003}
 --- !u!4 &1780593169
 Transform:
   m_ObjectHideFlags: 0
@@ -2896,7 +2896,7 @@ GameObject:
   - component: {fileID: 1900010002}
   - component: {fileID: 1900010003}
   m_Layer: 0
-  m_Name: NodeDistanceCullingManager
+  m_Name: CullingManager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

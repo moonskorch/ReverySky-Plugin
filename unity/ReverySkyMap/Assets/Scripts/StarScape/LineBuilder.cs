@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public sealed class LineBuilder : MonoBehaviour, INodeDistanceCullingConsumer
+public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 {
   [SerializeField, Min(0.01f)] private float radius = 1f;
   [SerializeField, Min(0.01f)] private float visibleDistance = 80f;
@@ -14,14 +14,14 @@ public sealed class LineBuilder : MonoBehaviour, INodeDistanceCullingConsumer
     visibleNodes.Clear();
   }
 
-  public bool TryCreateDistanceEntry(Component node, out NodeDistanceCullingManager.Entry entry)
+  public bool TryCreateDistanceEntry(Component node, out CullingManager.Entry entry)
   {
     entry = null;
 
     if (node is not Star && node is not TagNode)
       return false;
 
-    entry = new NodeDistanceCullingManager.Entry
+    entry = new CullingManager.Entry
     {
       node = node,
       referenceTransform = node.transform,
