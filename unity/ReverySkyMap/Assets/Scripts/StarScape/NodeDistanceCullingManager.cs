@@ -2,32 +2,43 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
+public interface INodeDistanceVisibilityConsumer
+{
+  /// <summary>
+  /// Receives the tracked node identity because some consumers, such as future
+  /// graph-level line builders, handle many nodes through one object.
+  /// </summary>
+  void SetDistanceVisible(Component node, bool visible);
+}
+
 /// <summary>
-/// Central distance/frustum gate for node labels. It uses one CullingGroup for all
-/// registered nodes and hides each label root GameObject, so TMP fallback renderers
-/// created for non-Latin text are culled together with the visible label.
+/// Central distance/frustum gate for graph nodes. It uses one CullingGroup for all
+/// tracked nodes, while consumers own the visual or behavioral reaction to visibility.
 /// </summary>
-public sealed class NodeLabelCullingManager : MonoBehaviour
+public sealed class NodeDistanceCullingManager : MonoBehaviour
 {
   private const float DefaultDistanceBand = 25f;
 
-  [Serializable]
   public sealed class Entry
   {
+    /// <summary>
+    /// Identifies the graph object for shared consumers
+    /// </summary>
+    public Component node;
     public Transform referenceTransform;
-    public GameObject labelRoot;
-    public Behaviour[] behavioursWhenVisible;
+    public INodeDistanceVisibilityConsumer consumer;
     [Min(0.01f)] public float radius = 1f;
     [Min(0.01f)] public float visibleDistance = 25f;
+    public bool hasAppliedVisibility;
+    public bool lastVisible;
   }
 
-  public static NodeLabelCullingManager Active { get; private set; }
+  public static NodeDistanceCullingManager Active { get; private set; }
 
   [SerializeField] private Camera targetCamera;
   [SerializeField] private bool requireCameraFrustumVisibility = true;
   [SerializeField] private bool refreshBoundsInLateUpdate = true;
   [SerializeField, Min(0f)] private float boundsRefreshInterval = 0f;
-  [SerializeField] private List<Entry> sceneEntries = new();
 
   private readonly List<Entry> entries = new();
   private BoundingSphere[] boundingSpheres = Array.Empty<BoundingSphere>();
@@ -77,12 +88,6 @@ public sealed class NodeLabelCullingManager : MonoBehaviour
     DisposeCullingGroup();
 
     entries.Clear();
-    var registeredLabelRoots = new HashSet<GameObject>();
-    for (int i = 0; i < sceneEntries.Count; i++)
-    {
-      if (IsUsable(sceneEntries[i]))
-        AddEntry(sceneEntries[i], registeredLabelRoots);
-    }
 
     EnsureCullingGroup();
     EnsureSphereCapacity(entries.Count);
@@ -98,15 +103,11 @@ public sealed class NodeLabelCullingManager : MonoBehaviour
     DisposeCullingGroup();
 
     entries.Clear();
-    var registeredLabelRoots = new HashSet<GameObject>();
-    for (int i = 0; i < sceneEntries.Count; i++)
-    {
-      if (IsUsable(sceneEntries[i]))
-        AddEntry(sceneEntries[i], registeredLabelRoots);
-    }
+    var registeredConsumers = new HashSet<INodeDistanceVisibilityConsumer>();
 
-    AddTargetsFromStars(stars, registeredLabelRoots);
-    AddTargetsFromTagNodes(tagNodes, registeredLabelRoots);
+    // Cartographer owns graph lifecycle, so culling registrations are rebuilt in one batch.
+    AddTargetsFromStars(stars, registeredConsumers);
+    AddTargetsFromTagNodes(tagNodes, registeredConsumers);
 
     EnsureCullingGroup();
     EnsureSphereCapacity(entries.Count);
@@ -118,26 +119,26 @@ public sealed class NodeLabelCullingManager : MonoBehaviour
   }
 
   public int Register(
+    Component node,
     Transform referenceTransform,
-    GameObject labelRoot,
-    Behaviour[] behavioursWhenVisible = null,
+    INodeDistanceVisibilityConsumer consumer,
     float radius = 1f,
     float visibleDistance = 25f)
   {
-    if (referenceTransform == null || labelRoot == null)
+    if (referenceTransform == null || consumer == null)
       return -1;
 
     EnsureCullingGroup();
 
-    int existingIndex = entries.FindIndex(entry => entry.labelRoot == labelRoot);
+    int existingIndex = entries.FindIndex(entry => entry.consumer == consumer);
     if (existingIndex >= 0)
       return existingIndex;
 
     entries.Add(new Entry
     {
+      node = node,
       referenceTransform = referenceTransform,
-      labelRoot = labelRoot,
-      behavioursWhenVisible = behavioursWhenVisible,
+      consumer = consumer,
       radius = Mathf.Max(0.01f, radius),
       visibleDistance = Mathf.Max(0.01f, visibleDistance)
     });
@@ -150,12 +151,12 @@ public sealed class NodeLabelCullingManager : MonoBehaviour
     return index;
   }
 
-  public void Unregister(GameObject labelRoot)
+  public void Unregister(INodeDistanceVisibilityConsumer consumer)
   {
-    if (labelRoot == null)
+    if (consumer == null)
       return;
 
-    int index = entries.FindIndex(entry => entry.labelRoot == labelRoot);
+    int index = entries.FindIndex(entry => entry.consumer == consumer);
     if (index < 0)
       return;
 
@@ -233,6 +234,7 @@ public sealed class NodeLabelCullingManager : MonoBehaviour
       return;
     }
 
+    // CullingGroup uses one shared sorted distance set; each entry maps its own threshold back to a band.
     List<float> distances = new();
     for (int i = 0; i < entries.Count; i++)
       AddUniqueDistance(distances, Mathf.Max(0.01f, entries[i].visibleDistance));
@@ -269,7 +271,7 @@ public sealed class NodeLabelCullingManager : MonoBehaviour
 
   private void OnCullingStateChanged(CullingGroupEvent state)
   {
-    ApplyVisibility(state.index, ShouldShowLabel(state.index, state.isVisible, state.currentDistance));
+    ApplyVisibilityIfChanged(state.index, ResolveVisibility(state.index, state.isVisible, state.currentDistance));
   }
 
   private void ApplyCurrentVisibility()
@@ -278,10 +280,10 @@ public sealed class NodeLabelCullingManager : MonoBehaviour
       return;
 
     for (int i = 0; i < entries.Count; i++)
-      ApplyVisibility(i, ShouldShowLabel(i, cullingGroup.IsVisible(i), cullingGroup.GetDistance(i)));
+      ApplyVisibilityIfChanged(i, ResolveVisibility(i, cullingGroup.IsVisible(i), cullingGroup.GetDistance(i)));
   }
 
-  private bool ShouldShowLabel(int index, bool isVisibleToCamera, int distanceBand)
+  private bool ResolveVisibility(int index, bool isVisibleToCamera, int distanceBand)
   {
     bool isNearEnough =
       index >= 0 &&
@@ -291,62 +293,58 @@ public sealed class NodeLabelCullingManager : MonoBehaviour
     return isNearEnough && (!requireCameraFrustumVisibility || isVisibleToCamera);
   }
 
-  private void ApplyVisibility(int index, bool visible)
+  private void ApplyVisibilityIfChanged(int index, bool visible)
   {
     if (index < 0 || index >= entries.Count)
       return;
 
     Entry entry = entries[index];
-    if (entry.labelRoot != null && entry.labelRoot.activeSelf != visible)
-      entry.labelRoot.SetActive(visible);
-
-    if (entry.behavioursWhenVisible == null)
+    if (entry.hasAppliedVisibility && entry.lastVisible == visible)
       return;
 
-    for (int i = 0; i < entry.behavioursWhenVisible.Length; i++)
-    {
-      Behaviour behaviour = entry.behavioursWhenVisible[i];
-      if (behaviour != null)
-        behaviour.enabled = visible;
-    }
+    // Consumers only receive the initial state and real threshold transitions, not every camera update.
+    entry.hasAppliedVisibility = true;
+    entry.lastVisible = visible;
+    entry.consumer?.SetDistanceVisible(entry.node, visible);
   }
 
   private static bool IsUsable(Entry entry)
   {
-    return entry != null && entry.referenceTransform != null && entry.labelRoot != null;
+    return entry != null && entry.referenceTransform != null && entry.consumer != null;
   }
 
-  private void AddTargetsFromStars(IReadOnlyList<Star> stars, HashSet<GameObject> registeredLabelRoots)
+  private void AddTargetsFromStars(IReadOnlyList<Star> stars, HashSet<INodeDistanceVisibilityConsumer> registeredConsumers)
   {
     if (stars == null)
       return;
 
     for (int i = 0; i < stars.Count; i++)
-      AddTargetFromComponent(stars[i], registeredLabelRoots);
+      AddTargetFromComponent(stars[i], registeredConsumers);
   }
 
-  private void AddTargetsFromTagNodes(IReadOnlyList<TagNode> tagNodes, HashSet<GameObject> registeredLabelRoots)
+  private void AddTargetsFromTagNodes(IReadOnlyList<TagNode> tagNodes, HashSet<INodeDistanceVisibilityConsumer> registeredConsumers)
   {
     if (tagNodes == null)
       return;
 
     for (int i = 0; i < tagNodes.Count; i++)
-      AddTargetFromComponent(tagNodes[i], registeredLabelRoots);
+      AddTargetFromComponent(tagNodes[i], registeredConsumers);
   }
 
-  private void AddTargetFromComponent(Component component, HashSet<GameObject> registeredLabelRoots)
+  private void AddTargetFromComponent(Component component, HashSet<INodeDistanceVisibilityConsumer> registeredConsumers)
   {
     if (component == null)
       return;
 
+    // Label targets are the first consumer type; the manager still only stores distance data.
     NodeLabelCullingTarget target = component.GetComponent<NodeLabelCullingTarget>();
-    if (target != null && target.TryCreateEntry(out var entry))
-      AddEntry(entry, registeredLabelRoots);
+    if (target != null && target.TryCreateDistanceEntry(out var entry))
+      AddEntry(entry, registeredConsumers);
   }
 
-  private void AddEntry(Entry entry, HashSet<GameObject> registeredLabelRoots)
+  private void AddEntry(Entry entry, HashSet<INodeDistanceVisibilityConsumer> registeredConsumers)
   {
-    if (!IsUsable(entry) || !registeredLabelRoots.Add(entry.labelRoot))
+    if (!IsUsable(entry) || !registeredConsumers.Add(entry.consumer))
       return;
 
     entries.Add(entry);

@@ -189,7 +189,7 @@ MonoBehaviour:
   behavioursWhenVisible:
   - {fileID: 8817344900950793421}
   radius: 1
-  visibleDistance: 100
+  visibleDistance: 125
 --- !u!1001 &4410025161415576194
 PrefabInstance:
   m_ObjectHideFlags: 0

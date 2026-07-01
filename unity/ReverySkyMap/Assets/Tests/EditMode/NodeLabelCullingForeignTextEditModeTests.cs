@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
 using TMPro;
@@ -10,7 +9,6 @@ public class NodeLabelCullingForeignTextEditModeTests
   [TestCase("中文节点")]
   public void HiddenLabelRoot_HidesForeignTextAndFallbackChildren(string labelText)
   {
-    GameObject managerObject = new GameObject("NodeLabelCullingForeignTextManager");
     GameObject nodeObject = new GameObject("NodeLabelCullingForeignTextNode");
     GameObject labelRoot = new GameObject("ForeignTextRoot");
     GameObject textObject = new GameObject("ForeignText");
@@ -18,9 +16,6 @@ public class NodeLabelCullingForeignTextEditModeTests
 
     try
     {
-      managerObject.SetActive(false);
-      NodeLabelCullingManager manager = managerObject.AddComponent<NodeLabelCullingManager>();
-
       labelRoot.transform.SetParent(nodeObject.transform, false);
       textObject.transform.SetParent(labelRoot.transform, false);
       fallbackRendererObject.transform.SetParent(textObject.transform, false);
@@ -29,9 +24,10 @@ public class NodeLabelCullingForeignTextEditModeTests
       TextMeshPro text = textObject.AddComponent<TextMeshPro>();
       text.text = labelText;
 
-      int index = AddEntry(manager, nodeObject.transform, labelRoot);
+      NodeLabelCullingTarget target = nodeObject.AddComponent<NodeLabelCullingTarget>();
+      SetPrivateField(target, "labelRoot", labelRoot);
 
-      InvokeApplyVisibility(manager, index, false);
+      target.SetDistanceVisible(nodeObject.transform, false);
 
       Assert.That(labelRoot.activeSelf, Is.False);
       Assert.That(textObject.activeInHierarchy, Is.False);
@@ -43,37 +39,65 @@ public class NodeLabelCullingForeignTextEditModeTests
       Object.DestroyImmediate(textObject);
       Object.DestroyImmediate(labelRoot);
       Object.DestroyImmediate(nodeObject);
+    }
+  }
+
+  [Test]
+  public void DistanceManager_AppliesVisibilityOnlyWhenStateChanges()
+  {
+    GameObject managerObject = new GameObject("NodeDistanceCullingTransitionManager");
+    GameObject nodeObject = new GameObject("NodeDistanceCullingTransitionNode");
+
+    try
+    {
+      NodeDistanceCullingManager manager = managerObject.AddComponent<NodeDistanceCullingManager>();
+      var consumer = new CountingDistanceConsumer();
+      int index = manager.Register(nodeObject.transform, nodeObject.transform, consumer, 1f, 1f);
+
+      InvokeApplyVisibilityIfChanged(manager, index, true);
+      InvokeApplyVisibilityIfChanged(manager, index, true);
+      InvokeApplyVisibilityIfChanged(manager, index, false);
+
+      Assert.That(consumer.CallCount, Is.EqualTo(2));
+      Assert.That(consumer.LastVisible, Is.False);
+      Assert.That(consumer.LastNode, Is.SameAs(nodeObject.transform));
+    }
+    finally
+    {
+      Object.DestroyImmediate(nodeObject);
       Object.DestroyImmediate(managerObject);
     }
   }
 
-  private static int AddEntry(NodeLabelCullingManager manager, Transform referenceTransform, GameObject labelRoot)
+  private static void InvokeApplyVisibilityIfChanged(NodeDistanceCullingManager manager, int index, bool visible)
   {
-    FieldInfo entriesField = typeof(NodeLabelCullingManager).GetField(
-      "entries",
+    MethodInfo method = typeof(NodeDistanceCullingManager).GetMethod(
+      "ApplyVisibilityIfChanged",
       BindingFlags.Instance | BindingFlags.NonPublic);
 
-    Assert.That(entriesField, Is.Not.Null, "NodeLabelCullingManager.entries was not found.");
-
-    var entries = (List<NodeLabelCullingManager.Entry>)entriesField.GetValue(manager);
-    entries.Add(new NodeLabelCullingManager.Entry
-    {
-      referenceTransform = referenceTransform,
-      labelRoot = labelRoot,
-      radius = 1f,
-      visibleDistance = 1f
-    });
-
-    return entries.Count - 1;
+    Assert.That(method, Is.Not.Null, "NodeDistanceCullingManager.ApplyVisibilityIfChanged was not found.");
+    method.Invoke(manager, new object[] { index, visible });
   }
 
-  private static void InvokeApplyVisibility(NodeLabelCullingManager manager, int index, bool visible)
+  private static void SetPrivateField(object target, string fieldName, object value)
   {
-    MethodInfo method = typeof(NodeLabelCullingManager).GetMethod(
-      "ApplyVisibility",
-      BindingFlags.Instance | BindingFlags.NonPublic);
+    FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(field, Is.Not.Null, $"{target.GetType().Name}.{fieldName} was not found.");
+    field.SetValue(target, value);
+  }
 
-    Assert.That(method, Is.Not.Null, "NodeLabelCullingManager.ApplyVisibility was not found.");
-    method.Invoke(manager, new object[] { index, visible });
+  private sealed class CountingDistanceConsumer : INodeDistanceVisibilityConsumer
+  {
+    public int CallCount { get; private set; }
+    public bool LastVisible { get; private set; }
+
+    public Component LastNode { get; private set; }
+
+    public void SetDistanceVisible(Component node, bool visible)
+    {
+      CallCount++;
+      LastNode = node;
+      LastVisible = visible;
+    }
   }
 }

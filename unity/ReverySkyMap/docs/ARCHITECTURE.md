@@ -33,9 +33,9 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Main code location: `Assets/Scripts/GameInput/GameInput.cs`, `Assets/Scripts/StarScape/FocusNode.cs`, `Assets/Scripts/Camera/CameraOrbitalController.cs`, `Assets/Scripts/UI/ChangeViewControl.cs`, `Assets/Scripts/UI/RotateCameraUI.cs`
   - Important dependencies: `EventSystem`, `Camera.main`, `MapRuntimeContext`, `Cartographer.I`, `GameSettings`
 - Visual assets and support objects:
-  - Responsibility: provide prefabs, scale calibration, labels, and the optional sample graph injector.
-  - Main code location: `Assets/Scripts/ScriptableObjects/StarSO.cs`, `Assets/Scripts/ScriptableObjects/TagNodeSO.cs`, `Assets/Scripts/Notification/Notification.cs`, `Assets/Scripts/StarScape/SampleDataGenerator.cs`
-  - Important dependencies: `MapRuntimeContext.NotesVersion`, `MapRuntimeContext.HasRuntimeNotes`, prefab assets in `Assets/Prefabs`
+  - Responsibility: provide prefabs, scale calibration, labels, node distance culling, and the optional sample graph injector.
+  - Main code location: `Assets/Scripts/ScriptableObjects/StarSO.cs`, `Assets/Scripts/ScriptableObjects/TagNodeSO.cs`, `Assets/Scripts/StarScape/NodeDistanceCullingManager.cs`, `Assets/Scripts/StarScape/NodeLabelCullingTarget.cs`, `Assets/Scripts/Notification/Notification.cs`, `Assets/Scripts/StarScape/SampleDataGenerator.cs`
+  - Important dependencies: `Cartographer.OnGraphVisualsChanged`, `MapRuntimeContext.NotesVersion`, `MapRuntimeContext.HasRuntimeNotes`, prefab assets in `Assets/Prefabs`
 - Automated checks:
   - Responsibility: guard bridge parsing, layout rules, and PlayMode bootstrap/visual stability.
   - Main code location: `Assets/Tests/EditMode/*`, `Assets/Tests/PlayMode/*`
@@ -198,6 +198,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 - The current scene wiring assigns the `StaticLinks` slot to the RecursiveHubs baseline under eval, which can continue construction or refinement through `Tick()` after `BuildGraph()`. `Engine_EmptySpheres` remains a static fallback/evaluation engine with EditMode coverage for its radius calculations and static contract.
 - `ScapeCameraWarper` owns the 2.5D warp state and only participates when the active engine is `Static25D`.
 - `StarSO` recomputes note-length scale buckets whenever `MapRuntimeContext.NotesVersion` changes.
+- `NodeDistanceCullingManager` owns the shared `CullingGroup` and threshold transitions for graph nodes. It rebuilds registrations from `Cartographer.OnGraphVisualsChanged`, then calls `INodeDistanceVisibilityConsumer.SetDistanceVisible(node, visible)` only for initial state or real visibility changes; `NodeLabelCullingTarget` owns the label-specific `GameObject` and `Behaviour` updates.
 - `GameInput` treats UI hits as blocked input and only forwards gestures that originate on the map.
 - Bridge contract rules that matter locally:
   - `protocolVersion` must match `2.0.0`.

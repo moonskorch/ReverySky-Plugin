@@ -2847,7 +2847,7 @@ GameObject:
   - component: {fileID: 1900010002}
   - component: {fileID: 1900010003}
   m_Layer: 0
-  m_Name: NodeLabelCullingManager
+  m_Name: NodeDistanceCullingManager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2884,7 +2884,6 @@ MonoBehaviour:
   requireCameraFrustumVisibility: 1
   refreshBoundsInLateUpdate: 1
   boundsRefreshInterval: 0
-  sceneEntries: []
 --- !u!1 &1956217079
 GameObject:
   m_ObjectHideFlags: 0
