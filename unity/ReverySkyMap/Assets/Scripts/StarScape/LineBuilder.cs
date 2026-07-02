@@ -1,16 +1,20 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Pool;
 
 // TODO:
 // 1. Purge long lines with limits.
-// 2. Pooling of lines.
-// 3. Focus node priority to show.
-// 4. Remove line building from engine.
-// 5. Limit per node.
-// 6. Per-frame budget for line activation/deactivation.
-// 7. Reconciliation: rebuild active lines from all visible nodes by priority, instead of keeping the lines that filled the limit first.
+// 2. Focus node priority to show.
+// 3. Remove line building from engine.
+// 4. Limit per node.
+// 5. Per-frame budget for line activation/deactivation.
+// 6. Reconciliation: rebuild active lines from all visible nodes by priority, instead of keeping the lines that filled the limit first.
 
+/// <summary>
+/// Builds culling-driven edge visuals for the active graph nodes.
+/// Physical line renderers are pooled because visibility changes can be frequent while graph data stays stable.
+/// </summary>
 public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 {
   private const string NoteEndpointPrefix = "note:";
@@ -44,17 +48,18 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   private readonly HashSet<string> edgeKeys = new(StringComparer.Ordinal);
   private readonly HashSet<string> visibleEndpoints = new(StringComparer.Ordinal);
   private readonly List<string> staleLineKeys = new();
+  private ObjectPool<LineRenderer> linePool;
   private int activeLineLimit;
+  private int linePoolMaxSize;
 
   public void Rebuild(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes, int maxActiveLines)
   {
     activeLineLimit = Mathf.Max(0, maxActiveLines);
+    // Release active lines before resizing so the old pool owns all inactive renderers it may dispose.
     ClearActiveLines();
-    endpointByNode.Clear();
-    transformByEndpoint.Clear();
-    candidatesByEndpoint.Clear();
-    edgeKeys.Clear();
-    visibleEndpoints.Clear();
+    ClearLineState();
+    EnsureLinePoolSize(activeLineLimit);
+
     if (activeLineLimit == 0)
       return;
 
@@ -62,6 +67,22 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     RegisterTagEndpoints(tagNodes);
     BuildNoteNoteCandidates();
     BuildNoteTagCandidates(stars);
+  }
+
+  private void OnDestroy()
+  {
+    ClearActiveLines();
+    DisposeLinePool();
+    ClearLineState();
+  }
+
+  private void ClearLineState()
+  {
+    endpointByNode.Clear();
+    transformByEndpoint.Clear();
+    candidatesByEndpoint.Clear();
+    edgeKeys.Clear();
+    visibleEndpoints.Clear();
   }
 
   public bool TryCreateDistanceEntry(Component node, out CullingManager.Entry entry)
@@ -276,8 +297,9 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     if (linePrefab == null)
       return;
 
-    Transform parent = lineParent != null ? lineParent : transform;
-    LineRenderer line = Instantiate(linePrefab, parent);
+    EnsureLinePoolSize(activeLineLimit);
+
+    LineRenderer line = linePool.Get();
     line.positionCount = 2;
     line.SetPosition(0, candidate.transformA.position);
     line.SetPosition(1, candidate.transformB.position);
@@ -295,10 +317,10 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     if (!activeLinesByEdgeKey.TryGetValue(edgeKey, out LineBinding binding))
       return;
 
-    if (binding?.line != null)
-      Destroy(binding.line.gameObject);
-
     activeLinesByEdgeKey.Remove(edgeKey);
+
+    if (binding?.line != null)
+      linePool.Release(binding.line);
   }
 
   private void ClearActiveLines()
@@ -307,10 +329,91 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     {
       LineBinding binding = pair.Value;
       if (binding?.line != null)
-        Destroy(binding.line.gameObject);
+      {
+        if (linePool != null)
+          linePool.Release(binding.line);
+        else
+          DestroyPooledLine(binding.line);
+      }
     }
 
     activeLinesByEdgeKey.Clear();
+  }
+
+  private void EnsureLinePoolSize(int requiredMaxSize)
+  {
+    if (requiredMaxSize <= 0 || linePrefab == null)
+    {
+      // A zero limit means the active engine does not use LineBuilder-managed lines at all.
+      DisposeLinePool();
+      return;
+    }
+
+    if (linePool != null && linePoolMaxSize == requiredMaxSize)
+      return;
+
+    var previousPool = linePool;
+    linePoolMaxSize = requiredMaxSize;
+    // Engine switches are rare, so matching the pool size to the current line limit
+    // is clearer than retaining a high-water mark.
+    linePool = new ObjectPool<LineRenderer>(
+      CreateLine,
+      PrepareLineForUse,
+      PrepareLineForPool,
+      DestroyPooledLine,
+      collectionCheck: false,
+      defaultCapacity: requiredMaxSize,
+      maxSize: requiredMaxSize);
+
+    previousPool?.Dispose();
+  }
+
+  private LineRenderer CreateLine()
+  {
+    Transform parent = lineParent != null ? lineParent : transform;
+    LineRenderer line = Instantiate(linePrefab, parent);
+    line.gameObject.SetActive(false);
+    return line;
+  }
+
+  private void PrepareLineForUse(LineRenderer line)
+  {
+    if (line == null)
+      return;
+
+    Transform parent = lineParent != null ? lineParent : transform;
+    if (line.transform.parent != parent)
+      line.transform.SetParent(parent, false);
+    line.gameObject.SetActive(true);
+  }
+
+  private static void PrepareLineForPool(LineRenderer line)
+  {
+    if (line == null)
+      return;
+
+    line.positionCount = 0;
+    line.gameObject.SetActive(false);
+  }
+
+  private static void DestroyPooledLine(LineRenderer line)
+  {
+    if (line == null)
+      return;
+
+    if (Application.isPlaying)
+      Destroy(line.gameObject);
+    else
+      // EditMode tests exercise pool disposal outside Play Mode, where Destroy
+      // would only log and defer cleanup.
+      DestroyImmediate(line.gameObject);
+  }
+
+  private void DisposeLinePool()
+  {
+    linePool?.Dispose();
+    linePool = null;
+    linePoolMaxSize = 0;
   }
 
   private static string OtherEndpoint(LineCandidate candidate, string endpoint)
