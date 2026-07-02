@@ -5,12 +5,11 @@ using UnityEngine;
 // TODO:
 // 1. Purge long lines with limits.
 // 2. Pooling of lines.
-// 3. Limits of lines in engines.
-// 4. Focus node priority to show.
-// 5. Remove line building from engine.
-// 6. Limit per node.
-// 7. Per-frame budget for line activation/deactivation.
-// 8. Reconciliation: rebuild active lines from all visible nodes by priority, instead of keeping the lines that filled the limit first.
+// 3. Focus node priority to show.
+// 4. Remove line building from engine.
+// 5. Limit per node.
+// 6. Per-frame budget for line activation/deactivation.
+// 7. Reconciliation: rebuild active lines from all visible nodes by priority, instead of keeping the lines that filled the limit first.
 
 public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 {
