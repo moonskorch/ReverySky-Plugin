@@ -18,14 +18,51 @@ using UnityEngine.Pool;
 /// </summary>
 public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 {
-  private const string NoteEndpointPrefix = "note:";
-  private const string TagEndpointPrefix = "tag:";
+  private const int NoNodeId = 0;
+
+  private readonly struct EdgeKey : IEquatable<EdgeKey>
+  {
+    private readonly int nodeAId;
+    private readonly int nodeBId;
+
+    public EdgeKey(int nodeAId, int nodeBId)
+    {
+      if (nodeAId <= nodeBId)
+      {
+        this.nodeAId = nodeAId;
+        this.nodeBId = nodeBId;
+      }
+      else
+      {
+        this.nodeAId = nodeBId;
+        this.nodeBId = nodeAId;
+      }
+    }
+
+    public bool Equals(EdgeKey other)
+    {
+      return nodeAId == other.nodeAId && nodeBId == other.nodeBId;
+    }
+
+    public override bool Equals(object obj)
+    {
+      return obj is EdgeKey other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+      unchecked
+      {
+        return (nodeAId * 397) ^ nodeBId;
+      }
+    }
+  }
 
   private sealed class LineCandidate
   {
-    public string edgeKey;
-    public string endpointA;
-    public string endpointB;
+    public EdgeKey edgeKey;
+    public int nodeAId;
+    public int nodeBId;
     public Transform transformA;
     public Transform transformB;
   }
@@ -46,20 +83,21 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   [SerializeField, Min(0)] private int maxActiveLongLines = 20;
   [SerializeField, Min(0f)] private float longLineDistance = 50f;
 
-  private readonly Dictionary<Component, string> endpointByNode = new();
-  private readonly Dictionary<string, Transform> transformByEndpoint = new(StringComparer.Ordinal);
-  private readonly Dictionary<string, List<LineCandidate>> candidatesByEndpoint = new(StringComparer.Ordinal);
-  private readonly Dictionary<string, LineBinding> activeLinesByEdgeKey = new(StringComparer.Ordinal);
-  private readonly HashSet<string> edgeKeys = new(StringComparer.Ordinal);
-  private readonly HashSet<string> visibleEndpoints = new(StringComparer.Ordinal);
-  private readonly HashSet<string> desiredLineKeys = new(StringComparer.Ordinal);
+  private readonly HashSet<int> registeredNodeIds = new();
+  private readonly Dictionary<string, Star> starByNoteId = new(StringComparer.Ordinal);
+  private readonly Dictionary<int, TagNode> tagNodeById = new();
+  private readonly Dictionary<int, List<LineCandidate>> candidatesByNodeId = new();
+  private readonly Dictionary<EdgeKey, LineBinding> activeLinesByEdgeKey = new();
+  private readonly HashSet<EdgeKey> edgeKeys = new();
+  private readonly HashSet<int> visibleNodeIds = new();
+  private readonly HashSet<EdgeKey> desiredLineKeys = new();
   private readonly List<LineCandidate> desiredLineCandidates = new();
-  private readonly List<string> staleLineKeys = new();
+  private readonly List<EdgeKey> staleLineKeys = new();
   private ObjectPool<LineRenderer> linePool;
   private int activeLineLimit;
   private int linePoolMaxSize;
   private bool lineSetDirty;
-  private string focusedEndpoint;
+  private int focusedNodeId;
 
   public void Rebuild(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes, int maxActiveLines)
   {
@@ -72,8 +110,8 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     if (activeLineLimit == 0)
       return;
 
-    RegisterStarEndpoints(stars);
-    RegisterTagEndpoints(tagNodes);
+    RegisterStarNodes(stars);
+    RegisterTagNodes(tagNodes);
     BuildNoteNoteCandidates();
     BuildNoteTagCandidates(stars);
   }
@@ -87,11 +125,12 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 
   private void ClearLineState()
   {
-    endpointByNode.Clear();
-    transformByEndpoint.Clear();
-    candidatesByEndpoint.Clear();
+    registeredNodeIds.Clear();
+    starByNoteId.Clear();
+    tagNodeById.Clear();
+    candidatesByNodeId.Clear();
     edgeKeys.Clear();
-    visibleEndpoints.Clear();
+    visibleNodeIds.Clear();
     ClearReconciliationScratch();
   }
 
@@ -101,14 +140,14 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     desiredLineCandidates.Clear();
     staleLineKeys.Clear();
     lineSetDirty = false;
-    focusedEndpoint = null;
+    focusedNodeId = NoNodeId;
   }
 
   public bool TryCreateDistanceEntry(Component node, out CullingManager.Entry entry)
   {
     entry = null;
 
-    if (node == null || !endpointByNode.ContainsKey(node))
+    if (node == null || !registeredNodeIds.Contains(NodeId(node)))
       return false;
 
     entry = new CullingManager.Entry
@@ -125,19 +164,23 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 
   public void SetDistanceVisible(Component node, bool visible)
   {
-    if (node == null || !endpointByNode.TryGetValue(node, out string endpoint))
+    if (node == null)
+      return;
+
+    int nodeId = NodeId(node);
+    if (!registeredNodeIds.Contains(nodeId))
       return;
 
     if (visible)
     {
-      if (!visibleEndpoints.Add(endpoint))
+      if (!visibleNodeIds.Add(nodeId))
         return;
 
       MarkLineSetDirty();
       return;
     }
 
-    if (!visibleEndpoints.Remove(endpoint))
+    if (!visibleNodeIds.Remove(nodeId))
       return;
 
     MarkLineSetDirty();
@@ -145,7 +188,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 
   private void LateUpdate()
   {
-    UpdateFocusedEndpointDirtyState();
+    UpdateFocusedNodeDirtyState();
     ReconcileActiveLinesIfDirty();
     UpdateActiveLinePositions();
   }
@@ -187,7 +230,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
       RemoveLine(staleLineKeys[i]);
   }
 
-  private void RegisterStarEndpoints(IReadOnlyList<Star> stars)
+  private void RegisterStarNodes(IReadOnlyList<Star> stars)
   {
     if (stars == null)
       return;
@@ -198,11 +241,15 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
       if (star == null || star.Data == null || string.IsNullOrWhiteSpace(star.Data.Id))
         continue;
 
-      RegisterEndpoint(star, NoteEndpoint(star.Data.Id));
+      if (starByNoteId.ContainsKey(star.Data.Id))
+        continue;
+
+      starByNoteId[star.Data.Id] = star;
+      RegisterNode(star);
     }
   }
 
-  private void RegisterTagEndpoints(IReadOnlyList<TagNode> tagNodes)
+  private void RegisterTagNodes(IReadOnlyList<TagNode> tagNodes)
   {
     if (tagNodes == null)
       return;
@@ -213,18 +260,24 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
       if (tagNode == null)
         continue;
 
-      RegisterEndpoint(tagNode, TagEndpoint(tagNode.UserTagId));
+      if (tagNodeById.ContainsKey(tagNode.UserTagId))
+        continue;
+
+      tagNodeById[tagNode.UserTagId] = tagNode;
+      RegisterNode(tagNode);
     }
   }
 
-  private void RegisterEndpoint(Component node, string endpoint)
+  private void RegisterNode(Component node)
   {
-    if (node == null || string.IsNullOrWhiteSpace(endpoint) || transformByEndpoint.ContainsKey(endpoint))
+    if (node == null)
       return;
 
-    endpointByNode[node] = endpoint;
-    transformByEndpoint[endpoint] = node.transform;
-    EnsureCandidateList(endpoint);
+    int nodeId = NodeId(node);
+    if (!registeredNodeIds.Add(nodeId))
+      return;
+
+    EnsureCandidateList(nodeId);
   }
 
   private void BuildNoteNoteCandidates()
@@ -242,7 +295,13 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
         continue;
       }
 
-      TryAddCandidate(NoteEndpoint(link.SourceId), NoteEndpoint(link.TargetId));
+      if (!starByNoteId.TryGetValue(link.SourceId, out Star sourceStar) ||
+          !starByNoteId.TryGetValue(link.TargetId, out Star targetStar))
+      {
+        continue;
+      }
+
+      TryAddCandidate(sourceStar, targetStar);
     }
   }
 
@@ -255,48 +314,56 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     {
       Star star = stars[i];
       if (star == null || star.Data == null || star.Data.TagIds == null ||
-          !endpointByNode.TryGetValue(star, out string noteEndpoint))
+          !registeredNodeIds.Contains(NodeId(star)))
       {
         continue;
       }
 
       for (int tagIndex = 0; tagIndex < star.Data.TagIds.Count; tagIndex++)
-        TryAddCandidate(noteEndpoint, TagEndpoint(star.Data.TagIds[tagIndex]));
+      {
+        if (tagNodeById.TryGetValue(star.Data.TagIds[tagIndex], out TagNode tagNode))
+          TryAddCandidate(star, tagNode);
+      }
     }
   }
 
-  private void TryAddCandidate(string endpointA, string endpointB)
+  private void TryAddCandidate(Component nodeA, Component nodeB)
   {
-    if (string.Equals(endpointA, endpointB, StringComparison.Ordinal) ||
-        !transformByEndpoint.TryGetValue(endpointA, out Transform transformA) ||
-        !transformByEndpoint.TryGetValue(endpointB, out Transform transformB))
+    if (nodeA == null || nodeB == null)
+      return;
+
+    int nodeAId = NodeId(nodeA);
+    int nodeBId = NodeId(nodeB);
+    if (nodeAId == nodeBId ||
+        !registeredNodeIds.Contains(nodeAId) ||
+        !registeredNodeIds.Contains(nodeBId))
     {
       return;
     }
 
-    string edgeKey = EdgeKey(endpointA, endpointB);
+    EdgeKey edgeKey = new(nodeAId, nodeBId);
     if (!edgeKeys.Add(edgeKey))
       return;
 
     var candidate = new LineCandidate
     {
       edgeKey = edgeKey,
-      endpointA = endpointA,
-      endpointB = endpointB,
-      transformA = transformA,
-      transformB = transformB
+      nodeAId = nodeAId,
+      nodeBId = nodeBId,
+      transformA = nodeA.transform,
+      transformB = nodeB.transform
     };
 
-    EnsureCandidateList(endpointA).Add(candidate);
-    EnsureCandidateList(endpointB).Add(candidate);
+    EnsureCandidateList(nodeAId).Add(candidate);
+    EnsureCandidateList(nodeBId).Add(candidate);
   }
 
-  private List<LineCandidate> EnsureCandidateList(string endpoint)
+  private List<LineCandidate> EnsureCandidateList(int nodeId)
   {
-    if (!candidatesByEndpoint.TryGetValue(endpoint, out var candidates))
+    if (!candidatesByNodeId.TryGetValue(nodeId, out var candidates))
     {
       candidates = new List<LineCandidate>();
-      candidatesByEndpoint[endpoint] = candidates;
+      candidatesByNodeId[nodeId] = candidates;
     }
 
     return candidates;
@@ -328,9 +395,9 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 
   private void AddFocusedLines(ref int selectedLongLineCount)
   {
-    if (string.IsNullOrEmpty(focusedEndpoint) ||
-        !visibleEndpoints.Contains(focusedEndpoint) ||
-        !candidatesByEndpoint.TryGetValue(focusedEndpoint, out var candidates))
+    if (focusedNodeId == NoNodeId ||
+        !visibleNodeIds.Contains(focusedNodeId) ||
+        !candidatesByNodeId.TryGetValue(focusedNodeId, out var candidates))
     {
       return;
     }
@@ -359,9 +426,9 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 
   private void FillVisibleLines(ref int selectedLongLineCount)
   {
-    foreach (string endpoint in visibleEndpoints)
+    foreach (int nodeId in visibleNodeIds)
     {
-      if (!candidatesByEndpoint.TryGetValue(endpoint, out var candidates))
+      if (!candidatesByNodeId.TryGetValue(nodeId, out var candidates))
         continue;
 
       for (int i = 0; i < candidates.Count; i++)
@@ -465,7 +532,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     };
   }
 
-  private void RemoveLine(string edgeKey)
+  private void RemoveLine(EdgeKey edgeKey)
   {
     if (!activeLinesByEdgeKey.TryGetValue(edgeKey, out LineBinding binding))
       return;
@@ -572,8 +639,8 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   private bool IsCandidateVisible(LineCandidate candidate)
   {
     return candidate != null &&
-           (visibleEndpoints.Contains(candidate.endpointA) ||
-            visibleEndpoints.Contains(candidate.endpointB));
+           (visibleNodeIds.Contains(candidate.nodeAId) ||
+            visibleNodeIds.Contains(candidate.nodeBId));
   }
 
   private bool IsLongLine(LineCandidate candidate)
@@ -589,40 +656,27 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
            maxLongLineDistance * maxLongLineDistance;
   }
 
-  private void UpdateFocusedEndpointDirtyState()
+  private void UpdateFocusedNodeDirtyState()
   {
-    string nextFocusedEndpoint = ResolveFocusedEndpoint();
-    if (string.Equals(focusedEndpoint, nextFocusedEndpoint, StringComparison.Ordinal))
+    int nextFocusedNodeId = ResolveFocusedNodeId();
+    if (focusedNodeId == nextFocusedNodeId)
       return;
 
-    focusedEndpoint = nextFocusedEndpoint;
+    focusedNodeId = nextFocusedNodeId;
     MarkLineSetDirty();
   }
 
-  private string ResolveFocusedEndpoint()
+  private int ResolveFocusedNodeId()
   {
     string focusedNoteId = focusNode != null ? focusNode.LastSelectedStarId : string.Empty;
     if (string.IsNullOrWhiteSpace(focusedNoteId))
-      return null;
+      return NoNodeId;
 
-    string endpoint = NoteEndpoint(focusedNoteId);
-    return transformByEndpoint.ContainsKey(endpoint) ? endpoint : null;
+    return starByNoteId.TryGetValue(focusedNoteId, out Star star) ? NodeId(star) : NoNodeId;
   }
 
-  private static string EdgeKey(string endpointA, string endpointB)
+  private static int NodeId(Component node)
   {
-    return string.CompareOrdinal(endpointA, endpointB) <= 0
-      ? $"{endpointA}|{endpointB}"
-      : $"{endpointB}|{endpointA}";
-  }
-
-  private static string NoteEndpoint(string noteId)
-  {
-    return $"{NoteEndpointPrefix}{noteId}";
-  }
-
-  private static string TagEndpoint(int tagId)
-  {
-    return $"{TagEndpointPrefix}{tagId}";
+    return node != null ? node.GetInstanceID() : NoNodeId;
   }
 }
