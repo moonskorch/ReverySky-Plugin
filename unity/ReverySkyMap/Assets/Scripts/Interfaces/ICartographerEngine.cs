@@ -14,6 +14,7 @@ public interface ICartographerEngine
 
   MapLayoutMode EngineType { get; }
   int MaxActiveLines { get; }
+  int MaxActiveLongLines { get; }
   ScapeCameraWarper ScapeWarper { get; }
   IReadOnlyList<Star> Stars { get; }
   IReadOnlyList<TagNode> TagNodes { get; }

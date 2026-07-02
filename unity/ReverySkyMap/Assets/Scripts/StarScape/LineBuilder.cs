@@ -7,7 +7,6 @@ using UnityEngine.Pool;
 // 1. Remove line building from engine.
 // 2. Limit per node.
 // 3. Rebalance active lines when the visible graph region changes.
-// 4. Move distanceVisibility, longLineLimits to engines.
 
 /// <summary>
 /// Builds culling-driven edge visuals for the active graph nodes.
@@ -77,8 +76,8 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   [SerializeField] private FocusNode focusNode;
   [SerializeField, Min(0.01f)] private float radius = 1f;
   [SerializeField, Min(0.01f)] private float visibleDistance = 80f;
-  [SerializeField, Min(0)] private int maxActiveLongLines = 20;
   [SerializeField, Min(0f)] private float longLineDistance = 50f;
+  [SerializeField] private bool focusedLinesIgnoreLongLineLimit = true;
 
   private readonly HashSet<int> registeredNodeIds = new();
   private readonly Dictionary<string, Star> starByNoteId = new(StringComparer.Ordinal);
@@ -92,13 +91,19 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   private readonly List<EdgeKey> staleLineKeys = new();
   private ObjectPool<LineRenderer> linePool;
   private int activeLineLimit;
+  private int activeLongLineLimit;
   private int linePoolMaxSize;
   private bool lineSetDirty;
   private int focusedNodeId;
 
-  public void Rebuild(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes, int maxActiveLines)
+  public void Rebuild(
+    IReadOnlyList<Star> stars,
+    IReadOnlyList<TagNode> tagNodes,
+    int maxActiveLines,
+    int maxActiveLongLines)
   {
     activeLineLimit = Mathf.Max(0, maxActiveLines);
+    activeLongLineLimit = Mathf.Max(0, maxActiveLongLines);
     // Release active lines before resizing so the old pool owns all inactive renderers it may dispose.
     ClearActiveLines();
     ClearLineState();
@@ -401,7 +406,10 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 
     for (int i = 0; i < candidates.Count; i++)
     {
-      AddDesiredLine(candidates[i], ignoreLongLineLimit: true, ref selectedLongLineCount);
+      AddDesiredLine(
+        candidates[i],
+        ignoreLongLineLimit: focusedLinesIgnoreLongLineLimit,
+        ref selectedLongLineCount);
       if (HasFilledLineLimit())
         return;
     }
@@ -448,7 +456,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     // Long-line budget is a selection-time heuristic; layout motion may move active lines
     // across the threshold until the next visibility or focus reconciliation.
     bool isLongLine = IsLongLine(candidate);
-    if (isLongLine && !ignoreLongLineLimit && selectedLongLineCount >= maxActiveLongLines)
+    if (isLongLine && !ignoreLongLineLimit && selectedLongLineCount >= activeLongLineLimit)
       return false;
 
     if (!desiredLineKeys.Add(candidate.edgeKey))

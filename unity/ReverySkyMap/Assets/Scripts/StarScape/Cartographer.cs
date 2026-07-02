@@ -267,7 +267,8 @@ public class Cartographer : MonoBehaviour
   private void HandleEngineNodesChanged(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes)
   {
     int activeLineLimit = _activeEngine?.MaxActiveLines ?? 0;
-    lineBuilder?.Rebuild(stars, tagNodes, activeLineLimit);
+    int activeLongLineLimit = _activeEngine?.MaxActiveLongLines ?? 0;
+    lineBuilder?.Rebuild(stars, tagNodes, activeLineLimit, activeLongLineLimit);
     cullingManager?.Rebuild(stars, tagNodes, lineBuilder);
     OnGraphVisualsChanged?.Invoke(stars, tagNodes);
   }

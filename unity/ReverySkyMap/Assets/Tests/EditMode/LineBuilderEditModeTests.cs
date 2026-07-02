@@ -16,7 +16,7 @@ public class LineBuilderEditModeTests
     ConfigureStar(scope.NoteB, "n2", "notes/n2.md");
     ConfigureTag(scope.Tag, 7);
 
-    scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode> { scope.Tag }, 4);
+    scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode> { scope.Tag }, 4, 10);
 
     Assert.That(scope.Builder.TryCreateDistanceEntry(scope.NoteA, out var starEntry), Is.True);
     Assert.That(starEntry.node, Is.SameAs(scope.NoteA));
@@ -53,7 +53,7 @@ public class LineBuilderEditModeTests
       new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "missing", Weight = 1f }
     });
 
-    scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode> { scope.Tag }, 4);
+    scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode> { scope.Tag }, 4, 10);
     scope.Builder.SetDistanceVisible(scope.NoteA, true);
     FlushLineBuilder(scope.Builder);
     yield return null;
@@ -75,7 +75,7 @@ public class LineBuilderEditModeTests
 
     MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>());
 
-    scope.Builder.Rebuild(new List<Star> { scope.NoteA }, new List<TagNode> { scope.Tag }, 4);
+    scope.Builder.Rebuild(new List<Star> { scope.NoteA }, new List<TagNode> { scope.Tag }, 4, 10);
     scope.Builder.SetDistanceVisible(scope.NoteA, true);
     scope.Builder.SetDistanceVisible(scope.Tag, true);
     FlushLineBuilder(scope.Builder);
@@ -109,7 +109,7 @@ public class LineBuilderEditModeTests
 
     MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>());
 
-    scope.Builder.Rebuild(new List<Star> { scope.NoteA }, new List<TagNode> { scope.Tag }, 4);
+    scope.Builder.Rebuild(new List<Star> { scope.NoteA }, new List<TagNode> { scope.Tag }, 4, 10);
     Assert.That(GetInactiveLineCount(scope.Builder), Is.EqualTo(0));
 
     scope.Builder.SetDistanceVisible(scope.NoteA, true);
@@ -147,7 +147,7 @@ public class LineBuilderEditModeTests
       new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n2", Weight = 1f }
     });
 
-    scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode>(), 1);
+    scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode>(), 1, 10);
     scope.Builder.SetDistanceVisible(scope.NoteA, true);
     FlushLineBuilder(scope.Builder);
     yield return null;
@@ -181,7 +181,7 @@ public class LineBuilderEditModeTests
       new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n2", Weight = 1f }
     });
 
-    scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode>(), 1);
+    scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode>(), 1, 10);
     scope.Builder.SetDistanceVisible(scope.NoteA, true);
     FlushLineBuilder(scope.Builder);
     yield return null;
@@ -192,7 +192,7 @@ public class LineBuilderEditModeTests
     yield return null;
     Assert.That(GetLineCount(scope.LineParent), Is.EqualTo(1));
 
-    scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode>(), 0);
+    scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode>(), 0, 10);
     yield return null;
 
     Assert.That(GetLineCount(scope.LineParent), Is.EqualTo(0));
@@ -211,7 +211,7 @@ public class LineBuilderEditModeTests
       new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n2", Weight = 1f }
     });
 
-    scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode> { scope.Tag }, 2);
+    scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode> { scope.Tag }, 2, 10);
     scope.Builder.SetDistanceVisible(scope.NoteA, true);
     FlushLineBuilder(scope.Builder);
     yield return null;
@@ -223,7 +223,7 @@ public class LineBuilderEditModeTests
     Assert.That(GetLineCount(scope.LineParent), Is.EqualTo(2));
     Assert.That(GetActiveLineCount(scope.LineParent), Is.EqualTo(0));
 
-    scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode> { scope.Tag }, 1);
+    scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode> { scope.Tag }, 1, 10);
     yield return null;
     Assert.That(GetLineCount(scope.LineParent), Is.EqualTo(0));
 
@@ -249,7 +249,7 @@ public class LineBuilderEditModeTests
       new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n2", Weight = 1f }
     });
 
-    scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode> { scope.Tag }, 1);
+    scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode> { scope.Tag }, 1, 10);
     scope.Builder.SetDistanceVisible(scope.NoteA, true);
     scope.Builder.SetDistanceVisible(scope.NoteB, true);
     scope.Builder.SetDistanceVisible(scope.Tag, true);
@@ -282,7 +282,7 @@ public class LineBuilderEditModeTests
         new MapRuntimeContext.RuntimeNoteLink { SourceId = "n2", TargetId = "n3", Weight = 1f }
       });
 
-      scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB, noteC }, new List<TagNode> { scope.Tag }, 1);
+      scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB, noteC }, new List<TagNode> { scope.Tag }, 1, 10);
       scope.Builder.SetDistanceVisible(scope.NoteB, true);
       scope.Builder.SetDistanceVisible(scope.NoteA, true);
       FlushLineBuilder(scope.Builder);
@@ -331,7 +331,7 @@ public class LineBuilderEditModeTests
         new MapRuntimeContext.RuntimeNoteLink { SourceId = "n2", TargetId = "n3", Weight = 1f }
       });
 
-      scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB, noteC }, new List<TagNode> { scope.Tag }, 1);
+      scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB, noteC }, new List<TagNode> { scope.Tag }, 1, 10);
       scope.Builder.SetDistanceVisible(scope.NoteB, true);
       scope.Builder.SetDistanceVisible(scope.NoteA, true);
       FlushLineBuilder(scope.Builder);
@@ -375,7 +375,6 @@ public class LineBuilderEditModeTests
       SetPosition(noteC, new Vector3(12f, 0f, 0f));
       SetPosition(noteD, new Vector3(1f, 0f, 0f));
       SetPrivateField(scope.Builder, "longLineDistance", 5f);
-      SetPrivateField(scope.Builder, "maxActiveLongLines", 1);
 
       MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>
       {
@@ -384,12 +383,62 @@ public class LineBuilderEditModeTests
         new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n4", Weight = 1f }
       });
 
-      scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB, noteC, noteD }, new List<TagNode>(), 3);
+      scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB, noteC, noteD }, new List<TagNode>(), 3, 1);
       scope.Builder.SetDistanceVisible(scope.NoteA, true);
       FlushLineBuilder(scope.Builder);
 
       Assert.That(GetActiveLineCount(scope.LineParent), Is.EqualTo(2));
       Assert.That(GetActiveLongLineCount(scope.LineParent, 5f), Is.EqualTo(1));
+    }
+    finally
+    {
+      Object.DestroyImmediate(noteCObject);
+      Object.DestroyImmediate(noteDObject);
+    }
+
+    yield return null;
+  }
+
+  [UnityTest]
+  public IEnumerator FocusedLines_RespectLongLineLimitWhenBypassIsDisabled()
+  {
+    using var scope = CreateScope();
+    var noteCObject = new GameObject("LineBuilderEditModeTests_NoteC");
+    var noteDObject = new GameObject("LineBuilderEditModeTests_NoteD");
+    var noteC = noteCObject.AddComponent<Star>();
+    var noteD = noteDObject.AddComponent<Star>();
+
+    try
+    {
+      ConfigureStar(scope.NoteA, "n1", "notes/n1.md");
+      ConfigureStar(scope.NoteB, "n2", "notes/n2.md");
+      ConfigureStar(noteC, "n3", "notes/n3.md");
+      ConfigureStar(noteD, "n4", "notes/n4.md");
+      SetPosition(scope.NoteA, Vector3.zero);
+      SetPosition(scope.NoteB, new Vector3(10f, 0f, 0f));
+      SetPosition(noteC, new Vector3(12f, 0f, 0f));
+      SetPosition(noteD, new Vector3(1f, 0f, 0f));
+      SetPrivateField(scope.Builder, "longLineDistance", 5f);
+      SetPrivateField(scope.Builder, "focusedLinesIgnoreLongLineLimit", false);
+      SetPrivateField(scope.Focus, "selectedStar", scope.NoteA);
+
+      MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>
+      {
+        new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n2", Weight = 1f },
+        new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n3", Weight = 1f },
+        new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n4", Weight = 1f }
+      });
+
+      scope.Builder.Rebuild(
+        new List<Star> { scope.NoteA, scope.NoteB, noteC, noteD },
+        new List<TagNode>(),
+        3,
+        0);
+      scope.Builder.SetDistanceVisible(scope.NoteA, true);
+      FlushLineBuilder(scope.Builder);
+
+      Assert.That(GetActiveLineCount(scope.LineParent), Is.EqualTo(1));
+      Assert.That(GetActiveLongLineCount(scope.LineParent, 5f), Is.EqualTo(0));
     }
     finally
     {

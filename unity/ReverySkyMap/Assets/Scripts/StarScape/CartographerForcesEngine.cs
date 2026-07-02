@@ -29,6 +29,7 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
 
   [Header("Line Builder")]
   [SerializeField, Min(0)] private int maxActiveLines = 200;
+  [SerializeField, Min(0)] private int maxActiveLongLines = 10;
 
   [Header("Orbit")]
   [SerializeField] private float orbitAngularSpeed = 0.1f;
@@ -65,6 +66,7 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
 
   public MapLayoutMode EngineType => MapLayoutMode.DynamicLinks;
   public int MaxActiveLines => maxActiveLines;
+  public int MaxActiveLongLines => maxActiveLongLines;
   public bool RequiresTick => true;
   public event Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnNodesChanged;
 

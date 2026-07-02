@@ -40,6 +40,7 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
 
   [Header("Line Builder")]
   [SerializeField, Min(0)] private int maxActiveLines = 0;
+  [SerializeField, Min(0)] private int maxActiveLongLines = 10;
 
   private const int STABLE_SEED = 12345;
 
@@ -58,6 +59,7 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
 
   public MapLayoutMode EngineType => MapLayoutMode.Dates;
   public int MaxActiveLines => maxActiveLines;
+  public int MaxActiveLongLines => maxActiveLongLines;
   public bool RequiresTick => false;
   public void Tick(float dt) { }
 

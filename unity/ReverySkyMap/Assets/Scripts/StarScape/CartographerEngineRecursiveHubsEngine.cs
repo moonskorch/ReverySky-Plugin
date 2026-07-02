@@ -110,6 +110,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
   [Header("Line Builder")]
   [SerializeField, Min(0)] private int maxActiveLines = 200;
+  [SerializeField, Min(0)] private int maxActiveLongLines = 10;
 
   [Header("Construction Timing")]
   [SerializeField] private AnimationLifetime constructionLifetime = AnimationLifetime.Timed;
@@ -365,6 +366,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
   public MapLayoutMode EngineType => MapLayoutMode.ScalableLinks;
   public int MaxActiveLines => maxActiveLines;
+  public int MaxActiveLongLines => maxActiveLongLines;
   public bool RequiresTick => _constructionActive || _remainingRefinementPasses > 0 ||
     (_continuousLinkRefinement && _graphHasNodes);
   public event Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnNodesChanged;
