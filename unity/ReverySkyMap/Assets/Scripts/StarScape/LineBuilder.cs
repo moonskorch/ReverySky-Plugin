@@ -37,7 +37,6 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   [SerializeField] private Transform lineParent;
   [SerializeField, Min(0.01f)] private float radius = 1f;
   [SerializeField, Min(0.01f)] private float visibleDistance = 80f;
-  [SerializeField, Min(1)] private int maxActiveLines = 200;
 
   private readonly Dictionary<Component, string> endpointByNode = new();
   private readonly Dictionary<string, Transform> transformByEndpoint = new(StringComparer.Ordinal);
@@ -46,20 +45,19 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   private readonly HashSet<string> edgeKeys = new(StringComparer.Ordinal);
   private readonly HashSet<string> visibleEndpoints = new(StringComparer.Ordinal);
   private readonly List<string> staleLineKeys = new();
+  private int activeLineLimit;
 
-  public void Rebuild()
+  public void Rebuild(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes, int maxActiveLines)
   {
-    Rebuild(null, null);
-  }
-
-  public void Rebuild(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes)
-  {
+    activeLineLimit = Mathf.Max(0, maxActiveLines);
     ClearActiveLines();
     endpointByNode.Clear();
     transformByEndpoint.Clear();
     candidatesByEndpoint.Clear();
     edgeKeys.Clear();
     visibleEndpoints.Clear();
+    if (activeLineLimit == 0)
+      return;
 
     RegisterStarEndpoints(stars);
     RegisterTagEndpoints(tagNodes);
@@ -109,6 +107,8 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   private void LateUpdate()
   {
     staleLineKeys.Clear();
+    if (activeLineLimit == 0 || activeLinesByEdgeKey.Count == 0)
+      return;
 
     foreach (var pair in activeLinesByEdgeKey)
     {
@@ -271,7 +271,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     if (candidate == null || activeLinesByEdgeKey.ContainsKey(candidate.edgeKey))
       return;
 
-    if (activeLinesByEdgeKey.Count >= maxActiveLines)
+    if (activeLineLimit <= 0 || activeLinesByEdgeKey.Count >= activeLineLimit)
       return;
 
     if (linePrefab == null)

@@ -13,6 +13,7 @@ public interface ICartographerEngine
   Vector3 Pivot { get; }
 
   MapLayoutMode EngineType { get; }
+  int MaxActiveLines { get; }
   ScapeCameraWarper ScapeWarper { get; }
   IReadOnlyList<Star> Stars { get; }
   IReadOnlyList<TagNode> TagNodes { get; }

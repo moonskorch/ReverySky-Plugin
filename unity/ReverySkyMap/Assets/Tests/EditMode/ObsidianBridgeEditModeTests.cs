@@ -463,6 +463,7 @@ public class ObsidianBridgeEditModeTests
     public float BoundRadius => 1f;
     public Vector3 Pivot => Vector3.zero;
     public MapLayoutMode EngineType { get; }
+    public int MaxActiveLines => 0;
     public ScapeCameraWarper ScapeWarper => null;
     public IReadOnlyList<Star> Stars => new List<Star>();
     public IReadOnlyList<TagNode> TagNodes => new List<TagNode>();

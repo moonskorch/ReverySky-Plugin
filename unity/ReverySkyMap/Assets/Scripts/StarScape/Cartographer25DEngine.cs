@@ -38,6 +38,9 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
   [SerializeField] private float boundXYRadius = 10f;
   [SerializeField] private bool clampZToRange = true;
 
+  [Header("Line Builder")]
+  [SerializeField, Min(0)] private int maxActiveLines = 0;
+
   private const int STABLE_SEED = 12345;
 
   private readonly List<Node> _nodes = new();
@@ -54,6 +57,7 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
   }
 
   public MapLayoutMode EngineType => MapLayoutMode.Dates;
+  public int MaxActiveLines => maxActiveLines;
   public bool RequiresTick => false;
   public void Tick(float dt) { }
 

@@ -312,6 +312,7 @@ MonoBehaviour:
   minimumBoundRadius: 6
   spawnFillRatio: 0.3
   tagScale: 0.7
+  maxActiveLines: 200
   orbitAngularSpeed: 0.1
 --- !u!4 &280067060
 Transform:
@@ -679,6 +680,7 @@ MonoBehaviour:
   olderNotesAreFar: 1
   boundXYRadius: 10
   clampZToRange: 1
+  maxActiveLines: 20
 --- !u!4 &428893402
 Transform:
   m_ObjectHideFlags: 0
@@ -1552,6 +1554,7 @@ MonoBehaviour:
   rootGuardDistanceFactor: 5
   maxSeparationChecksPerNode: 180
   tagScale: 0.7
+  maxActiveLines: 200
   constructionLifetime: 1
   constructionAnimationSeconds: 3
   endlessConstructionNodesPerFrame: 120
@@ -1774,7 +1777,6 @@ MonoBehaviour:
   lineParent: {fileID: 1327961058}
   radius: 1
   visibleDistance: 60
-  maxActiveLines: 200
 --- !u!4 &1217411435
 Transform:
   m_ObjectHideFlags: 0
@@ -2683,7 +2685,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
   injectSampleData: 0
   sampleScenario: 0
-  sampleNoteCount: 250
+  sampleNoteCount: 2500
   sampleTagPoolSize: 40
   sampleDateSpanDays: 365
   sampleMaxTagsPerNote: 4
