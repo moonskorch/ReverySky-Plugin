@@ -853,7 +853,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
   private void BuildDirectNoteLinks()
   {
-    if (!MapRuntimeContext.IsRuntimeMode || MapRuntimeContext.Links == null)
+    if (MapRuntimeContext.Links == null)
       return;
 
     var noteIndexById = new Dictionary<string, int>(StringComparer.Ordinal);

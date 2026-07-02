@@ -1,0 +1,2 @@
+# Unity tests may create an empty Resources folder; this project does not use Resources.Load.
+Assets/Resources.meta

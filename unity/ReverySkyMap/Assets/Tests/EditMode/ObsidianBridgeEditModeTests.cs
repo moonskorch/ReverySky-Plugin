@@ -36,7 +36,6 @@ public class ObsidianBridgeEditModeTests
   {
     bridge.OnGraphSet(TestPayloads.MinimalGraphSetPayload);
 
-    Assert.That(MapRuntimeContext.IsRuntimeMode, Is.True);
     Assert.That(MapRuntimeContext.Notes, Has.Count.EqualTo(2));
     Assert.That(MapRuntimeContext.Links, Has.Count.EqualTo(1));
     Assert.That(MapRuntimeContext.Links[0].SourceId, Is.EqualTo("n1"));
@@ -315,7 +314,6 @@ public class ObsidianBridgeEditModeTests
   {
     bridge.OnGraphSet(string.Empty);
 
-    Assert.That(MapRuntimeContext.IsRuntimeMode, Is.True);
     Assert.That(MapRuntimeContext.Notes, Has.Count.EqualTo(0));
     Assert.That(MapRuntimeContext.Links, Has.Count.EqualTo(0));
 

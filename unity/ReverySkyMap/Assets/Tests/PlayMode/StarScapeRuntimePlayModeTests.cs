@@ -35,7 +35,6 @@ public class StarScapeRuntimePlayModeTests
     Assert.That(cartographer, Is.Not.Null);
     Assert.That(cartographer.isActiveAndEnabled, Is.True);
 
-    Assert.That(MapRuntimeContext.IsRuntimeMode, Is.True);
     Assert.That(MapRuntimeContext.Notes, Has.Count.EqualTo(3));
     Assert.That(MapRuntimeContext.Links, Has.Count.EqualTo(2));
     NoteData firstNote = MapRuntimeContext.FindNoteById("v1");

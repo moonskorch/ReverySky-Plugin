@@ -46,8 +46,6 @@ public class ObsidianBridge : MonoBehaviour
     if (IsRuntimeShuttingDown)
       return;
 
-    MapRuntimeContext.EnableRuntimeMode();
-
     if (string.IsNullOrWhiteSpace(json))
       return;
 
@@ -166,8 +164,6 @@ public class ObsidianBridge : MonoBehaviour
   {
     if (IsRuntimeShuttingDown)
       return;
-
-    MapRuntimeContext.EnableRuntimeMode();
 
     if (string.IsNullOrWhiteSpace(json))
       return;

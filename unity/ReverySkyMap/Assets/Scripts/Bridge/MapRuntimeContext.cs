@@ -18,7 +18,6 @@ public static class MapRuntimeContext
   public static List<NoteData> Notes { get; private set; } = new();
   public static List<RuntimeNoteLink> Links { get; private set; } = new();
   private static Dictionary<int, string> tagNamesById = new();
-  public static bool IsRuntimeMode { get; private set; } = false;
   public static int NotesVersion { get; private set; } = 0;
 
   public static string PendingFocusNoteId { get; set; } = string.Empty;
@@ -30,14 +29,8 @@ public static class MapRuntimeContext
 
   public static bool HasRuntimeNotes => Notes != null && Notes.Count > 0;
 
-  public static void EnableRuntimeMode()
-  {
-    IsRuntimeMode = true;
-  }
-
   public static void SetNotes(List<NoteData> notes)
   {
-    IsRuntimeMode = true;
     Notes = notes ?? new List<NoteData>();
     ApplyDirectLinkCounts();
     NotesVersion++;
@@ -46,7 +39,6 @@ public static class MapRuntimeContext
 
   public static void SetLinks(List<RuntimeNoteLink> links)
   {
-    IsRuntimeMode = true;
     Links = links ?? new List<RuntimeNoteLink>();
   }
 

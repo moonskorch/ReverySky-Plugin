@@ -10,6 +10,7 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
   [SerializeField] private Transform layoutParent;
   [SerializeField] private TagNodeSO tagNodeTemplate;
   [SerializeField] private LineRenderer edgePrefab;
+  [SerializeField] private bool drawLines = true;
 
   [Header("Layout (force-directed)")]
   [SerializeField] private float idealEdgeLen = 3.2f;
@@ -142,13 +143,16 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
 
         _edges.Add(new Edge { noteInd = noteIdx, tagInd = ti, restLen = idealEdgeLen });
 
-        var lr = Instantiate(edgePrefab, layoutParent);
-        lr.positionCount = 2;
-        _lines.Add(lr);
+        if (drawLines)
+        {
+          var lr = Instantiate(edgePrefab, layoutParent);
+          lr.positionCount = 2;
+          _lines.Add(lr);
+        }
       }
     }
 
-    if (MapRuntimeContext.IsRuntimeMode && MapRuntimeContext.Links != null && MapRuntimeContext.Links.Count > 0)
+    if (MapRuntimeContext.Links != null && MapRuntimeContext.Links.Count > 0)
     {
       var noteIndexById = _nodes
         .Select((node, idx) => new { node, idx })
@@ -183,13 +187,17 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
           restLen = Mathf.Clamp(idealEdgeLen / Mathf.Sqrt(weight), 0.8f, idealEdgeLen * 1.5f)
         });
 
-        var lr = Instantiate(edgePrefab, layoutParent);
-        lr.positionCount = 2;
-        _lines.Add(lr);
+        if (drawLines)
+        {
+          var lr = Instantiate(edgePrefab, layoutParent);
+          lr.positionCount = 2;
+          _lines.Add(lr);
+        }
       }
     }
 
-    UpdateLines();
+    if (drawLines)
+      UpdateLines();
     PublishVisualNodesChanged();
   }
 
@@ -310,13 +318,14 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
     }
 
     // 4) Update lines
-    UpdateLines();
+    if (drawLines)
+      UpdateLines();
   }
 
   public void ApplyView(ScapeView view)
   {
     bool showTags = (view == ScapeView.Planets);
-    bool showEdges = (view == ScapeView.Planets);
+    bool showEdges = drawLines && (view == ScapeView.Planets);
 
     for (int i = 0; i < _nodes.Count; i++)
     {

@@ -108,9 +108,9 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Entry point: bridge messages from the parent runtime
   - Calls / sends to: `MapRuntimeContext`, `Cartographer`, `ReverySkyBridgePostNoteOpen`
 - `MapRuntimeContext`
-  - Responsibility: owns the live runtime graph snapshot, pending focus note id, and runtime mode.
+  - Responsibility: owns the live runtime graph snapshot and pending focus note id.
   - Code anchor: `Assets/Scripts/Bridge/MapRuntimeContext.cs`
-  - Entry point: `SetNotes`, `SetLinks`, `SetTagNames`, `RequestOpenNote`, `EnableRuntimeMode`
+  - Entry point: `SetNotes`, `SetLinks`, `SetTagNames`, `RequestOpenNote`
   - Calls / sends to: `Cartographer`, `StarSO`, `FocusNode`, `ObsidianBridge`
 - `NoteData`
   - Responsibility: represents the normalized runtime note model consumed by engines and visuals.
