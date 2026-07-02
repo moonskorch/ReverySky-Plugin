@@ -131,7 +131,7 @@ public class ObsidianBridgeEditModeTests
 
       focusField.SetValue(cartographer, focusNode);
       cameraField.SetValue(focusNode, cameraController);
-      focusNode.LastSelectedStarId = "old";
+      focusNode.FocusRestoreNoteId = "old";
 
       var notes = new List<NoteData>
       {
@@ -147,7 +147,7 @@ public class ObsidianBridgeEditModeTests
       MapRuntimeContext.PendingFocusNoteId = string.Empty;
       focusAfterRebuild.Invoke(cartographer, new object[] { notes });
       Assert.That(MapRuntimeContext.PendingFocusNoteId, Is.EqualTo(string.Empty));
-      Assert.That(focusNode.LastSelectedStarId, Is.EqualTo("old"));
+      Assert.That(focusNode.FocusRestoreNoteId, Is.EqualTo("old"));
     }
     finally
     {

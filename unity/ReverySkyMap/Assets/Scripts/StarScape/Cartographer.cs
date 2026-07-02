@@ -190,7 +190,7 @@ public class Cartographer : MonoBehaviour
       return;
     }
 
-    var previousFocusId = focusNode?.LastSelectedStarId;
+    var previousFocusId = focusNode?.FocusRestoreNoteId;
     if (string.IsNullOrWhiteSpace(previousFocusId))
     {
       focusNode?.ResetFocus();

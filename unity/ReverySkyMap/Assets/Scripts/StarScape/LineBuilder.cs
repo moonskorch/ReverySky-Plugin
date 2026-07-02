@@ -6,11 +6,8 @@ using UnityEngine.Pool;
 // TODO:
 // 1. Remove line building from engine.
 // 2. Limit per node.
-// 3. Per-frame budget for line activation/deactivation.
-// 4. Rebalance active lines when the visible graph region changes.
-// 5. Move distanceVisibility, longLineLimits to engines.
-// 6. Make focus changes event-driven.
-// 7. Replace interpolated string keys with existing node identity.
+// 3. Rebalance active lines when the visible graph region changes.
+// 4. Move distanceVisibility, longLineLimits to engines.
 
 /// <summary>
 /// Builds culling-driven edge visuals for the active graph nodes.
@@ -658,21 +655,13 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 
   private void UpdateFocusedNodeDirtyState()
   {
-    int nextFocusedNodeId = ResolveFocusedNodeId();
+    Star focusedStar = focusNode != null ? focusNode.SelectedStar : null;
+    int nextFocusedNodeId = NodeId(focusedStar);
     if (focusedNodeId == nextFocusedNodeId)
       return;
 
     focusedNodeId = nextFocusedNodeId;
     MarkLineSetDirty();
-  }
-
-  private int ResolveFocusedNodeId()
-  {
-    string focusedNoteId = focusNode != null ? focusNode.LastSelectedStarId : string.Empty;
-    if (string.IsNullOrWhiteSpace(focusedNoteId))
-      return NoNodeId;
-
-    return starByNoteId.TryGetValue(focusedNoteId, out Star star) ? NodeId(star) : NoNodeId;
   }
 
   private static int NodeId(Component node)

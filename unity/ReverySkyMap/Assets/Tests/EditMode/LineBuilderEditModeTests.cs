@@ -340,7 +340,7 @@ public class LineBuilderEditModeTests
       Assert.That(firstLine.GetPosition(0), Is.EqualTo(scope.NoteB.transform.position));
       Assert.That(firstLine.GetPosition(1), Is.EqualTo(noteC.transform.position));
 
-      scope.Focus.LastSelectedStarId = "n1";
+      SetPrivateField(scope.Focus, "selectedStar", scope.NoteA);
       FlushLineBuilder(scope.Builder);
 
       LineRenderer focusedLine = GetOnlyActiveLine(scope.LineParent);

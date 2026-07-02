@@ -2628,7 +2628,7 @@ MonoBehaviour:
   layoutParent: {fileID: 1327961058}
   cameraController: {fileID: 330585549}
   selectedDistance: 5
-  LastSelectedStarId: 
+  FocusRestoreNoteId: 
 --- !u!114 &1780593168
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2687,12 +2687,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
   injectSampleData: 0
-  sampleScenario: 0
-  sampleNoteCount: 250
-  sampleTagPoolSize: 50
+  sampleScenario: 1
+  sampleNoteCount: 2500
+  sampleTagPoolSize: 1000
   sampleDateSpanDays: 365
   sampleMaxTagsPerNote: 4
-  sampleExtraLinks: 0
+  sampleExtraLinks: 1000
 --- !u!1 &1787028428
 GameObject:
   m_ObjectHideFlags: 0

@@ -8,8 +8,9 @@ public class FocusNode : MonoBehaviour
   [SerializeField] private float selectedDistance = 5.0f;
 
   private Star selectedStar;
-  public string LastSelectedStarId;
+  public string FocusRestoreNoteId;
 
+  public Star SelectedStar => selectedStar;
   public CameraOrbitalController CameraController => cameraController;
 
   private void Start()
@@ -75,6 +76,6 @@ public class FocusNode : MonoBehaviour
   private void SelectStar(Star star)
   {
     selectedStar = star;
-    LastSelectedStarId = star?.Data?.Id;
+    FocusRestoreNoteId = star?.Data?.Id;
   }
 }

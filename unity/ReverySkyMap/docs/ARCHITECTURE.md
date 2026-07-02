@@ -60,7 +60,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 5. `Cartographer.HandleRuntimeNotesChanged()` calls `RebuildGraph(MapRuntimeContext.MapLayoutPreference)`.
 6. `Cartographer.ResolveModeByNotesCount()` uses `defaultEngine` first. Without an override, explicit `Static25D` and `StaticLinks` stay fixed, while `Auto` and `Forces` resolve by note count: small graphs use `Forces`, large graphs use `StaticLinks`.
 7. The chosen engine runs `BuildGraph(notes)`, then `ApplyView(CurrentView)`, and `Cartographer` rebinds any `ScapeCameraWarper` exposed by the active engine.
-8. After `BuildGraph()`, `Cartographer` restores focus only from `FocusNode.LastSelectedStarId`; missing focus calls `ResetFocus()`.
+8. After `BuildGraph()`, `Cartographer` restores focus only from `FocusNode.FocusRestoreNoteId`; missing focus calls `ResetFocus()`.
 9. Incremental engines retry delayed focus through `MapRuntimeContext.PendingFocusNoteId`.
 
 ### 3. Note focus and open-note callback
