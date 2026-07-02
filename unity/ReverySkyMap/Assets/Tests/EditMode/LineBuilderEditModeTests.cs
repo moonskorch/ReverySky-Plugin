@@ -55,6 +55,7 @@ public class LineBuilderEditModeTests
 
     scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode> { scope.Tag }, 4);
     scope.Builder.SetDistanceVisible(scope.NoteA, true);
+    FlushLineBuilder(scope.Builder);
     yield return null;
 
     LineRenderer[] lines = scope.LineParent.GetComponentsInChildren<LineRenderer>(true);
@@ -77,17 +78,20 @@ public class LineBuilderEditModeTests
     scope.Builder.Rebuild(new List<Star> { scope.NoteA }, new List<TagNode> { scope.Tag }, 4);
     scope.Builder.SetDistanceVisible(scope.NoteA, true);
     scope.Builder.SetDistanceVisible(scope.Tag, true);
+    FlushLineBuilder(scope.Builder);
     yield return null;
 
     Assert.That(GetLineCount(scope.LineParent), Is.EqualTo(1));
     Assert.That(GetActiveLineCount(scope.LineParent), Is.EqualTo(1));
 
     scope.Builder.SetDistanceVisible(scope.NoteA, false);
+    FlushLineBuilder(scope.Builder);
     yield return null;
     Assert.That(GetLineCount(scope.LineParent), Is.EqualTo(1));
     Assert.That(GetActiveLineCount(scope.LineParent), Is.EqualTo(1));
 
     scope.Builder.SetDistanceVisible(scope.Tag, false);
+    FlushLineBuilder(scope.Builder);
     Assert.That(GetLineCount(scope.LineParent), Is.EqualTo(1));
     yield return null;
     Assert.That(GetLineCount(scope.LineParent), Is.EqualTo(1));
@@ -110,18 +114,22 @@ public class LineBuilderEditModeTests
 
     scope.Builder.SetDistanceVisible(scope.NoteA, true);
     scope.Builder.SetDistanceVisible(scope.Tag, true);
+    FlushLineBuilder(scope.Builder);
     yield return null;
 
     Assert.That(GetInactiveLineCount(scope.Builder), Is.EqualTo(0));
 
     scope.Builder.SetDistanceVisible(scope.NoteA, false);
+    FlushLineBuilder(scope.Builder);
     yield return null;
     Assert.That(GetInactiveLineCount(scope.Builder), Is.EqualTo(0));
 
     scope.Builder.SetDistanceVisible(scope.Tag, false);
+    FlushLineBuilder(scope.Builder);
     Assert.That(GetInactiveLineCount(scope.Builder), Is.EqualTo(1));
 
     scope.Builder.SetDistanceVisible(scope.Tag, false);
+    FlushLineBuilder(scope.Builder);
     Assert.That(GetInactiveLineCount(scope.Builder), Is.EqualTo(1));
   }
 
@@ -141,16 +149,19 @@ public class LineBuilderEditModeTests
 
     scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode>(), 1);
     scope.Builder.SetDistanceVisible(scope.NoteA, true);
+    FlushLineBuilder(scope.Builder);
     yield return null;
 
     LineRenderer firstLine = GetOnlyLine(scope.LineParent);
     Assert.That(firstLine.gameObject.activeSelf, Is.True);
 
     scope.Builder.SetDistanceVisible(scope.NoteA, false);
+    FlushLineBuilder(scope.Builder);
     yield return null;
     Assert.That(firstLine.gameObject.activeSelf, Is.False);
 
     scope.Builder.SetDistanceVisible(scope.NoteB, true);
+    FlushLineBuilder(scope.Builder);
     yield return null;
 
     LineRenderer reusedLine = GetOnlyLine(scope.LineParent);
@@ -172,10 +183,12 @@ public class LineBuilderEditModeTests
 
     scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode>(), 1);
     scope.Builder.SetDistanceVisible(scope.NoteA, true);
+    FlushLineBuilder(scope.Builder);
     yield return null;
     Assert.That(GetLineCount(scope.LineParent), Is.EqualTo(1));
 
     scope.Builder.SetDistanceVisible(scope.NoteA, false);
+    FlushLineBuilder(scope.Builder);
     yield return null;
     Assert.That(GetLineCount(scope.LineParent), Is.EqualTo(1));
 
@@ -200,10 +213,12 @@ public class LineBuilderEditModeTests
 
     scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode> { scope.Tag }, 2);
     scope.Builder.SetDistanceVisible(scope.NoteA, true);
+    FlushLineBuilder(scope.Builder);
     yield return null;
     Assert.That(GetLineCount(scope.LineParent), Is.EqualTo(2));
 
     scope.Builder.SetDistanceVisible(scope.NoteA, false);
+    FlushLineBuilder(scope.Builder);
     yield return null;
     Assert.That(GetLineCount(scope.LineParent), Is.EqualTo(2));
     Assert.That(GetActiveLineCount(scope.LineParent), Is.EqualTo(0));
@@ -213,6 +228,7 @@ public class LineBuilderEditModeTests
     Assert.That(GetLineCount(scope.LineParent), Is.EqualTo(0));
 
     scope.Builder.SetDistanceVisible(scope.NoteA, true);
+    FlushLineBuilder(scope.Builder);
     yield return null;
     Assert.That(GetLineCount(scope.LineParent), Is.EqualTo(1));
   }
@@ -237,9 +253,151 @@ public class LineBuilderEditModeTests
     scope.Builder.SetDistanceVisible(scope.NoteA, true);
     scope.Builder.SetDistanceVisible(scope.NoteB, true);
     scope.Builder.SetDistanceVisible(scope.Tag, true);
+    FlushLineBuilder(scope.Builder);
     yield return null;
 
     Assert.That(GetLineCount(scope.LineParent), Is.EqualTo(1));
+  }
+
+  [UnityTest]
+  public IEnumerator SetDistanceVisible_FreedLineLimitRefillsFromAlreadyVisibleEndpoints()
+  {
+    using var scope = CreateScope();
+    var noteCObject = new GameObject("LineBuilderEditModeTests_NoteC");
+    var noteC = noteCObject.AddComponent<Star>();
+
+    try
+    {
+      ConfigureStar(scope.NoteA, "n1", "notes/n1.md", 7);
+      ConfigureStar(scope.NoteB, "n2", "notes/n2.md");
+      ConfigureStar(noteC, "n3", "notes/n3.md");
+      ConfigureTag(scope.Tag, 7);
+      SetPosition(scope.NoteA, new Vector3(-4f, 0f, 0f));
+      SetPosition(scope.NoteB, new Vector3(0f, 0f, 0f));
+      SetPosition(noteC, new Vector3(4f, 0f, 0f));
+      SetPosition(scope.Tag, new Vector3(-4f, 2f, 0f));
+
+      MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>
+      {
+        new MapRuntimeContext.RuntimeNoteLink { SourceId = "n2", TargetId = "n3", Weight = 1f }
+      });
+
+      scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB, noteC }, new List<TagNode> { scope.Tag }, 1);
+      scope.Builder.SetDistanceVisible(scope.NoteB, true);
+      scope.Builder.SetDistanceVisible(scope.NoteA, true);
+      FlushLineBuilder(scope.Builder);
+      yield return null;
+
+      LineRenderer firstLine = GetOnlyActiveLine(scope.LineParent);
+      Assert.That(firstLine.GetPosition(0), Is.EqualTo(scope.NoteB.transform.position));
+      Assert.That(firstLine.GetPosition(1), Is.EqualTo(noteC.transform.position));
+
+      scope.Builder.SetDistanceVisible(scope.NoteB, false);
+      FlushLineBuilder(scope.Builder);
+      yield return null;
+
+      LineRenderer refilledLine = GetOnlyActiveLine(scope.LineParent);
+      Assert.That(refilledLine.GetPosition(0), Is.EqualTo(scope.NoteA.transform.position));
+      Assert.That(refilledLine.GetPosition(1), Is.EqualTo(scope.Tag.transform.position));
+    }
+    finally
+    {
+      Object.DestroyImmediate(noteCObject);
+    }
+
+    yield return null;
+  }
+
+  [UnityTest]
+  public IEnumerator FocusedEndpointLines_EvictExistingLinesWithinActiveLimit()
+  {
+    using var scope = CreateScope();
+    var noteCObject = new GameObject("LineBuilderEditModeTests_NoteC");
+    var noteC = noteCObject.AddComponent<Star>();
+
+    try
+    {
+      ConfigureStar(scope.NoteA, "n1", "notes/n1.md", 7);
+      ConfigureStar(scope.NoteB, "n2", "notes/n2.md");
+      ConfigureStar(noteC, "n3", "notes/n3.md");
+      ConfigureTag(scope.Tag, 7);
+      SetPosition(scope.NoteA, new Vector3(-4f, 0f, 0f));
+      SetPosition(scope.NoteB, new Vector3(0f, 0f, 0f));
+      SetPosition(noteC, new Vector3(4f, 0f, 0f));
+      SetPosition(scope.Tag, new Vector3(-4f, 2f, 0f));
+
+      MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>
+      {
+        new MapRuntimeContext.RuntimeNoteLink { SourceId = "n2", TargetId = "n3", Weight = 1f }
+      });
+
+      scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB, noteC }, new List<TagNode> { scope.Tag }, 1);
+      scope.Builder.SetDistanceVisible(scope.NoteB, true);
+      scope.Builder.SetDistanceVisible(scope.NoteA, true);
+      FlushLineBuilder(scope.Builder);
+
+      LineRenderer firstLine = GetOnlyActiveLine(scope.LineParent);
+      Assert.That(firstLine.GetPosition(0), Is.EqualTo(scope.NoteB.transform.position));
+      Assert.That(firstLine.GetPosition(1), Is.EqualTo(noteC.transform.position));
+
+      scope.Focus.LastSelectedStarId = "n1";
+      FlushLineBuilder(scope.Builder);
+
+      LineRenderer focusedLine = GetOnlyActiveLine(scope.LineParent);
+      Assert.That(focusedLine.GetPosition(0), Is.EqualTo(scope.NoteA.transform.position));
+      Assert.That(focusedLine.GetPosition(1), Is.EqualTo(scope.Tag.transform.position));
+    }
+    finally
+    {
+      Object.DestroyImmediate(noteCObject);
+    }
+
+    yield return null;
+  }
+
+  [UnityTest]
+  public IEnumerator Reconcile_LongLinesRespectDedicatedLimit()
+  {
+    using var scope = CreateScope();
+    var noteCObject = new GameObject("LineBuilderEditModeTests_NoteC");
+    var noteDObject = new GameObject("LineBuilderEditModeTests_NoteD");
+    var noteC = noteCObject.AddComponent<Star>();
+    var noteD = noteDObject.AddComponent<Star>();
+
+    try
+    {
+      ConfigureStar(scope.NoteA, "n1", "notes/n1.md");
+      ConfigureStar(scope.NoteB, "n2", "notes/n2.md");
+      ConfigureStar(noteC, "n3", "notes/n3.md");
+      ConfigureStar(noteD, "n4", "notes/n4.md");
+      SetPosition(scope.NoteA, Vector3.zero);
+      SetPosition(scope.NoteB, new Vector3(10f, 0f, 0f));
+      SetPosition(noteC, new Vector3(12f, 0f, 0f));
+      SetPosition(noteD, new Vector3(1f, 0f, 0f));
+      SetPrivateField(scope.Builder, "longLineDistance", 5f);
+      SetPrivateField(scope.Builder, "maxActiveLongLines", 1);
+
+      MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>
+      {
+        new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n2", Weight = 1f },
+        new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n3", Weight = 1f },
+        new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n4", Weight = 1f }
+      });
+
+      scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB, noteC, noteD }, new List<TagNode>(), 3);
+      scope.Builder.SetDistanceVisible(scope.NoteA, true);
+      FlushLineBuilder(scope.Builder);
+
+      Assert.That(GetActiveLineCount(scope.LineParent), Is.EqualTo(2));
+      Assert.That(GetActiveLongLineCount(scope.LineParent, 5f), Is.EqualTo(1));
+    }
+    finally
+    {
+      Object.DestroyImmediate(noteCObject);
+      Object.DestroyImmediate(noteDObject);
+    }
+
+    yield return null;
   }
 
   private static void ConfigureStar(Star star, string id, string path, params int[] tagIds)
@@ -282,6 +440,24 @@ public class LineBuilderEditModeTests
     return count;
   }
 
+  private static int GetActiveLongLineCount(Transform lineParent, float longLineDistance)
+  {
+    LineRenderer[] lines = lineParent.GetComponentsInChildren<LineRenderer>(true);
+    float longLineDistanceSquared = longLineDistance * longLineDistance;
+    int count = 0;
+
+    for (int i = 0; i < lines.Length; i++)
+    {
+      if (!lines[i].gameObject.activeSelf)
+        continue;
+
+      if ((lines[i].GetPosition(0) - lines[i].GetPosition(1)).sqrMagnitude > longLineDistanceSquared)
+        count++;
+    }
+
+    return count;
+  }
+
   private static int GetInactiveLineCount(LineBuilder builder)
   {
     FieldInfo field = typeof(LineBuilder).GetField("linePool", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -298,6 +474,24 @@ public class LineBuilderEditModeTests
     return lines[0];
   }
 
+  private static LineRenderer GetOnlyActiveLine(Transform lineParent)
+  {
+    LineRenderer[] lines = lineParent.GetComponentsInChildren<LineRenderer>(true);
+    LineRenderer activeLine = null;
+
+    for (int i = 0; i < lines.Length; i++)
+    {
+      if (!lines[i].gameObject.activeSelf)
+        continue;
+
+      Assert.That(activeLine, Is.Null, "Expected exactly one active line.");
+      activeLine = lines[i];
+    }
+
+    Assert.That(activeLine, Is.Not.Null, "Expected one active line.");
+    return activeLine;
+  }
+
   private static LineBuilderScope CreateScope()
   {
     var scope = new LineBuilderScope();
@@ -310,6 +504,13 @@ public class LineBuilderEditModeTests
     FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
     Assert.That(field, Is.Not.Null, $"Missing field {fieldName}.");
     field.SetValue(target, value);
+  }
+
+  private static void FlushLineBuilder(LineBuilder builder)
+  {
+    MethodInfo method = typeof(LineBuilder).GetMethod("LateUpdate", BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(method, Is.Not.Null, "Missing method LateUpdate.");
+    method.Invoke(builder, null);
   }
 
   private static void ResetRuntimeContext()
@@ -333,6 +534,8 @@ public class LineBuilderEditModeTests
     public Star NoteB { get; }
     public GameObject TagObject { get; }
     public TagNode Tag { get; }
+    public GameObject FocusObject { get; }
+    public FocusNode Focus { get; }
 
     public LineBuilderScope()
     {
@@ -356,12 +559,16 @@ public class LineBuilderEditModeTests
 
       TagObject = new GameObject("LineBuilderEditModeTests_Tag");
       Tag = TagObject.AddComponent<TagNode>();
+
+      FocusObject = new GameObject("LineBuilderEditModeTests_Focus");
+      Focus = FocusObject.AddComponent<FocusNode>();
     }
 
     public void ConfigureForTests()
     {
       SetPrivateField(Builder, "linePrefab", LinePrefab);
       SetPrivateField(Builder, "lineParent", LineParent);
+      SetPrivateField(Builder, "focusNode", Focus);
     }
 
     public void Dispose()
@@ -383,6 +590,9 @@ public class LineBuilderEditModeTests
 
       if (TagObject != null)
         Object.DestroyImmediate(TagObject);
+
+      if (FocusObject != null)
+        Object.DestroyImmediate(FocusObject);
     }
   }
 }

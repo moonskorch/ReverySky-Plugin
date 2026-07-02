@@ -4,12 +4,13 @@ using UnityEngine;
 using UnityEngine.Pool;
 
 // TODO:
-// 1. Purge long lines with limits.
-// 2. Focus node priority to show.
-// 3. Remove line building from engine.
-// 4. Limit per node.
-// 5. Per-frame budget for line activation/deactivation.
-// 6. Reconciliation: rebuild active lines from all visible nodes by priority, instead of keeping the lines that filled the limit first.
+// 1. Remove line building from engine.
+// 2. Limit per node.
+// 3. Per-frame budget for line activation/deactivation.
+// 4. Rebalance active lines when the visible graph region changes.
+// 5. Move distanceVisibility, longLineLimits to engines.
+// 6. Make focus changes event-driven.
+// 7. Replace interpolated string keys with existing node identity.
 
 /// <summary>
 /// Builds culling-driven edge visuals for the active graph nodes.
@@ -32,14 +33,18 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   private sealed class LineBinding
   {
     public LineRenderer line;
+    public LineCandidate candidate;
     public Transform transformA;
     public Transform transformB;
   }
 
   [SerializeField] private LineRenderer linePrefab;
   [SerializeField] private Transform lineParent;
+  [SerializeField] private FocusNode focusNode;
   [SerializeField, Min(0.01f)] private float radius = 1f;
   [SerializeField, Min(0.01f)] private float visibleDistance = 80f;
+  [SerializeField, Min(0)] private int maxActiveLongLines = 20;
+  [SerializeField, Min(0f)] private float longLineDistance = 50f;
 
   private readonly Dictionary<Component, string> endpointByNode = new();
   private readonly Dictionary<string, Transform> transformByEndpoint = new(StringComparer.Ordinal);
@@ -47,10 +52,14 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   private readonly Dictionary<string, LineBinding> activeLinesByEdgeKey = new(StringComparer.Ordinal);
   private readonly HashSet<string> edgeKeys = new(StringComparer.Ordinal);
   private readonly HashSet<string> visibleEndpoints = new(StringComparer.Ordinal);
+  private readonly HashSet<string> desiredLineKeys = new(StringComparer.Ordinal);
+  private readonly List<LineCandidate> desiredLineCandidates = new();
   private readonly List<string> staleLineKeys = new();
   private ObjectPool<LineRenderer> linePool;
   private int activeLineLimit;
   private int linePoolMaxSize;
+  private bool lineSetDirty;
+  private string focusedEndpoint;
 
   public void Rebuild(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes, int maxActiveLines)
   {
@@ -83,6 +92,16 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     candidatesByEndpoint.Clear();
     edgeKeys.Clear();
     visibleEndpoints.Clear();
+    ClearReconciliationScratch();
+  }
+
+  private void ClearReconciliationScratch()
+  {
+    desiredLineKeys.Clear();
+    desiredLineCandidates.Clear();
+    staleLineKeys.Clear();
+    lineSetDirty = false;
+    focusedEndpoint = null;
   }
 
   public bool TryCreateDistanceEntry(Component node, out CullingManager.Entry entry)
@@ -114,22 +133,43 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
       if (!visibleEndpoints.Add(endpoint))
         return;
 
-      ShowCandidateLines(endpoint);
+      MarkLineSetDirty();
       return;
     }
 
     if (!visibleEndpoints.Remove(endpoint))
       return;
 
-    HideUnneededCandidateLines(endpoint);
+    MarkLineSetDirty();
   }
 
   private void LateUpdate()
   {
-    staleLineKeys.Clear();
+    UpdateFocusedEndpointDirtyState();
+    ReconcileActiveLinesIfDirty();
+    UpdateActiveLinePositions();
+  }
+
+  private void MarkLineSetDirty()
+  {
+    lineSetDirty = true;
+  }
+
+  private void ReconcileActiveLinesIfDirty()
+  {
+    if (!lineSetDirty)
+      return;
+
+    lineSetDirty = false;
+    ReconcileActiveLines();
+  }
+
+  private void UpdateActiveLinePositions()
+  {
     if (activeLineLimit == 0 || activeLinesByEdgeKey.Count == 0)
       return;
 
+    staleLineKeys.Clear();
     foreach (var pair in activeLinesByEdgeKey)
     {
       LineBinding binding = pair.Value;
@@ -262,27 +302,139 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     return candidates;
   }
 
-  private void ShowCandidateLines(string endpoint)
+  private void ReconcileActiveLines()
   {
-    if (!candidatesByEndpoint.TryGetValue(endpoint, out var candidates))
+    if (activeLineLimit <= 0)
+    {
+      ClearActiveLines();
       return;
+    }
 
-    for (int i = 0; i < candidates.Count; i++)
-      ShowLine(candidates[i]);
+    BuildDesiredLineSetStreaming();
+    RemoveLinesOutsideDesiredSet();
+    AddMissingDesiredLines();
   }
 
-  private void HideUnneededCandidateLines(string endpoint)
+  private void BuildDesiredLineSetStreaming()
   {
-    if (!candidatesByEndpoint.TryGetValue(endpoint, out var candidates))
+    desiredLineKeys.Clear();
+    desiredLineCandidates.Clear();
+
+    int selectedLongLineCount = 0;
+    AddFocusedLines(ref selectedLongLineCount);
+    RetainActiveLines(ref selectedLongLineCount);
+    FillVisibleLines(ref selectedLongLineCount);
+  }
+
+  private void AddFocusedLines(ref int selectedLongLineCount)
+  {
+    if (string.IsNullOrEmpty(focusedEndpoint) ||
+        !visibleEndpoints.Contains(focusedEndpoint) ||
+        !candidatesByEndpoint.TryGetValue(focusedEndpoint, out var candidates))
+    {
       return;
+    }
 
     for (int i = 0; i < candidates.Count; i++)
     {
-      LineCandidate candidate = candidates[i];
-      if (visibleEndpoints.Contains(OtherEndpoint(candidate, endpoint)))
+      AddDesiredLine(candidates[i], ignoreLongLineLimit: true, ref selectedLongLineCount);
+      if (HasFilledLineLimit())
+        return;
+    }
+  }
+
+  private void RetainActiveLines(ref int selectedLongLineCount)
+  {
+    foreach (var pair in activeLinesByEdgeKey)
+    {
+      LineCandidate candidate = pair.Value?.candidate;
+      if (candidate == null)
         continue;
 
-      RemoveLine(candidate.edgeKey);
+      AddDesiredLine(candidate, ignoreLongLineLimit: false, ref selectedLongLineCount);
+      if (HasFilledLineLimit())
+        return;
+    }
+  }
+
+  private void FillVisibleLines(ref int selectedLongLineCount)
+  {
+    foreach (string endpoint in visibleEndpoints)
+    {
+      if (!candidatesByEndpoint.TryGetValue(endpoint, out var candidates))
+        continue;
+
+      for (int i = 0; i < candidates.Count; i++)
+      {
+        AddDesiredLine(candidates[i], ignoreLongLineLimit: false, ref selectedLongLineCount);
+        if (HasFilledLineLimit())
+          return;
+      }
+    }
+  }
+
+  private bool AddDesiredLine(
+    LineCandidate candidate,
+    bool ignoreLongLineLimit,
+    ref int selectedLongLineCount)
+  {
+    if (!CanSelectCandidate(candidate))
+      return false;
+
+    // Long-line budget is a selection-time heuristic; layout motion may move active lines
+    // across the threshold until the next visibility or focus reconciliation.
+    bool isLongLine = IsLongLine(candidate);
+    if (isLongLine && !ignoreLongLineLimit && selectedLongLineCount >= maxActiveLongLines)
+      return false;
+
+    if (!desiredLineKeys.Add(candidate.edgeKey))
+      return false;
+
+    desiredLineCandidates.Add(candidate);
+
+    if (isLongLine)
+      selectedLongLineCount++;
+
+    return true;
+  }
+
+  private bool CanSelectCandidate(LineCandidate candidate)
+  {
+    return candidate != null &&
+           !HasFilledLineLimit() &&
+           IsCandidateVisible(candidate);
+  }
+
+  private bool HasFilledLineLimit()
+  {
+    return desiredLineKeys.Count >= activeLineLimit;
+  }
+
+  private void RemoveLinesOutsideDesiredSet()
+  {
+    staleLineKeys.Clear();
+    foreach (var pair in activeLinesByEdgeKey)
+    {
+      if (!desiredLineKeys.Contains(pair.Key))
+        staleLineKeys.Add(pair.Key);
+    }
+
+    for (int i = 0; i < staleLineKeys.Count; i++)
+      RemoveLine(staleLineKeys[i]);
+  }
+
+  private void AddMissingDesiredLines()
+  {
+    for (int i = 0; i < desiredLineCandidates.Count; i++)
+    {
+      LineCandidate candidate = desiredLineCandidates[i];
+      if (candidate == null || activeLinesByEdgeKey.ContainsKey(candidate.edgeKey))
+        continue;
+
+      ShowLine(candidate);
+
+      if (activeLinesByEdgeKey.Count >= activeLineLimit)
+        return;
     }
   }
 
@@ -307,6 +459,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     activeLinesByEdgeKey[candidate.edgeKey] = new LineBinding
     {
       line = line,
+      candidate = candidate,
       transformA = candidate.transformA,
       transformB = candidate.transformB
     };
@@ -416,11 +569,44 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     linePoolMaxSize = 0;
   }
 
-  private static string OtherEndpoint(LineCandidate candidate, string endpoint)
+  private bool IsCandidateVisible(LineCandidate candidate)
   {
-    return string.Equals(candidate.endpointA, endpoint, StringComparison.Ordinal)
-      ? candidate.endpointB
-      : candidate.endpointA;
+    return candidate != null &&
+           (visibleEndpoints.Contains(candidate.endpointA) ||
+            visibleEndpoints.Contains(candidate.endpointB));
+  }
+
+  private bool IsLongLine(LineCandidate candidate)
+  {
+    if (candidate == null || candidate.transformA == null || candidate.transformB == null)
+      return false;
+
+    float maxLongLineDistance = Mathf.Max(0f, longLineDistance);
+    if (maxLongLineDistance <= 0f)
+      return true;
+
+    return (candidate.transformA.position - candidate.transformB.position).sqrMagnitude >
+           maxLongLineDistance * maxLongLineDistance;
+  }
+
+  private void UpdateFocusedEndpointDirtyState()
+  {
+    string nextFocusedEndpoint = ResolveFocusedEndpoint();
+    if (string.Equals(focusedEndpoint, nextFocusedEndpoint, StringComparison.Ordinal))
+      return;
+
+    focusedEndpoint = nextFocusedEndpoint;
+    MarkLineSetDirty();
+  }
+
+  private string ResolveFocusedEndpoint()
+  {
+    string focusedNoteId = focusNode != null ? focusNode.LastSelectedStarId : string.Empty;
+    if (string.IsNullOrWhiteSpace(focusedNoteId))
+      return null;
+
+    string endpoint = NoteEndpoint(focusedNoteId);
+    return transformByEndpoint.ContainsKey(endpoint) ? endpoint : null;
   }
 
   private static string EdgeKey(string endpointA, string endpointB)
