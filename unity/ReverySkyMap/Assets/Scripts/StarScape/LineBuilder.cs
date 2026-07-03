@@ -5,7 +5,6 @@ using UnityEngine.Pool;
 
 // TODO:
 // 1. Remove line building from engine.
-// 2. Limit per node.
 
 /// <summary>
 /// Builds culling-driven edge visuals for the active graph nodes.
@@ -78,6 +77,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   [SerializeField, Min(0f)] private float longLineDistance = 50f;
   [SerializeField] private bool focusedLinesIgnoreLongLineLimit = true;
   [SerializeField, Range(0f, 1f)] private float visibleRegionRefreshLineRatio = 0.05f;
+  [SerializeField, Min(1)] private int maxLinesPerNode = 50;
 
   private readonly HashSet<int> registeredNodeIds = new();
   private readonly Dictionary<string, Star> starByNoteId = new(StringComparer.Ordinal);
@@ -92,6 +92,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   private readonly HashSet<EdgeKey> desiredLineKeys = new();
   private readonly List<LineCandidate> desiredLineCandidates = new();
   private readonly List<EdgeKey> staleLineKeys = new();
+  private readonly Dictionary<int, int> selectedLineCountByNodeId = new();
   private ObjectPool<LineRenderer> linePool;
   private int activeLineLimit;
   private int activeLongLineLimit;
@@ -145,6 +146,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     desiredLineCandidates.Clear();
     staleLineKeys.Clear();
     newlyVisibleNodeIds.Clear();
+    selectedLineCountByNodeId.Clear();
     lineSetDirty = false;
     focusedNodeId = NoNodeId;
   }
@@ -393,6 +395,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   {
     desiredLineKeys.Clear();
     desiredLineCandidates.Clear();
+    selectedLineCountByNodeId.Clear();
 
     int selectedLongLineCount = 0;
     AddFocusedLines(ref selectedLongLineCount);
@@ -418,7 +421,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
         candidates[i],
         ignoreLongLineLimit: focusedLinesIgnoreLongLineLimit,
         ref selectedLongLineCount);
-      if (HasFilledLineLimit())
+      if (HasFilledLineLimit() || HasFilledNodeLineLimit(focusedNodeId))
         return;
     }
   }
@@ -456,6 +459,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
       // already have changed again before this reconciliation runs.
       if (HasFilledLineLimit() ||
           addedCount >= refreshBudget ||
+          HasFilledNodeLineLimit(nodeId) ||
           !visibleNodeIds.Contains(nodeId) ||
           !candidatesByNodeId.TryGetValue(nodeId, out var candidates))
       {
@@ -467,7 +471,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
         if (AddDesiredLine(candidates[candidateIndex], ignoreLongLineLimit: false, ref selectedLongLineCount))
           addedCount++;
 
-        if (HasFilledLineLimit() || addedCount >= refreshBudget)
+        if (HasFilledLineLimit() || HasFilledNodeLineLimit(nodeId) || addedCount >= refreshBudget)
           break;
       }
     }
@@ -477,14 +481,19 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   {
     foreach (int nodeId in visibleNodeIds)
     {
-      if (!candidatesByNodeId.TryGetValue(nodeId, out var candidates))
+      if (HasFilledNodeLineLimit(nodeId) ||
+          !candidatesByNodeId.TryGetValue(nodeId, out var candidates))
+      {
         continue;
+      }
 
       for (int i = 0; i < candidates.Count; i++)
       {
         AddDesiredLine(candidates[i], ignoreLongLineLimit: false, ref selectedLongLineCount);
         if (HasFilledLineLimit())
           return;
+        if (HasFilledNodeLineLimit(nodeId))
+          break;
       }
     }
   }
@@ -507,6 +516,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
       return false;
 
     desiredLineCandidates.Add(candidate);
+    TrackSelectedLine(candidate);
 
     if (isLongLine)
       selectedLongLineCount++;
@@ -518,12 +528,32 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   {
     return candidate != null &&
            !HasFilledLineLimit() &&
+           !HasFilledNodeLineLimit(candidate.nodeAId) &&
+           !HasFilledNodeLineLimit(candidate.nodeBId) &&
            IsCandidateVisible(candidate);
   }
 
   private bool HasFilledLineLimit()
   {
     return desiredLineKeys.Count >= activeLineLimit;
+  }
+
+  private bool HasFilledNodeLineLimit(int nodeId)
+  {
+    return selectedLineCountByNodeId.TryGetValue(nodeId, out int selectedCount) &&
+           selectedCount >= maxLinesPerNode;
+  }
+
+  private void TrackSelectedLine(LineCandidate candidate)
+  {
+    IncrementSelectedLineCount(candidate.nodeAId);
+    IncrementSelectedLineCount(candidate.nodeBId);
+  }
+
+  private void IncrementSelectedLineCount(int nodeId)
+  {
+    selectedLineCountByNodeId.TryGetValue(nodeId, out int selectedCount);
+    selectedLineCountByNodeId[nodeId] = selectedCount + 1;
   }
 
   private int ResolveVisibleRegionRefreshLineBudget()

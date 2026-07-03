@@ -260,6 +260,55 @@ public class LineBuilderEditModeTests
   }
 
   [UnityTest]
+  public IEnumerator Rebuild_PerNodeLineLimit_CapsHubLines()
+  {
+    using var scope = CreateScope();
+    var leafObjects = new List<GameObject>();
+    var stars = new List<Star> { scope.NoteA };
+    var links = new List<MapRuntimeContext.RuntimeNoteLink>();
+
+    try
+    {
+      ConfigureStar(scope.NoteA, "hub", "notes/hub.md");
+      SetPosition(scope.NoteA, Vector3.zero);
+
+      for (int i = 0; i < 60; i++)
+      {
+        var leafObject = new GameObject($"LineBuilderEditModeTests_Leaf_{i}");
+        var leaf = leafObject.AddComponent<Star>();
+        string leafId = $"leaf-{i}";
+
+        ConfigureStar(leaf, leafId, $"notes/{leafId}.md");
+        SetPosition(leaf, new Vector3(1f + (i % 10) * 0.1f, i / 10, 0f));
+
+        leafObjects.Add(leafObject);
+        stars.Add(leaf);
+        links.Add(new MapRuntimeContext.RuntimeNoteLink
+        {
+          SourceId = "hub",
+          TargetId = leafId,
+          Weight = 1f
+        });
+      }
+
+      MapRuntimeContext.SetLinks(links);
+
+      scope.Builder.Rebuild(stars, new List<TagNode>(), 80, 80);
+      scope.Builder.SetDistanceVisible(scope.NoteA, true);
+      FlushLineBuilder(scope.Builder);
+
+      Assert.That(GetActiveLineCount(scope.LineParent), Is.EqualTo(50));
+    }
+    finally
+    {
+      for (int i = 0; i < leafObjects.Count; i++)
+        Object.DestroyImmediate(leafObjects[i]);
+    }
+
+    yield return null;
+  }
+
+  [UnityTest]
   public IEnumerator SetDistanceVisible_FreedLineLimitRefillsFromAlreadyVisibleEndpoints()
   {
     using var scope = CreateScope();

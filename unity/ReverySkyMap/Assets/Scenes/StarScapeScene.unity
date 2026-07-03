@@ -1783,7 +1783,8 @@ MonoBehaviour:
   visibleDistance: 60
   longLineDistance: 40
   focusedLinesIgnoreLongLineLimit: 1
-  visibleRegionRefreshLineRatio: 0.05
+  visibleRegionRefreshLineRatio: 0.1
+  maxLinesPerNode: 80
 --- !u!4 &1217411435
 Transform:
   m_ObjectHideFlags: 0
@@ -2692,11 +2693,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
   injectSampleData: 0
   sampleScenario: 1
-  sampleNoteCount: 2500
-  sampleTagPoolSize: 400
+  sampleNoteCount: 250
+  sampleTagPoolSize: 0
   sampleDateSpanDays: 365
   sampleMaxTagsPerNote: 4
-  sampleExtraLinks: 1000
+  sampleExtraLinks: 100
 --- !u!1 &1787028428
 GameObject:
   m_ObjectHideFlags: 0
