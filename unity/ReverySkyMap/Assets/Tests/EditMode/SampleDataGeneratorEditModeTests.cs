@@ -12,12 +12,12 @@ public class SampleDataGeneratorEditModeTests
   {
     var settings = new SampleGraphSettings
     {
-      Scenario = SampleGraphScenario.Normal,
+      ConnectionModel = SampleConnectionModel.Random,
       NoteCount = 30,
       TagPoolSize = 8,
       DateSpanDays = 720,
       MaxTagsPerNote = 3,
-      ExtraLinks = 20
+      LinkDensity = 5
     };
 
     SampleGraphData first = SampleDataGenerator.GenerateGraph(settings, AnchorDate);
@@ -34,12 +34,12 @@ public class SampleDataGeneratorEditModeTests
   {
     var settings = new SampleGraphSettings
     {
-      Scenario = SampleGraphScenario.Normal,
+      ConnectionModel = SampleConnectionModel.Random,
       NoteCount = noteCount,
       TagPoolSize = 8,
       DateSpanDays = 720,
       MaxTagsPerNote = 3,
-      ExtraLinks = 0
+      LinkDensity = 0
     };
 
     SampleGraphData result = SampleDataGenerator.GenerateGraph(settings, AnchorDate);
@@ -49,19 +49,21 @@ public class SampleDataGeneratorEditModeTests
       Assert.That(result.Links.Count, Is.EqualTo(0));
   }
 
-  [TestCase(SampleGraphScenario.Normal)]
-  [TestCase(SampleGraphScenario.Hub)]
-  [TestCase(SampleGraphScenario.Clusters)]
-  public void GenerateGraph_ProducesValidInvariants_ForAllScenarios(SampleGraphScenario scenario)
+  [TestCase(SampleConnectionModel.Random)]
+  [TestCase(SampleConnectionModel.Hubs)]
+  [TestCase(SampleConnectionModel.Clusters)]
+  [TestCase(SampleConnectionModel.SmallWorld)]
+  [TestCase(SampleConnectionModel.Chain)]
+  public void GenerateGraph_ProducesValidInvariants_ForAllConnectionModels(SampleConnectionModel connectionModel)
   {
     var settings = new SampleGraphSettings
     {
-      Scenario = scenario,
+      ConnectionModel = connectionModel,
       NoteCount = 50,
       TagPoolSize = 12,
       DateSpanDays = 720,
       MaxTagsPerNote = 3,
-      ExtraLinks = 60
+      LinkDensity = 10
     };
 
     SampleGraphData result = SampleDataGenerator.GenerateGraph(settings, AnchorDate);
@@ -74,12 +76,12 @@ public class SampleDataGeneratorEditModeTests
   {
     var settings = new SampleGraphSettings
     {
-      Scenario = SampleGraphScenario.Normal,
+      ConnectionModel = SampleConnectionModel.Random,
       NoteCount = 25,
       TagPoolSize = tagPoolSize,
       DateSpanDays = 720,
       MaxTagsPerNote = maxTagsPerNote,
-      ExtraLinks = 0
+      LinkDensity = 0
     };
 
     SampleGraphData result = SampleDataGenerator.GenerateGraph(settings, AnchorDate);
@@ -94,16 +96,35 @@ public class SampleDataGeneratorEditModeTests
   }
 
   [Test]
+  public void GenerateGraph_ZeroDensityCreatesNoVisibleSampleLinks()
+  {
+    var settings = new SampleGraphSettings
+    {
+      ConnectionModel = SampleConnectionModel.Random,
+      NoteCount = 40,
+      TagPoolSize = 12,
+      DateSpanDays = 720,
+      MaxTagsPerNote = 4,
+      LinkDensity = 0
+    };
+
+    SampleGraphData result = SampleDataGenerator.GenerateGraph(settings, AnchorDate);
+
+    Assert.That(result.Links.Count, Is.EqualTo(0));
+    Assert.That(result.Notes.SelectMany(note => note.TagIds).Any(), Is.False);
+  }
+
+  [Test]
   public void GenerateGraph_HubScenario_CreatesVisibleHubs()
   {
     var settings = new SampleGraphSettings
     {
-      Scenario = SampleGraphScenario.Hub,
+      ConnectionModel = SampleConnectionModel.Hubs,
       NoteCount = 100,
       TagPoolSize = 12,
       DateSpanDays = 720,
       MaxTagsPerNote = 3,
-      ExtraLinks = 150
+      LinkDensity = 4
     };
 
     SampleGraphData result = SampleDataGenerator.GenerateGraph(settings, AnchorDate);
@@ -118,12 +139,12 @@ public class SampleDataGeneratorEditModeTests
   {
     var settings = new SampleGraphSettings
     {
-      Scenario = SampleGraphScenario.Clusters,
+      ConnectionModel = SampleConnectionModel.Clusters,
       NoteCount = 40,
       TagPoolSize = 12,
       DateSpanDays = 720,
       MaxTagsPerNote = 3,
-      ExtraLinks = 60
+      LinkDensity = 35
     };
 
     SampleGraphData result = SampleDataGenerator.GenerateGraph(settings, AnchorDate);

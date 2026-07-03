@@ -2,22 +2,32 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-public enum SampleGraphScenario
+public enum SampleConnectionModel
 {
-  Normal,
-  Hub,
-  Clusters
+  Random,
+  Hubs,
+  Clusters,
+  SmallWorld,
+  Chain
+}
+
+public enum SampleIslandMode
+{
+  Auto,
+  One,
+  Many
 }
 
 [Serializable]
 public struct SampleGraphSettings
 {
-  public SampleGraphScenario Scenario;
+  public SampleConnectionModel ConnectionModel;
+  public SampleIslandMode Islands;
   public int NoteCount;
   public int TagPoolSize;
   public int DateSpanDays;
   public int MaxTagsPerNote;
-  public int ExtraLinks;
+  public int LinkDensity;
 }
 
 public sealed class SampleGraphData
@@ -39,16 +49,24 @@ public sealed class SampleGraphData
 
 public class SampleDataGenerator : MonoBehaviour
 {
+  private const int MaxVisualLinksPerNote = 8;
+
   [Header("Injection")]
   [SerializeField] private bool injectSampleData = false;
 
   [Header("Sample graph")]
-  [SerializeField] private SampleGraphScenario sampleScenario = SampleGraphScenario.Normal;
-  [SerializeField] private int sampleNoteCount = 320;
-  [SerializeField] private int sampleTagPoolSize = 24;
-  [SerializeField] private int sampleDateSpanDays = 720;
-  [SerializeField] private int sampleMaxTagsPerNote = 3;
-  [SerializeField] private int sampleExtraLinks = 480;
+  [SerializeField] private SampleConnectionModel connectionModel = SampleConnectionModel.Random;
+  [SerializeField] private SampleIslandMode islands = SampleIslandMode.Auto;
+  [Min(0)]
+  [SerializeField] private int noteCount = 320;
+  [Min(0)]
+  [SerializeField] private int tagPoolSize = 24;
+  [Min(1)]
+  [SerializeField] private int dateSpanDays = 720;
+  [Range(0, 32)]
+  [SerializeField] private int maxTagsPerNote = 3;
+  [Range(0, 100)]
+  [SerializeField] private int linkDensity = 1;
 
   public bool TryInjectSampleDataIfNeeded()
   {
@@ -57,12 +75,13 @@ public class SampleDataGenerator : MonoBehaviour
 
     var settings = new SampleGraphSettings
     {
-      Scenario = sampleScenario,
-      NoteCount = sampleNoteCount,
-      TagPoolSize = sampleTagPoolSize,
-      DateSpanDays = sampleDateSpanDays,
-      MaxTagsPerNote = sampleMaxTagsPerNote,
-      ExtraLinks = sampleExtraLinks
+      ConnectionModel = connectionModel,
+      Islands = islands,
+      NoteCount = noteCount,
+      TagPoolSize = tagPoolSize,
+      DateSpanDays = dateSpanDays,
+      MaxTagsPerNote = maxTagsPerNote,
+      LinkDensity = linkDensity
     };
 
     var sampleGraph = GenerateGraph(settings, DateTime.Now.Date);
@@ -71,7 +90,7 @@ public class SampleDataGenerator : MonoBehaviour
     MapRuntimeContext.SetNotes(sampleGraph.Notes);
 
     Debug.Log(
-      $"[CartographerSampleData] Injected scenario={settings.Scenario} notes={sampleGraph.Notes.Count} tags={sampleGraph.TagNames.Count} links={sampleGraph.Links.Count}");
+      $"[CartographerSampleData] Injected connectionModel={settings.ConnectionModel} islands={settings.Islands} density={settings.LinkDensity} notes={sampleGraph.Notes.Count} tags={sampleGraph.TagNames.Count} links={sampleGraph.Links.Count}");
     return true;
   }
 
@@ -93,8 +112,8 @@ public class SampleDataGenerator : MonoBehaviour
     settings.NoteCount = Mathf.Clamp(settings.NoteCount, 0, 10000);
     settings.TagPoolSize = Mathf.Clamp(settings.TagPoolSize, 0, 256);
     settings.DateSpanDays = Mathf.Clamp(settings.DateSpanDays, 1, 3650);
-    settings.MaxTagsPerNote = Mathf.Clamp(settings.MaxTagsPerNote, 0, 8);
-    settings.ExtraLinks = Mathf.Max(0, settings.ExtraLinks);
+    settings.MaxTagsPerNote = Mathf.Clamp(settings.MaxTagsPerNote, 0, 32);
+    settings.LinkDensity = Mathf.Clamp(settings.LinkDensity, 0, 100);
     return settings;
   }
 
@@ -114,7 +133,7 @@ public class SampleDataGenerator : MonoBehaviour
     int[] clusterSizes = null;
     List<int>[] clusterTagPools = null;
 
-    if (settings.Scenario == SampleGraphScenario.Clusters)
+    if (settings.ConnectionModel == SampleConnectionModel.Clusters)
     {
       BuildClusterLayout(settings.NoteCount, clusterCount, out clusterStarts, out clusterSizes);
       clusterTagPools = BuildClusterTagPools(tagIds, clusterCount);
@@ -141,26 +160,38 @@ public class SampleDataGenerator : MonoBehaviour
       };
 
       IReadOnlyList<int> tagPool = tagIds;
-      if (settings.Scenario == SampleGraphScenario.Clusters)
+      if (settings.ConnectionModel == SampleConnectionModel.Clusters)
       {
         int clusterIndex = GetClusterIndex(i, clusterStarts, clusterSizes);
         tagPool = clusterTagPools[clusterIndex];
       }
 
-      AssignTags(note, tagPool, settings.MaxTagsPerNote, tagRng);
+      AssignTags(note, tagPool, GetEffectiveMaxTagsPerNote(settings), tagRng);
       notes.Add(note);
     }
 
     return notes;
   }
 
+  private static int GetEffectiveMaxTagsPerNote(SampleGraphSettings settings)
+  {
+    if (settings.LinkDensity <= 0 || settings.MaxTagsPerNote <= 0)
+      return 0;
+
+    return Mathf.Clamp(
+      Mathf.CeilToInt(settings.MaxTagsPerNote * (settings.LinkDensity / 100f)),
+      1,
+      settings.MaxTagsPerNote);
+  }
+
   private static int BuildNoteLength(DateTime anchorDate, int noteIndex, SampleGraphSettings settings)
   {
-    var rng = new System.Random(ComputeSeed(anchorDate, noteIndex, settings.NoteCount, (int)settings.Scenario, 109));
-    int scenarioBias = settings.Scenario switch
+    var rng = new System.Random(ComputeSeed(anchorDate, noteIndex, settings.NoteCount, (int)settings.ConnectionModel, 109));
+    int scenarioBias = settings.ConnectionModel switch
     {
-      SampleGraphScenario.Hub => 3,
-      SampleGraphScenario.Clusters => 5,
+      SampleConnectionModel.Hubs => 3,
+      SampleConnectionModel.Clusters => 5,
+      SampleConnectionModel.SmallWorld => 2,
       _ => 1
     };
 
@@ -203,109 +234,135 @@ public class SampleDataGenerator : MonoBehaviour
     DateTime anchorDate)
   {
     var links = new List<MapRuntimeContext.RuntimeNoteLink>();
-    if (notes == null || notes.Count < 2)
+    if (notes == null || notes.Count < 2 || settings.LinkDensity <= 0)
       return links;
 
     var usedPairs = new HashSet<long>();
-    int maxExtraLinks = GetMaxExtraLinks(settings, notes.Count);
-    int densityLimit = notes.Count * 8;
-    int extraLinks = Math.Min(settings.ExtraLinks, Math.Min(densityLimit, maxExtraLinks));
-    var linkRng = new System.Random(ComputeSeed(anchorDate, settings.NoteCount, settings.ExtraLinks, (int)settings.Scenario, 73));
+    int targetLinks = GetTargetLinkCount(settings, notes.Count);
+    if (targetLinks <= 0)
+      return links;
 
-    switch (settings.Scenario)
+    var linkRng = new System.Random(ComputeSeed(anchorDate, settings.NoteCount, settings.LinkDensity, (int)settings.ConnectionModel, 73));
+
+    if (settings.Islands == SampleIslandMode.One && settings.ConnectionModel != SampleConnectionModel.Chain)
+      AddRandomTreeLinks(BuildSequentialIndices(notes.Count), targetLinks, linkRng, notes, links, usedPairs);
+
+    switch (settings.ConnectionModel)
     {
-      case SampleGraphScenario.Hub:
-        BuildHubLinks(notes, extraLinks, linkRng, links, usedPairs);
+      case SampleConnectionModel.Hubs:
+        BuildHubLinks(settings, notes, targetLinks, linkRng, links, usedPairs);
         break;
-      case SampleGraphScenario.Clusters:
-        BuildClusterLinks(notes, settings.NoteCount, extraLinks, linkRng, links, usedPairs);
+      case SampleConnectionModel.Clusters:
+        BuildClusterLinks(settings, notes, targetLinks, linkRng, links, usedPairs);
+        break;
+      case SampleConnectionModel.SmallWorld:
+        BuildSmallWorldLinks(settings, notes, targetLinks, linkRng, links, usedPairs);
+        break;
+      case SampleConnectionModel.Chain:
+        BuildChainLinks(settings, notes, targetLinks, links, usedPairs);
         break;
       default:
-        BuildNormalLinks(notes, extraLinks, linkRng, links, usedPairs);
+        BuildRandomLinks(settings, notes, targetLinks, linkRng, links, usedPairs);
         break;
     }
 
     return links;
   }
 
-  private static void BuildNormalLinks(
+  private static void BuildRandomLinks(
+    SampleGraphSettings settings,
     List<NoteData> notes,
-    int extraLinks,
+    int targetLinks,
     System.Random rng,
     List<MapRuntimeContext.RuntimeNoteLink> links,
     HashSet<long> usedPairs)
   {
-    for (int i = 0; i < notes.Count - 1; i++)
-      TryAddUniqueLink(i, i + 1, notes, links, usedPairs, 1f);
-
-    int created = 0;
-    int safety = extraLinks * 12 + 64;
-    while (created < extraLinks && safety-- > 0)
+    int safety = targetLinks * 12 + 64;
+    while (links.Count < targetLinks && safety-- > 0)
     {
-      int sourceIndex = rng.Next(0, notes.Count);
-      int targetIndex = rng.Next(0, notes.Count);
-      if (TryAddUniqueLink(sourceIndex, targetIndex, notes, links, usedPairs, RandomWeight(rng)))
-        created++;
+      SelectRandomPair(settings, notes.Count, rng, out int sourceIndex, out int targetIndex);
+      TryAddUniqueLink(sourceIndex, targetIndex, notes, links, usedPairs, RandomWeight(rng));
     }
   }
 
   private static void BuildHubLinks(
+    SampleGraphSettings settings,
     List<NoteData> notes,
-    int extraLinks,
+    int targetLinks,
     System.Random rng,
     List<MapRuntimeContext.RuntimeNoteLink> links,
     HashSet<long> usedPairs)
   {
-    for (int i = 0; i < notes.Count - 1; i++)
-      TryAddUniqueLink(i, i + 1, notes, links, usedPairs, 1f);
+    if (settings.Islands == SampleIslandMode.Many)
+    {
+      BuildPartitionHubLinks(settings, notes, targetLinks, rng, links, usedPairs);
+      return;
+    }
 
     int hubCount = Math.Min(3, notes.Count);
     var hubs = new int[hubCount];
     for (int i = 0; i < hubCount; i++)
       hubs[i] = i;
 
-    int created = 0;
-    for (int hubOffset = 0; created < extraLinks && hubOffset < hubCount; hubOffset++)
+    for (int hubOffset = 0; links.Count < targetLinks && hubOffset < hubCount; hubOffset++)
     {
-      for (int noteIndex = 0; created < extraLinks && noteIndex < notes.Count; noteIndex++)
-      {
+      for (int noteIndex = 0; links.Count < targetLinks && noteIndex < notes.Count; noteIndex++)
         if (TryAddUniqueLink(noteIndex, hubs[hubOffset], notes, links, usedPairs, RandomWeight(rng)))
-          created++;
-      }
+          continue;
     }
 
-    int safety = extraLinks * 12 + 64;
-    while (created < extraLinks && safety-- > 0)
+    int safety = targetLinks * 12 + 64;
+    while (links.Count < targetLinks && safety-- > 0)
     {
-      int sourceIndex = rng.Next(0, notes.Count);
-      int targetIndex = rng.Next(0, notes.Count);
-      if (TryAddUniqueLink(sourceIndex, targetIndex, notes, links, usedPairs, RandomWeight(rng)))
-        created++;
+      SelectRandomPair(settings, notes.Count, rng, out int sourceIndex, out int targetIndex);
+      TryAddUniqueLink(sourceIndex, targetIndex, notes, links, usedPairs, RandomWeight(rng));
     }
   }
 
-  private static void BuildClusterLinks(
+  private static void BuildPartitionHubLinks(
+    SampleGraphSettings settings,
     List<NoteData> notes,
-    int noteCount,
-    int extraLinks,
+    int targetLinks,
     System.Random rng,
     List<MapRuntimeContext.RuntimeNoteLink> links,
     HashSet<long> usedPairs)
   {
-    int clusterCount = Math.Min(4, noteCount);
-    BuildClusterLayout(noteCount, clusterCount, out var clusterStarts, out var clusterSizes);
-
-    for (int clusterIndex = 0; clusterIndex < clusterCount; clusterIndex++)
+    int partitionCount = GetIslandPartitionCount(settings, notes.Count);
+    BuildClusterLayout(notes.Count, partitionCount, out var starts, out var sizes);
+    for (int partitionIndex = 0; links.Count < targetLinks && partitionIndex < partitionCount; partitionIndex++)
     {
-      int start = clusterStarts[clusterIndex];
-      int size = clusterSizes[clusterIndex];
-      for (int i = 0; i < size - 1; i++)
-        TryAddUniqueLink(start + i, start + i + 1, notes, links, usedPairs, 1f);
+      int start = starts[partitionIndex];
+      int size = sizes[partitionIndex];
+      int hubCount = Math.Min(3, size);
+      for (int hubOffset = 0; links.Count < targetLinks && hubOffset < hubCount; hubOffset++)
+      {
+        int hubIndex = start + hubOffset;
+        for (int noteIndex = start; links.Count < targetLinks && noteIndex < start + size; noteIndex++)
+          TryAddUniqueLink(noteIndex, hubIndex, notes, links, usedPairs, RandomWeight(rng));
+      }
     }
 
-    int created = 0;
-    int safety = extraLinks * 12 + 64;
-    while (created < extraLinks && safety-- > 0)
+    int safety = targetLinks * 12 + 64;
+    while (links.Count < targetLinks && safety-- > 0)
+    {
+      SelectRandomPair(settings, notes.Count, rng, out int sourceIndex, out int targetIndex);
+      TryAddUniqueLink(sourceIndex, targetIndex, notes, links, usedPairs, RandomWeight(rng));
+    }
+  }
+
+  private static void BuildClusterLinks(
+    SampleGraphSettings settings,
+    List<NoteData> notes,
+    int targetLinks,
+    System.Random rng,
+    List<MapRuntimeContext.RuntimeNoteLink> links,
+    HashSet<long> usedPairs)
+  {
+    int clusterCount = GetClusterCount(settings);
+    BuildClusterLayout(notes.Count, clusterCount, out var clusterStarts, out var clusterSizes);
+
+    int safety = targetLinks * 12 + 64;
+    while (links.Count < targetLinks && safety-- > 0)
     {
       int clusterIndex = rng.Next(0, clusterCount);
       int size = clusterSizes[clusterIndex];
@@ -315,9 +372,68 @@ public class SampleDataGenerator : MonoBehaviour
       int start = clusterStarts[clusterIndex];
       int sourceIndex = start + rng.Next(0, size);
       int targetIndex = start + rng.Next(0, size);
-      if (TryAddUniqueLink(sourceIndex, targetIndex, notes, links, usedPairs, RandomWeight(rng)))
-        created++;
+      TryAddUniqueLink(sourceIndex, targetIndex, notes, links, usedPairs, RandomWeight(rng));
     }
+  }
+
+  private static void BuildSmallWorldLinks(
+    SampleGraphSettings settings,
+    List<NoteData> notes,
+    int targetLinks,
+    System.Random rng,
+    List<MapRuntimeContext.RuntimeNoteLink> links,
+    HashSet<long> usedPairs)
+  {
+    int localWindow = Math.Max(2, notes.Count / 20);
+    int safety = targetLinks * 12 + 64;
+    while (links.Count < targetLinks && safety-- > 0)
+    {
+      int sourceIndex = rng.Next(0, notes.Count);
+      int targetIndex;
+      if (rng.NextDouble() < 0.8d)
+      {
+        int offset = rng.Next(1, localWindow + 1);
+        targetIndex = rng.NextDouble() < 0.5d
+          ? sourceIndex - offset
+          : sourceIndex + offset;
+        targetIndex = Mathf.Clamp(targetIndex, 0, notes.Count - 1);
+      }
+      else
+      {
+        targetIndex = rng.Next(0, notes.Count);
+      }
+
+      if (settings.Islands == SampleIslandMode.Many && !AreInSamePartition(sourceIndex, targetIndex, notes.Count, GetIslandPartitionCount(settings, notes.Count)))
+        continue;
+
+      TryAddUniqueLink(sourceIndex, targetIndex, notes, links, usedPairs, RandomWeight(rng));
+    }
+  }
+
+  private static void BuildChainLinks(
+    SampleGraphSettings settings,
+    List<NoteData> notes,
+    int targetLinks,
+    List<MapRuntimeContext.RuntimeNoteLink> links,
+    HashSet<long> usedPairs)
+  {
+    if (settings.Islands == SampleIslandMode.Many)
+    {
+      int partitionCount = GetIslandPartitionCount(settings, notes.Count);
+      BuildClusterLayout(notes.Count, partitionCount, out var starts, out var sizes);
+      for (int partitionIndex = 0; links.Count < targetLinks && partitionIndex < partitionCount; partitionIndex++)
+      {
+        int start = starts[partitionIndex];
+        int size = sizes[partitionIndex];
+        for (int i = 0; links.Count < targetLinks && i < size - 1; i++)
+          TryAddUniqueLink(start + i, start + i + 1, notes, links, usedPairs, 1f);
+      }
+
+      return;
+    }
+
+    for (int i = 0; links.Count < targetLinks && i < notes.Count - 1; i++)
+      TryAddUniqueLink(i, i + 1, notes, links, usedPairs, 1f);
   }
 
   private static bool TryAddUniqueLink(
@@ -394,7 +510,7 @@ public class SampleDataGenerator : MonoBehaviour
 
   private static int GetClusterCount(SampleGraphSettings settings)
   {
-    return settings.Scenario == SampleGraphScenario.Clusters
+    return settings.ConnectionModel == SampleConnectionModel.Clusters
       ? Math.Min(4, settings.NoteCount)
       : 0;
   }
@@ -434,28 +550,168 @@ public class SampleDataGenerator : MonoBehaviour
     }
   }
 
-  private static int GetMaxExtraLinks(SampleGraphSettings settings, int noteCount)
+  private static int GetTargetLinkCount(SampleGraphSettings settings, int noteCount)
+  {
+    int maxLinks = GetMaxLinkCount(settings, noteCount);
+    if (maxLinks <= 0 || settings.LinkDensity <= 0)
+      return 0;
+
+    int targetLinks = Mathf.RoundToInt(maxLinks * (settings.LinkDensity / 100f));
+    targetLinks = Mathf.Clamp(targetLinks, 1, maxLinks);
+
+    if (settings.Islands == SampleIslandMode.One && settings.ConnectionModel != SampleConnectionModel.Chain)
+      targetLinks = Math.Min(GetMaxPairCount(noteCount), Math.Max(targetLinks, noteCount - 1));
+
+    return targetLinks;
+  }
+
+  private static int GetMaxLinkCount(SampleGraphSettings settings, int noteCount)
   {
     if (noteCount < 2)
       return 0;
 
-    int notePairLimit = (noteCount * (noteCount - 1)) / 2;
-    int baseChainLimit = noteCount - 1;
+    if (settings.ConnectionModel == SampleConnectionModel.Chain)
+      return GetMaxChainLinkCount(settings, noteCount);
 
-    if (settings.Scenario != SampleGraphScenario.Clusters)
-      return Math.Max(0, notePairLimit - baseChainLimit);
+    int visualLinkLimit = noteCount * MaxVisualLinksPerNote;
+    if (settings.ConnectionModel == SampleConnectionModel.Clusters && settings.Islands != SampleIslandMode.One)
+      return Math.Min(visualLinkLimit, GetClusterPairLimit(settings, noteCount));
 
+    if (settings.Islands == SampleIslandMode.Many)
+      return Math.Min(visualLinkLimit, GetPartitionPairLimit(settings, noteCount, GetIslandPartitionCount(settings, noteCount)));
+
+    return Math.Min(visualLinkLimit, GetMaxPairCount(noteCount));
+  }
+
+  private static int GetMaxPairCount(int noteCount)
+  {
+    return (noteCount * (noteCount - 1)) / 2;
+  }
+
+  private static int GetMaxChainLinkCount(SampleGraphSettings settings, int noteCount)
+  {
+    if (settings.Islands != SampleIslandMode.Many)
+      return noteCount - 1;
+
+    int partitionCount = GetIslandPartitionCount(settings, noteCount);
+    BuildClusterLayout(noteCount, partitionCount, out _, out var sizes);
+    int maxLinks = 0;
+    for (int i = 0; i < sizes.Length; i++)
+      maxLinks += Math.Max(0, sizes[i] - 1);
+
+    return maxLinks;
+  }
+
+  private static int GetClusterPairLimit(SampleGraphSettings settings, int noteCount)
+  {
     int clusterCount = GetClusterCount(settings);
-    BuildClusterLayout(noteCount, clusterCount, out _, out var clusterSizes);
-    int clusterExtraLimit = 0;
-    for (int i = 0; i < clusterSizes.Length; i++)
+    return GetPartitionPairLimit(settings, noteCount, clusterCount);
+  }
+
+  private static int GetPartitionPairLimit(SampleGraphSettings settings, int noteCount, int partitionCount)
+  {
+    if (partitionCount <= 0)
+      return 0;
+
+    BuildClusterLayout(noteCount, partitionCount, out _, out var sizes);
+    int maxLinks = 0;
+    for (int i = 0; i < sizes.Length; i++)
+      maxLinks += GetMaxPairCount(sizes[i]);
+
+    return maxLinks;
+  }
+
+  private static List<int> BuildSequentialIndices(int count)
+  {
+    var indices = new List<int>(count);
+    for (int i = 0; i < count; i++)
+      indices.Add(i);
+
+    return indices;
+  }
+
+  private static void AddRandomTreeLinks(
+    List<int> sourceIndices,
+    int targetLinks,
+    System.Random rng,
+    List<NoteData> notes,
+    List<MapRuntimeContext.RuntimeNoteLink> links,
+    HashSet<long> usedPairs)
+  {
+    if (sourceIndices == null || sourceIndices.Count < 2)
+      return;
+
+    var indices = new List<int>(sourceIndices);
+    for (int i = indices.Count - 1; i > 0; i--)
     {
-      int size = clusterSizes[i];
-      if (size >= 2)
-        clusterExtraLimit += ((size - 1) * (size - 2)) / 2;
+      int swapIndex = rng.Next(0, i + 1);
+      (indices[i], indices[swapIndex]) = (indices[swapIndex], indices[i]);
     }
 
-    return Math.Max(0, clusterExtraLimit);
+    for (int i = 1; links.Count < targetLinks && i < indices.Count; i++)
+    {
+      int sourceIndex = indices[i];
+      int targetIndex = indices[rng.Next(0, i)];
+      TryAddUniqueLink(sourceIndex, targetIndex, notes, links, usedPairs, 1f);
+    }
+  }
+
+  private static void SelectRandomPair(
+    SampleGraphSettings settings,
+    int noteCount,
+    System.Random rng,
+    out int sourceIndex,
+    out int targetIndex)
+  {
+    if (settings.Islands == SampleIslandMode.Many)
+    {
+      SelectRandomPairInPartition(noteCount, GetIslandPartitionCount(settings, noteCount), rng, out sourceIndex, out targetIndex);
+      return;
+    }
+
+    sourceIndex = rng.Next(0, noteCount);
+    targetIndex = rng.Next(0, noteCount);
+  }
+
+  private static void SelectRandomPairInPartition(
+    int noteCount,
+    int partitionCount,
+    System.Random rng,
+    out int sourceIndex,
+    out int targetIndex)
+  {
+    BuildClusterLayout(noteCount, partitionCount, out var starts, out var sizes);
+    int partitionIndex = rng.Next(0, partitionCount);
+    int size = sizes[partitionIndex];
+    if (size < 2)
+    {
+      sourceIndex = 0;
+      targetIndex = 0;
+      return;
+    }
+
+    int start = starts[partitionIndex];
+    sourceIndex = start + rng.Next(0, size);
+    targetIndex = start + rng.Next(0, size);
+  }
+
+  private static bool AreInSamePartition(int leftIndex, int rightIndex, int noteCount, int partitionCount)
+  {
+    return GetPartitionIndex(leftIndex, noteCount, partitionCount) == GetPartitionIndex(rightIndex, noteCount, partitionCount);
+  }
+
+  private static int GetPartitionIndex(int noteIndex, int noteCount, int partitionCount)
+  {
+    BuildClusterLayout(noteCount, partitionCount, out var starts, out var sizes);
+    return GetClusterIndex(noteIndex, starts, sizes);
+  }
+
+  private static int GetIslandPartitionCount(SampleGraphSettings settings, int noteCount)
+  {
+    if (settings.ConnectionModel == SampleConnectionModel.Clusters)
+      return GetClusterCount(settings);
+
+    return Math.Min(4, noteCount);
   }
 
   private static long GetUndirectedPairKey(int a, int b)
