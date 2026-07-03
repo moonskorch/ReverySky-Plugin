@@ -679,7 +679,7 @@ MonoBehaviour:
   olderNotesAreFar: 1
   boundXYRadius: 10
   clampZToRange: 1
-  maxActiveLines: 30
+  maxActiveLines: 0
   maxActiveLongLines: 0
 --- !u!4 &428893402
 Transform:
@@ -2677,12 +2677,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
   injectSampleData: 0
-  sampleScenario: 1
-  sampleNoteCount: 250
+  sampleScenario: 2
+  sampleNoteCount: 5000
   sampleTagPoolSize: 0
   sampleDateSpanDays: 365
   sampleMaxTagsPerNote: 4
-  sampleExtraLinks: 100
+  sampleExtraLinks: 0
 --- !u!1 &1787028428
 GameObject:
   m_ObjectHideFlags: 0

@@ -497,7 +497,7 @@ public class CameraOrbitalController : MonoBehaviour
     rotateDirection = 0f;
 
     if (startPosition != null)
-      targetPos = startPosition.position;
+      targetPos = FlattenToActivePivotEquator(startPosition.position);
 
     SyncOrbitFromTarget();
 
@@ -517,6 +517,12 @@ public class CameraOrbitalController : MonoBehaviour
     pivotCompensation = Vector3.zero;
 
     SyncDateSliderFromCurrentFocus();
+  }
+
+  private Vector3 FlattenToActivePivotEquator(Vector3 worldPos)
+  {
+    worldPos.y = ActivePivotPos.y;
+    return worldPos;
   }
 
   // TODO

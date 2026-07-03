@@ -207,6 +207,47 @@ public class ObsidianBridgeEditModeTests
     }
   }
 
+  [TestCase(MapLayoutMode.DynamicLinks)]
+  [TestCase(MapLayoutMode.ScalableLinks)]
+  [TestCase(MapLayoutMode.Dates)]
+  public void ResetToStart_FlattensStartPositionToActivePivotEquator(MapLayoutMode engineType)
+  {
+    var cartographerObject = new GameObject("CameraResetCartographerTests");
+    var cameraObject = new GameObject("CameraResetControllerTests");
+    var startObject = new GameObject("CameraResetStartTests");
+    try
+    {
+      SetCartographerSingleton(null);
+
+      var cartographer = cartographerObject.AddComponent<Cartographer>();
+      var cameraController = cameraObject.AddComponent<CameraOrbitalController>();
+      var pivot = new Vector3(3f, 25f, 4f);
+      var activeEngine = new TestCartographerEngine(engineType, pivot);
+
+      SetCartographerSingleton(cartographer);
+      SetPrivateField(cartographer, "_activeEngine", activeEngine);
+
+      startObject.transform.position = new Vector3(0f, -9f, -20f);
+      SetPrivateField(cameraController, "startPosition", startObject.transform);
+
+      cameraController.ResetToStart();
+
+      Vector3 storedTargetPos = GetPrivateField<Vector3>(cameraController, "targetPos");
+      float orbitHeight = GetPrivateField<float>(cameraController, "orbitHeight");
+
+      Assert.That(storedTargetPos.y, Is.EqualTo(pivot.y).Within(0.0001f));
+      Assert.That(orbitHeight, Is.EqualTo(0f).Within(0.0001f));
+    }
+    finally
+    {
+      SetCartographerSingleton(null);
+
+      Object.DestroyImmediate(cartographerObject);
+      Object.DestroyImmediate(cameraObject);
+      Object.DestroyImmediate(startObject);
+    }
+  }
+
   [Test]
   public void ResolveModeByNotesCount_UsesScalableLinksForLargeAutoAndDynamicLinksGraphs()
   {
@@ -454,21 +495,33 @@ public class ObsidianBridgeEditModeTests
 
   private sealed class TestCartographerEngine : ICartographerEngine
   {
+    private readonly Vector3 pivot;
+
     public TestCartographerEngine(MapLayoutMode engineType)
+      : this(engineType, Vector3.zero)
+    {
+    }
+
+    public TestCartographerEngine(MapLayoutMode engineType, Vector3 pivot)
     {
       EngineType = engineType;
+      this.pivot = pivot;
     }
 
     public bool RequiresTick => false;
     public float BoundRadius => 1f;
-    public Vector3 Pivot => Vector3.zero;
+    public Vector3 Pivot => pivot;
     public MapLayoutMode EngineType { get; }
     public int MaxActiveLines => 0;
     public int MaxActiveLongLines => 0;
     public ScapeCameraWarper ScapeWarper => null;
     public IReadOnlyList<Star> Stars => new List<Star>();
     public IReadOnlyList<TagNode> TagNodes => new List<TagNode>();
-    public event System.Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnNodesChanged;
+    public event System.Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnNodesChanged
+    {
+      add { }
+      remove { }
+    }
 
     public Star FindStarByNoteId(string noteId)
     {
