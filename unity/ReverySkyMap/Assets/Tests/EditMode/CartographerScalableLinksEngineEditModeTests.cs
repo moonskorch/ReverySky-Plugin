@@ -192,6 +192,38 @@ public class CartographerScalableLinksEngineEditModeTests
     Assert.That(scope.Engine.RequiresTick, Is.True);
   }
 
+  [Test]
+  public void BuildGraph_TimedConstructionKeepsNavigationPivotStable()
+  {
+    var graph = BuildTaglessComponentsGraph(64);
+    using var scope = CreateEngineScope(
+      graph.Notes,
+      graph.Links,
+      engineScope =>
+      {
+        engineScope.SetAnimationLifetime("constructionLifetime", "Timed");
+        engineScope.SetPrivateFieldForTest("constructionAnimationSeconds", 5f);
+        engineScope.SetAnimationLifetime("linkRefinementLifetime", "Timed");
+        engineScope.SetPrivateFieldForTest("linkRefinementPasses", 4);
+        engineScope.SetPrivateFieldForTest("refinementFinishTaperFraction", 0f);
+        engineScope.SetPrivateFieldForTest("refinementPassesPerFrame", 1);
+      });
+
+    Vector3 initialPivot = scope.Engine.Pivot;
+
+    Assert.That(scope.Engine.RequiresTick, Is.True);
+
+    TickUntilStopped(scope);
+
+    Vector3 finalPivot = scope.Engine.Pivot;
+    Assert.That(finalPivot.x, Is.EqualTo(initialPivot.x).Within(0.0001f));
+    Assert.That(finalPivot.y, Is.EqualTo(initialPivot.y).Within(0.0001f));
+    Assert.That(finalPivot.z, Is.EqualTo(initialPivot.z).Within(0.0001f));
+    Assert.That(scope.Engine.BoundRadius, Is.GreaterThan(0f));
+    Assert.That(float.IsNaN(scope.Engine.BoundRadius), Is.False);
+    Assert.That(float.IsInfinity(scope.Engine.BoundRadius), Is.False);
+  }
+
   private static EngineScope CreateEngineScope(
     IReadOnlyList<NoteData> notes,
     IReadOnlyList<MapRuntimeContext.RuntimeNoteLink> links,
