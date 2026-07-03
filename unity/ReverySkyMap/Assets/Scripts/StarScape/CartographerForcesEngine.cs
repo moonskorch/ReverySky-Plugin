@@ -9,8 +9,6 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
   [SerializeField] private StarSO starTemplate;
   [SerializeField] private Transform layoutParent;
   [SerializeField] private TagNodeSO tagNodeTemplate;
-  [SerializeField] private LineRenderer edgePrefab;
-  [SerializeField] private bool drawLines = true;
 
   [Header("Layout (force-directed)")]
   [SerializeField] private float idealEdgeLen = 3.2f;
@@ -42,7 +40,6 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
   private readonly List<Node> _nodes = new();
   private readonly List<Edge> _edges = new();
   private readonly List<Edge> _noteLinks = new();
-  private readonly List<LineRenderer> _lines = new();
 
   private readonly List<Star> _stars = new();
   private readonly List<TagNode> _tagNodes = new();
@@ -148,13 +145,6 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
         }
 
         _edges.Add(new Edge { noteInd = noteIdx, tagInd = ti, restLen = idealEdgeLen });
-
-        if (drawLines)
-        {
-          var lr = Instantiate(edgePrefab, layoutParent);
-          lr.positionCount = 2;
-          _lines.Add(lr);
-        }
       }
     }
 
@@ -192,28 +182,15 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
           tagInd = dstIdx,
           restLen = Mathf.Clamp(idealEdgeLen / Mathf.Sqrt(weight), 0.8f, idealEdgeLen * 1.5f)
         });
-
-        if (drawLines)
-        {
-          var lr = Instantiate(edgePrefab, layoutParent);
-          lr.positionCount = 2;
-          _lines.Add(lr);
-        }
       }
     }
 
-    if (drawLines)
-      UpdateLines();
     PublishVisualNodesChanged();
   }
 
   public void ClearGraph()
   {
     ScapeWarper?.Clear();
-
-    for (int i = 0; i < _lines.Count; i++)
-      if (_lines[i]) Destroy(_lines[i].gameObject);
-    _lines.Clear();
 
     for (int i = 0; i < _nodes.Count; i++)
       if (_nodes[i].t) Destroy(_nodes[i].t.gameObject);
@@ -323,15 +300,11 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
       _nodes[i] = n;
     }
 
-    // 4) Update lines
-    if (drawLines)
-      UpdateLines();
   }
 
   public void ApplyView(ScapeView view)
   {
     bool showTags = (view == ScapeView.Planets);
-    bool showEdges = drawLines && (view == ScapeView.Planets);
 
     for (int i = 0; i < _nodes.Count; i++)
     {
@@ -340,9 +313,6 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
       if (_nodes[i].star != null)
         _nodes[i].star.SetView(view);
     }
-
-    for (int i = 0; i < _lines.Count; i++)
-      if (_lines[i] != null) _lines[i].enabled = showEdges;
   }
 
   public Star FindStarByNoteId(string noteId)
@@ -419,35 +389,6 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
     var v = new Vector3(x, y, z);
     if (v.sqrMagnitude > 1f) v = v.normalized;
     return v * spawnRadius;
-  }
-
-  private void UpdateLines()
-  {
-    int lineIdx = 0;
-
-    for (int k = 0; k < _edges.Count; k++)
-    {
-      var e = _edges[k];
-      var lr = lineIdx < _lines.Count ? _lines[lineIdx] : null;
-      if (lr != null)
-      {
-        lr.SetPosition(0, _nodes[e.noteInd].t.position);
-        lr.SetPosition(1, _nodes[e.tagInd].t.position);
-      }
-      lineIdx++;
-    }
-
-    for (int k = 0; k < _noteLinks.Count; k++)
-    {
-      var e = _noteLinks[k];
-      var lr = lineIdx < _lines.Count ? _lines[lineIdx] : null;
-      if (lr != null)
-      {
-        lr.SetPosition(0, _nodes[e.noteInd].t.position);
-        lr.SetPosition(1, _nodes[e.tagInd].t.position);
-      }
-      lineIdx++;
-    }
   }
 
   private void PublishVisualNodesChanged()

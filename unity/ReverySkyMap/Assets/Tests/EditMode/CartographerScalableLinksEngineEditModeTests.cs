@@ -317,7 +317,6 @@ public class CartographerScalableLinksEngineEditModeTests
       SetPrivateField("starTemplate", starTemplate);
       SetPrivateField("layoutParent", engineObject.transform);
       SetPrivateField("tagNodeTemplate", null);
-      SetPrivateField("edgePrefab", null);
       SetPrivateField("constructionLifetime", ParseNestedEnum("AnimationLifetime", "Instant"));
       SetPrivateField("linkRefinementLifetime", ParseNestedEnum("AnimationLifetime", "Instant"));
       SetPrivateField("constructionAnimationSeconds", 0f);

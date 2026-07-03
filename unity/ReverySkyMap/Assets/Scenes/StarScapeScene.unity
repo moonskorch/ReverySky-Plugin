@@ -301,8 +301,6 @@ MonoBehaviour:
   starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
   layoutParent: {fileID: 1327961058}
   tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
-  edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
-  drawLines: 0
   idealEdgeLen: 4
   repelStrength: 40
   springK: 2.5
@@ -1509,7 +1507,6 @@ MonoBehaviour:
   starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
   layoutParent: {fileID: 1327961058}
   tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
-  edgePrefab: {fileID: 792926316352650865, guid: 4c9a94ee88e1b5b40a35f933f8a0da82, type: 3}
   constructionBatchesPerFrame: 1
   nodeSpacingFactor: 8.1
   minimumNavigationRadius: 14
@@ -1563,18 +1560,6 @@ MonoBehaviour:
   endlessConstructionNodesPerFrame: 120
   timingFrameRate: 30
   linkRefinementLifetime: 1
-  edgeBudgetMode: 0
-  manualVisibleEdges: 0
-  smallGraphVisibleEdges: 420
-  smallGraphNodeThreshold: 700
-  minimumVisibleEdges: 260
-  maximumVisibleEdges: 1100
-  visibleEdgesPerNode: 0.38
-  backboneBudgetRatio: 0.48
-  directLinkBudgetRatio: 0.42
-  maxVisibleTagEdgeRestMultiplier: 2.6
-  pruneLongNonBackboneEdges: 1
-  nonBackboneMaxRestLengthMultiplier: 3
 --- !u!1 &1085980073
 GameObject:
   m_ObjectHideFlags: 0

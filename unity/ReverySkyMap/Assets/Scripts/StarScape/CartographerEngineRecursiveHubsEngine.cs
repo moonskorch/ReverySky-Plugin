@@ -23,12 +23,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     Endless
   }
 
-  private enum EdgeBudgetMode
-  {
-    Manual,
-    AdaptiveByNodeCount
-  }
-
   private enum LargeGraphVisualPolicy
   {
     PreserveVisuals,
@@ -40,7 +34,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   [SerializeField] private StarSO starTemplate;
   [SerializeField] private Transform layoutParent;
   [SerializeField] private TagNodeSO tagNodeTemplate;
-  [SerializeField] private LineRenderer edgePrefab;
 
   [Header("Progressive construction")]
   [SerializeField, Range(1, 16)] private int constructionBatchesPerFrame = 1;
@@ -123,20 +116,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   [Header("Link Timing")]
   [SerializeField] private AnimationLifetime linkRefinementLifetime = AnimationLifetime.Timed;
 
-  [Header("Line LOD")]
-  [SerializeField] private EdgeBudgetMode edgeBudgetMode = EdgeBudgetMode.AdaptiveByNodeCount;
-  [SerializeField, Range(0, 3000)] private int manualVisibleEdges = 900;
-  [SerializeField, Range(0, 3000)] private int smallGraphVisibleEdges = 420;
-  [SerializeField, Range(100, 3000)] private int smallGraphNodeThreshold = 700;
-  [SerializeField, Range(0, 3000)] private int minimumVisibleEdges = 260;
-  [SerializeField, Range(0, 3000)] private int maximumVisibleEdges = 1100;
-  [SerializeField, Range(0f, 2f)] private float visibleEdgesPerNode = 0.38f;
-  [SerializeField, Range(0f, 1f)] private float backboneBudgetRatio = 0.48f;
-  [SerializeField, Range(0f, 1f)] private float directLinkBudgetRatio = 0.42f;
-  [SerializeField, Min(1f)] private float maxVisibleTagEdgeRestMultiplier = 2.6f;
-  [SerializeField] private bool pruneLongNonBackboneEdges = true;
-  [SerializeField, Min(1f)] private float nonBackboneMaxRestLengthMultiplier = 3.0f;
-
   private const float GOLDEN_ANGLE_RAD = 2.39996323f;
   private const float GOLDEN_RATIO_CONJUGATE = 0.61803398875f;
   private const float MIN_SQR_DISTANCE = 0.000001f;
@@ -160,7 +139,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   private long _frontierPops;
   private long _separationPairChecks;
   private bool _constructionActive;
-  private bool _linesInstantiated;
   private bool _animateConstruction;
   private bool _animateRefinement;
 
@@ -170,7 +148,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   private readonly List<Edge> _allEdges = new();
   private readonly List<Edge> _backboneEdges = new();
   private readonly List<Component> _components = new();
-  private readonly List<LineBinding> _lineBindings = new();
   private readonly List<Star> _stars = new();
   private readonly List<TagNode> _tagNodes = new();
 
@@ -184,8 +161,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
   private bool _continuousLinkRefinement;
   private bool _graphHasNodes;
-  private bool _postBuildOptimized;
-  private int _visibleEdgeBudget;
   private readonly HashSet<Vector3Int> _placementCells = new();
   private List<Vector3Int> _packingOffsets = new();
 
@@ -350,20 +325,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     }
   }
 
-  private readonly struct LineBinding
-  {
-    public readonly LineRenderer Line;
-    public readonly int A;
-    public readonly int B;
-
-    public LineBinding(LineRenderer line, int a, int b)
-    {
-      Line = line;
-      A = a;
-      B = b;
-    }
-  }
-
   public MapLayoutMode EngineType => MapLayoutMode.ScalableLinks;
   public int MaxActiveLines => maxActiveLines;
   public int MaxActiveLongLines => maxActiveLongLines;
@@ -387,31 +348,25 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     if (_constructionActive)
     {
       TickConstruction();
-      TryApplyPostBuildOptimizations();
       return;
     }
 
     if (_remainingRefinementPasses > 0)
     {
       TickFiniteRefinement();
-      TryApplyPostBuildOptimizations();
       return;
     }
 
-    if (_continuousLinkRefinement && _graphHasNodes && _linesInstantiated)
+    if (_continuousLinkRefinement && _graphHasNodes)
       TickContinuousRefinement();
-
-    TryApplyPostBuildOptimizations();
   }
 
   public void BuildGraph(List<NoteData> notes)
   {
     _continuousLinkRefinement = false;
-    _postBuildOptimized = false;
     _graphHasNodes = notes != null && notes.Count > 0;
 
     int noteCount = notes?.Count ?? 0;
-    ConfigureLineBudgetBeforeBuild(noteCount);
     ConfigureLinkTimingBeforeBuild();
     ConfigureConstructionTimingBeforeBuild(noteCount);
 
@@ -421,8 +376,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     _continuousLinkRefinement =
       _graphHasNodes &&
       linkRefinementLifetime == AnimationLifetime.Endless;
-
-    TryApplyPostBuildOptimizations();
   }
 
   private void TickConstruction()
@@ -458,7 +411,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     }
 
     UpdateVisualPositions();
-    UpdateLinePositions();
     UpdateNavigationBounds();
 
     if (_remainingRefinementPasses == 0)
@@ -476,7 +428,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       RunRefinementPass();
 
     UpdateVisualPositions();
-    UpdateLinePositions();
     UpdateNavigationBounds();
   }
 
@@ -534,30 +485,10 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       $"roots={_rootCount}, placed={_placedCount}/{_nodes.Count}, constructionActive={_constructionActive}, " +
       $"constructionWaves={_constructionWaves}, maxHierarchyDepth={_maxHierarchyDepth}, " +
       $"placementFallbacks={_placementFallbacks}, frontierPushes={_frontierPushes}, frontierPops={_frontierPops}, " +
-      $"visibleEdges={_lineBindings.Count}, totalMs={totalStopwatch.Elapsed.TotalMilliseconds:F1}, " +
+      $"totalMs={totalStopwatch.Elapsed.TotalMilliseconds:F1}, " +
       $"LogicalMs={logicalStopwatch.Elapsed.TotalMilliseconds:F1}, " +
       $"InitializeRootsMs={seedStopwatch.Elapsed.TotalMilliseconds:F1}, " +
       $"ConstructionMs={constructionStopwatch.Elapsed.TotalMilliseconds:F1}");
-  }
-
-  private void ConfigureLineBudgetBeforeBuild(int noteCount)
-  {
-    _visibleEdgeBudget = Mathf.Max(0, ResolveEdgeBudget(noteCount));
-  }
-
-  private int ResolveEdgeBudget(int noteCount)
-  {
-    if (edgeBudgetMode == EdgeBudgetMode.Manual)
-      return Mathf.Max(0, manualVisibleEdges);
-
-    int safeNoteCount = Mathf.Max(0, noteCount);
-    if (safeNoteCount > 0 && safeNoteCount <= smallGraphNodeThreshold)
-      return Mathf.Max(0, smallGraphVisibleEdges);
-
-    int adaptiveBudget = Mathf.RoundToInt(safeNoteCount * Mathf.Max(0f, visibleEdgesPerNode));
-    int lowerBound = Mathf.Min(minimumVisibleEdges, maximumVisibleEdges);
-    int upperBound = Mathf.Max(minimumVisibleEdges, maximumVisibleEdges);
-    return Mathf.Clamp(adaptiveBudget, lowerBound, upperBound);
   }
 
   private void ConfigureConstructionTimingBeforeBuild(int noteCount)
@@ -652,72 +583,8 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     _resolvedLinkRefinementTaperPasses = taperPasses;
   }
 
-  private void TryApplyPostBuildOptimizations()
-  {
-    if (_postBuildOptimized || !_graphHasNodes || !_linesInstantiated)
-      return;
-
-    if (pruneLongNonBackboneEdges)
-      PruneLongNonBackboneLines();
-
-    _postBuildOptimized = true;
-  }
-
-  private void PruneLongNonBackboneLines()
-  {
-    var backbonePairs = BuildBackbonePairSet();
-    float maxLength = ResolveMaxNonBackboneLineLength();
-    float maxLengthSqr = maxLength * maxLength;
-
-    for (int i = _lineBindings.Count - 1; i >= 0; i--)
-    {
-      var binding = _lineBindings[i];
-      if (binding.Line == null)
-      {
-        _lineBindings.RemoveAt(i);
-        continue;
-      }
-
-      long pairKey = PairKey(Mathf.Min(binding.A, binding.B), Mathf.Max(binding.A, binding.B));
-      if (backbonePairs.Contains(pairKey))
-        continue;
-
-      if ((
-          _nodes[binding.B].LocalPosition -
-          _nodes[binding.A].LocalPosition).sqrMagnitude <= maxLengthSqr)
-      {
-        continue;
-      }
-
-      Destroy(binding.Line.gameObject);
-      _lineBindings.RemoveAt(i);
-    }
-  }
-
-  private HashSet<long> BuildBackbonePairSet()
-  {
-    var pairs = new HashSet<long>();
-    for (int i = 0; i < _backboneEdges.Count; i++)
-    {
-      var edge = _backboneEdges[i];
-      pairs.Add(PairKey(Mathf.Min(edge.A, edge.B), Mathf.Max(edge.A, edge.B)));
-    }
-
-    return pairs;
-  }
-
-  private float ResolveMaxNonBackboneLineLength()
-  {
-    return Mathf.Max(directLinkRestLength, noteTagRestLength) *
-      Mathf.Max(1f, nonBackboneMaxRestLengthMultiplier);
-  }
-
   public void ClearGraph()
   {
-    for (int i = 0; i < _lineBindings.Count; i++)
-      if (_lineBindings[i].Line) Destroy(_lineBindings[i].Line.gameObject);
-    _lineBindings.Clear();
-
     for (int i = 0; i < _nodes.Count; i++)
     {
       var visualTransform = _nodes[i].VisualTransform;
@@ -754,7 +621,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     _frontierPops = 0;
     _separationPairChecks = 0;
     _constructionActive = false;
-    _linesInstantiated = false;
     _nextPlacementSequence = 0;
     _layoutCenter = Vector3.zero;
     _navigationRadius = Mathf.Max(0.1f, minimumNavigationRadius);
@@ -774,9 +640,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       if (node.Star != null)
         node.Star.SetView(view);
     }
-
-    for (int i = 0; i < _lineBindings.Count; i++)
-      if (_lineBindings[i].Line != null) _lineBindings[i].Line.enabled = showDetails;
   }
 
   public Star FindStarByNoteId(string noteId)
@@ -1538,7 +1401,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     InstantiatePlacedNodesWithoutVisuals();
     PublishVisualNodesChanged();
     Cartographer.I?.FocusRuntimeNote(MapRuntimeContext.PendingFocusNoteId);
-    InstantiateLines();
     UpdateNavigationBounds();
 
     if (_animateRefinement)
@@ -1554,15 +1416,14 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       }
 
       UpdateVisualPositions();
-      UpdateLinePositions();
       UpdateNavigationBounds();
       _remainingRefinementPasses = 0;
     }
 
     UnityEngine.Debug.Log(
-      $"[RecursiveHubs/v7] Construction completed placed={_placedCount}/{_nodes.Count}, " +
+      $"[RecursiveHubs] Construction completed placed={_placedCount}/{_nodes.Count}, " +
       $"waves={_constructionWaves}, roots={_rootCount}, backboneEdges={_backboneEdges.Count}, " +
-      $"remainingRefinementPasses={_remainingRefinementPasses}, visibleEdges={_lineBindings.Count}, " +
+      $"remainingRefinementPasses={_remainingRefinementPasses}, " +
       $"targetFullPasses={linkRefinementPasses}, resolvedPasses={_resolvedLinkRefinementPasses}, " +
       $"taperPasses={_resolvedLinkRefinementTaperPasses}, taperFraction={refinementFinishTaperFraction:F2}, " +
       $"navigationRadius={_navigationRadius:F1}");
@@ -1859,12 +1720,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
     if (node.IsNote)
     {
-      if (starTemplate == null)
-      {
-        UnityEngine.Debug.LogError("[RecursiveHubs/v7] Missing starTemplate.");
-        return;
-      }
-
       node.Star = starTemplate.Instantiate(
         worldPosition,
         node.Note,
@@ -1896,130 +1751,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     }
   }
 
-  private void InstantiateLines()
-  {
-    if (_linesInstantiated || edgePrefab == null || _visibleEdgeBudget <= 0)
-      return;
-
-    int backboneBudget = Mathf.Clamp(
-      Mathf.RoundToInt(_visibleEdgeBudget * backboneBudgetRatio),
-      0,
-      _visibleEdgeBudget);
-
-    int directBudget = Mathf.Clamp(
-      Mathf.RoundToInt(_visibleEdgeBudget * directLinkBudgetRatio),
-      0,
-      _visibleEdgeBudget - backboneBudget);
-
-    var orderedBackbone = _backboneEdges
-      .OrderBy(edge => edge.Kind == EdgeKind.DirectNoteLink ? 0 : 1)
-      .ThenBy(edge => Mathf.Min(
-        _nodes[edge.A].HierarchyDepth,
-        _nodes[edge.B].HierarchyDepth))
-      .ThenByDescending(edge => Mathf.Max(
-        _nodes[edge.A].StructuralScore,
-        _nodes[edge.B].StructuralScore))
-      .ThenBy(edge => edge.A)
-      .ThenBy(edge => edge.B)
-      .ToList();
-
-    var orderedDirectLinks = _noteLinks
-      .OrderByDescending(edge => edge.Weight)
-      .ThenBy(edge => edge.A)
-      .ThenBy(edge => edge.B)
-      .ToList();
-
-    var orderedTagEdges = _tagEdges
-      .Where(IsVisibleTagEdgeCandidate)
-      .OrderBy(edge => EdgeLengthSqr(edge))
-      .ThenBy(edge => edge.A)
-      .ThenBy(edge => edge.B)
-      .ToList();
-
-    var instantiatedPairs = new HashSet<long>();
-    int added = 0;
-
-    added += InstantiateLinesFromEdges(
-      orderedBackbone,
-      backboneBudget,
-      instantiatedPairs);
-
-    added += InstantiateLinesFromEdges(
-      orderedDirectLinks,
-      Mathf.Min(directBudget, _visibleEdgeBudget - added),
-      instantiatedPairs);
-
-    added += InstantiateLinesFromEdges(
-      orderedTagEdges,
-      _visibleEdgeBudget - added,
-      instantiatedPairs);
-
-    if (added < _visibleEdgeBudget)
-    {
-      InstantiateLinesFromEdges(
-        orderedDirectLinks,
-        _visibleEdgeBudget - added,
-        instantiatedPairs);
-    }
-
-    _linesInstantiated = true;
-    ApplyView(_currentView);
-  }
-
-  private bool IsVisibleTagEdgeCandidate(Edge edge)
-  {
-    if (edge.Kind != EdgeKind.NoteTag)
-      return true;
-
-    float maxLength =
-      Mathf.Max(0.01f, noteTagRestLength) *
-      maxVisibleTagEdgeRestMultiplier;
-
-    return EdgeLengthSqr(edge) <= maxLength * maxLength;
-  }
-
-  private float EdgeLengthSqr(Edge edge)
-  {
-    return (_nodes[edge.B].LocalPosition - _nodes[edge.A].LocalPosition).sqrMagnitude;
-  }
-
-  private int InstantiateLinesFromEdges(
-    IEnumerable<Edge> edges,
-    int maxCount,
-    HashSet<long> instantiatedPairs)
-  {
-    int added = 0;
-    int safeMaxCount = Mathf.Max(0, maxCount);
-
-    foreach (var edge in edges)
-    {
-      if (added >= safeMaxCount)
-        break;
-
-      int aIndex = Mathf.Min(edge.A, edge.B);
-      int bIndex = Mathf.Max(edge.A, edge.B);
-      long pairKey = PairKey(aIndex, bIndex);
-
-      if (!instantiatedPairs.Add(pairKey))
-        continue;
-
-      var a = _nodes[edge.A].VisualTransform;
-      var b = _nodes[edge.B].VisualTransform;
-
-      if (!a || !b)
-        continue;
-
-      var line = Instantiate(edgePrefab, layoutParent);
-      line.positionCount = 2;
-      line.SetPosition(0, a.position);
-      line.SetPosition(1, b.position);
-      _lineBindings.Add(new LineBinding(line, edge.A, edge.B));
-      added++;
-    }
-
-    return added;
-  }
-
   private void UpdateVisualPositions()
   {
     for (int nodeIndex = 0; nodeIndex < _nodes.Count; nodeIndex++)
@@ -2027,24 +1758,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       var visualTransform = _nodes[nodeIndex].VisualTransform;
       if (visualTransform)
         visualTransform.position = ToWorldPosition(_nodes[nodeIndex].LocalPosition);
-    }
-  }
-
-  private void UpdateLinePositions()
-  {
-    for (int i = 0; i < _lineBindings.Count; i++)
-    {
-      var binding = _lineBindings[i];
-      if (binding.Line == null)
-        continue;
-
-      var a = _nodes[binding.A].VisualTransform;
-      var b = _nodes[binding.B].VisualTransform;
-      if (!a || !b)
-        continue;
-
-      binding.Line.SetPosition(0, a.position);
-      binding.Line.SetPosition(1, b.position);
     }
   }
 

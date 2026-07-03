@@ -3,9 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Pool;
 
-// TODO:
-// 1. Remove line building from engine.
-
 /// <summary>
 /// Builds culling-driven edge visuals for the active graph nodes.
 /// Physical line renderers are pooled because visibility changes can be frequent while graph data stays stable.
