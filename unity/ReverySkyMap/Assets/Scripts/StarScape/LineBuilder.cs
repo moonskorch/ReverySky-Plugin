@@ -6,7 +6,6 @@ using UnityEngine.Pool;
 // TODO:
 // 1. Remove line building from engine.
 // 2. Limit per node.
-// 3. Rebalance active lines when the visible graph region changes.
 
 /// <summary>
 /// Builds culling-driven edge visuals for the active graph nodes.
@@ -78,6 +77,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   [SerializeField, Min(0.01f)] private float visibleDistance = 80f;
   [SerializeField, Min(0f)] private float longLineDistance = 50f;
   [SerializeField] private bool focusedLinesIgnoreLongLineLimit = true;
+  [SerializeField, Range(0f, 1f)] private float visibleRegionRefreshLineRatio = 0.05f;
 
   private readonly HashSet<int> registeredNodeIds = new();
   private readonly Dictionary<string, Star> starByNoteId = new(StringComparer.Ordinal);
@@ -86,6 +86,9 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   private readonly Dictionary<EdgeKey, LineBinding> activeLinesByEdgeKey = new();
   private readonly HashSet<EdgeKey> edgeKeys = new();
   private readonly HashSet<int> visibleNodeIds = new();
+  // One-shot batch of nodes that crossed into visibility since the last reconciliation.
+  // Current visibility remains authoritative, so fast fly-by nodes can be skipped lazily.
+  private readonly Queue<int> newlyVisibleNodeIds = new();
   private readonly HashSet<EdgeKey> desiredLineKeys = new();
   private readonly List<LineCandidate> desiredLineCandidates = new();
   private readonly List<EdgeKey> staleLineKeys = new();
@@ -141,6 +144,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     desiredLineKeys.Clear();
     desiredLineCandidates.Clear();
     staleLineKeys.Clear();
+    newlyVisibleNodeIds.Clear();
     lineSetDirty = false;
     focusedNodeId = NoNodeId;
   }
@@ -178,6 +182,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
       if (!visibleNodeIds.Add(nodeId))
         return;
 
+      EnqueueNewlyVisibleNode(nodeId);
       MarkLineSetDirty();
       return;
     }
@@ -391,6 +396,9 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 
     int selectedLongLineCount = 0;
     AddFocusedLines(ref selectedLongLineCount);
+    // Newly visible regions get a bounded chance to preempt old retained lines,
+    // while focused lines stay protected by being selected first.
+    AddNewlyVisibleLines(ref selectedLongLineCount);
     RetainActiveLines(ref selectedLongLineCount);
     FillVisibleLines(ref selectedLongLineCount);
   }
@@ -426,6 +434,42 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
       AddDesiredLine(candidate, ignoreLongLineLimit: false, ref selectedLongLineCount);
       if (HasFilledLineLimit())
         return;
+    }
+  }
+
+  private void AddNewlyVisibleLines(ref int selectedLongLineCount)
+  {
+    int refreshBudget = ResolveVisibleRegionRefreshLineBudget();
+    if (refreshBudget <= 0 || newlyVisibleNodeIds.Count == 0)
+    {
+      ClearNewlyVisibleQueue();
+      return;
+    }
+
+    int addedCount = 0;
+    int pendingCount = newlyVisibleNodeIds.Count;
+    for (int i = 0; i < pendingCount; i++)
+    {
+      int nodeId = newlyVisibleNodeIds.Dequeue();
+
+      // The queue is an event batch, not the source of truth; visibility may
+      // already have changed again before this reconciliation runs.
+      if (HasFilledLineLimit() ||
+          addedCount >= refreshBudget ||
+          !visibleNodeIds.Contains(nodeId) ||
+          !candidatesByNodeId.TryGetValue(nodeId, out var candidates))
+      {
+        continue;
+      }
+
+      for (int candidateIndex = 0; candidateIndex < candidates.Count; candidateIndex++)
+      {
+        if (AddDesiredLine(candidates[candidateIndex], ignoreLongLineLimit: false, ref selectedLongLineCount))
+          addedCount++;
+
+        if (HasFilledLineLimit() || addedCount >= refreshBudget)
+          break;
+      }
     }
   }
 
@@ -480,6 +524,27 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   private bool HasFilledLineLimit()
   {
     return desiredLineKeys.Count >= activeLineLimit;
+  }
+
+  private int ResolveVisibleRegionRefreshLineBudget()
+  {
+    if (activeLineLimit <= 0 || visibleRegionRefreshLineRatio <= 0f)
+      return 0;
+
+    return Mathf.CeilToInt(activeLineLimit * Mathf.Clamp01(visibleRegionRefreshLineRatio));
+  }
+
+  private void EnqueueNewlyVisibleNode(int nodeId)
+  {
+    if (nodeId == NoNodeId)
+      return;
+
+    newlyVisibleNodeIds.Enqueue(nodeId);
+  }
+
+  private void ClearNewlyVisibleQueue()
+  {
+    newlyVisibleNodeIds.Clear();
   }
 
   private void RemoveLinesOutsideDesiredSet()

@@ -356,6 +356,107 @@ public class LineBuilderEditModeTests
   }
 
   [UnityTest]
+  public IEnumerator NewlyVisibleEndpointLines_EvictExistingNonFocusedLinesWithinRefreshBudget()
+  {
+    using var scope = CreateScope();
+    var noteCObject = new GameObject("LineBuilderEditModeTests_NoteC");
+    var noteDObject = new GameObject("LineBuilderEditModeTests_NoteD");
+    var noteC = noteCObject.AddComponent<Star>();
+    var noteD = noteDObject.AddComponent<Star>();
+
+    try
+    {
+      ConfigureStar(scope.NoteA, "n1", "notes/n1.md");
+      ConfigureStar(scope.NoteB, "n2", "notes/n2.md");
+      ConfigureStar(noteC, "n3", "notes/n3.md");
+      ConfigureStar(noteD, "n4", "notes/n4.md");
+      SetPosition(scope.NoteA, new Vector3(-6f, 0f, 0f));
+      SetPosition(scope.NoteB, new Vector3(-4f, 0f, 0f));
+      SetPosition(noteC, new Vector3(4f, 0f, 0f));
+      SetPosition(noteD, new Vector3(6f, 0f, 0f));
+
+      MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>
+      {
+        new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n2", Weight = 1f },
+        new MapRuntimeContext.RuntimeNoteLink { SourceId = "n3", TargetId = "n4", Weight = 1f }
+      });
+
+      scope.Builder.Rebuild(
+        new List<Star> { scope.NoteA, scope.NoteB, noteC, noteD },
+        new List<TagNode>(),
+        1,
+        10);
+      scope.Builder.SetDistanceVisible(scope.NoteA, true);
+      FlushLineBuilder(scope.Builder);
+
+      AssertLineConnects(GetOnlyActiveLine(scope.LineParent), scope.NoteA, scope.NoteB);
+
+      scope.Builder.SetDistanceVisible(noteC, true);
+      FlushLineBuilder(scope.Builder);
+
+      AssertLineConnects(GetOnlyActiveLine(scope.LineParent), noteC, noteD);
+    }
+    finally
+    {
+      Object.DestroyImmediate(noteCObject);
+      Object.DestroyImmediate(noteDObject);
+    }
+
+    yield return null;
+  }
+
+  [UnityTest]
+  public IEnumerator NewlyVisibleEndpointLines_DoNotEvictFocusedLines()
+  {
+    using var scope = CreateScope();
+    var noteCObject = new GameObject("LineBuilderEditModeTests_NoteC");
+    var noteDObject = new GameObject("LineBuilderEditModeTests_NoteD");
+    var noteC = noteCObject.AddComponent<Star>();
+    var noteD = noteDObject.AddComponent<Star>();
+
+    try
+    {
+      ConfigureStar(scope.NoteA, "n1", "notes/n1.md");
+      ConfigureStar(scope.NoteB, "n2", "notes/n2.md");
+      ConfigureStar(noteC, "n3", "notes/n3.md");
+      ConfigureStar(noteD, "n4", "notes/n4.md");
+      SetPosition(scope.NoteA, new Vector3(-6f, 0f, 0f));
+      SetPosition(scope.NoteB, new Vector3(-4f, 0f, 0f));
+      SetPosition(noteC, new Vector3(4f, 0f, 0f));
+      SetPosition(noteD, new Vector3(6f, 0f, 0f));
+
+      MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>
+      {
+        new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n2", Weight = 1f },
+        new MapRuntimeContext.RuntimeNoteLink { SourceId = "n3", TargetId = "n4", Weight = 1f }
+      });
+
+      scope.Builder.Rebuild(
+        new List<Star> { scope.NoteA, scope.NoteB, noteC, noteD },
+        new List<TagNode>(),
+        1,
+        10);
+      scope.Builder.SetDistanceVisible(scope.NoteA, true);
+      SetPrivateField(scope.Focus, "selectedStar", scope.NoteA);
+      FlushLineBuilder(scope.Builder);
+
+      AssertLineConnects(GetOnlyActiveLine(scope.LineParent), scope.NoteA, scope.NoteB);
+
+      scope.Builder.SetDistanceVisible(noteC, true);
+      FlushLineBuilder(scope.Builder);
+
+      AssertLineConnects(GetOnlyActiveLine(scope.LineParent), scope.NoteA, scope.NoteB);
+    }
+    finally
+    {
+      Object.DestroyImmediate(noteCObject);
+      Object.DestroyImmediate(noteDObject);
+    }
+
+    yield return null;
+  }
+
+  [UnityTest]
   public IEnumerator Reconcile_LongLinesRespectDedicatedLimit()
   {
     using var scope = CreateScope();
@@ -539,6 +640,16 @@ public class LineBuilderEditModeTests
 
     Assert.That(activeLine, Is.Not.Null, "Expected one active line.");
     return activeLine;
+  }
+
+  private static void AssertLineConnects(LineRenderer line, Component nodeA, Component nodeB)
+  {
+    Vector3 positionA = nodeA.transform.position;
+    Vector3 positionB = nodeB.transform.position;
+    bool forward = line.GetPosition(0) == positionA && line.GetPosition(1) == positionB;
+    bool reverse = line.GetPosition(0) == positionB && line.GetPosition(1) == positionA;
+
+    Assert.That(forward || reverse, Is.True, "Line endpoints did not match the expected nodes.");
   }
 
   private static LineBuilderScope CreateScope()
