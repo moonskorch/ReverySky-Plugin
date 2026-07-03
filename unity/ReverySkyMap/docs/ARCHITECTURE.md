@@ -21,19 +21,23 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Main code location: `Assets/Scripts/Bridge/ObsidianBridge.cs`, `Assets/Scripts/Bridge/MapRuntimeContext.cs`, `Assets/Scripts/Models/NoteData.cs`
   - Important dependencies: `GameSettings`, `CartographerEngine`, `MapRuntimeContext.OnNotesChanged`, `MapRuntimeContext.OnOpenNoteRequested`
 - Graph orchestration:
-  - Responsibility: chooses the active layout engine, rebuilds the graph when runtime notes change, and restores focus after ingest or selection.
+  - Responsibility: chooses the active layout engine, rebuilds the graph when runtime notes change, forwards rebuilt node lists into `LineBuilder` and `CullingManager`, and restores focus after ingest or selection.
   - Main code location: `Assets/Scripts/StarScape/Cartographer.cs`
-  - Important dependencies: `ICartographerEngine`, `FocusNode`, `ChangeViewControl`, `Notification`, `SampleDataGenerator`, `MapRuntimeContext`
+  - Important dependencies: `ICartographerEngine`, `FocusNode`, `ChangeViewControl`, `Notification`, `SampleDataGenerator`, `MapRuntimeContext`, `LineBuilder`, `CullingManager`, `OnGraphVisualsChanged`
 - Graph layout engines:
-  - Responsibility: build, tick when needed, and clear stars, tags, and links for the active runtime engine.
+  - Responsibility: build and clear the active graph layout, tick when needed, and publish the star/tag node lists plus line budgets consumed by `LineBuilder`.
   - Main code location: `Assets/Scripts/StarScape/CartographerForcesEngine.cs`, `Assets/Scripts/StarScape/Cartographer25DEngine.cs`, `Assets/Scripts/StarScape/EngineExperiments/*`, `Assets/Scripts/Interfaces/ICartographerEngine.cs`
-  - Important dependencies: `StarSO`, `TagNodeSO`, `ScapeCameraWarper`, `NoteData`, `MapRuntimeContext.RuntimeNoteLink`
+  - Important dependencies: `StarSO`, `TagNodeSO`, `ScapeCameraWarper`, `NoteData`, `MapRuntimeContext.RuntimeNoteLink`, `MaxActiveLines`, `MaxActiveLongLines`, `OnNodesChanged`
+- Line rendering and culling:
+  - Responsibility: build pooled line renderers for active note-note and note-tag connections, keep the visible edge set in sync with node visibility and focus, and share the distance-culling pipeline with other consumers.
+  - Main code location: `Assets/Scripts/StarScape/LineBuilder.cs`, `Assets/Scripts/StarScape/CullingManager.cs`, `Assets/Scripts/StarScape/BehaviourCullingTarget.cs`, `Assets/Scripts/StarScape/LabelCullingTarget.cs`
+  - Important dependencies: `MapRuntimeContext.Links`, `Star.Data.TagIds`, `FocusNode.SelectedStar`, `ICullingConsumer`, `LineRenderer`, `ObjectPool<LineRenderer>`, `CullingGroup`
 - Interaction and camera:
   - Responsibility: turns touch and mouse input into focus, orbit, zoom, view switching, and note-open actions.
   - Main code location: `Assets/Scripts/GameInput/GameInput.cs`, `Assets/Scripts/StarScape/FocusNode.cs`, `Assets/Scripts/Camera/CameraOrbitalController.cs`, `Assets/Scripts/UI/ChangeViewControl.cs`, `Assets/Scripts/UI/RotateCameraUI.cs`
   - Important dependencies: `EventSystem`, `Camera.main`, `MapRuntimeContext`, `Cartographer.I`, `GameSettings`
 - Visual assets and support objects:
-  - Responsibility: provide prefabs, scale calibration, labels, node distance culling, and the optional sample graph injector.
+  - Responsibility: provide prefabs, scale calibration, labels, shared culling consumers, and the optional sample graph injector.
   - Main code location: `Assets/Scripts/ScriptableObjects/StarSO.cs`, `Assets/Scripts/ScriptableObjects/TagNodeSO.cs`, `Assets/Scripts/StarScape/CullingManager.cs`, `Assets/Scripts/StarScape/LabelCullingTarget.cs`, `Assets/Scripts/StarScape/BehaviourCullingTarget.cs`, `Assets/Scripts/Notification/Notification.cs`, `Assets/Scripts/StarScape/SampleDataGenerator.cs`
   - Important dependencies: `Cartographer.OnGraphVisualsChanged`, `MapRuntimeContext.NotesVersion`, `MapRuntimeContext.HasRuntimeNotes`, prefab assets in `Assets/Prefabs`
 - Automated checks:
@@ -59,7 +63,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 4. `MapRuntimeContext.SetTagNames`, `SetLinks`, and `SetNotes` store the runtime source of truth and raise `OnNotesChanged`.
 5. `Cartographer.HandleRuntimeNotesChanged()` calls `RebuildGraph(MapRuntimeContext.MapLayoutPreference)`.
 6. `Cartographer.ResolveModeByNotesCount()` uses `defaultEngine` first. Without an override, explicit `Static25D` and `StaticLinks` stay fixed, while `Auto` and `Forces` resolve by note count: small graphs use `Forces`, large graphs use `StaticLinks`.
-7. The chosen engine runs `BuildGraph(notes)`, then `ApplyView(CurrentView)`, and `Cartographer` rebinds any `ScapeCameraWarper` exposed by the active engine.
+7. The chosen engine runs `BuildGraph(notes)`, which emits `OnNodesChanged`; `Cartographer.HandleEngineNodesChanged(...)` immediately rebuilds `LineBuilder` and `CullingManager` from the same node lists and line budgets, then `ApplyView(CurrentView)` and `Cartographer`'s `ScapeCameraWarper` rebinding follow.
 8. After `BuildGraph()`, `Cartographer` restores focus only from `FocusNode.FocusRestoreNoteId`; missing focus calls `ResetFocus()`.
 9. Incremental engines retry delayed focus through `MapRuntimeContext.PendingFocusNoteId`.
 
@@ -88,15 +92,14 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 4. `ChangeViewControl` raises `OnChangeScapeView`, and `Cartographer.CycleView()` switches between `ScapeView.Planets` and `ScapeView.Plain`.
 5. `RotateCameraUI` triggers continuous orbit rotation while a rotate button is held.
 
-### 6. Node distance culling
+### 6. Line rendering and node distance culling
 
-1. `Cartographer` raises `OnGraphVisualsChanged(stars, tagNodes)` after an engine rebuild changes the visible graph objects.
-2. `CullingManager.Rebuild(...)` walks the physical `Star` and `TagNode` components supplied by `Cartographer`.
-3. Each node is scanned for `ICullingConsumer` components. Current prefab consumers are `LabelCullingTarget` for label roots and `BehaviourCullingTarget` for one serialized `Behaviour`.
-4. Each consumer returns an `Entry` request: physical node, reference transform, radius, visible distance, and consumer.
-5. The manager folds those requests into one `NodeTarget` per physical node. Each `NodeTarget` owns one `BoundingSphere` and a list of `Interest` records.
-6. Each `Interest` owns one consumer's visible distance and last-applied visibility state.
-7. `CullingGroup` reports state by `NodeTarget`; the manager then evaluates that node's interests and calls `SetDistanceVisible(node, visible)` only for first application or real threshold changes.
+1. `Cartographer.HandleEngineNodesChanged(...)` receives the rebuilt `Star` and `TagNode` lists from the active engine, then forwards them with the active engine's line budgets to `LineBuilder.Rebuild(...)`.
+2. `LineBuilder.Rebuild(...)` stores the new limits, clears active line renderers and cached state, resizes its `ObjectPool<LineRenderer>`, registers the graph nodes, and creates candidate note-note edges from `MapRuntimeContext.Links` plus note-tag edges from each star's `TagIds`.
+3. `CullingManager.Rebuild(stars, tagNodes, lineBuilder)` scans the same physical nodes and asks each `ICullingConsumer` for an `Entry`; `LineBuilder.TryCreateDistanceEntry(...)` provides one consumer-specific culling rule per registered graph node.
+4. When `CullingGroup` changes a node's visibility, `CullingManager` calls `LineBuilder.SetDistanceVisible(...)`, which updates the visible-node set and marks the edge set dirty.
+5. `LineBuilder.LateUpdate()` applies the focused-node priority, keeps recently visible regions within a refresh budget, reconciles the desired edge set against the pooled renderers, and rewrites each active line's endpoints from the live transforms.
+6. `Cartographer.CycleView()` calls `ApplyLineVisibility()`, so the current view only toggles whether the existing line renderers are shown; it does not rebuild the candidate edge set.
 
 ## Subsystems
 
@@ -161,6 +164,24 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Entry point: called by `TagNode.Create`
   - Calls / sends to: `CartographerForcesEngine`
 
+### Line rendering and culling
+
+- `LineBuilder`
+  - Responsibility: owns pooled line renderers, candidate edge selection, focus-priority ordering, recent-visibility refresh, and per-frame endpoint updates for the active graph.
+  - Code anchor: `Assets/Scripts/StarScape/LineBuilder.cs::Rebuild`, `SetDistanceVisible`, `LateUpdate`, `ShowLine`
+  - Entry point: `Cartographer.HandleEngineNodesChanged`, `CullingManager`, `Cartographer.CycleView`
+  - Calls / sends to: `CullingManager`, `MapRuntimeContext.Links`, `FocusNode`, `LineRenderer`
+- `CullingManager`
+  - Responsibility: shares one `CullingGroup` across graph-node consumers and dispatches visibility changes only when a threshold actually changes.
+  - Code anchor: `Assets/Scripts/StarScape/CullingManager.cs::Rebuild`, `Register`, `ApplyTargetVisibility`
+  - Entry point: `Cartographer.HandleEngineNodesChanged`, `LineBuilder.Rebuild`
+  - Calls / sends to: `LineBuilder`, `LabelCullingTarget`, `BehaviourCullingTarget`
+- `ICullingConsumer` and prefab culling targets
+  - Responsibility: define the distance-visibility contract used by graph-level consumers such as `LineBuilder`, `LabelCullingTarget`, and `BehaviourCullingTarget`.
+  - Code anchor: `Assets/Scripts/StarScape/CullingManager.cs::ICullingConsumer`, `Assets/Scripts/StarScape/LabelCullingTarget.cs`, `Assets/Scripts/StarScape/BehaviourCullingTarget.cs`
+  - Entry point: `CullingManager.Rebuild`
+  - Calls / sends to: `CullingManager`
+
 ### Interaction, focus, and camera
 
 - `GameInput`
@@ -204,7 +225,8 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 - `MapRuntimeContext` is the source of truth for live runtime notes, links, tag names, runtime mode, pending focus note id, layout preference, and the `NotesVersion` counter.
 - `ObsidianBridge` owns bridge validation and all conversion from the JSON envelope into runtime models.
 - `Cartographer` owns engine selection, rebuild timing, current view, rebuild focus restoration, and pending focus application.
-- `CartographerForcesEngine`, `Cartographer25DEngine`, and the engine assigned to `Cartographer.staticLinksEngineBehaviour` own placement and cleanup of instantiated stars, tags, and edge objects for their respective layout strategies.
+- `CartographerForcesEngine`, `Cartographer25DEngine`, and the engine assigned to `Cartographer.staticLinksEngineBehaviour` own placement and cleanup of instantiated stars and tags for their respective layout strategies; line visuals are handed off to `LineBuilder` after the engine raises `OnNodesChanged`.
+- `LineBuilder` owns pooled line renderers, candidate edge selection, focus-priority ordering, recent-visibility refresh, and the per-frame endpoint refresh for the active graph.
 - The current scene wiring assigns the `StaticLinks` slot to the RecursiveHubs baseline under eval, which can continue construction or refinement through `Tick()` after `BuildGraph()`. `Engine_EmptySpheres` remains a static fallback/evaluation engine with EditMode coverage for its radius calculations and static contract.
 - `ScapeCameraWarper` owns the 2.5D warp state and only participates when the active engine is `Static25D`.
 - `StarSO` recomputes note-length scale buckets whenever `MapRuntimeContext.NotesVersion` changes.
@@ -244,6 +266,9 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 - Engine selection and layout:
   - Automated checks: `Assets/Tests/EditMode/CartographerForcesEngineRadiusEditModeTests.cs`, `Assets/Tests/EditMode/CartographerScalableLinksEngineEditModeTests.cs`, PlayMode engine-preference checks in `Assets/Tests/PlayMode/StarScapeRuntimePlayModeTests.cs`
   - Manual checks when needed: inspect force layout, static-link slot output, date-range behavior, and the `Static25D` camera slider
+- Line rendering and culling:
+  - Automated checks: `Assets/Tests/EditMode/LineBuilderEditModeTests.cs`
+  - Manual checks when needed: load a populated graph, switch between `Planets` and `Plain`, and confirm lines appear only in `Planets`, react to focus and visibility changes, and keep their endpoints attached to moving nodes
 - PlayMode bootstrap and visual stability:
   - Automated checks: `Assets/Tests/PlayMode/StarScapeRuntimePlayModeTests.cs` (`StarScapeRuntimePlayModeTests`)
   - Manual checks when needed: open `Assets/Scenes/StarScapeScene.unity`, enter Play mode, and confirm no missing scripts or critical console errors
