@@ -170,6 +170,37 @@ public class LineBuilderEditModeTests
   }
 
   [UnityTest]
+  public IEnumerator SetLinesVisible_TogglesRenderersWithoutReturningLinesToPool()
+  {
+    using var scope = CreateScope();
+    ConfigureStar(scope.NoteA, "n1", "notes/n1.md");
+    ConfigureStar(scope.NoteB, "n2", "notes/n2.md");
+
+    MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>
+    {
+      new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n2", Weight = 1f }
+    });
+
+    scope.Builder.Rebuild(new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode>(), 1, 10);
+    scope.Builder.SetLinesVisible(false);
+    scope.Builder.SetDistanceVisible(scope.NoteA, true);
+    FlushLineBuilder(scope.Builder);
+    yield return null;
+
+    LineRenderer line = GetOnlyActiveLine(scope.LineParent);
+    Assert.That(line.enabled, Is.False);
+    Assert.That(GetInactiveLineCount(scope.Builder), Is.EqualTo(0));
+
+    scope.Builder.SetLinesVisible(true);
+    Assert.That(line.gameObject.activeSelf, Is.True);
+    Assert.That(line.enabled, Is.True);
+
+    scope.Builder.SetLinesVisible(false);
+    Assert.That(line.gameObject.activeSelf, Is.True);
+    Assert.That(line.enabled, Is.False);
+  }
+
+  [UnityTest]
   public IEnumerator Rebuild_ZeroActiveLineLimit_DisposesPooledLines()
   {
     using var scope = CreateScope();

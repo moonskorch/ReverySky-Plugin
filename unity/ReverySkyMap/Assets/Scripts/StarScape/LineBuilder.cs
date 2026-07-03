@@ -98,6 +98,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   private int activeLongLineLimit;
   private int linePoolMaxSize;
   private bool lineSetDirty;
+  private bool linesVisible = true;
   private int focusedNodeId;
 
   public void Rebuild(
@@ -127,6 +128,15 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     ClearActiveLines();
     DisposeLinePool();
     ClearLineState();
+  }
+
+  public void SetLinesVisible(bool visible)
+  {
+    if (linesVisible == visible)
+      return;
+
+    linesVisible = visible;
+    ApplyActiveLineVisibility();
   }
 
   private void ClearLineState()
@@ -620,6 +630,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 
     LineRenderer line = linePool.Get();
     line.positionCount = 2;
+    line.enabled = linesVisible;
     line.SetPosition(0, candidate.transformA.position);
     line.SetPosition(1, candidate.transformB.position);
 
@@ -658,6 +669,16 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     }
 
     activeLinesByEdgeKey.Clear();
+  }
+
+  private void ApplyActiveLineVisibility()
+  {
+    foreach (var pair in activeLinesByEdgeKey)
+    {
+      LineBinding binding = pair.Value;
+      if (binding?.line != null)
+        binding.line.enabled = linesVisible;
+    }
   }
 
   private void EnsureLinePoolSize(int requiredMaxSize)

@@ -76,6 +76,7 @@ public class Cartographer : MonoBehaviour
       changeViewControl.OnChangeScapeView += CycleView;
 
     UpdateViewButtonIcon();
+    ApplyLineVisibility();
     if (focusNode != null && focusNode.CameraController != null)
       focusNode.CameraController.UpdateDateSlider();
   }
@@ -110,6 +111,7 @@ public class Cartographer : MonoBehaviour
     }
 
     SetCurrentView(CurrentView);
+    ApplyLineVisibility();
     BuildGraph(noteList, layoutPreference);
     SetCameraFocus(noteList);
   }
@@ -180,6 +182,7 @@ public class Cartographer : MonoBehaviour
     currentView = ScapeViewHelper.CycleView(CurrentView);
     UpdateViewButtonIcon();
     _activeEngine?.ApplyView(CurrentView);
+    ApplyLineVisibility();
   }
 
   private void SetCameraFocus(List<NoteData> visibleNotes)
@@ -257,6 +260,11 @@ public class Cartographer : MonoBehaviour
       ScapeView.Plain => viewIconSimple,
       _ => viewButtonImage.sprite
     };
+  }
+
+  private void ApplyLineVisibility()
+  {
+    lineBuilder?.SetLinesVisible(CurrentView == ScapeView.Planets);
   }
 
   private void HandleRuntimeNotesChanged()
