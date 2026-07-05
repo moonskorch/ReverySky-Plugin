@@ -1,7 +1,6 @@
 ﻿using System;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.EventSystems;
 
 public class RotateCameraUI : MonoBehaviour
 {
@@ -12,23 +11,8 @@ public class RotateCameraUI : MonoBehaviour
   // with arguments: clockwise / counterclockwise, pressed
   public Action<bool, bool> OnCameraRotated;
 
-  public void StartRotateLeft(BaseEventData eventData)
+  public void SetRotationPressed(bool clockwise, bool pressed)
   {
-    OnCameraRotated?.Invoke(false, true);
-  }
-
-  public void StopRotateLeft(BaseEventData eventData)
-  {
-    OnCameraRotated?.Invoke(false, false);
-  }
-
-  public void StartRotateRight(BaseEventData eventData)
-  {
-    OnCameraRotated?.Invoke(true, true);
-  }
-
-  public void StopRotateRight(BaseEventData eventData)
-  {
-    OnCameraRotated?.Invoke(true, false);
+    OnCameraRotated?.Invoke(clockwise, pressed);
   }
 }
