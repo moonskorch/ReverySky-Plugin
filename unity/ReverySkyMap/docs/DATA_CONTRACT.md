@@ -11,6 +11,7 @@ If this file conflicts with canonical contract, canonical contract wins.
 - `protocolVersion` must match expected version exactly.
 - Runtime-ready signal is `bridge:ready`.
 - Runtime ingestion message is `graph:set`.
+- Runtime graph completion signal is `graph:ready`.
 - Runtime shutdown message is `runtime:shutdown`.
 
 ## Envelope Shape
@@ -31,7 +32,30 @@ Required fields for Unity ingestion:
 - `payload` (object)
 
 Optional field:
-- `requestId` (string)
+- `requestId` (string; parent builds now provide this for `graph:set` so Unity can echo it in `graph:ready`)
+
+## Graph Ready Handling
+`graph:ready` is Unity's completion acknowledgement for one parent `graph:set`.
+
+Runtime -> parent:
+
+```json
+{
+  "protocolVersion": "2.0.0",
+  "type": "graph:ready",
+  "requestId": "req_..."
+}
+```
+
+Unity-side behavior:
+- `ObsidianBridge.OnGraphSet` stores the incoming `requestId` in `MapRuntimeContext.GraphRequestId`.
+- Engines call `MapRuntimeContext.RequestGraphReady()` when their current graph reaches its user-visible ready point.
+- `MapRuntimeContext.OnGraphReady` reaches `ObsidianBridge.HandleGraphReadyRequested`.
+- WebGL builds forward the event to JavaScript via `ReverySkyBridgePostGraphReady(requestId)`.
+- Empty or whitespace `requestId` is not sent out as `graph:ready`; this avoids a startup empty-graph rebuild producing an invalid completion event.
+- `Dates` and `DynamicLinks` signal ready after their synchronous build publishes visual nodes.
+- `RecursiveHubs` signals ready after an empty graph, after instant/endless construction completion, or after the final finite refinement pass.
+- Parent iframe status owns the visible loading text and only clears `N notes, M links (loading...)` when `graph:ready.requestId` matches the latest `graph:set`.
 
 ## Runtime Shutdown Handling
 Unity WebGL shutdown is a bridge/runtime-wrapper lifecycle guard, not a full Unity engine shutdown.
@@ -49,9 +73,9 @@ Expected shutdown envelope:
 Unity-side behavior:
 - The iframe JS wrapper receives `runtime:shutdown`, enters `isShuttingDown`, removes its own bridge listeners, and replies to the parent with `runtime:shutdown-complete`.
 - The iframe JS wrapper forwards shutdown to `ObsidianBridge.OnRuntimeShutdown(string json)` when the Unity instance can receive messages.
-- `ObsidianBridge.OnRuntimeShutdown` marks the bridge as shutting down and unsubscribes from `MapRuntimeContext.OnOpenNoteRequested`.
+- `ObsidianBridge.OnRuntimeShutdown` marks the bridge as shutting down and unsubscribes from `MapRuntimeContext.OnOpenNoteRequested` and `MapRuntimeContext.OnGraphReady`.
 - After shutdown, `ObsidianBridge.OnGraphSet` and `ObsidianBridge.OnNoteFocus` return without processing.
-- After shutdown, `HandleOpenNoteRequested` returns without sending `note:open`.
+- After shutdown, `HandleOpenNoteRequested` and `HandleGraphReadyRequested` return without sending outbound bridge events.
 
 Non-goals:
 - Do not call `Application.Quit()`.
@@ -119,6 +143,7 @@ Current runtime behavior snapshot for Unity ingestion and map interaction:
   - fallback: negative size maps to `0`.
 - `mapLayout` -> preferred runtime map layout for the next graph build.
   - expected mapping: `auto` = threshold-based selection (`DynamicLinks` for small graphs, `ScalableLinks` for large graphs), `dynamicLinks` = links map preference with the same large-graph fallback to `ScalableLinks`, `dates` = explicit dates map preference, `scalableLinks` = explicit scalable links map preference.
+- envelope `requestId` -> copied to `MapRuntimeContext.GraphRequestId` and echoed through `graph:ready` after the active engine reaches its ready point.
 - `links[].sourceId` and `links[].targetId` -> note-note edges in Forces engine.
   - gate: empty ids and self-links are dropped during bridge mapping; missing runtime node ids are dropped by Forces edge resolution.
 - `links[].weight` -> Forces spring rest length (`idealEdgeLen / sqrt(weight)`).
@@ -136,10 +161,11 @@ Current runtime behavior snapshot for Unity ingestion and map interaction:
 - `NoteData.CrystalType = Unknown` for bridge-ingested notes is currently retained for legacy visual compatibility only.
 
 ## Ignored And Not Enforced In Runtime
-- Ignored fields: `requestId`, `payload.graphVersion`, `payload.generatedAt`, `payload.vault.noteCount`, `links[].kind`.
+- Ignored fields: `payload.graphVersion`, `payload.generatedAt`, `payload.vault.noteCount`, `links[].kind`.
 - Not enforced on ingest:
   - `vault.noteCount == notes.length` is documented but not validated in Unity ingest code.
   - Link endpoint existence is not validated on ingest; missing ids are dropped later during Forces edge resolution.
+  - Non-empty `graph:set.requestId` is expected for parent completion tracking, but Unity still ingests graph data without it and simply suppresses outbound `graph:ready`.
 
 ## Error Handling Expectations
 - Invalid envelope or protocol mismatch must be rejected gracefully.

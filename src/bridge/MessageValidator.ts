@@ -1,5 +1,6 @@
 import {
   BRIDGE_PROTOCOL_VERSION,
+  GraphReadyMessage,
   GraphPayload,
   IncomingBridgeMessage,
   NoteOpenMessage,
@@ -131,6 +132,30 @@ export class MessageValidator {
     }
     if (!this.isNonEmptyString(data.payload.path)) {
       errors.push("incoming note:open payload.path must be a non-empty string");
+    }
+
+    return errors;
+  }
+
+  static validateIncomingGraphReadyMessage(data: GraphReadyMessage): string[] {
+    const errors: string[] = [];
+
+    if (!data || typeof data !== "object") {
+      return ["incoming message must be an object"];
+    }
+
+    if (data.type !== "graph:ready") {
+      errors.push("incoming message type must be graph:ready");
+    }
+
+    if (data.protocolVersion !== BRIDGE_PROTOCOL_VERSION) {
+      errors.push(
+        `incoming protocolVersion mismatch: expected ${BRIDGE_PROTOCOL_VERSION}, got ${String(data.protocolVersion)}`
+      );
+    }
+
+    if (!this.isNonEmptyString(data.requestId)) {
+      errors.push("incoming graph:ready requestId must be a non-empty string");
     }
 
     return errors;

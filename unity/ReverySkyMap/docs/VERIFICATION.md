@@ -130,7 +130,8 @@ Verification gate:
 If a Unity change affects WebGL artifacts, bridge behavior, or Obsidian integration:
 1. Run parent WebGL import/build workflow.
 2. Run parent Obsidian integration smoke checks.
-3. Confirm `bridge:ready` and `graph:set` flow in plugin view.
+3. Confirm `bridge:ready`, `graph:set`, and `graph:ready` flow in plugin view.
+4. For graph loading status changes, confirm the parent iframe shows `N notes, M links (loading...)` during a slow rebuild and clears it only after matching `graph:ready`.
 
 Reference (parent scope):
 - `../../docs/WEBGL_INTEGRATION_RUNBOOK.md`

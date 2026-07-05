@@ -13,6 +13,9 @@ public class ObsidianBridge : MonoBehaviour
 #if UNITY_WEBGL && !UNITY_EDITOR
   [DllImport("__Internal")]
   private static extern void ReverySkyBridgePostNoteOpen(string noteId, string notePath);
+
+  [DllImport("__Internal")]
+  private static extern void ReverySkyBridgePostGraphReady(string requestId);
 #endif
 
   [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -34,11 +37,13 @@ public class ObsidianBridge : MonoBehaviour
   private void OnEnable()
   {
     MapRuntimeContext.OnOpenNoteRequested += HandleOpenNoteRequested;
+    MapRuntimeContext.OnGraphReady += HandleGraphReadyRequested;
   }
 
   private void OnDisable()
   {
     MapRuntimeContext.OnOpenNoteRequested -= HandleOpenNoteRequested;
+    MapRuntimeContext.OnGraphReady -= HandleGraphReadyRequested;
   }
 
   public void OnGraphSet(string json)
@@ -78,6 +83,7 @@ public class ObsidianBridge : MonoBehaviour
     }
 
     MapRuntimeContext.MapLayoutPreference = ParseMapLayoutPreference(envelope.payload.mapLayout);
+    MapRuntimeContext.SetGraphRequestId(envelope.requestId);
 
     var notes = envelope.payload.notes ?? Array.Empty<GraphNote>();
     var links = envelope.payload.links ?? Array.Empty<GraphLink>();
@@ -221,10 +227,27 @@ public class ObsidianBridge : MonoBehaviour
 #endif
   }
 
+  private static void HandleGraphReadyRequested(string requestId)
+  {
+    if (IsRuntimeShuttingDown)
+      return;
+
+    var safeRequestId = requestId ?? string.Empty;
+    if (string.IsNullOrWhiteSpace(safeRequestId))
+      return;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+    ReverySkyBridgePostGraphReady(safeRequestId);
+#else
+    Debug.Log($"[ObsidianBridge] graph:ready requested (Editor/Non-WebGL): requestId={safeRequestId}");
+#endif
+  }
+
   public void OnRuntimeShutdown(string json)
   {
     IsRuntimeShuttingDown = true;
     MapRuntimeContext.OnOpenNoteRequested -= HandleOpenNoteRequested;
+    MapRuntimeContext.OnGraphReady -= HandleGraphReadyRequested;
     Debug.Log("[ObsidianBridge] runtime shutdown requested.");
   }
 
@@ -268,6 +291,7 @@ public class ObsidianBridge : MonoBehaviour
   {
     public string protocolVersion;
     public string type;
+    public string requestId;
     public GraphPayload payload;
   }
 

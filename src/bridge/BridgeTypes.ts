@@ -37,6 +37,12 @@ export type NoteFocusMessage = {
   payload: NoteFocusPayload;
 };
 
+export type GraphReadyMessage = {
+  protocolVersion: string;
+  type: "graph:ready";
+  requestId: string;
+};
+
 export type RuntimeShutdownMessage = {
   protocolVersion: string;
   type: "runtime:shutdown";
@@ -85,5 +91,9 @@ export type GraphSetMessage = {
   payload: GraphPayload;
 };
 
-export type IncomingBridgeMessage = BridgeReadyMessage | NoteOpenMessage | RuntimeShutdownCompleteMessage;
+export type IncomingBridgeMessage =
+  | BridgeReadyMessage
+  | GraphReadyMessage
+  | NoteOpenMessage
+  | RuntimeShutdownCompleteMessage;
 export type OutgoingBridgeMessage = GraphSetMessage | NoteFocusMessage | RuntimeShutdownMessage;

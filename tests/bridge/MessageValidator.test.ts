@@ -91,6 +91,26 @@ describe("MessageValidator", () => {
     expect(errors).toContain("incoming note:open payload.path must be a non-empty string");
   });
 
+  it("accepts incoming graph:ready with requestId", () => {
+    const errors = MessageValidator.validateIncomingGraphReadyMessage({
+      type: "graph:ready",
+      protocolVersion: BRIDGE_PROTOCOL_VERSION,
+      requestId: "req_1700000000000_1"
+    });
+
+    expect(errors).toEqual([]);
+  });
+
+  it("rejects incoming graph:ready without requestId", () => {
+    const errors = MessageValidator.validateIncomingGraphReadyMessage({
+      type: "graph:ready",
+      protocolVersion: BRIDGE_PROTOCOL_VERSION,
+      requestId: ""
+    });
+
+    expect(errors).toContain("incoming graph:ready requestId must be a non-empty string");
+  });
+
   it("accepts incoming runtime:shutdown-complete with matching protocol and requestId", () => {
     const errors = MessageValidator.validateIncomingShutdownCompleteMessage({
       type: "runtime:shutdown-complete",

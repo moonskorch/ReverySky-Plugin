@@ -29,8 +29,28 @@ Plugin -> runtime:
 
 Runtime -> plugin:
 - `bridge:ready`: runtime is initialized and ready to receive payloads.
+- `graph:ready`: runtime has finished the current graph build or stabilization phase for a matching `graph:set` request.
 - `note:open`: request for Obsidian to open a note by required `id` and `path`.
 - `runtime:shutdown-complete`: acknowledgement for a matching `runtime:shutdown` request.
+
+## Graph Ready Messages
+`graph:ready` is a completion acknowledgement for a specific `graph:set` request.
+
+Runtime -> parent:
+
+```json
+{
+  "protocolVersion": "2.0.0",
+  "type": "graph:ready",
+  "requestId": "req_..."
+}
+```
+
+Rules:
+- `graph:set` includes a unique `requestId`.
+- `graph:ready` must echo the matching `graph:set` `requestId`.
+- The iframe status UI must ignore stale `graph:ready` messages whose `requestId` does not match the latest `graph:set`.
+- The runtime sends `graph:ready` after the active layout engine reaches its user-visible ready point; engines with continuous background refinement must still provide a finite ready point.
 
 ## Runtime Shutdown Messages
 `runtime:shutdown` is a bridge/runtime-wrapper lifecycle handshake, not a full Unity engine teardown.
@@ -106,6 +126,7 @@ type GraphLink = {
 ## Validation Requirements
 - Outgoing `graph:set` payloads are validated before postMessage dispatch.
 - Incoming `bridge:ready` is accepted only when `protocolVersion` matches exactly.
+- Incoming `graph:ready` is accepted only when `protocolVersion` matches and `requestId` is a non-empty string.
 - Incoming `note:open` is accepted only when `protocolVersion` matches and the payload includes non-empty `id` and `path`.
 - Incoming `runtime:shutdown-complete` is accepted only when `protocolVersion` matches and `requestId` is a non-empty string matching the pending shutdown request.
 - Invalid envelopes are rejected with explicit, non-fatal error reporting.
@@ -118,6 +139,7 @@ type GraphLink = {
 
 ## Current Producer Semantics
 - `graph:set` is the effective filtered payload emitted by the plugin view, not the raw vault snapshot.
+- Each emitted `graph:set` gets a unique `requestId` so stale `graph:ready` messages cannot complete a newer graph status.
 - `notes[].date` uses `frontmatter.date`, then `frontmatter.created`, then `frontmatter.created_at`, then file creation time. Missing, blank, or invalid candidates are skipped, and the field is omitted when no valid source exists.
 - `notes[].tags` are produced by merging inline tags and frontmatter tags, then normalizing and deduplicating the result.
 - `notes[].size` is emitted as file size in bytes.

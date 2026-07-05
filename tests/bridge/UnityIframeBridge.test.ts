@@ -67,6 +67,7 @@ function createMessageWindow(): Window & {
 
 describe("UnityIframeBridge", () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
@@ -85,7 +86,26 @@ describe("UnityIframeBridge", () => {
     expect(targetOrigin).toBe("*");
     expect(message.type).toBe("graph:set");
     expect(message.protocolVersion).toBe(BRIDGE_PROTOCOL_VERSION);
+    expect(message.requestId).toEqual(expect.stringMatching(/^req_\d+_\d+$/));
     expect((message.payload as GraphPayload).mapLayout).toBe("dynamicLinks");
+    bridge.detach();
+  });
+
+  it("generates unique graph:set requestIds for rapid sends", () => {
+    vi.spyOn(Date, "now").mockReturnValue(1700000000000);
+    const bridge = new UnityIframeBridge();
+    const postMessage = vi.fn();
+    const iframeWindow = { postMessage } as unknown as Window;
+    const payload = makeValidPayload();
+
+    bridge.attach(iframeWindow, {});
+    bridge.sendGraphSet(payload);
+    bridge.sendGraphSet(payload);
+
+    const firstMessage = postMessage.mock.calls[0]?.[0] as Record<string, unknown>;
+    const secondMessage = postMessage.mock.calls[1]?.[0] as Record<string, unknown>;
+    expect(firstMessage.requestId).toBe("req_1700000000000_1");
+    expect(secondMessage.requestId).toBe("req_1700000000000_2");
     bridge.detach();
   });
 
@@ -226,6 +246,48 @@ describe("UnityIframeBridge", () => {
       id: "note_1",
       path: "Folder/Note.md"
     });
+    bridge.detach();
+  });
+
+  it("invokes onGraphReady for valid graph:ready from attached iframe source", () => {
+    const bridge = new UnityIframeBridge();
+    const onGraphReady = vi.fn();
+    const iframeWindow = { postMessage: vi.fn() } as unknown as Window;
+
+    bridge.attach(iframeWindow, { onGraphReady });
+    dispatchMessage(
+      {
+        type: "graph:ready",
+        protocolVersion: BRIDGE_PROTOCOL_VERSION,
+        requestId: "req_1700000000000_1"
+      },
+      iframeWindow
+    );
+
+    expect(onGraphReady).toHaveBeenCalledTimes(1);
+    expect(onGraphReady).toHaveBeenCalledWith("req_1700000000000_1");
+    bridge.detach();
+  });
+
+  it("rejects invalid graph:ready from attached iframe source", () => {
+    const bridge = new UnityIframeBridge();
+    const onGraphReady = vi.fn();
+    const onError = vi.fn();
+    const iframeWindow = { postMessage: vi.fn() } as unknown as Window;
+
+    bridge.attach(iframeWindow, { onGraphReady, onError });
+    dispatchMessage(
+      {
+        type: "graph:ready",
+        protocolVersion: BRIDGE_PROTOCOL_VERSION,
+        requestId: ""
+      },
+      iframeWindow
+    );
+
+    expect(onGraphReady).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError.mock.calls[0]?.[0]).toContain("incoming graph:ready requestId must be a non-empty string");
     bridge.detach();
   });
 

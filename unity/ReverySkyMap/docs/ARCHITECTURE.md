@@ -17,9 +17,9 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Main code location: `Assets/Scenes/StarScapeScene.unity`
   - Important dependencies: `GameInput`, `CameraOrbitalController`, `Cartographer`, `CartographerForcesEngine`, `Cartographer25DEngine`, the serialized `StaticLinks` slot engine, `ScapeCameraWarper`, `ChangeViewControl`, `RotateCameraUI`, `Notification`
 - Bridge and runtime state:
-  - Responsibility: validates inbound bridge envelopes, converts payloads into runtime models, and stores the current graph snapshot.
+  - Responsibility: validates inbound bridge envelopes, converts payloads into runtime models, stores the current graph snapshot, and raises outbound runtime events for parent bridge messages.
   - Main code location: `Assets/Scripts/Bridge/ObsidianBridge.cs`, `Assets/Scripts/Bridge/MapRuntimeContext.cs`, `Assets/Scripts/Models/NoteData.cs`
-  - Important dependencies: `GameSettings`, `CartographerEngine`, `MapRuntimeContext.OnNotesChanged`, `MapRuntimeContext.OnOpenNoteRequested`
+  - Important dependencies: `GameSettings`, `CartographerEngine`, `MapRuntimeContext.OnNotesChanged`, `MapRuntimeContext.OnOpenNoteRequested`, `MapRuntimeContext.OnGraphReady`
 - Graph orchestration:
   - Responsibility: chooses the active layout engine, rebuilds the graph when runtime notes change, forwards rebuilt node lists into `LineBuilder` and `CullingManager`, and restores focus after ingest or selection.
   - Main code location: `Assets/Scripts/StarScape/Cartographer.cs`
@@ -58,7 +58,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 ### 2. `graph:set` ingestion and graph rebuild
 
 1. `ObsidianBridge.OnGraphSet(string json)` sets runtime mode and parses the envelope with `JsonUtility.FromJson`.
-2. The bridge rejects payloads with a wrong `protocolVersion` or `type`, then normalizes the payload into `NoteData` and `MapRuntimeContext.RuntimeNoteLink` objects.
+2. The bridge rejects payloads with a wrong `protocolVersion` or `type`, stores the envelope `requestId` in `MapRuntimeContext.GraphRequestId`, then normalizes the payload into `NoteData` and `MapRuntimeContext.RuntimeNoteLink` objects.
 3. Tags are de-duplicated by name, blank titles become `GameSettings.DefaultTitle`, invalid dates become `DateTime.MinValue`, and non-positive link weights are normalized to `1`.
 4. `MapRuntimeContext.SetTagNames`, `SetLinks`, and `SetNotes` store the runtime source of truth and raise `OnNotesChanged`.
 5. `Cartographer.HandleRuntimeNotesChanged()` calls `RebuildGraph(MapRuntimeContext.MapLayoutPreference)`.
@@ -66,6 +66,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 7. The chosen engine runs `BuildGraph(notes)`, which emits `OnNodesChanged`; `Cartographer.HandleEngineNodesChanged(...)` immediately rebuilds `LineBuilder` and `CullingManager` from the same node lists and line budgets, then `ApplyView(CurrentView)` and `Cartographer`'s `ScapeCameraWarper` rebinding follow.
 8. After `BuildGraph()`, `Cartographer` restores focus only from `FocusNode.FocusRestoreNoteId`; missing focus calls `ResetFocus()`.
 9. Incremental engines retry delayed focus through `MapRuntimeContext.PendingFocusNoteId`.
+10. When the active engine reaches its ready point, it calls `MapRuntimeContext.RequestGraphReady()`. `ObsidianBridge` forwards the matching `requestId` to JavaScript as `graph:ready`, unless the id is empty.
 
 ### 3. Note focus and open-note callback
 
@@ -82,7 +83,8 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 1. Before the parent plugin detaches the iframe, the WebGL wrapper receives `runtime:shutdown` and forwards it to `ObsidianBridge.OnRuntimeShutdown(string json)` when the Unity instance can receive messages.
 2. `ObsidianBridge` marks the bridge as shutting down and unsubscribes from `MapRuntimeContext.OnOpenNoteRequested`.
 3. After shutdown starts, `OnGraphSet`, `OnNoteFocus`, and `HandleOpenNoteRequested` return without processing so the closing runtime cannot ingest new graph state, focus notes, or send late `note:open` callbacks.
-4. This is a bridge lifecycle guard only; parent hosting, iframe detachment, and full Unity engine teardown remain outside the Unity project boundary.
+4. `HandleGraphReadyRequested` also returns during shutdown so late engine completion cannot send `graph:ready`.
+5. This is a bridge lifecycle guard only; parent hosting, iframe detachment, and full Unity engine teardown remain outside the Unity project boundary.
 
 ### 5. Camera and view controls
 
@@ -106,14 +108,14 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 ### Bridge and runtime state
 
 - `ObsidianBridge`
-  - Responsibility: owns bridge validation, payload normalization, the shutdown guard, and the WebGL callback back into the parent plugin.
-  - Code anchor: `Assets/Scripts/Bridge/ObsidianBridge.cs::OnGraphSet`, `OnNoteFocus`, `OnRuntimeShutdown`, `HandleOpenNoteRequested`
+  - Responsibility: owns bridge validation, payload normalization, the shutdown guard, and WebGL callbacks back into the parent plugin.
+  - Code anchor: `Assets/Scripts/Bridge/ObsidianBridge.cs::OnGraphSet`, `OnNoteFocus`, `OnRuntimeShutdown`, `HandleOpenNoteRequested`, `HandleGraphReadyRequested`
   - Entry point: bridge messages from the parent runtime
-  - Calls / sends to: `MapRuntimeContext`, `Cartographer`, `ReverySkyBridgePostNoteOpen`
+  - Calls / sends to: `MapRuntimeContext`, `Cartographer`, `ReverySkyBridgePostNoteOpen`, `ReverySkyBridgePostGraphReady`
 - `MapRuntimeContext`
-  - Responsibility: owns the live runtime graph snapshot and pending focus note id.
+  - Responsibility: owns the live runtime graph snapshot, current graph request id, and pending focus note id.
   - Code anchor: `Assets/Scripts/Bridge/MapRuntimeContext.cs`
-  - Entry point: `SetNotes`, `SetLinks`, `SetTagNames`, `RequestOpenNote`
+  - Entry point: `SetNotes`, `SetLinks`, `SetTagNames`, `SetGraphRequestId`, `RequestOpenNote`, `RequestGraphReady`
   - Calls / sends to: `Cartographer`, `StarSO`, `FocusNode`, `ObsidianBridge`
 - `NoteData`
   - Responsibility: represents the normalized runtime note model consumed by engines and visuals.
@@ -238,6 +240,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Accepted parent-to-Unity message types are `graph:set`, `note:focus`, and `runtime:shutdown`.
   - `graph:set` payloads are already filtered by the parent plugin; Unity does not own vault query logic.
   - `graph:set` carries only the filtered graph payload; focus is handled separately through `note:focus`.
+  - `graph:set.requestId` is echoed in `graph:ready` after active engine readiness; empty ids suppress outbound `graph:ready`.
   - `runtime:shutdown` is a lifecycle guard that stops bridge input and output without calling Unity quit APIs.
   - `path` values are treated as vault-relative and normalized with `/` separators when path lookup is needed.
   - Empty titles fall back to `GameSettings.DefaultTitle`.
@@ -262,7 +265,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 
 - Bridge parsing and runtime mapping:
   - Automated checks: `Assets/Tests/EditMode/ObsidianBridgeEditModeTests.cs`
-  - Manual checks when needed: load the scene and confirm `graph:set` populates notes, links, tags, and focus state without errors; in the parent plugin, close and quickly reopen the map view and confirm there are no delayed `note:open` callbacks or bridge errors
+  - Manual checks when needed: load the scene and confirm `graph:set` populates notes, links, tags, request id, and focus state without errors; in the parent plugin, close and quickly reopen the map view and confirm there are no delayed `note:open`, stale `graph:ready`, or bridge errors
 - Engine selection and layout:
   - Automated checks: `Assets/Tests/EditMode/CartographerForcesEngineRadiusEditModeTests.cs`, `Assets/Tests/EditMode/CartographerScalableLinksEngineEditModeTests.cs`, PlayMode engine-preference checks in `Assets/Tests/PlayMode/StarScapeRuntimePlayModeTests.cs`
   - Manual checks when needed: inspect force layout, static-link slot output, date-range behavior, and the `Static25D` camera slider

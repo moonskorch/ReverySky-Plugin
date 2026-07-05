@@ -414,8 +414,9 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     if (_remainingRefinementPasses == 0)
     {
       UnityEngine.Debug.Log(
-        $"[RecursiveHubs/v7] Refinement completed passes={_completedRefinementPasses}, " +
+        $"[RecursiveHubs] Refinement completed passes={_completedRefinementPasses}, " +
         $"separationChecks={_separationPairChecks}, navigationRadius={_navigationRadius:F1}");
+      MapRuntimeContext.RequestGraphReady();
     }
   }
 
@@ -447,6 +448,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       UnityEngine.Debug.Log(
         $"[RecursiveHubs] Built empty graph in {totalStopwatch.Elapsed.TotalMilliseconds:F1} ms. " +
         $"LogicalMs={logicalStopwatch.Elapsed.TotalMilliseconds:F1}");
+      MapRuntimeContext.RequestGraphReady();
       return;
     }
 
@@ -1425,6 +1427,9 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       $"targetFullPasses={linkRefinementPasses}, resolvedPasses={_resolvedLinkRefinementPasses}, " +
       $"taperPasses={_resolvedLinkRefinementTaperPasses}, taperFraction={refinementFinishTaperFraction:F2}, " +
       $"navigationRadius={_navigationRadius:F1}");
+
+    if (_remainingRefinementPasses == 0 || linkRefinementLifetime == AnimationLifetime.Endless)
+      MapRuntimeContext.RequestGraphReady();
   }
 
   private void RunRefinementPass()

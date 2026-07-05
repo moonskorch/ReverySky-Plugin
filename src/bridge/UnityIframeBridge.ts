@@ -13,6 +13,7 @@ import { MessageValidator } from "./MessageValidator";
 
 type BridgeCallbacks = {
   onReady?: () => void;
+  onGraphReady?: (requestId: string) => void;
   onNoteOpen?: (payload: NoteOpenPayload) => void;
   onError?: (message: string) => void;
 };
@@ -34,6 +35,7 @@ export class UnityIframeBridge {
   private attached = false;
   private callbacks: BridgeCallbacks = {};
   private pendingShutdown: PendingShutdown | null = null;
+  private requestSequence = 0;
   private readonly onMessageRef = (event: MessageEvent) => this.onMessage(event);
 
   /**
@@ -117,7 +119,7 @@ export class UnityIframeBridge {
     const message: GraphSetMessage = {
       protocolVersion: BRIDGE_PROTOCOL_VERSION,
       type: "graph:set",
-      requestId: `req_${Date.now()}`,
+      requestId: this.createRequestId(),
       payload
     };
 
@@ -183,6 +185,16 @@ export class UnityIframeBridge {
       return;
     }
 
+    if (data.type === "graph:ready") {
+      const incomingErrors = MessageValidator.validateIncomingGraphReadyMessage(data);
+      if (incomingErrors.length > 0) {
+        this.callbacks.onError?.(`Invalid incoming bridge message: ${incomingErrors.join("; ")}`);
+        return;
+      }
+      this.callbacks.onGraphReady?.(data.requestId);
+      return;
+    }
+
     if (data.type === "runtime:shutdown-complete") {
       const incomingErrors = MessageValidator.validateIncomingShutdownCompleteMessage(data);
       if (incomingErrors.length > 0) {
@@ -204,5 +216,10 @@ export class UnityIframeBridge {
     pendingShutdown.timeoutWindow.clearTimeout(pendingShutdown.timeoutId);
     this.pendingShutdown = null;
     pendingShutdown.resolve(result);
+  }
+
+  private createRequestId(): string {
+    this.requestSequence += 1;
+    return `req_${Date.now()}_${this.requestSequence}`;
   }
 }

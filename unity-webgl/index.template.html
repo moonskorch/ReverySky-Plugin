@@ -134,6 +134,10 @@
         let readySent = false;
         let isShuttingDown = false;
         let latestGraphSetMessage = null;
+        let latestGraphSetRequestId = "";
+        let latestGraphNoteCount = 0;
+        let latestGraphLinkCount = 0;
+        let graphSetDispatchToken = 0;
         let latestNoteFocusMessage = null;
         let frameworkBlobUrl = null;
         let dataBlobUrl = null;
@@ -143,6 +147,10 @@
           if (statusValueEl) {
             statusValueEl.textContent = text;
           }
+        }
+
+        function formatGraphStatus(noteCount, linkCount, isLoading) {
+          return String(noteCount) + " notes, " + String(linkCount) + " links" + (isLoading ? " (loading...)" : "");
         }
 
         function getEmbeddedText(id) {
@@ -213,6 +221,21 @@
                 id: noteId,
                 path: notePath
               }
+            },
+            "*"
+          );
+        }
+
+        function postGraphReady(requestId) {
+          if (isShuttingDown || !window.parent) {
+            return;
+          }
+
+          window.parent.postMessage(
+            {
+              protocolVersion: protocolVersion,
+              type: "graph:ready",
+              requestId: typeof requestId === "string" ? requestId : ""
             },
             "*"
           );
@@ -323,6 +346,32 @@
           }
         }
 
+        function scheduleGraphSetDispatch(message) {
+          const dispatchToken = ++graphSetDispatchToken;
+          const dispatch = () => {
+            if (
+              isShuttingDown ||
+              dispatchToken !== graphSetDispatchToken ||
+              latestGraphSetMessage !== message ||
+              runtimeMode !== "unity"
+            ) {
+              return;
+            }
+
+            tryDispatchGraphSetToUnity(message);
+          };
+          const scheduleDispatch = () => {
+            window.setTimeout(dispatch, 0);
+          };
+
+          if (typeof window.requestAnimationFrame === "function") {
+            window.requestAnimationFrame(scheduleDispatch);
+            return;
+          }
+
+          scheduleDispatch();
+        }
+
         function applyGraphSet(message) {
           if (isShuttingDown) {
             return;
@@ -332,13 +381,23 @@
           const payload = message.payload || { notes: [], links: [] };
           const noteCount = payload && payload.vault ? payload.vault.noteCount : (payload.notes || []).length;
           const linkCount = Array.isArray(payload.links) ? payload.links.length : 0;
+          latestGraphSetRequestId = typeof message.requestId === "string" ? message.requestId : "";
+          latestGraphNoteCount = noteCount;
+          latestGraphLinkCount = linkCount;
+          setStatus(formatGraphStatus(noteCount, linkCount, true));
 
-          if (runtimeMode === "unity" && tryDispatchGraphSetToUnity(message)) {
-            setStatus(String(noteCount) + " notes, " + String(linkCount) + " links");
+          if (runtimeMode === "unity") {
+            scheduleGraphSetDispatch(message);
+          }
+        }
+
+        function applyGraphReady(requestId) {
+          const readyRequestId = typeof requestId === "string" ? requestId : "";
+          if (readyRequestId !== latestGraphSetRequestId) {
             return;
           }
 
-          setStatus("Loading: " + String(noteCount) + " notes, " + String(linkCount) + " links");
+          setStatus(formatGraphStatus(latestGraphNoteCount, latestGraphLinkCount, false));
         }
 
         function applyNoteFocus(message) {
@@ -398,8 +457,13 @@
           isShuttingDown = true;
           runtimeMode = "closing";
           latestGraphSetMessage = null;
+          latestGraphSetRequestId = "";
+          latestGraphNoteCount = 0;
+          latestGraphLinkCount = 0;
+          graphSetDispatchToken++;
           latestNoteFocusMessage = null;
           window.ReverySkyBridgePostNoteOpen = function () {};
+          window.ReverySkyBridgePostGraphReady = function () {};
           window.removeEventListener("resize", onWindowResize);
           canvas.removeEventListener("webglcontextlost", onWebglContextLost);
 
@@ -495,7 +559,8 @@
           sendReady();
 
           if (latestGraphSetMessage) {
-            tryDispatchGraphSetToUnity(latestGraphSetMessage);
+            setStatus(formatGraphStatus(latestGraphNoteCount, latestGraphLinkCount, true));
+            scheduleGraphSetDispatch(latestGraphSetMessage);
           }
           if (latestNoteFocusMessage) {
             tryDispatchNoteFocusToUnity(latestNoteFocusMessage);
@@ -505,6 +570,10 @@
         async function boot() {
           window.ReverySkyBridgePostNoteOpen = function (noteId, notePath) {
             postNoteOpen(noteId, notePath);
+          };
+          window.ReverySkyBridgePostGraphReady = function (requestId) {
+            postGraphReady(requestId);
+            applyGraphReady(requestId);
           };
           window.addEventListener("message", onBridgeMessage);
           canvas.addEventListener("webglcontextlost", onWebglContextLost);

@@ -81,7 +81,11 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
   public void BuildGraph(List<NoteData> notes)
   {
     ClearGraph();
-    if (notes == null || notes.Count == 0) return;
+    if (notes == null || notes.Count == 0)
+    {
+      MapRuntimeContext.RequestGraphReady();
+      return;
+    }
 
     // small same-day groups -> vertical if fits
     // groups above maxSameDateVerticalNotes -> XY chain with virtual-day Z steps
@@ -230,6 +234,7 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
     }
 
     PublishVisualNodesChanged();
+    MapRuntimeContext.RequestGraphReady();
   }
 
   public void ClearGraph()

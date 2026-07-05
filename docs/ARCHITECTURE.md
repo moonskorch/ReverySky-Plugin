@@ -184,6 +184,7 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 7. `src/bridge/UnityIframeBridge.ts` -> `sendGraphSet()`
    Validates the payload with `MessageValidator`, builds a `graph:set` envelope, and calls `iframeWindow.postMessage(...)`.
 8. Unity receives `graph:set`, replaces the runtime graph snapshot, rebuilds through `Cartographer`, and restores focus only from `FocusNode.LastSelectedStarId`; missing focus resets the camera.
+9. When the active Unity engine reaches its ready point, Unity emits `graph:ready` with the matching `requestId`; the iframe status UI ignores stale ready messages and clears `loading...` only for the latest `graph:set`.
 
 `graph:set` and `note:focus` are latest-intent messages, not durable queues.
 Before `bridge:ready`, `MapSession` keeps only the latest pending graph payload.
@@ -409,10 +410,11 @@ The canonical plugin-side contract lives in:
 Important current contract facts:
 - protocol version is `2.0.0`;
 - startup order is `bridge:ready` first, then `graph:set`;
-- runtime-to-plugin messages are `bridge:ready`, `note:open`, and `runtime:shutdown-complete`;
+- runtime-to-plugin messages are `bridge:ready`, `graph:ready`, `note:open`, and `runtime:shutdown-complete`;
 - plugin-to-runtime messages are `graph:set`, `note:focus`, and `runtime:shutdown`;
 - `path` values must stay vault-relative and use `/` separators;
 - `graph:set` carries the effective filtered graph; focus changes are sent separately via `note:focus`, which must include both `id` and `path`;
+- `graph:ready` must echo the latest `graph:set` `requestId` before the iframe clears the loading status;
 - `runtime:shutdown` is a bridge/runtime-wrapper lifecycle handshake, not a full Unity engine shutdown;
 - `mapLayout` is an optional plugin-owned runtime hint;
 - `renderScale` is a plugin-owned iframe startup hint and does not belong to the bridge payload contract;

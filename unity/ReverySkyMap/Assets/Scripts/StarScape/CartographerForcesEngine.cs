@@ -102,7 +102,11 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
       out _boundRadius,
       out float spawnRadius);
 
-    if (notes == null || notes.Count == 0) return;
+    if (notes == null || notes.Count == 0)
+    {
+      MapRuntimeContext.RequestGraphReady();
+      return;
+    }
 
     var tagIndex = new Dictionary<int, int>();
 
@@ -186,6 +190,7 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
     }
 
     PublishVisualNodesChanged();
+    MapRuntimeContext.RequestGraphReady();
   }
 
   public void ClearGraph()

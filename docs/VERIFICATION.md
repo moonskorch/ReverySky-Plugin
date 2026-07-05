@@ -45,11 +45,13 @@ Current TS baseline test suites:
 - `tests/bridge/MessageValidator.test.ts`
   - validates valid payload path;
   - validates invalid payload path (date, noteCount mismatch, invalid weight, empty required fields);
-  - validates protocol mismatch rejection for incoming `bridge:ready`.
+  - validates protocol mismatch rejection for incoming `bridge:ready`;
+  - validates incoming `graph:ready` request id requirements.
 - `tests/bridge/UnityIframeBridge.test.ts`
   - validates outgoing `graph:set` dispatch for valid payload;
+  - validates unique outgoing `graph:set` request ids;
   - validates error path for invalid payload without dispatch;
-  - validates `bridge:ready`, `note:open`, and shutdown acknowledgement handling for the attached iframe source;
+  - validates `bridge:ready`, `graph:ready`, `note:open`, and shutdown acknowledgement handling for the attached iframe source;
   - validates ignoring foreign source messages and listener cleanup on `detach()`.
 - `tests/graph/VaultGraphBuilder.test.ts`
   - validates graph extraction from Obsidian vault files and metadata cache.

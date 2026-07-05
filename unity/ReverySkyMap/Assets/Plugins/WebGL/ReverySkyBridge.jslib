@@ -22,5 +22,25 @@ mergeInto(LibraryManager.library, {
         "*"
       );
     }
+  },
+
+  ReverySkyBridgePostGraphReady: function (requestIdPtr) {
+    var requestId = requestIdPtr ? UTF8ToString(requestIdPtr) : "";
+
+    if (typeof window !== "undefined" && typeof window.ReverySkyBridgePostGraphReady === "function") {
+      window.ReverySkyBridgePostGraphReady(requestId);
+      return;
+    }
+
+    if (typeof window !== "undefined" && window.parent && typeof window.parent.postMessage === "function") {
+      window.parent.postMessage(
+        {
+          protocolVersion: "2.0.0",
+          type: "graph:ready",
+          requestId: requestId
+        },
+        "*"
+      );
+    }
   }
 });
