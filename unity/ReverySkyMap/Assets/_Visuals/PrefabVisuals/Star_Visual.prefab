@@ -115,6 +115,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Crystal_Visual
       objectReference: {fileID: 0}
+    - target: {fileID: 1525475787186229051, guid: 2cb8e9d3218d6aa458ada00c03e19f6a, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 4583177746481324222, guid: 2cb8e9d3218d6aa458ada00c03e19f6a, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0

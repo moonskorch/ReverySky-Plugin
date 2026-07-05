@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Linq;
 using TMPro;
 using UnityEngine;
@@ -9,15 +8,19 @@ public class StarVisual : MonoBehaviour
 
   [SerializeField] private TextMeshPro nameText;
   [SerializeField] private Renderer sphereRenderer;
+  [SerializeField] private Transform crystalCore;
   [SerializeField] private SphereMaterialCatalogSO sphereMaterialCatalog;
-  [SerializeField] private List<CrystalType_GameObject> crystalTypeVisualMap;
+  [SerializeField] private CrystalTypeScaleMapperSO crystalScaleMapper;
 
   [Header("Switched sections")]
   [SerializeField] private GameObject sphere;
   [SerializeField] private GameObject crystal;
 
+  private Vector3 crystalCoreBaseScale = Vector3.one;
+
   private void Start()
   {
+    crystalCoreBaseScale = crystalCore.localScale;
     star.OnDataChanged += UpdateVisual;
     UpdateVisual();
   }
@@ -79,16 +82,8 @@ public class StarVisual : MonoBehaviour
     if (!show) return;
 
     var selectedCore = ResolveCrystalTypeByDirectLinkCount(star.Data.DirectLinkCount);
-    var hasSelectedCore = crystalTypeVisualMap.Any(x => x.crystalType == selectedCore);
-    if (!hasSelectedCore)
-      // Prefab variants can lag code buckets; keep a visible core instead of hiding the section.
-      selectedCore = crystalTypeVisualMap.FirstOrDefault()?.crystalType ?? CrystalType.Unknown;
-
-    foreach (var crystalPair in crystalTypeVisualMap)
-    {
-      crystalPair.gameObject
-        .SetActive(crystalPair.crystalType == selectedCore);
-    }
+    var scaleMultiplier = ResolveCrystalScaleMultiplier(selectedCore);
+    crystalCore.localScale = crystalCoreBaseScale * scaleMultiplier;
   }
 
   private SphereType_Material ResolveRandomSphereMaterial()
@@ -129,5 +124,16 @@ public class StarVisual : MonoBehaviour
       return CrystalType.Value2;
 
     return CrystalType.Value3;
+  }
+
+  private float ResolveCrystalScaleMultiplier(CrystalType crystalType)
+  {
+    var selectedScale = crystalScaleMapper.multipliers
+      .FirstOrDefault(x => x.crystalType == crystalType);
+
+    if (selectedScale != null)
+      return selectedScale.scaleMultiplier;
+
+    return crystalScaleMapper.defaultScale;
   }
 }
