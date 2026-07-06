@@ -1473,6 +1473,7 @@ MonoBehaviour:
   endlessConstructionNodesPerFrame: 120
   timingFrameRate: 30
   linkRefinementLifetime: 1
+  visualSmoothingSeconds: 0.2
 --- !u!1 &1085980073
 GameObject:
   m_ObjectHideFlags: 0
@@ -2532,10 +2533,10 @@ MonoBehaviour:
   connectionModel: 2
   islands: 0
   noteCount: 10000
-  tagPoolSize: 1000
+  tagPoolSize: 600
   dateSpanDays: 365
   maxTagsPerNote: 4
-  linkDensity: 45
+  linkDensity: 31
 --- !u!1 &1787028428
 GameObject:
   m_ObjectHideFlags: 0

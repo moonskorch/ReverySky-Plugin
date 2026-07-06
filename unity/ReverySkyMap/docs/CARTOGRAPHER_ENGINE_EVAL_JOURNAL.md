@@ -203,6 +203,13 @@ Missing or not yet standardized:
 
 ## Recent Changes
 
+- 2026-07-06: [run-one-approved] Added visual-only smoothing for RecursiveHubs
+  timed link refinement. Baseline: accepted RecursiveHubs direction after the
+  hard node spacing work. Hypothesis: move visual transforms toward existing
+  calculated positions without changing layout math, then continue visual-only
+  smoothing to exact sync after the final pass. Technical gates:
+  `CartographerScalableLinksEngineEditModeTests` passed 18/18 through Unity MCP.
+  Decision: keep evaluating manually for feel and FPS on large maps.
 - 2026-07-06: Recorded owner verdict that the isolated hard node spacing
   constraint is a successful RecursiveHubs space-preservation step so far. The
   old separation pass was removed after the useful comparison showed hard node

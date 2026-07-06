@@ -226,6 +226,101 @@ public class CartographerScalableLinksEngineEditModeTests
   }
 
   [Test]
+  public void TimedRefinementSmoothing_ContinuesVisualMotionAfterFinalPass()
+  {
+    var graph = BuildTaglessComponentsGraph(2);
+    int graphReadyCount = 0;
+    Action<string> onGraphReady = _ => graphReadyCount++;
+    MapRuntimeContext.OnGraphReady += onGraphReady;
+
+    try
+    {
+      using var scope = CreateEngineScope(
+        graph.Notes,
+        graph.Links,
+        engineScope =>
+        {
+          engineScope.SetAnimationLifetime("linkRefinementLifetime", "Timed");
+          engineScope.SetPrivateFieldForTest("linkRefinementPasses", 2);
+          engineScope.SetPrivateFieldForTest("refinementFinishTaperFraction", 0f);
+          engineScope.SetPrivateFieldForTest("refinementPassesPerFrame", 1);
+          engineScope.SetPrivateFieldForTest("nodeSpacingPassesPerRefinement", 0);
+          engineScope.SetPrivateFieldForTest("rootMobility", 1f);
+          engineScope.SetPrivateFieldForTest("linkPull", 1f);
+          engineScope.SetPrivateFieldForTest("maxMovePerPass", 1f);
+          engineScope.SetPrivateFieldForTest("visualSmoothingSeconds", 0.3f);
+        });
+
+      SetNodeLocalPosition(scope, 0, Vector3.zero);
+      SetNodeLocalPosition(scope, 1, new Vector3(30f, 0f, 0f));
+      scope.InvokePrivateMethodForTest("UpdateVisualPositions");
+
+      scope.Engine.Tick(1f / 30f);
+
+      Vector3 firstVisualPosition = scope.Engine.Stars[0].transform.position;
+      Vector3 firstTargetPosition = GetNodeLocalPosition(scope, 0);
+
+      Assert.That(scope.GetPrivateFieldForTest<int>("_remainingRefinementPasses"), Is.EqualTo(1));
+      Assert.That(Vector3.Distance(firstVisualPosition, firstTargetPosition), Is.GreaterThan(0.001f));
+      Assert.That(graphReadyCount, Is.EqualTo(0));
+
+      scope.Engine.Tick(1f / 30f);
+
+      Vector3 finalTargetPosition = GetNodeLocalPosition(scope, 0);
+      Vector3 secondVisualPosition = scope.Engine.Stars[0].transform.position;
+      Assert.That(scope.GetPrivateFieldForTest<int>("_remainingRefinementPasses"), Is.EqualTo(0));
+      Assert.That(scope.Engine.RequiresTick, Is.True);
+      Assert.That(Vector3.Distance(secondVisualPosition, finalTargetPosition), Is.GreaterThan(0.001f));
+      Assert.That(graphReadyCount, Is.EqualTo(0));
+
+      TickUntilStopped(scope);
+
+      Assert.That(scope.Engine.Stars[0].transform.position.x, Is.EqualTo(finalTargetPosition.x).Within(0.0001f));
+      Assert.That(scope.Engine.Stars[0].transform.position.y, Is.EqualTo(finalTargetPosition.y).Within(0.0001f));
+      Assert.That(scope.Engine.Stars[0].transform.position.z, Is.EqualTo(finalTargetPosition.z).Within(0.0001f));
+      Assert.That(scope.Engine.RequiresTick, Is.False);
+      Assert.That(graphReadyCount, Is.EqualTo(1));
+    }
+    finally
+    {
+      MapRuntimeContext.OnGraphReady -= onGraphReady;
+    }
+  }
+
+  [Test]
+  public void TimedRefinementSmoothing_DoesNotChangeCalculatedLocalPositions()
+  {
+    var graph = BuildTaglessComponentsGraph(24);
+    using var unsmoothed = CreateEngineScope(
+      graph.Notes,
+      graph.Links,
+      engineScope =>
+      {
+        engineScope.SetAnimationLifetime("linkRefinementLifetime", "Timed");
+        engineScope.SetPrivateFieldForTest("linkRefinementPasses", 6);
+        engineScope.SetPrivateFieldForTest("refinementFinishTaperFraction", 0f);
+        engineScope.SetPrivateFieldForTest("refinementPassesPerFrame", 1);
+        engineScope.SetPrivateFieldForTest("visualSmoothingSeconds", 0f);
+      });
+    using var smoothed = CreateEngineScope(
+      graph.Notes,
+      graph.Links,
+      engineScope =>
+      {
+        engineScope.SetAnimationLifetime("linkRefinementLifetime", "Timed");
+        engineScope.SetPrivateFieldForTest("linkRefinementPasses", 6);
+        engineScope.SetPrivateFieldForTest("refinementFinishTaperFraction", 0f);
+        engineScope.SetPrivateFieldForTest("refinementPassesPerFrame", 1);
+        engineScope.SetPrivateFieldForTest("visualSmoothingSeconds", 0.3f);
+      });
+
+    TickUntilStopped(unsmoothed);
+    TickUntilStopped(smoothed);
+
+    AssertNodeLocalPositionsEqual(unsmoothed, smoothed, graph.Notes.Count);
+  }
+
+  [Test]
   public void NodeSpacing_SeparatesOverlappingUnlinkedNodesToHardRadius()
   {
     using var scope = CreateEngineScope(
@@ -408,6 +503,18 @@ public class CartographerScalableLinksEngineEditModeTests
     return nodes[nodeIndex];
   }
 
+  private static void AssertNodeLocalPositionsEqual(EngineScope expected, EngineScope actual, int count)
+  {
+    for (int i = 0; i < count; i++)
+    {
+      Vector3 expectedPosition = GetNodeLocalPosition(expected, i);
+      Vector3 actualPosition = GetNodeLocalPosition(actual, i);
+      Assert.That(actualPosition.x, Is.EqualTo(expectedPosition.x).Within(0.0001f));
+      Assert.That(actualPosition.y, Is.EqualTo(expectedPosition.y).Within(0.0001f));
+      Assert.That(actualPosition.z, Is.EqualTo(expectedPosition.z).Within(0.0001f));
+    }
+  }
+
   private static void AssertFinite(Vector3 position)
   {
     Assert.That(float.IsNaN(position.x), Is.False);
@@ -537,7 +644,12 @@ public class CartographerScalableLinksEngineEditModeTests
 
     public void InvokePrivateMethodForTest(string methodName)
     {
-      MethodInfo method = typeof(CartographerEngineRecursiveHubsEngine).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+      MethodInfo method = typeof(CartographerEngineRecursiveHubsEngine).GetMethod(
+        methodName,
+        BindingFlags.Instance | BindingFlags.NonPublic,
+        null,
+        Type.EmptyTypes,
+        null);
       Assert.That(method, Is.Not.Null, $"Missing method {methodName}.");
       method.Invoke(Engine, Array.Empty<object>());
     }

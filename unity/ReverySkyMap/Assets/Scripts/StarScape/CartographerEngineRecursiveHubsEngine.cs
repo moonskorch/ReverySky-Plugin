@@ -124,10 +124,14 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
   [Header("Link Timing")]
   [SerializeField] private AnimationLifetime linkRefinementLifetime = AnimationLifetime.Timed;
+  [SerializeField, Range(0f, 0.5f)]
+  [Tooltip("Visual-only smoothing time in seconds for timed refinement. 0 disables smoothing; larger values soften motion but increase visible lag until the final exact sync.")]
+  private float visualSmoothingSeconds = 0.08f;
 
   private const float GOLDEN_ANGLE_RAD = 2.39996323f;
   private const float GOLDEN_RATIO_CONJUGATE = 0.61803398875f;
   private const float MIN_SQR_DISTANCE = 0.000001f;
+  private const float VISUAL_SMOOTHING_FINISH_DISTANCE = 0.001f;
 
   private float _navigationRadius;
   private Vector3 _layoutCenter;
@@ -150,6 +154,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   private bool _constructionActive;
   private bool _animateConstruction;
   private bool _animateRefinement;
+  private bool _visualSmoothingActive;
 
   private readonly List<Node> _nodes = new();
   private readonly List<Edge> _tagEdges = new();
@@ -339,7 +344,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   public int MaxActiveLines => maxActiveLines;
   public int MaxActiveLongLines => maxActiveLongLines;
   public bool RequiresTick => _constructionActive || _remainingRefinementPasses > 0 ||
-    (_continuousLinkRefinement && _graphHasNodes);
+    _visualSmoothingActive || (_continuousLinkRefinement && _graphHasNodes);
   public event Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnNodesChanged;
   public float BoundRadius => _navigationRadius;
   public Vector3 Pivot => layoutParent ? layoutParent.TransformPoint(_layoutCenter) : _layoutCenter;
@@ -363,7 +368,13 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
     if (_remainingRefinementPasses > 0)
     {
-      TickFiniteRefinement();
+      TickFiniteRefinement(dt);
+      return;
+    }
+
+    if (_visualSmoothingActive)
+    {
+      TickFinalVisualSmoothing(dt);
       return;
     }
 
@@ -403,7 +414,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     }
   }
 
-  private void TickFiniteRefinement()
+  private void TickFiniteRefinement(float dt)
   {
     if (_remainingRefinementPasses <= 0)
       return;
@@ -419,16 +430,20 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       _completedRefinementPasses++;
     }
 
-    UpdateVisualPositions();
+    bool smoothVisuals = ShouldSmoothTimedRefinementVisuals();
+    bool visualSettled = UpdateVisualPositions(dt, smoothVisuals);
 
     if (_remainingRefinementPasses == 0)
     {
+      _visualSmoothingActive = smoothVisuals && !visualSettled;
       UpdateNavigationRadius();
       UnityEngine.Debug.Log(
         $"[RecursiveHubs] Refinement completed passes={_completedRefinementPasses}, " +
         $"nodeSpacingChecks={_nodeSpacingPairChecks}, " +
         $"navigationRadius={_navigationRadius:F1}");
-      MapRuntimeContext.RequestGraphReady();
+
+      if (!_visualSmoothingActive)
+        MapRuntimeContext.RequestGraphReady();
     }
   }
 
@@ -439,6 +454,15 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       RunRefinementPass();
 
     UpdateVisualPositions();
+  }
+
+  private void TickFinalVisualSmoothing(float dt)
+  {
+    if (UpdateVisualPositions(dt, true))
+    {
+      _visualSmoothingActive = false;
+      MapRuntimeContext.RequestGraphReady();
+    }
   }
 
   private void BuildGraphCore(List<NoteData> notes)
@@ -635,6 +659,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     _frontierPops = 0;
     _nodeSpacingPairChecks = 0;
     _constructionActive = false;
+    _visualSmoothingActive = false;
     _nextPlacementSequence = 0;
     _layoutCenter = Vector3.zero;
     _navigationRadius = Mathf.Max(0.1f, minimumNavigationRadius);
@@ -1801,14 +1826,67 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     }
   }
 
-  private void UpdateVisualPositions()
+  private bool ShouldSmoothTimedRefinementVisuals()
   {
+    return linkRefinementLifetime == AnimationLifetime.Timed &&
+      visualSmoothingSeconds > 0f;
+  }
+
+  private bool UpdateVisualPositions()
+  {
+    return UpdateVisualPositions(0f, false);
+  }
+
+  private bool UpdateVisualPositions(float dt, bool smoothVisuals)
+  {
+    bool allSettled = true;
+    float finishDistanceSqr =
+      VISUAL_SMOOTHING_FINISH_DISTANCE *
+      VISUAL_SMOOTHING_FINISH_DISTANCE;
+    float smoothingBlend = smoothVisuals
+      ? ResolveVisualSmoothingBlend(dt)
+      : 1f;
+
     for (int nodeIndex = 0; nodeIndex < _nodes.Count; nodeIndex++)
     {
       var visualTransform = _nodes[nodeIndex].VisualTransform;
-      if (visualTransform)
-        visualTransform.position = ToWorldPosition(_nodes[nodeIndex].LocalPosition);
+      if (!visualTransform)
+        continue;
+
+      Vector3 targetPosition = ToWorldPosition(_nodes[nodeIndex].LocalPosition);
+      if (!smoothVisuals)
+      {
+        visualTransform.position = targetPosition;
+        continue;
+      }
+
+      Vector3 nextPosition = Vector3.Lerp(
+        visualTransform.position,
+        targetPosition,
+        smoothingBlend);
+
+      if ((targetPosition - nextPosition).sqrMagnitude <= finishDistanceSqr)
+      {
+        nextPosition = targetPosition;
+      }
+      else
+      {
+        allSettled = false;
+      }
+
+      visualTransform.position = nextPosition;
     }
+
+    return allSettled;
+  }
+
+  private float ResolveVisualSmoothingBlend(float dt)
+  {
+    if (dt <= 0f)
+      return 1f;
+
+    float smoothingSeconds = Mathf.Max(0.01f, visualSmoothingSeconds);
+    return Mathf.Clamp01(1f - Mathf.Exp(-dt / smoothingSeconds));
   }
 
   private void UpdateNavigationCenter()

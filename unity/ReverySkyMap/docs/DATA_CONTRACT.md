@@ -54,7 +54,7 @@ Unity-side behavior:
 - WebGL builds forward the event to JavaScript via `ReverySkyBridgePostGraphReady(requestId)`.
 - Empty or whitespace `requestId` is not sent out as `graph:ready`; this avoids a startup empty-graph rebuild producing an invalid completion event.
 - `Dates` and `DynamicLinks` signal ready after their synchronous build publishes visual nodes.
-- `RecursiveHubs` signals ready after an empty graph, after instant/endless construction completion, or after the final finite refinement pass.
+- `RecursiveHubs` signals ready after an empty graph, after instant/endless construction completion, or after timed visual smoothing settles following the final finite refinement pass.
 - Parent iframe status owns the visible loading text and only clears `N notes, M links (loading...)` when `graph:ready.requestId` matches the latest `graph:set`.
 
 ## Runtime Shutdown Handling
