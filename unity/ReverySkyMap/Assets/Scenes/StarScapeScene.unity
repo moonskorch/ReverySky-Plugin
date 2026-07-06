@@ -1459,10 +1459,12 @@ MonoBehaviour:
   directLinkRestLength: 7.2
   minimumDirectLinkRestLength: 3.5
   rootMobility: 0.1
-  hardNodeSpacingPassesPerRefinement: 1
+  nodeSpacingPassesPerRefinement: 1
   hardNodeSpacingRadius: 1.8
-  hardNodeSpacingProjectionStrength: 1
-  maxHardNodeSpacingChecksPerNode: 256
+  airNodeSpacingRadius: 3.6
+  nodeSpacingProjectionStrength: 0.8
+  closeNeighborBudget: 2
+  maxNodeSpacingChecksPerNode: 256
   tagScale: 0.7
   maxActiveLines: 150
   maxActiveLongLines: 10
@@ -2527,13 +2529,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
   injectSampleData: 0
-  connectionModel: 0
+  connectionModel: 2
   islands: 0
-  noteCount: 2500
-  tagPoolSize: 400
+  noteCount: 10000
+  tagPoolSize: 1000
   dateSpanDays: 365
   maxTagsPerNote: 4
-  linkDensity: 12
+  linkDensity: 45
 --- !u!1 &1787028428
 GameObject:
   m_ObjectHideFlags: 0

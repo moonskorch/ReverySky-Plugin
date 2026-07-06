@@ -247,15 +247,15 @@ preventing later link refinement from pulling hub systems into unreadable knots.
   - Result: rejected in that form. One pass could spread the outer mass while
     dense center overlaps remained, and more passes looked likely to raise the
     same cost concerns as continuous separation.
-- Clean hard node spacing:
+- Clean node spacing:
   - Concept: isolate the spacing idea from all hub/orbital/link changes and only
-    enforce a forbidden radius around each node center.
+    enforce physical node space around each center.
   - Technique: added a spatial-grid projection after link contraction, with
-    editor-facing controls for pass count, node spacing radius, projection
-    strength, and per-node check cap. A pass count of 0 disables the constraint.
-    It does not change initial placement, rest lengths, link weights, or hub role
-    rules.
+    editor-facing controls for pass count, hard radius, air radius, one shared
+    projection strength, close-neighbor budget, and per-node check cap. A pass
+    count of 0 disables the constraint. It does not change initial placement,
+    rest lengths, link weights, or hub role rules.
   - Result: current successful owner verdict. With the old separation pass
-    removed, hard node spacing set to one pass, and radius near 1, live maps no
-    longer show glued node piles, including link-saturated maps and single-hub
-    cases.
+    removed, node spacing set to one pass, and hard/air radii tuned separately,
+    live maps no longer show glued node piles, including link-saturated maps and
+    single-hub cases.

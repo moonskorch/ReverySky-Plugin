@@ -226,7 +226,7 @@ public class CartographerScalableLinksEngineEditModeTests
   }
 
   [Test]
-  public void HardNodeSpacing_SeparatesOverlappingUnlinkedNodes()
+  public void NodeSpacing_SeparatesOverlappingUnlinkedNodesToHardRadius()
   {
     using var scope = CreateEngineScope(
       BuildTaglessNotes(2),
@@ -235,14 +235,16 @@ public class CartographerScalableLinksEngineEditModeTests
       {
         engineScope.SetPrivateFieldForTest("linkRefinementPasses", 0);
         engineScope.SetPrivateFieldForTest("hardNodeSpacingRadius", 1f);
-        engineScope.SetPrivateFieldForTest("hardNodeSpacingProjectionStrength", 1f);
-        engineScope.SetPrivateFieldForTest("maxHardNodeSpacingChecksPerNode", 0);
+        engineScope.SetPrivateFieldForTest("airNodeSpacingRadius", 3f);
+        engineScope.SetPrivateFieldForTest("nodeSpacingProjectionStrength", 1f);
+        engineScope.SetPrivateFieldForTest("closeNeighborBudget", 1);
+        engineScope.SetPrivateFieldForTest("maxNodeSpacingChecksPerNode", 0);
       });
 
     SetNodeLocalPosition(scope, 0, Vector3.zero);
     SetNodeLocalPosition(scope, 1, Vector3.zero);
 
-    scope.InvokePrivateMethodForTest("ApplyHardNodeSpacingPass");
+    scope.InvokePrivateMethodForTest("ApplyNodeSpacingPass");
 
     float distance = Vector3.Distance(
       GetNodeLocalPosition(scope, 0),
@@ -252,7 +254,7 @@ public class CartographerScalableLinksEngineEditModeTests
   }
 
   [Test]
-  public void HardNodeSpacing_ZeroPasses_DisablesConstraint()
+  public void NodeSpacing_ZeroPasses_DisablesConstraint()
   {
     using var scope = CreateEngineScope(
       BuildTaglessNotes(2),
@@ -260,7 +262,7 @@ public class CartographerScalableLinksEngineEditModeTests
       engineScope =>
       {
         engineScope.SetPrivateFieldForTest("linkRefinementPasses", 0);
-        engineScope.SetPrivateFieldForTest("hardNodeSpacingPassesPerRefinement", 0);
+        engineScope.SetPrivateFieldForTest("nodeSpacingPassesPerRefinement", 0);
         engineScope.SetPrivateFieldForTest("hardNodeSpacingRadius", 1f);
       });
 
@@ -277,7 +279,56 @@ public class CartographerScalableLinksEngineEditModeTests
   }
 
   [Test]
-  public void HardNodeSpacing_CheckCap_BoundsDenseLocalWork()
+  public void NodeSpacing_CloseNeighborBudget_AllowsLimitedPairsInsideAirRadius()
+  {
+    using var allowed = CreateEngineScope(
+      BuildTaglessNotes(2),
+      new List<MapRuntimeContext.RuntimeNoteLink>(),
+      engineScope =>
+      {
+        engineScope.SetPrivateFieldForTest("linkRefinementPasses", 0);
+        engineScope.SetPrivateFieldForTest("hardNodeSpacingRadius", 1f);
+        engineScope.SetPrivateFieldForTest("airNodeSpacingRadius", 3f);
+        engineScope.SetPrivateFieldForTest("nodeSpacingProjectionStrength", 1f);
+        engineScope.SetPrivateFieldForTest("closeNeighborBudget", 1);
+        engineScope.SetPrivateFieldForTest("maxNodeSpacingChecksPerNode", 0);
+      });
+
+    SetNodeLocalPosition(allowed, 0, Vector3.zero);
+    SetNodeLocalPosition(allowed, 1, new Vector3(4f, 0f, 0f));
+    allowed.InvokePrivateMethodForTest("ApplyNodeSpacingPass");
+
+    float allowedDistance = Vector3.Distance(
+      GetNodeLocalPosition(allowed, 0),
+      GetNodeLocalPosition(allowed, 1));
+
+    using var exhausted = CreateEngineScope(
+      BuildTaglessNotes(2),
+      new List<MapRuntimeContext.RuntimeNoteLink>(),
+      engineScope =>
+      {
+        engineScope.SetPrivateFieldForTest("linkRefinementPasses", 0);
+        engineScope.SetPrivateFieldForTest("hardNodeSpacingRadius", 1f);
+        engineScope.SetPrivateFieldForTest("airNodeSpacingRadius", 3f);
+        engineScope.SetPrivateFieldForTest("nodeSpacingProjectionStrength", 1f);
+        engineScope.SetPrivateFieldForTest("closeNeighborBudget", 0);
+        engineScope.SetPrivateFieldForTest("maxNodeSpacingChecksPerNode", 0);
+      });
+
+    SetNodeLocalPosition(exhausted, 0, Vector3.zero);
+    SetNodeLocalPosition(exhausted, 1, new Vector3(4f, 0f, 0f));
+    exhausted.InvokePrivateMethodForTest("ApplyNodeSpacingPass");
+
+    float exhaustedDistance = Vector3.Distance(
+      GetNodeLocalPosition(exhausted, 0),
+      GetNodeLocalPosition(exhausted, 1));
+
+    Assert.That(allowedDistance, Is.EqualTo(4f).Within(0.0001f));
+    Assert.That(exhaustedDistance, Is.EqualTo(6f).Within(0.0001f));
+  }
+
+  [Test]
+  public void NodeSpacing_CheckCap_BoundsDenseLocalWork()
   {
     using var scope = CreateEngineScope(
       BuildTaglessNotes(64),
@@ -286,17 +337,17 @@ public class CartographerScalableLinksEngineEditModeTests
       {
         engineScope.SetPrivateFieldForTest("linkRefinementPasses", 0);
         engineScope.SetPrivateFieldForTest("hardNodeSpacingRadius", 1f);
-        engineScope.SetPrivateFieldForTest("hardNodeSpacingProjectionStrength", 1f);
-        engineScope.SetPrivateFieldForTest("maxHardNodeSpacingChecksPerNode", 1);
+        engineScope.SetPrivateFieldForTest("nodeSpacingProjectionStrength", 1f);
+        engineScope.SetPrivateFieldForTest("maxNodeSpacingChecksPerNode", 1);
       });
 
     for (int i = 0; i < 64; i++)
       SetNodeLocalPosition(scope, i, Vector3.zero);
 
-    scope.SetPrivateFieldForTest("_hardSpacingPairChecks", 0L);
-    scope.InvokePrivateMethodForTest("ApplyHardNodeSpacingPass");
+    scope.SetPrivateFieldForTest("_nodeSpacingPairChecks", 0L);
+    scope.InvokePrivateMethodForTest("ApplyNodeSpacingPass");
 
-    long pairChecks = scope.GetPrivateFieldForTest<long>("_hardSpacingPairChecks");
+    long pairChecks = scope.GetPrivateFieldForTest<long>("_nodeSpacingPairChecks");
     Assert.That(pairChecks, Is.LessThanOrEqualTo(64));
 
     for (int i = 0; i < 64; i++)

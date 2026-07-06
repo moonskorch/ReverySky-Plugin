@@ -93,12 +93,19 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   [SerializeField, Range(0f, 1f)] private float rootMobility = 0.1f;
 
   [Header("Space preservation")]
-  [SerializeField, Range(0, 8)] private int hardNodeSpacingPassesPerRefinement = 1;
-  [Tooltip("Forbidden radius around each node center. Center-to-center spacing targets twice this value.")]
-  [SerializeField, Min(0f)] private float hardNodeSpacingRadius = 1f;
-  [SerializeField, Range(0f, 1f)] private float hardNodeSpacingProjectionStrength = 1f;
+  [FormerlySerializedAs("hardNodeSpacingPassesPerRefinement")]
+  [SerializeField, Range(0, 8)] private int nodeSpacingPassesPerRefinement = 1;
+  [Tooltip("Absolute forbidden radius around each node center. Center-to-center spacing targets twice this value.")]
+  [SerializeField, Min(0f)] private float hardNodeSpacingRadius = 1.8f;
+  [Tooltip("Preferred breathing radius around each node center. Close-neighbor budget allows limited pairs inside it.")]
+  [SerializeField, Min(0f)] private float airNodeSpacingRadius = 3.6f;
+  [FormerlySerializedAs("hardNodeSpacingProjectionStrength")]
+  [SerializeField, Range(0f, 1f)] private float nodeSpacingProjectionStrength = 1f;
+  [Tooltip("How many spatial neighbors a node may keep inside air radius before air spacing pushes additional pairs apart.")]
+  [SerializeField, Range(0, 16)] private int closeNeighborBudget = 2;
   [Tooltip("Caps local collision checks per node for dense 10K maps. 0 means unlimited.")]
-  [SerializeField, Range(0, 8192)] private int maxHardNodeSpacingChecksPerNode = 256;
+  [FormerlySerializedAs("maxHardNodeSpacingChecksPerNode")]
+  [SerializeField, Range(0, 8192)] private int maxNodeSpacingChecksPerNode = 256;
 
   [Header("Visual")]
   [SerializeField, Min(0.01f)] private float tagScale = 0.7f;
@@ -139,7 +146,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   private int _resolvedLinkRefinementTaperPasses;
   private long _frontierPushes;
   private long _frontierPops;
-  private long _hardSpacingPairChecks;
+  private long _nodeSpacingPairChecks;
   private bool _constructionActive;
   private bool _animateConstruction;
   private bool _animateRefinement;
@@ -157,6 +164,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   private bool[] _queuedForPlacement = Array.Empty<bool>();
   private Vector3[] _corrections = Array.Empty<Vector3>();
   private int[] _correctionCounts = Array.Empty<int>();
+  private int[] _closeNeighborCounts = Array.Empty<int>();
 
   private readonly PlacementMaxHeap _frontier = new();
   private long _nextPlacementSequence;
@@ -418,7 +426,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       UpdateNavigationRadius();
       UnityEngine.Debug.Log(
         $"[RecursiveHubs] Refinement completed passes={_completedRefinementPasses}, " +
-        $"hardSpacingChecks={_hardSpacingPairChecks}, " +
+        $"nodeSpacingChecks={_nodeSpacingPairChecks}, " +
         $"navigationRadius={_navigationRadius:F1}");
       MapRuntimeContext.RequestGraphReady();
     }
@@ -609,6 +617,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     _queuedForPlacement = Array.Empty<bool>();
     _corrections = Array.Empty<Vector3>();
     _correctionCounts = Array.Empty<int>();
+    _closeNeighborCounts = Array.Empty<int>();
     _frontier.Clear();
     _placementCells.Clear();
     _packingOffsets.Clear();
@@ -624,7 +633,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     _completedRefinementPasses = 0;
     _frontierPushes = 0;
     _frontierPops = 0;
-    _hardSpacingPairChecks = 0;
+    _nodeSpacingPairChecks = 0;
     _constructionActive = false;
     _nextPlacementSequence = 0;
     _layoutCenter = Vector3.zero;
@@ -1449,8 +1458,8 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     ApplyLinkContractionCorrections();
     ApplyCorrections();
 
-    for (int pass = 0; pass < hardNodeSpacingPassesPerRefinement; pass++)
-      ApplyHardNodeSpacingPass();
+    for (int pass = 0; pass < nodeSpacingPassesPerRefinement; pass++)
+      ApplyNodeSpacingPass();
   }
 
   private float ResolveCurrentMaxMovePerPass()
@@ -1525,32 +1534,35 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     }
   }
 
-  private void ApplyHardNodeSpacingPass()
+  private void ApplyNodeSpacingPass()
   {
-    // This is a collision-style projection, not a force: it only resolves
-    // forbidden center spacing and leaves link geometry decisions elsewhere.
-    float desiredDistance = Mathf.Max(0f, hardNodeSpacingRadius) * 2f;
-    if (desiredDistance <= 0f || hardNodeSpacingProjectionStrength <= 0f)
+    // This is a collision-style projection, not a force: it protects node space
+    // while leaving link geometry decisions to link contraction.
+    float hardDistance = Mathf.Max(0f, hardNodeSpacingRadius) * 2f;
+    float airDistance = Mathf.Max(hardDistance, Mathf.Max(0f, airNodeSpacingRadius) * 2f);
+    if (airDistance <= 0f || nodeSpacingProjectionStrength <= 0f)
       return;
 
-    BuildSpacingGrid(desiredDistance);
+    EnsureNodeSpacingBuffers();
+    Array.Clear(_closeNeighborCounts, 0, _closeNeighborCounts.Length);
+    BuildSpacingGrid(airDistance);
 
     for (int nodeIndex = 0; nodeIndex < _nodes.Count; nodeIndex++)
     {
       var node = _nodes[nodeIndex];
-      Vector3Int origin = ToCell(node.LocalPosition, desiredDistance);
+      Vector3Int origin = ToCell(node.LocalPosition, airDistance);
       int checks = 0;
-      bool hasCheckLimit = maxHardNodeSpacingChecksPerNode > 0;
+      bool hasCheckLimit = maxNodeSpacingChecksPerNode > 0;
 
-      for (int x = -1; x <= 1 && (!hasCheckLimit || checks < maxHardNodeSpacingChecksPerNode); x++)
-        for (int y = -1; y <= 1 && (!hasCheckLimit || checks < maxHardNodeSpacingChecksPerNode); y++)
-          for (int z = -1; z <= 1 && (!hasCheckLimit || checks < maxHardNodeSpacingChecksPerNode); z++)
+      for (int x = -1; x <= 1 && (!hasCheckLimit || checks < maxNodeSpacingChecksPerNode); x++)
+        for (int y = -1; y <= 1 && (!hasCheckLimit || checks < maxNodeSpacingChecksPerNode); y++)
+          for (int z = -1; z <= 1 && (!hasCheckLimit || checks < maxNodeSpacingChecksPerNode); z++)
           {
             if (!_spacingGrid.TryGetValue(origin + new Vector3Int(x, y, z), out var bucket))
               continue;
 
             for (int bucketOffset = 0;
-                 bucketOffset < bucket.Count && (!hasCheckLimit || checks < maxHardNodeSpacingChecksPerNode);
+                 bucketOffset < bucket.Count && (!hasCheckLimit || checks < maxNodeSpacingChecksPerNode);
                  bucketOffset++)
             {
               int otherIndex = bucket[bucketOffset];
@@ -1558,23 +1570,27 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
                 continue;
 
               checks++;
-              _hardSpacingPairChecks++;
-              ApplyHardNodeSpacingPair(nodeIndex, otherIndex, desiredDistance);
+              _nodeSpacingPairChecks++;
+              ApplyNodeSpacingPair(nodeIndex, otherIndex, hardDistance, airDistance);
             }
           }
     }
   }
 
-  private void ApplyHardNodeSpacingPair(int nodeIndex, int otherIndex, float desiredDistance)
+  private void ApplyNodeSpacingPair(
+    int nodeIndex,
+    int otherIndex,
+    float hardDistance,
+    float airDistance)
   {
     var node = _nodes[nodeIndex];
     var other = _nodes[otherIndex];
 
     Vector3 delta = other.LocalPosition - node.LocalPosition;
     float distanceSqr = delta.sqrMagnitude;
-    float desiredDistanceSqr = desiredDistance * desiredDistance;
+    float airDistanceSqr = airDistance * airDistance;
 
-    if (distanceSqr >= desiredDistanceSqr)
+    if (distanceSqr >= airDistanceSqr)
       return;
 
     Vector3 direction;
@@ -1591,8 +1607,12 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       direction = delta / distance;
     }
 
+    float desiredDistance = ResolveNodeSpacingDistance(nodeIndex, otherIndex, distance, hardDistance, airDistance);
+    if (desiredDistance <= distance)
+      return;
+
     float projection = (desiredDistance - distance) *
-      Mathf.Clamp01(hardNodeSpacingProjectionStrength);
+      Mathf.Clamp01(nodeSpacingProjectionStrength);
     if (projection <= 0f)
       return;
 
@@ -1604,6 +1624,30 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
     _nodes[nodeIndex].LocalPosition -= direction * (projection * (nodeMobility / mobilitySum));
     _nodes[otherIndex].LocalPosition += direction * (projection * (otherMobility / mobilitySum));
+  }
+
+  private float ResolveNodeSpacingDistance(
+    int nodeIndex,
+    int otherIndex,
+    float distance,
+    float hardDistance,
+    float airDistance)
+  {
+    bool hasCloseBudget =
+      closeNeighborBudget > 0 &&
+      _closeNeighborCounts[nodeIndex] < closeNeighborBudget &&
+      _closeNeighborCounts[otherIndex] < closeNeighborBudget;
+
+    if (hasCloseBudget)
+    {
+      _closeNeighborCounts[nodeIndex]++;
+      _closeNeighborCounts[otherIndex]++;
+      return distance < hardDistance ? hardDistance : distance;
+    }
+
+    return distance < hardDistance
+      ? Mathf.Max(hardDistance, airDistance)
+      : airDistance;
   }
 
   private void ApplyCorrections()
@@ -1658,6 +1702,14 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
     _corrections = new Vector3[_nodes.Count];
     _correctionCounts = new int[_nodes.Count];
+  }
+
+  private void EnsureNodeSpacingBuffers()
+  {
+    if (_closeNeighborCounts.Length == _nodes.Count)
+      return;
+
+    _closeNeighborCounts = new int[_nodes.Count];
   }
 
   private void BuildSpacingGrid(float cellSize)
