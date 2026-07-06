@@ -1,4 +1,3 @@
-using System.Linq;
 using TMPro;
 using UnityEngine;
 
@@ -73,7 +72,7 @@ public class StarVisual : MonoBehaviour
     if (!show) return;
 
     var sphereMap = ResolveRandomSphereMaterial();
-    sphereRenderer.material = sphereMap?.material ?? sphereMaterialCatalog.defaultMaterial;
+    sphereRenderer.sharedMaterial = sphereMap?.material ?? sphereMaterialCatalog.defaultMaterial;
   }
 
   private void ShowCrystal(bool show)
@@ -88,17 +87,50 @@ public class StarVisual : MonoBehaviour
 
   private SphereType_Material ResolveRandomSphereMaterial()
   {
-    var colorPalette = sphereMaterialCatalog.materials
-      .Where(x =>
-        x != null &&
-        x.material != null &&
-        x.sphereType != SphereType.Black)
-      .ToList();
+    var materials = sphereMaterialCatalog.materials;
+    int validCount = 0;
+    for (int i = 0; i < materials.Count; i++)
+    {
+      if (IsSelectableSphereMaterial(materials[i]))
+        validCount++;
+    }
 
-    if (!colorPalette.Any())
+    if (validCount == 0)
       return null;
 
-    return Rng.Pick(colorPalette, BuildStableVisualSeed());
+    int selectedOffset = StableIndex(BuildStableVisualSeed(), validCount);
+
+    for (int i = 0; i < materials.Count; i++)
+    {
+      var candidate = materials[i];
+      if (!IsSelectableSphereMaterial(candidate))
+        continue;
+
+      if (selectedOffset == 0)
+        return candidate;
+
+      selectedOffset--;
+    }
+
+    return null;
+  }
+
+  private static bool IsSelectableSphereMaterial(SphereType_Material candidate)
+  {
+    return candidate != null &&
+      candidate.material != null &&
+      candidate.sphereType != SphereType.Black;
+  }
+
+  private static int StableIndex(int seed, int count)
+  {
+    if (count <= 0)
+      return 0;
+
+    unchecked
+    {
+      return (int)((uint)seed % (uint)count);
+    }
   }
 
   private int BuildStableVisualSeed()
@@ -128,11 +160,13 @@ public class StarVisual : MonoBehaviour
 
   private float ResolveCrystalScaleMultiplier(CrystalType crystalType)
   {
-    var selectedScale = crystalScaleMapper.multipliers
-      .FirstOrDefault(x => x.crystalType == crystalType);
-
-    if (selectedScale != null)
-      return selectedScale.scaleMultiplier;
+    var multipliers = crystalScaleMapper.multipliers;
+    for (int i = 0; i < multipliers.Count; i++)
+    {
+      var candidate = multipliers[i];
+      if (candidate != null && candidate.crystalType == crystalType)
+        return candidate.scaleMultiplier;
+    }
 
     return crystalScaleMapper.defaultScale;
   }
