@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
@@ -224,6 +225,84 @@ public class CartographerScalableLinksEngineEditModeTests
     Assert.That(float.IsInfinity(scope.Engine.BoundRadius), Is.False);
   }
 
+  [Test]
+  public void HardNodeSpacing_SeparatesOverlappingUnlinkedNodes()
+  {
+    using var scope = CreateEngineScope(
+      BuildTaglessNotes(2),
+      new List<MapRuntimeContext.RuntimeNoteLink>(),
+      engineScope =>
+      {
+        engineScope.SetPrivateFieldForTest("linkRefinementPasses", 0);
+        engineScope.SetPrivateFieldForTest("hardNodeSpacingRadius", 1f);
+        engineScope.SetPrivateFieldForTest("hardNodeSpacingProjectionStrength", 1f);
+        engineScope.SetPrivateFieldForTest("maxHardNodeSpacingChecksPerNode", 0);
+      });
+
+    SetNodeLocalPosition(scope, 0, Vector3.zero);
+    SetNodeLocalPosition(scope, 1, Vector3.zero);
+
+    scope.InvokePrivateMethodForTest("ApplyHardNodeSpacingPass");
+
+    float distance = Vector3.Distance(
+      GetNodeLocalPosition(scope, 0),
+      GetNodeLocalPosition(scope, 1));
+
+    Assert.That(distance, Is.EqualTo(2f).Within(0.0001f));
+  }
+
+  [Test]
+  public void HardNodeSpacing_ZeroPasses_DisablesConstraint()
+  {
+    using var scope = CreateEngineScope(
+      BuildTaglessNotes(2),
+      new List<MapRuntimeContext.RuntimeNoteLink>(),
+      engineScope =>
+      {
+        engineScope.SetPrivateFieldForTest("linkRefinementPasses", 0);
+        engineScope.SetPrivateFieldForTest("hardNodeSpacingPassesPerRefinement", 0);
+        engineScope.SetPrivateFieldForTest("hardNodeSpacingRadius", 1f);
+      });
+
+    SetNodeLocalPosition(scope, 0, Vector3.zero);
+    SetNodeLocalPosition(scope, 1, Vector3.zero);
+
+    scope.InvokePrivateMethodForTest("RunRefinementPass");
+
+    float distance = Vector3.Distance(
+      GetNodeLocalPosition(scope, 0),
+      GetNodeLocalPosition(scope, 1));
+
+    Assert.That(distance, Is.EqualTo(0f).Within(0.0001f));
+  }
+
+  [Test]
+  public void HardNodeSpacing_CheckCap_BoundsDenseLocalWork()
+  {
+    using var scope = CreateEngineScope(
+      BuildTaglessNotes(64),
+      new List<MapRuntimeContext.RuntimeNoteLink>(),
+      engineScope =>
+      {
+        engineScope.SetPrivateFieldForTest("linkRefinementPasses", 0);
+        engineScope.SetPrivateFieldForTest("hardNodeSpacingRadius", 1f);
+        engineScope.SetPrivateFieldForTest("hardNodeSpacingProjectionStrength", 1f);
+        engineScope.SetPrivateFieldForTest("maxHardNodeSpacingChecksPerNode", 1);
+      });
+
+    for (int i = 0; i < 64; i++)
+      SetNodeLocalPosition(scope, i, Vector3.zero);
+
+    scope.SetPrivateFieldForTest("_hardSpacingPairChecks", 0L);
+    scope.InvokePrivateMethodForTest("ApplyHardNodeSpacingPass");
+
+    long pairChecks = scope.GetPrivateFieldForTest<long>("_hardSpacingPairChecks");
+    Assert.That(pairChecks, Is.LessThanOrEqualTo(64));
+
+    for (int i = 0; i < 64; i++)
+      AssertFinite(GetNodeLocalPosition(scope, i));
+  }
+
   private static EngineScope CreateEngineScope(
     IReadOnlyList<NoteData> notes,
     IReadOnlyList<MapRuntimeContext.RuntimeNoteLink> links,
@@ -253,6 +332,39 @@ public class CartographerScalableLinksEngineEditModeTests
       scope.Engine.Tick(1f / 30f);
 
     Assert.That(scope.Engine.RequiresTick, Is.False);
+  }
+
+  private static void SetNodeLocalPosition(EngineScope scope, int nodeIndex, Vector3 position)
+  {
+    object node = GetNode(scope, nodeIndex);
+    FieldInfo positionField = node.GetType().GetField("LocalPosition", BindingFlags.Instance | BindingFlags.Public);
+    Assert.That(positionField, Is.Not.Null, "Node LocalPosition field was not found.");
+    positionField.SetValue(node, position);
+  }
+
+  private static Vector3 GetNodeLocalPosition(EngineScope scope, int nodeIndex)
+  {
+    object node = GetNode(scope, nodeIndex);
+    FieldInfo positionField = node.GetType().GetField("LocalPosition", BindingFlags.Instance | BindingFlags.Public);
+    Assert.That(positionField, Is.Not.Null, "Node LocalPosition field was not found.");
+    return (Vector3)positionField.GetValue(node);
+  }
+
+  private static object GetNode(EngineScope scope, int nodeIndex)
+  {
+    var nodes = scope.GetPrivateFieldForTest<IList>("_nodes");
+    Assert.That(nodes, Has.Count.GreaterThan(nodeIndex));
+    return nodes[nodeIndex];
+  }
+
+  private static void AssertFinite(Vector3 position)
+  {
+    Assert.That(float.IsNaN(position.x), Is.False);
+    Assert.That(float.IsNaN(position.y), Is.False);
+    Assert.That(float.IsNaN(position.z), Is.False);
+    Assert.That(float.IsInfinity(position.x), Is.False);
+    Assert.That(float.IsInfinity(position.y), Is.False);
+    Assert.That(float.IsInfinity(position.z), Is.False);
   }
 
   private static List<NoteData> BuildTaglessNotes(int count)
@@ -370,6 +482,13 @@ public class CartographerScalableLinksEngineEditModeTests
       FieldInfo field = typeof(CartographerEngineRecursiveHubsEngine).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
       Assert.That(field, Is.Not.Null, $"Missing field {fieldName}.");
       return (T)field.GetValue(Engine);
+    }
+
+    public void InvokePrivateMethodForTest(string methodName)
+    {
+      MethodInfo method = typeof(CartographerEngineRecursiveHubsEngine).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+      Assert.That(method, Is.Not.Null, $"Missing method {methodName}.");
+      method.Invoke(Engine, Array.Empty<object>());
     }
 
     public void Dispose()

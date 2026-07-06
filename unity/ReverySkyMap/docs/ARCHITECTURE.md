@@ -26,7 +26,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Important dependencies: `ICartographerEngine`, `FocusNode`, `ChangeViewControl`, `Notification`, `SampleDataGenerator`, `MapRuntimeContext`, `LineBuilder`, `CullingManager`, `OnGraphVisualsChanged`
 - Graph layout engines:
   - Responsibility: build and clear the active graph layout, tick when needed, and publish the star/tag node lists plus line budgets consumed by `LineBuilder`.
-  - Main code location: `Assets/Scripts/StarScape/CartographerForcesEngine.cs`, `Assets/Scripts/StarScape/Cartographer25DEngine.cs`, `Assets/Scripts/StarScape/EngineExperiments/*`, `Assets/Scripts/Interfaces/ICartographerEngine.cs`
+  - Main code location: `Assets/Scripts/StarScape/CartographerForcesEngine.cs`, `Assets/Scripts/StarScape/Cartographer25DEngine.cs`, `Assets/Scripts/StarScape/CartographerEngineRecursiveHubsEngine.cs`, `Assets/Scripts/StarScape/EngineExperiments/*`, `Assets/Scripts/Interfaces/ICartographerEngine.cs`
   - Important dependencies: `StarSO`, `TagNodeSO`, `ScapeCameraWarper`, `NoteData`, `MapRuntimeContext.RuntimeNoteLink`, `MaxActiveLines`, `MaxActiveLongLines`, `OnNodesChanged`
 - Line rendering and culling:
   - Responsibility: build pooled line renderers for active note-note and note-tag connections, keep the visible edge set in sync with node visibility and focus, and share the distance-culling pipeline with other consumers.
@@ -146,10 +146,16 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Entry point: `Cartographer.BuildGraph`
   - Calls / sends to: `StarSO`, `ScapeCameraWarper`, `CameraOrbitalController`
 - `StaticLinks` slot engines
-  - Responsibility: provide the serialized large-graph engine selected by `Cartographer` when the resolved mode is `StaticLinks`. The current chosen direction for medium and large maps is the RecursiveHubs family, with `Engine_RecursiveHubs_v6` as the latest worked-out baseline.
-  - Code anchor: `Assets/Scripts/StarScape/EngineExperiments/Engine_RecursiveHubs_v6.cs::BuildGraph`, `Tick`, `ClearGraph`; `Assets/Scripts/StarScape/EngineExperiments/Engine_EmptySpheres.cs::BuildGraph`, `CalculateBoundRadius`
+  - Responsibility: provide the serialized large-graph engine selected by `Cartographer` when the resolved mode is `StaticLinks`. The accepted medium-and-large-map direction is RecursiveHubs; older candidates under `EngineExperiments` remain useful eval references.
+  - Code anchor: `Assets/Scripts/StarScape/CartographerEngineRecursiveHubsEngine.cs::BuildGraph`, `Tick`, `ClearGraph`; `Assets/Scripts/StarScape/EngineExperiments/Engine_EmptySpheres.cs::BuildGraph`, `CalculateBoundRadius`
   - Entry point: `Cartographer.BuildGraph`
   - Calls / sends to: `StarSO`, `TagNodeSO`, `MapRuntimeContext.RuntimeNoteLink`
+- `CartographerEngineRecursiveHubsEngine`
+  - Responsibility: builds the current RecursiveHubs large-graph layout by selecting structural maxima, recursively placing hub systems, refining links after placement, and preserving node space through a hard node-spacing constraint.
+  - Code anchor: `Assets/Scripts/StarScape/CartographerEngineRecursiveHubsEngine.cs::BuildGraph`, `RunRefinementPass`, `ApplyLinkContractionCorrections`, `ApplyHardNodeSpacingPass`
+  - Entry point: `Cartographer.BuildGraph`
+  - Calls / sends to: `StarSO`, `TagNodeSO`, `MapRuntimeContext.RuntimeNoteLink`, `MapRuntimeContext.RequestGraphReady`
+  - Spacing strategy: link contraction still controls connected-pair geometry, but collision-style hard node spacing owns the minimum center spacing between nearby nodes, including unrelated nodes. The old broader separation pass was removed; `hardNodeSpacingPassesPerRefinement = 0` disables the constraint.
 - `ScapeCameraWarper`
   - Responsibility: warps the 2.5D layout around the camera based on engine-specific depth profiles.
   - Code anchor: `Assets/Scripts/StarScape/ScapeCameraWarper.cs::Rebind`, `ApplyWarp`, `Clear`
@@ -230,6 +236,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 - `CartographerForcesEngine`, `Cartographer25DEngine`, and the engine assigned to `Cartographer.staticLinksEngineBehaviour` own placement and cleanup of instantiated stars and tags for their respective layout strategies; line visuals are handed off to `LineBuilder` after the engine raises `OnNodesChanged`.
 - `LineBuilder` owns pooled line renderers, candidate edge selection, focus-priority ordering, recent-visibility refresh, and the per-frame endpoint refresh for the active graph.
 - The current scene wiring assigns the `StaticLinks` slot to the RecursiveHubs baseline under eval, which can continue construction or refinement through `Tick()` after `BuildGraph()`. `Engine_EmptySpheres` remains a static fallback/evaluation engine with EditMode coverage for its radius calculations and static contract.
+- RecursiveHubs space preservation is owned by the engine, not by Unity physics. The engine applies a deterministic spatial-grid hard spacing projection during refinement, after link contraction, and caps per-node collision checks for dense maps.
 - `ScapeCameraWarper` owns the 2.5D warp state and only participates when the active engine is `Static25D`.
 - `StarSO` recomputes note-length scale buckets whenever `MapRuntimeContext.NotesVersion` changes.
 - `CullingManager` owns the shared `CullingGroup` and threshold transitions for graph nodes. Runtime tracking is split into `NodeTarget` and `Interest`: a `NodeTarget` is one physical graph node and one culling sphere, while each `Interest` is one consumer-specific distance rule and last visibility state.
@@ -268,7 +275,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Manual checks when needed: load the scene and confirm `graph:set` populates notes, links, tags, request id, and focus state without errors; in the parent plugin, close and quickly reopen the map view and confirm there are no delayed `note:open`, stale `graph:ready`, or bridge errors
 - Engine selection and layout:
   - Automated checks: `Assets/Tests/EditMode/CartographerForcesEngineRadiusEditModeTests.cs`, `Assets/Tests/EditMode/CartographerScalableLinksEngineEditModeTests.cs`, PlayMode engine-preference checks in `Assets/Tests/PlayMode/StarScapeRuntimePlayModeTests.cs`
-  - Manual checks when needed: inspect force layout, static-link slot output, date-range behavior, and the `Static25D` camera slider
+  - Manual checks when needed: inspect force layout, static-link slot output, RecursiveHubs hard node spacing on hub-heavy maps, date-range behavior, and the `Static25D` camera slider
 - Line rendering and culling:
   - Automated checks: `Assets/Tests/EditMode/LineBuilderEditModeTests.cs`
   - Manual checks when needed: load a populated graph, switch between `Planets` and `Plain`, and confirm lines appear only in `Planets`, react to focus and visibility changes, and keep their endpoints attached to moving nodes

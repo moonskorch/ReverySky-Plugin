@@ -1459,11 +1459,6 @@ MonoBehaviour:
   directLinkRestLength: 7.2
   minimumDirectLinkRestLength: 3.5
   rootMobility: 0.1
-  separationPassesPerRefinement: 0
-  clusterGuardDistanceFactor: 3.6
-  rootGuardDistanceFactor: 5
-  maxSeparationChecksPerNode: 180
-  useHardNodeSpacing: 1
   hardNodeSpacingPassesPerRefinement: 1
   hardNodeSpacingRadius: 1.8
   hardNodeSpacingProjectionStrength: 1
@@ -2532,13 +2527,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
   injectSampleData: 0
-  connectionModel: 1
-  islands: 1
+  connectionModel: 0
+  islands: 0
   noteCount: 2500
   tagPoolSize: 400
   dateSpanDays: 365
   maxTagsPerNote: 4
-  linkDensity: 27
+  linkDensity: 12
 --- !u!1 &1787028428
 GameObject:
   m_ObjectHideFlags: 0

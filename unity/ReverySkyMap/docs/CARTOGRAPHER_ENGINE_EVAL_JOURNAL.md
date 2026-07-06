@@ -205,8 +205,8 @@ Missing or not yet standardized:
 
 - 2026-07-06: Recorded owner verdict that the isolated hard node spacing
   constraint is a successful RecursiveHubs space-preservation step so far. The
-  useful comparison is with old separation disabled, not with both systems
-  running together.
+  old separation pass was removed after the useful comparison showed hard node
+  spacing should stand on its own.
 - 2026-06-12: Recorded owner verdict that RecursiveHubs is the accepted
   medium-and-large-map direction. `Engine_RecursiveHubs_v6` is the current
   baseline in that family. Continue tuning within RecursiveHubs instead of
@@ -242,7 +242,7 @@ preventing later link refinement from pulling hub systems into unreadable knots.
   - Concept: protect node space directly, regardless of graph links, so unrelated
     nodes cannot occupy the same visual area.
   - Technique: used a spatial-grid projection after refinement passes, with
-    editor-facing controls for enablement, pass count, distance factor, and
+    editor-facing controls for pass count, distance factor, and
     projection strength.
   - Result: rejected in that form. One pass could spread the outer mass while
     dense center overlaps remained, and more passes looked likely to raise the
@@ -251,10 +251,11 @@ preventing later link refinement from pulling hub systems into unreadable knots.
   - Concept: isolate the spacing idea from all hub/orbital/link changes and only
     enforce a forbidden radius around each node center.
   - Technique: added a spatial-grid projection after link contraction, with
-    editor-facing controls for enablement, pass count, node spacing radius,
-    projection strength, and per-node check cap. It does not change initial
-    placement, rest lengths, link weights, or hub role rules.
-  - Result: current successful owner verdict. With old separation disabled, hard
-    node spacing enabled, radius near 1, and one hard-spacing pass per refinement
-    pass, live maps no longer show glued node piles, including link-saturated
-    maps and single-hub cases.
+    editor-facing controls for pass count, node spacing radius, projection
+    strength, and per-node check cap. A pass count of 0 disables the constraint.
+    It does not change initial placement, rest lengths, link weights, or hub role
+    rules.
+  - Result: current successful owner verdict. With the old separation pass
+    removed, hard node spacing set to one pass, and radius near 1, live maps no
+    longer show glued node piles, including link-saturated maps and single-hub
+    cases.
