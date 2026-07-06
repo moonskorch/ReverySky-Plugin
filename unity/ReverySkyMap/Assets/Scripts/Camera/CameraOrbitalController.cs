@@ -35,7 +35,7 @@ public class CameraOrbitalController : MonoBehaviour
   /// Slider units per pixel of pinch
   /// </summary>
   [SerializeField] private float pinchZoomSensitivity = 0.0015f; 
-  [SerializeField] private float mouseWheelZoomSensitivity = 0.08f;
+  [SerializeField] private float scrollZoomSensitivity = 0.08f;
 
   [Header("Orbit")]
   /// <summary>
@@ -47,7 +47,7 @@ public class CameraOrbitalController : MonoBehaviour
   /// Degrees per second when rotate button is pressed
   /// </summary>
   [SerializeField] private float rotateSpeedDegrees = 90f;
-  [SerializeField] private float mouseRotateSensitivity = 0.15f;
+  [SerializeField] private float orbitDragSensitivity = 0.15f;
 
   [SerializeField] private float pivotFollowEps = 0.002f;
   [SerializeField] private float pivotFollowLerp = 12f;
@@ -124,10 +124,10 @@ public class CameraOrbitalController : MonoBehaviour
     targetPos = transform.position;
     targetRot = transform.rotation;
 
-    GameInput.Instance.OnSwipe += HandleSwipe;
-    GameInput.Instance.OnPinch += HandlePinch;
-    GameInput.Instance.OnMouseWheelZoom += HandleMouseWheelZoom;
-    GameInput.Instance.OnMouseRotateDrag += HandleMouseRotateDrag;
+    GameInput.Instance.OnPan += HandlePan;
+    GameInput.Instance.OnPinchZoom += HandlePinchZoom;
+    GameInput.Instance.OnScrollZoom += HandleScrollZoom;
+    GameInput.Instance.OnOrbitDrag += HandleOrbitDrag;
 
     InitOrbitRange();
     SetActivePivot(null);
@@ -159,10 +159,10 @@ public class CameraOrbitalController : MonoBehaviour
 
   private void OnDestroy()
   {
-    GameInput.Instance.OnSwipe -= HandleSwipe;
-    GameInput.Instance.OnPinch -= HandlePinch;
-    GameInput.Instance.OnMouseWheelZoom -= HandleMouseWheelZoom;
-    GameInput.Instance.OnMouseRotateDrag -= HandleMouseRotateDrag;
+    GameInput.Instance.OnPan -= HandlePan;
+    GameInput.Instance.OnPinchZoom -= HandlePinchZoom;
+    GameInput.Instance.OnScrollZoom -= HandleScrollZoom;
+    GameInput.Instance.OnOrbitDrag -= HandleOrbitDrag;
 
     if (rotateUI != null)
       rotateUI.OnCameraRotated -= HandleCameraRotated;
@@ -326,15 +326,15 @@ public class CameraOrbitalController : MonoBehaviour
     RebuildOrbitTarget();
   }
 
-  private void HandleSwipe(Vector2 delta, Vector2 pos)
+  private void HandlePan(Vector2 delta, Vector2 pos)
   {
     // Orbital focus shift in the plane perpendicular to the camera's view
     Vector3 move = Vector3.zero;
 
-    // Swipe left/right → panning by the right axis
+    // Horizontal interaction pans by the camera's right axis.
     move += -delta.x * moveSpeed * transform.right;
 
-    // Swipe up/down → panning by the up axis
+    // Vertical interaction pans by the camera's up axis.
     move += -delta.y * moveSpeed * transform.up;
 
     // Apply shift to orbital focus
@@ -357,7 +357,7 @@ public class CameraOrbitalController : MonoBehaviour
     RebuildOrbitTarget();
   }
 
-  private void HandlePinch(float pinchDelta)
+  private void HandlePinchZoom(float pinchDelta)
   {
     // pinchDelta > 0 when fingers move apart
     // We want pinch-out => zoom IN (closer) => smaller orbitRadius => smaller slider value
@@ -387,31 +387,31 @@ public class CameraOrbitalController : MonoBehaviour
     pivotCompensation = Vector3.zero;
   }
 
-  private void HandleMouseWheelZoom(float wheelDelta)
+  private void HandleScrollZoom(float wheelDelta)
   {
     if (Mathf.Approximately(wheelDelta, 0f))
       return;
 
     if (zoomSlider != null)
     {
-      float next = Mathf.Clamp01(zoomSlider.value - wheelDelta * mouseWheelZoomSensitivity);
+      float next = Mathf.Clamp01(zoomSlider.value - wheelDelta * scrollZoomSensitivity);
       zoomSlider.SetValueWithoutNotify(next);
       HandleZoomChanged(next);
       return;
     }
 
     float t = Mathf.InverseLerp(orbitRadiusMin, orbitRadiusMax, orbitRadius);
-    t = Mathf.Clamp01(t - wheelDelta * mouseWheelZoomSensitivity);
+    t = Mathf.Clamp01(t - wheelDelta * scrollZoomSensitivity);
     orbitRadius = Mathf.Lerp(orbitRadiusMin, orbitRadiusMax, t);
     RebuildOrbitTarget();
   }
 
-  private void HandleMouseRotateDrag(float deltaX)
+  private void HandleOrbitDrag(float deltaX)
   {
     if (Mathf.Abs(deltaX) < 0.001f)
       return;
 
-    orbitYaw += deltaX * mouseRotateSensitivity;
+    orbitYaw += deltaX * orbitDragSensitivity;
     RebuildOrbitTarget();
   }
 

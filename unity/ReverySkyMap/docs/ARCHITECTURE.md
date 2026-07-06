@@ -33,7 +33,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Main code location: `Assets/Scripts/StarScape/LineBuilder.cs`, `Assets/Scripts/StarScape/CullingManager.cs`, `Assets/Scripts/StarScape/BehaviourCullingTarget.cs`, `Assets/Scripts/StarScape/LabelCullingTarget.cs`
   - Important dependencies: `MapRuntimeContext.Links`, `Star.Data.TagIds`, `FocusNode.SelectedStar`, `ICullingConsumer`, `LineRenderer`, `ObjectPool<LineRenderer>`, `CullingGroup`
 - Interaction and camera:
-  - Responsibility: turns touch and mouse input into focus, orbit, zoom, view switching, and note-open actions.
+  - Responsibility: turns device input into selection, pan, orbit, zoom, view switching, and note-open actions.
   - Main code location: `Assets/Scripts/GameInput/GameInput.cs`, `Assets/Scripts/StarScape/FocusNode.cs`, `Assets/Scripts/Camera/CameraOrbitalController.cs`, `Assets/Scripts/UI/ChangeViewControl.cs`, `Assets/Scripts/UI/RotateCameraUI.cs`
   - Important dependencies: `EventSystem`, `Camera.main`, `MapRuntimeContext`, `Cartographer.I`, `GameSettings`
 - Visual assets and support objects:
@@ -70,8 +70,8 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 
 ### 3. Note focus and open-note callback
 
-1. `FocusNode.HandleTouch()` raycasts against `GameInput.Instance.InteractableLayers`.
-2. Tapping a `Star` selects it, focuses the camera, and calls `MapRuntimeContext.RequestOpenNote(star.Data)`.
+1. `FocusNode.HandleSelect()` raycasts against `GameInput.Instance.InteractableLayers`.
+2. Selecting a `Star` focuses the camera and calls `MapRuntimeContext.RequestOpenNote(star.Data)`.
 3. `MapRuntimeContext.OnOpenNoteRequested` reaches `ObsidianBridge.HandleOpenNoteRequested`.
 4. In WebGL builds, `ObsidianBridge` forwards the event to JavaScript via `ReverySkyBridgePostNoteOpen(noteId, notePath)`.
 5. Incoming `note:focus` messages call `ObsidianBridge.OnNoteFocus()`, which resolves the note through `Cartographer.FocusRuntimeNote()` and defers focus restore when the graph rebuild has not yet materialized the star.
@@ -88,7 +88,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 
 ### 5. Camera and view controls
 
-1. `GameInput` translates touch and mouse gestures into semantic events such as tap, swipe, pinch, wheel zoom, and right-drag rotation.
+1. `GameInput` translates device input into semantic events such as select, pan, pinch zoom, scroll zoom, and orbit drag.
 2. `CameraOrbitalController` listens to those events and keeps the camera orbiting around the current pivot.
 3. `FocusNode` uses `CameraOrbitalController` to focus stars or tag nodes.
 4. `ChangeViewControl` raises `OnChangeScapeView`, and `Cartographer.CycleView()` switches between `ScapeView.Planets` and `ScapeView.Plain`.
@@ -199,7 +199,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Calls / sends to: `FocusNode`, `CameraOrbitalController`, `EventSystem`
 - `FocusNode`
   - Responsibility: resolves taps on stars and tags into focus changes and note-open requests.
-  - Code anchor: `Assets/Scripts/StarScape/FocusNode.cs::HandleTouch`, `SetSelectedStar`, `ResetFocus`
+  - Code anchor: `Assets/Scripts/StarScape/FocusNode.cs::HandleSelect`, `SetSelectedStar`, `ResetFocus`
   - Entry point: `GameInput` events
   - Calls / sends to: `CameraOrbitalController`, `MapRuntimeContext`, `Cartographer.I`
 - `CameraOrbitalController`

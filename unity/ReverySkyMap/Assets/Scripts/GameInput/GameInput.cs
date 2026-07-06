@@ -10,30 +10,31 @@ public class GameInput : MonoBehaviour
   [SerializeField] private LayerMask interactableLayers;
 
   [Header("Gesture thresholds")]
-  [SerializeField] private float tapMaxDuration = 0.25f;   // seconds
-  [SerializeField] private float swipeDeadZonePx = 12f;    // pixels
+  [SerializeField] private float selectMaxDuration = 0.25f;
+
+  [SerializeField] private float panDeadZonePx = 12f;
 
   public LayerMask InteractableLayers => interactableLayers;
 
-  // Raw events
-  public event Action<Vector2> OnTouchBegan;
-  public event Action<Vector2> OnTouchMoved;
-  public event Action<Vector2> OnTouchEnded;
+  // Raw interaction events
+  public event Action<Vector2> OnPressBegan;
+  public event Action<Vector2> OnPressMoved;
+  public event Action<Vector2> OnPressEnded;
 
   // Semantic events
-  public event Action<Vector2> OnTap;
-  public event Action OnDragStart;
-  public event Action OnDragEnd;
-  public event Action<Vector2, Vector2> OnSwipe; // (delta, currentPosition)
-  public event Action<float> OnPinch;
-  public event Action<float> OnMouseWheelZoom;
-  public event Action<float> OnMouseRotateDrag;
+  public event Action<Vector2> OnSelect;
+  public event Action OnPanStart;
+  public event Action OnPanEnd;
+  public event Action<Vector2, Vector2> OnPan; // (delta, currentPosition)
+  public event Action<float> OnPinchZoom;
+  public event Action<float> OnScrollZoom;
+  public event Action<float> OnOrbitDrag;
 
-  private Vector2 lastTouchPos;
+  private Vector2 lastPressPos;
   private Vector2 startPos;
   private float startTime;
-  private float accumMovement;     // sum |delta| from touch start
-  private bool dragging;           // is over swipe threshold  
+  private float accumMovement;
+  private bool panning;
   private bool pinchInProgress;
 
   private int? blockedFingerId = null;
@@ -51,14 +52,12 @@ public class GameInput : MonoBehaviour
 
   private void Update()
   {
-    // DESKTOP MOUSE
     if (Input.touchCount == 0)
     {
       HandleMouseInput();
       return;
     }
 
-    // PINCH
     if (Input.touchCount == 2)
     {
       Touch t0 = Input.GetTouch(0);
@@ -77,16 +76,15 @@ public class GameInput : MonoBehaviour
       float prevDist = (p0Prev - p1Prev).magnitude;
       float currDist = (t0.position - t1.position).magnitude;
 
-      OnPinch?.Invoke(currDist - prevDist);
+      OnPinchZoom?.Invoke(currDist - prevDist);
       return;
     }
 
-    // SINGLE TOUCH
     if (Input.touchCount == 1)
     {
       Touch touch = Input.GetTouch(0);
 
-      // Ignore tock if it started under UI
+      // Ignore interaction if it started under UI.
       if (blockedFingerId.HasValue && touch.fingerId == blockedFingerId.Value)
       {
         if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
@@ -105,49 +103,42 @@ public class GameInput : MonoBehaviour
           }
 
           blockedFingerId = null;
-          dragging = false;
+          panning = false;
           accumMovement = 0f;
-          startPos = lastTouchPos = touch.position;
+          startPos = lastPressPos = touch.position;
           startTime = Time.unscaledTime;
 
-          OnTouchBegan?.Invoke(touch.position);
+          OnPressBegan?.Invoke(touch.position);
           break;
 
         case TouchPhase.Moved:
           if (blockedFingerId.HasValue) break;
 
-          Vector2 delta = touch.position - lastTouchPos;
-          lastTouchPos = touch.position;
+          Vector2 delta = touch.position - lastPressPos;
+          lastPressPos = touch.position;
 
-          OnTouchMoved?.Invoke(delta);
+          OnPressMoved?.Invoke(delta);
 
-          if (!dragging)
+          if (!panning)
           {
-            // Accumulate sum movement
-            float prevAccum = accumMovement;
             accumMovement += delta.magnitude;
 
-            if (accumMovement >= swipeDeadZonePx)
+            if (accumMovement >= panDeadZonePx)
             {
-              // Enter drag: invoke OnDragStart and first delta -
-              // surplus over the threshold toward the current sum
-              dragging = true;
-              OnDragStart?.Invoke();
+              panning = true;
+              OnPanStart?.Invoke();
 
-              float overshoot = accumMovement - swipeDeadZonePx;
+              float overshoot = accumMovement - panDeadZonePx;
               if (overshoot > 0f)
               {
-                // Direction - to the currend delta vector (suffucient for UX)
                 Vector2 effective = delta.normalized * overshoot;
-                OnSwipe?.Invoke(effective, touch.position);
+                OnPan?.Invoke(effective, touch.position);
               }
             }
-            // Otherwise do nothing until threshold is reached 
           }
           else
           {
-            // Already during dragging - send delta as it is
-            OnSwipe?.Invoke(delta, touch.position);
+            OnPan?.Invoke(delta, touch.position);
           }
           break;
 
@@ -155,22 +146,21 @@ public class GameInput : MonoBehaviour
         case TouchPhase.Canceled:
           if (blockedFingerId.HasValue) { blockedFingerId = null; break; }
 
-          if (dragging)
+          if (panning)
           {
-            OnDragEnd?.Invoke();
-            // Do not interprete as Tap
+            OnPanEnd?.Invoke();
           }
           else if (!pinchInProgress)
           {
             float duration = Time.unscaledTime - startTime;
             float moved = (touch.position - startPos).magnitude;
-            if (duration <= tapMaxDuration && moved <= swipeDeadZonePx)
-              OnTap?.Invoke(touch.position);
+            if (duration <= selectMaxDuration && moved <= panDeadZonePx)
+              OnSelect?.Invoke(touch.position);
             else
-              OnTouchEnded?.Invoke(touch.position); 
+              OnPressEnded?.Invoke(touch.position);
           }
 
-          dragging = false;
+          panning = false;
           pinchInProgress = false;
           accumMovement = 0f;
           break;
@@ -184,7 +174,7 @@ public class GameInput : MonoBehaviour
 
     float scrollDelta = Input.mouseScrollDelta.y;
     if (Mathf.Abs(scrollDelta) > Mathf.Epsilon && !IsMouseOverUI())
-      OnMouseWheelZoom?.Invoke(scrollDelta);
+      OnScrollZoom?.Invoke(scrollDelta);
 
     if (Input.GetMouseButtonDown(1))
     {
@@ -211,7 +201,7 @@ public class GameInput : MonoBehaviour
       if (rightDelta.sqrMagnitude > 0f)
       {
         lastRightMousePos = mousePos;
-        OnMouseRotateDrag?.Invoke(rightDelta.x);
+        OnOrbitDrag?.Invoke(rightDelta.x);
       }
     }
 
@@ -228,11 +218,11 @@ public class GameInput : MonoBehaviour
       }
 
       blockedMouse = false;
-      dragging = false;
+      panning = false;
       accumMovement = 0f;
-      startPos = lastTouchPos = mousePos;
+      startPos = lastPressPos = mousePos;
       startTime = Time.unscaledTime;
-      OnTouchBegan?.Invoke(mousePos);
+      OnPressBegan?.Invoke(mousePos);
       return;
     }
 
@@ -245,32 +235,32 @@ public class GameInput : MonoBehaviour
 
     if (Input.GetMouseButton(0))
     {
-      Vector2 delta = mousePos - lastTouchPos;
+      Vector2 delta = mousePos - lastPressPos;
       if (delta.sqrMagnitude <= 0f)
         return;
 
-      lastTouchPos = mousePos;
-      OnTouchMoved?.Invoke(delta);
+      lastPressPos = mousePos;
+      OnPressMoved?.Invoke(delta);
 
-      if (!dragging)
+      if (!panning)
       {
         accumMovement += delta.magnitude;
-        if (accumMovement >= swipeDeadZonePx)
+        if (accumMovement >= panDeadZonePx)
         {
-          dragging = true;
-          OnDragStart?.Invoke();
+          panning = true;
+          OnPanStart?.Invoke();
 
-          float overshoot = accumMovement - swipeDeadZonePx;
+          float overshoot = accumMovement - panDeadZonePx;
           if (overshoot > 0f)
           {
             Vector2 effective = delta.normalized * overshoot;
-            OnSwipe?.Invoke(effective, mousePos);
+            OnPan?.Invoke(effective, mousePos);
           }
         }
       }
       else
       {
-        OnSwipe?.Invoke(delta, mousePos);
+        OnPan?.Invoke(delta, mousePos);
       }
 
       return;
@@ -278,21 +268,21 @@ public class GameInput : MonoBehaviour
 
     if (Input.GetMouseButtonUp(0))
     {
-      if (dragging)
+      if (panning)
       {
-        OnDragEnd?.Invoke();
+        OnPanEnd?.Invoke();
       }
       else if (!pinchInProgress)
       {
         float duration = Time.unscaledTime - startTime;
         float moved = (mousePos - startPos).magnitude;
-        if (duration <= tapMaxDuration && moved <= swipeDeadZonePx)
-          OnTap?.Invoke(mousePos);
+        if (duration <= selectMaxDuration && moved <= panDeadZonePx)
+          OnSelect?.Invoke(mousePos);
         else
-          OnTouchEnded?.Invoke(mousePos);
+          OnPressEnded?.Invoke(mousePos);
       }
 
-      dragging = false;
+      panning = false;
       pinchInProgress = false;
       accumMovement = 0f;
     }

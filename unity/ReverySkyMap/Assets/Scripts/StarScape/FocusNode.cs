@@ -15,10 +15,10 @@ public class FocusNode : MonoBehaviour
 
   private void Start()
   {
-    GameInput.Instance.OnTap += HandleTouch;
+    GameInput.Instance.OnSelect += HandleSelect;
   }
 
-  private void HandleTouch(Vector2 screenPosition)
+  private void HandleSelect(Vector2 screenPosition)
   {
     Ray ray = Camera.main.ScreenPointToRay(screenPosition);
     bool isHit = Physics.Raycast(

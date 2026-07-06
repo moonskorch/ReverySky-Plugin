@@ -488,10 +488,10 @@ MonoBehaviour:
   zMax: 50
   followLerp: 7
   pinchZoomSensitivity: 0.0015
-  mouseWheelZoomSensitivity: 0.08
+  scrollZoomSensitivity: 0.08
   rotateLerp: 7
   rotateSpeedDegrees: 90
-  mouseRotateSensitivity: 0.15
+  orbitDragSensitivity: 0.15
   pivotFollowEps: 0.002
   pivotFollowLerp: 12
   pivotFollowMaxSpeed: 6
@@ -757,8 +757,8 @@ MonoBehaviour:
   interactableLayers:
     serializedVersion: 2
     m_Bits: 1
-  tapMaxDuration: 0.25
-  swipeDeadZonePx: 12
+  selectMaxDuration: 0.25
+  panDeadZonePx: 12
 --- !u!4 &523709432
 Transform:
   m_ObjectHideFlags: 0
@@ -2532,7 +2532,7 @@ MonoBehaviour:
   injectSampleData: 0
   connectionModel: 2
   islands: 0
-  noteCount: 10000
+  noteCount: 2500
   tagPoolSize: 600
   dateSpanDays: 365
   maxTagsPerNote: 4
