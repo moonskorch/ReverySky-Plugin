@@ -97,6 +97,15 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   [SerializeField, Min(1f)] private float clusterGuardDistanceFactor = 3.6f;
   [SerializeField, Min(1f)] private float rootGuardDistanceFactor = 5.0f;
   [SerializeField, Range(8, 8192)] private int maxSeparationChecksPerNode = 180;
+  // Kept separate from broader separation so evals can test pure node spacing
+  // without changing hub placement, link lengths, or cluster/root guards.
+  [SerializeField] private bool useHardNodeSpacing = true;
+  [SerializeField, Range(0, 8)] private int hardNodeSpacingPassesPerRefinement = 1;
+  [Tooltip("Forbidden radius around each node center. Center-to-center spacing targets twice this value.")]
+  [SerializeField, Min(0f)] private float hardNodeSpacingRadius = 1f;
+  [SerializeField, Range(0f, 1f)] private float hardNodeSpacingProjectionStrength = 1f;
+  [Tooltip("Caps local collision checks per node for dense 10K maps. 0 means unlimited.")]
+  [SerializeField, Range(0, 8192)] private int maxHardNodeSpacingChecksPerNode = 256;
 
   [Header("Visual")]
   [SerializeField, Min(0.01f)] private float tagScale = 0.7f;
@@ -138,6 +147,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   private long _frontierPushes;
   private long _frontierPops;
   private long _separationPairChecks;
+  private long _hardSpacingPairChecks;
   private bool _constructionActive;
   private bool _animateConstruction;
   private bool _animateRefinement;
@@ -413,9 +423,11 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
     if (_remainingRefinementPasses == 0)
     {
+      UpdateNavigationRadius();
       UnityEngine.Debug.Log(
         $"[RecursiveHubs] Refinement completed passes={_completedRefinementPasses}, " +
-        $"separationChecks={_separationPairChecks}, navigationRadius={_navigationRadius:F1}");
+        $"separationChecks={_separationPairChecks}, hardSpacingChecks={_hardSpacingPairChecks}, " +
+        $"navigationRadius={_navigationRadius:F1}");
       MapRuntimeContext.RequestGraphReady();
     }
   }
@@ -621,6 +633,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     _frontierPushes = 0;
     _frontierPops = 0;
     _separationPairChecks = 0;
+    _hardSpacingPairChecks = 0;
     _constructionActive = false;
     _nextPlacementSequence = 0;
     _layoutCenter = Vector3.zero;
@@ -1418,6 +1431,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
       UpdateVisualPositions();
       _remainingRefinementPasses = 0;
+      UpdateNavigationRadius();
     }
 
     UnityEngine.Debug.Log(
@@ -1443,6 +1457,12 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
     ApplyLinkContractionCorrections();
     ApplyCorrections();
+
+    if (useHardNodeSpacing)
+    {
+      for (int pass = 0; pass < hardNodeSpacingPassesPerRefinement; pass++)
+        ApplyHardNodeSpacingPass();
+    }
 
     for (int pass = 0; pass < separationPassesPerRefinement; pass++)
       ApplySeparationPass();
@@ -1560,6 +1580,87 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     }
 
     ApplyCorrections();
+  }
+
+  private void ApplyHardNodeSpacingPass()
+  {
+    // This is a collision-style projection, not a force: it only resolves
+    // forbidden center spacing and leaves link geometry decisions elsewhere.
+    float desiredDistance = Mathf.Max(0f, hardNodeSpacingRadius) * 2f;
+    if (desiredDistance <= 0f || hardNodeSpacingProjectionStrength <= 0f)
+      return;
+
+    BuildSeparationGrid(desiredDistance);
+
+    for (int nodeIndex = 0; nodeIndex < _nodes.Count; nodeIndex++)
+    {
+      var node = _nodes[nodeIndex];
+      Vector3Int origin = ToCell(node.LocalPosition, desiredDistance);
+      int checks = 0;
+      bool hasCheckLimit = maxHardNodeSpacingChecksPerNode > 0;
+
+      for (int x = -1; x <= 1 && (!hasCheckLimit || checks < maxHardNodeSpacingChecksPerNode); x++)
+        for (int y = -1; y <= 1 && (!hasCheckLimit || checks < maxHardNodeSpacingChecksPerNode); y++)
+          for (int z = -1; z <= 1 && (!hasCheckLimit || checks < maxHardNodeSpacingChecksPerNode); z++)
+          {
+            if (!_separationGrid.TryGetValue(origin + new Vector3Int(x, y, z), out var bucket))
+              continue;
+
+            for (int bucketOffset = 0;
+                 bucketOffset < bucket.Count && (!hasCheckLimit || checks < maxHardNodeSpacingChecksPerNode);
+                 bucketOffset++)
+            {
+              int otherIndex = bucket[bucketOffset];
+              if (otherIndex <= nodeIndex)
+                continue;
+
+              checks++;
+              _hardSpacingPairChecks++;
+              ApplyHardNodeSpacingPair(nodeIndex, otherIndex, desiredDistance);
+            }
+          }
+    }
+  }
+
+  private void ApplyHardNodeSpacingPair(int nodeIndex, int otherIndex, float desiredDistance)
+  {
+    var node = _nodes[nodeIndex];
+    var other = _nodes[otherIndex];
+
+    Vector3 delta = other.LocalPosition - node.LocalPosition;
+    float distanceSqr = delta.sqrMagnitude;
+    float desiredDistanceSqr = desiredDistance * desiredDistance;
+
+    if (distanceSqr >= desiredDistanceSqr)
+      return;
+
+    Vector3 direction;
+    float distance;
+
+    if (distanceSqr <= MIN_SQR_DISTANCE)
+    {
+      direction = StablePairDirection(nodeIndex, otherIndex, 907);
+      distance = 0f;
+    }
+    else
+    {
+      distance = Mathf.Sqrt(distanceSqr);
+      direction = delta / distance;
+    }
+
+    float projection = (desiredDistance - distance) *
+      Mathf.Clamp01(hardNodeSpacingProjectionStrength);
+    if (projection <= 0f)
+      return;
+
+    float nodeMobility = NodeMobility(node);
+    float otherMobility = NodeMobility(other);
+    float mobilitySum = nodeMobility + otherMobility;
+    if (mobilitySum <= 0f)
+      return;
+
+    _nodes[nodeIndex].LocalPosition -= direction * (projection * (nodeMobility / mobilitySum));
+    _nodes[otherIndex].LocalPosition += direction * (projection * (otherMobility / mobilitySum));
   }
 
   private void ApplyPairSeparation(

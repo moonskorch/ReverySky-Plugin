@@ -1,7 +1,7 @@
 # Cartographer Engine Eval Journal
 
 Status: active
-Last updated: 2026-06-12
+Last updated: 2026-07-06
 
 ## Theme
 
@@ -203,9 +203,58 @@ Missing or not yet standardized:
 
 ## Recent Changes
 
+- 2026-07-06: Recorded owner verdict that the isolated hard node spacing
+  constraint is a successful RecursiveHubs space-preservation step so far. The
+  useful comparison is with old separation disabled, not with both systems
+  running together.
 - 2026-06-12: Recorded owner verdict that RecursiveHubs is the accepted
   medium-and-large-map direction. `Engine_RecursiveHubs_v6` is the current
   baseline in that family. Continue tuning within RecursiveHubs instead of
   comparing it against Barnes or macro candidates as the main line.
 - 2026-06-11: Created the journal from current source comments and scene/docs
   inspection. No engine code or engine comments were changed.
+
+## RecursiveHubs space-preservation workstream
+
+Goal: preserve the spatial air created by RecursiveHubs initial placement while
+preventing later link refinement from pulling hub systems into unreadable knots.
+
+- Complex orbital rewrite:
+  - Concept: turn RecursiveHubs into an orbital layout where hubs reserve shells
+    and link refinement cannot collapse those shells.
+  - Technique: changed initial placement through `CalculatePreferredChildPosition`,
+    changed rest-length behavior through `ResolveRestLength`, adjusted contraction
+    strength, added radial shell clamping, and demoted separation to emergency
+    fallback in one combined pass.
+  - Result: rejected and reverted. Some very large hub cases improved, but
+    smaller/live maps regressed with long sticks, crescent-like hub shells, dense
+    unreadable local piles, and loss of the wider starfield feel.
+- Degree-aware link weighting and contraction multipliers:
+  - Concept: make high-degree or hub-like links pull less aggressively so link
+    refinement does not drag a hub system into a knot.
+  - Technique: experimented around `ResolveRestLength` and
+    `ApplyLinkContractionCorrections`, including endpoint-degree/link-category
+    scaling and exposed contraction multipliers.
+  - Result: rejected as the main answer. The changes mostly affected convergence
+    speed or target length, not true spacing. Low pull left unresolved long links;
+    high pull returned toward collapse; the parameter surface became too noisy.
+- First hard space control:
+  - Concept: protect node space directly, regardless of graph links, so unrelated
+    nodes cannot occupy the same visual area.
+  - Technique: used a spatial-grid projection after refinement passes, with
+    editor-facing controls for enablement, pass count, distance factor, and
+    projection strength.
+  - Result: rejected in that form. One pass could spread the outer mass while
+    dense center overlaps remained, and more passes looked likely to raise the
+    same cost concerns as continuous separation.
+- Clean hard node spacing:
+  - Concept: isolate the spacing idea from all hub/orbital/link changes and only
+    enforce a forbidden radius around each node center.
+  - Technique: added a spatial-grid projection after link contraction, with
+    editor-facing controls for enablement, pass count, node spacing radius,
+    projection strength, and per-node check cap. It does not change initial
+    placement, rest lengths, link weights, or hub role rules.
+  - Result: current successful owner verdict. With old separation disabled, hard
+    node spacing enabled, radius near 1, and one hard-spacing pass per refinement
+    pass, live maps no longer show glued node piles, including link-saturated
+    maps and single-hub cases.
