@@ -45,6 +45,7 @@ public class Cartographer : MonoBehaviour
   private ICartographerEngine _datesEngine;
   private ICartographerEngine _scalableLinksEngine;
   private ICartographerEngine _activeEngine;
+  private ScapeCameraWarper _activeWarper;
 
   public ICartographerEngine ActiveEngine => _activeEngine;
   public ICartographerEngine StaticSlotEngine => _scalableLinksEngine;
@@ -89,12 +90,17 @@ public class Cartographer : MonoBehaviour
 
     if (_activeEngine != null)
       _activeEngine.OnNodesChanged -= HandleEngineNodesChanged;
+
+    BindActiveWarper(null);
   }
 
   private void Update()
   {
     if (_activeEngine != null && _activeEngine.RequiresTick)
+    {
       _activeEngine.Tick(Time.deltaTime);
+      cullingManager?.RefreshTargets();
+    }
   }
 
   private void RebuildGraph(MapLayoutMode layoutPreference)
@@ -169,12 +175,14 @@ public class Cartographer : MonoBehaviour
     if (_activeEngine != null && _activeEngine != next) 
     {
       _activeEngine.OnNodesChanged -= HandleEngineNodesChanged;
+      BindActiveWarper(null);
       _activeEngine.ClearGraph();
       OnEngineChanged?.Invoke(next.EngineType);
     }
 
     _activeEngine = next;
     _activeEngine.OnNodesChanged += HandleEngineNodesChanged;
+    BindActiveWarper(_activeEngine.ScapeWarper);
   }
 
   private void CycleView()
@@ -270,6 +278,25 @@ public class Cartographer : MonoBehaviour
   private void HandleRuntimeNotesChanged()
   {
     RebuildGraph(MapRuntimeContext.MapLayoutPreference);
+  }
+
+  private void BindActiveWarper(ScapeCameraWarper warper)
+  {
+    if (_activeWarper == warper)
+      return;
+
+    if (_activeWarper != null)
+      _activeWarper.OnWarpApplied -= HandleWarpApplied;
+
+    _activeWarper = warper;
+
+    if (_activeWarper != null)
+      _activeWarper.OnWarpApplied += HandleWarpApplied;
+  }
+
+  private void HandleWarpApplied()
+  {
+    cullingManager?.RefreshTargets();
   }
 
   private void HandleEngineNodesChanged(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes)

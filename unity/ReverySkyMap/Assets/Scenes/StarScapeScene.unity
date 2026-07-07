@@ -2783,8 +2783,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   targetCamera: {fileID: 330585545}
   requireCameraFrustumVisibility: 1
-  refreshBoundsInLateUpdate: 1
-  boundsRefreshInterval: 0
 --- !u!224 &1901072594 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 1272032575063817357, guid: 8c7833d75763f3b429f96a0a42210b15, type: 3}

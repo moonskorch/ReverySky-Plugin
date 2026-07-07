@@ -1438,13 +1438,13 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   {
     _constructionActive = false;
     InstantiatePlacedNodesWithoutVisuals();
-    PublishVisualNodesChanged();
-    Cartographer.I?.FocusRuntimeNote(MapRuntimeContext.PendingFocusNoteId);
     UpdateNavigationRadius();
 
     if (_animateRefinement)
     {
       _remainingRefinementPasses = _resolvedLinkRefinementPasses;
+      PublishVisualNodesChanged();
+      Cartographer.I?.FocusRuntimeNote(MapRuntimeContext.PendingFocusNoteId);
     }
     else
     {
@@ -1457,6 +1457,8 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       UpdateVisualPositions();
       _remainingRefinementPasses = 0;
       UpdateNavigationRadius();
+      PublishVisualNodesChanged();
+      Cartographer.I?.FocusRuntimeNote(MapRuntimeContext.PendingFocusNoteId);
     }
 
     UnityEngine.Debug.Log(

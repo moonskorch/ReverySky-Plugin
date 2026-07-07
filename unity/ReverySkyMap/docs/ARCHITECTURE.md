@@ -99,9 +99,10 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 1. `Cartographer.HandleEngineNodesChanged(...)` receives the rebuilt `Star` and `TagNode` lists from the active engine, then forwards them with the active engine's line budgets to `LineBuilder.Rebuild(...)`.
 2. `LineBuilder.Rebuild(...)` stores the new limits, clears active line renderers and cached state, resizes its `ObjectPool<LineRenderer>`, registers the graph nodes, and creates candidate note-note edges from `MapRuntimeContext.Links` plus note-tag edges from each star's `TagIds`.
 3. `CullingManager.Rebuild(stars, tagNodes, lineBuilder)` scans the same physical nodes and asks each `ICullingConsumer` for an `Entry`; `LineBuilder.TryCreateDistanceEntry(...)` provides one consumer-specific culling rule per registered graph node.
-4. When `CullingGroup` changes a node's visibility, `CullingManager` calls `LineBuilder.SetDistanceVisible(...)`, which updates the visible-node set and marks the edge set dirty.
-5. `LineBuilder.LateUpdate()` applies the focused-node priority, keeps recently visible regions within a refresh budget, reconciles the desired edge set against the pooled renderers, and rewrites each active line's endpoints from the live transforms.
-6. `Cartographer.CycleView()` calls `ApplyLineVisibility()`, so the current view only toggles whether the existing line renderers are shown; it does not rebuild the candidate edge set.
+4. `Cartographer.Update()` refreshes culling targets after ticking moving engines, and `ScapeCameraWarper.OnWarpApplied` refreshes them after 2.5D warp movement; static layouts do not refresh bounds every frame.
+5. When `CullingGroup` changes a node's visibility, `CullingManager` calls `LineBuilder.SetDistanceVisible(...)`, which updates the visible-node set and marks the edge set dirty.
+6. `LineBuilder.LateUpdate()` applies the focused-node priority, keeps recently visible regions within a refresh budget, reconciles the desired edge set against the pooled renderers, and rewrites each active line's endpoints from the live transforms.
+7. `Cartographer.CycleView()` calls `ApplyLineVisibility()`, so the current view only toggles whether the existing line renderers are shown; it does not rebuild the candidate edge set.
 
 ## Subsystems
 
@@ -181,8 +182,8 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Calls / sends to: `CullingManager`, `MapRuntimeContext.Links`, `FocusNode`, `LineRenderer`
 - `CullingManager`
   - Responsibility: shares one `CullingGroup` across graph-node consumers and dispatches visibility changes only when a threshold actually changes.
-  - Code anchor: `Assets/Scripts/StarScape/CullingManager.cs::Rebuild`, `Register`, `ApplyTargetVisibility`
-  - Entry point: `Cartographer.HandleEngineNodesChanged`, `LineBuilder.Rebuild`
+  - Code anchor: `Assets/Scripts/StarScape/CullingManager.cs::Rebuild`, `Register`, `RefreshTargets`, `ApplyTargetVisibility`
+  - Entry point: `Cartographer.HandleEngineNodesChanged`, `Cartographer.Update`, `ScapeCameraWarper.OnWarpApplied`, `LineBuilder.Rebuild`
   - Calls / sends to: `LineBuilder`, `LabelCullingTarget`, `BehaviourCullingTarget`
 - `ICullingConsumer` and prefab culling targets
   - Responsibility: define the distance-visibility contract used by graph-level consumers such as `LineBuilder`, `LabelCullingTarget`, and `BehaviourCullingTarget`.
@@ -239,7 +240,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 - RecursiveHubs space preservation is owned by the engine, not by Unity physics. The engine applies a deterministic spatial-grid node-spacing projection during refinement, after link contraction, and caps per-node collision checks for dense maps.
 - `ScapeCameraWarper` owns the 2.5D warp state and only participates when the active engine is `Static25D`.
 - `StarSO` recomputes note-length scale buckets whenever `MapRuntimeContext.NotesVersion` changes.
-- `CullingManager` owns the shared `CullingGroup` and threshold transitions for graph nodes. Runtime tracking is split into `NodeTarget` and `Interest`: a `NodeTarget` is one physical graph node and one culling sphere, while each `Interest` is one consumer-specific distance rule and last visibility state.
+- `CullingManager` owns the shared `CullingGroup` and threshold transitions for graph nodes. Runtime tracking is split into `NodeTarget` and `Interest`: a `NodeTarget` is one physical graph node and one culling sphere, while each `Interest` is one consumer-specific distance rule and last visibility state. Bounds refreshes are explicit after engine ticks and warp application, not a standalone every-frame manager loop.
 - `ICullingConsumer` is the prefab-side contract for distance-driven behavior. A consumer describes its own `Entry` request and receives `SetDistanceVisible(node, visible)` only for first application or real threshold changes. Current consumers are `LabelCullingTarget` for label roots and `BehaviourCullingTarget` for one serialized `Behaviour`.
 - `GameInput` treats UI hits as blocked input and only forwards gestures that originate on the map.
 - Bridge contract rules that matter locally:

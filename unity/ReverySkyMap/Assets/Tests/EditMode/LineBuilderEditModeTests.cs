@@ -836,3 +836,233 @@ public class LineBuilderEditModeTests
     }
   }
 }
+
+public class CullingRefreshEditModeTests
+{
+  [Test]
+  public void RefreshTargets_ReevaluatesMovedNode()
+  {
+    using var scope = new CullingRefreshScope();
+
+    scope.Manager.Register(scope.Node, scope.Node.transform, scope.Consumer, 0.5f, 5f);
+    scope.Manager.RefreshTargets();
+    AssertPositionsEqual(GetFirstBoundingSpherePosition(scope.Manager), scope.Node.transform.position);
+
+    scope.Node.transform.position = new Vector3(0f, 0f, 20f);
+    AssertPositionsNotEqual(GetFirstBoundingSpherePosition(scope.Manager), scope.Node.transform.position);
+
+    scope.Manager.RefreshTargets();
+    AssertPositionsEqual(GetFirstBoundingSpherePosition(scope.Manager), scope.Node.transform.position);
+  }
+
+  [Test]
+  public void CartographerUpdate_TickingEngineRefreshesCullingTargets()
+  {
+    using var scope = new CullingRefreshScope();
+    var cartographerObject = new GameObject("CullingRefreshEditModeTests_Cartographer");
+
+    try
+    {
+      var cartographer = cartographerObject.AddComponent<Cartographer>();
+      var engine = new TickOnlyEngine();
+
+      SetPrivateField(cartographer, "_activeEngine", engine);
+      SetPrivateField(cartographer, "cullingManager", scope.Manager);
+
+      scope.Manager.Register(scope.Node, scope.Node.transform, scope.Consumer, 0.5f, 5f);
+      scope.Manager.RefreshTargets();
+
+      scope.Node.transform.position = new Vector3(0f, 0f, 20f);
+      AssertPositionsNotEqual(GetFirstBoundingSpherePosition(scope.Manager), scope.Node.transform.position);
+      InvokePrivate(cartographer, "Update");
+
+      Assert.That(engine.TickCount, Is.EqualTo(1));
+      AssertPositionsEqual(GetFirstBoundingSpherePosition(scope.Manager), scope.Node.transform.position);
+    }
+    finally
+    {
+      Object.DestroyImmediate(cartographerObject);
+    }
+  }
+
+  [Test]
+  public void ScapeCameraWarper_RaisesOnWarpAppliedAfterRebindAndCameraDrivenWarp()
+  {
+    var cameraObject = new GameObject("CullingRefreshEditModeTests_WarperCamera");
+    var layoutObject = new GameObject("CullingRefreshEditModeTests_WarperLayout");
+    var warperObject = new GameObject("CullingRefreshEditModeTests_Warper");
+    var starObject = new GameObject("CullingRefreshEditModeTests_WarperStar");
+
+    try
+    {
+      var camera = cameraObject.AddComponent<Camera>();
+      camera.transform.position = new Vector3(0f, 0f, -10f);
+
+      var star = starObject.AddComponent<Star>();
+      star.transform.position = new Vector3(3f, 0f, 20f);
+
+      var warper = warperObject.AddComponent<ScapeCameraWarper>();
+      SetPrivateField(warper, "cam", camera);
+      SetPrivateField(warper, "layoutParent", layoutObject.transform);
+      SetPrivateField(warper, "maxHzWhileMoving", 0f);
+
+      int warpAppliedCount = 0;
+      warper.OnWarpApplied += () => warpAppliedCount++;
+
+      warper.Rebind(new StaticStarsEngine(new List<Star> { star }));
+      Assert.That(warpAppliedCount, Is.EqualTo(1));
+
+      camera.transform.position = new Vector3(0f, 0f, -8f);
+      InvokePrivate(warper, "LateUpdate");
+
+      Assert.That(warpAppliedCount, Is.EqualTo(2));
+    }
+    finally
+    {
+      Object.DestroyImmediate(cameraObject);
+      Object.DestroyImmediate(layoutObject);
+      Object.DestroyImmediate(warperObject);
+      Object.DestroyImmediate(starObject);
+    }
+  }
+
+  private static void SetPrivateField(object target, string fieldName, object value)
+  {
+    FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(field, Is.Not.Null, $"Missing field {fieldName}.");
+    field.SetValue(target, value);
+  }
+
+  private static void InvokePrivate(object target, string methodName)
+  {
+    MethodInfo method = target.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(method, Is.Not.Null, $"Missing method {methodName}.");
+    method.Invoke(target, null);
+  }
+
+  private static Vector3 GetFirstBoundingSpherePosition(CullingManager manager)
+  {
+    FieldInfo field = typeof(CullingManager).GetField("boundingSpheres", BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(field, Is.Not.Null, "Missing field boundingSpheres.");
+
+    var spheres = (BoundingSphere[])field.GetValue(manager);
+    Assert.That(spheres, Has.Length.GreaterThan(0));
+    return spheres[0].position;
+  }
+
+  private static void AssertPositionsEqual(Vector3 actual, Vector3 expected)
+  {
+    Assert.That((actual - expected).sqrMagnitude, Is.LessThanOrEqualTo(0.000001f),
+      $"Expected positions to match. actual={actual}, expected={expected}");
+  }
+
+  private static void AssertPositionsNotEqual(Vector3 actual, Vector3 expected)
+  {
+    Assert.That((actual - expected).sqrMagnitude, Is.GreaterThan(0.000001f),
+      $"Expected positions to differ. actual={actual}, expected={expected}");
+  }
+
+  private sealed class CullingRefreshScope : System.IDisposable
+  {
+    private readonly GameObject cameraObject;
+    private readonly GameObject managerObject;
+    private readonly GameObject nodeObject;
+
+    public CullingManager Manager { get; }
+    public TestCullingConsumer Consumer { get; }
+    public Component Node => Consumer;
+
+    public CullingRefreshScope()
+    {
+      cameraObject = new GameObject("CullingRefreshEditModeTests_Camera");
+      Camera camera = cameraObject.AddComponent<Camera>();
+      camera.transform.position = Vector3.zero;
+
+      managerObject = new GameObject("CullingRefreshEditModeTests_Manager");
+      Manager = managerObject.AddComponent<CullingManager>();
+      SetPrivateField(Manager, "targetCamera", camera);
+      SetPrivateField(Manager, "requireCameraFrustumVisibility", false);
+
+      nodeObject = new GameObject("CullingRefreshEditModeTests_Node");
+      Consumer = nodeObject.AddComponent<TestCullingConsumer>();
+      nodeObject.transform.position = new Vector3(0f, 0f, 1f);
+    }
+
+    public void Dispose()
+    {
+      Object.DestroyImmediate(nodeObject);
+      Object.DestroyImmediate(managerObject);
+      Object.DestroyImmediate(cameraObject);
+    }
+  }
+
+  private sealed class TestCullingConsumer : MonoBehaviour, ICullingConsumer
+  {
+    public bool LastVisible { get; private set; }
+
+    public bool TryCreateDistanceEntry(Component node, out CullingManager.Entry entry)
+    {
+      entry = new CullingManager.Entry
+      {
+        node = node,
+        referenceTransform = transform,
+        consumer = this,
+        radius = 0.5f,
+        visibleDistance = 5f
+      };
+
+      return true;
+    }
+
+    public void SetDistanceVisible(Component node, bool visible)
+    {
+      LastVisible = visible;
+    }
+  }
+
+  private sealed class TickOnlyEngine : ICartographerEngine
+  {
+    public int TickCount { get; private set; }
+    public MapLayoutMode EngineType => MapLayoutMode.DynamicLinks;
+    public int MaxActiveLines => 0;
+    public int MaxActiveLongLines => 0;
+    public bool RequiresTick => true;
+    public float BoundRadius => 1f;
+    public Vector3 Pivot => Vector3.zero;
+    public ScapeCameraWarper ScapeWarper => null;
+    public IReadOnlyList<Star> Stars => System.Array.Empty<Star>();
+    public IReadOnlyList<TagNode> TagNodes => System.Array.Empty<TagNode>();
+    public event System.Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnNodesChanged;
+
+    public void BuildGraph(List<NoteData> notes) { }
+    public void ClearGraph() { }
+    public void Tick(float dt) => TickCount++;
+    public void ApplyView(ScapeView view) { }
+    public Star FindStarByNoteId(string noteId) => null;
+  }
+
+  private sealed class StaticStarsEngine : ICartographerEngine
+  {
+    public StaticStarsEngine(IReadOnlyList<Star> stars)
+    {
+      Stars = stars;
+    }
+
+    public MapLayoutMode EngineType => MapLayoutMode.Dates;
+    public int MaxActiveLines => 0;
+    public int MaxActiveLongLines => 0;
+    public bool RequiresTick => false;
+    public float BoundRadius => 1f;
+    public Vector3 Pivot => Vector3.zero;
+    public ScapeCameraWarper ScapeWarper => null;
+    public IReadOnlyList<Star> Stars { get; }
+    public IReadOnlyList<TagNode> TagNodes => System.Array.Empty<TagNode>();
+    public event System.Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnNodesChanged;
+
+    public void BuildGraph(List<NoteData> notes) { }
+    public void ClearGraph() { }
+    public void Tick(float dt) { }
+    public void ApplyView(ScapeView view) { }
+    public Star FindStarByNoteId(string noteId) => null;
+  }
+}

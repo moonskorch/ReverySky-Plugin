@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public sealed class ScapeCameraWarper : MonoBehaviour
@@ -52,6 +53,8 @@ public sealed class ScapeCameraWarper : MonoBehaviour
 
   private Vector3 _tubeAxisWorld = Vector3.forward;
   private Vector3 _tubeOriginWorld = Vector3.zero;
+
+  public event Action OnWarpApplied;
 
   public void ApplyEngineProfile(MapLayoutMode engineType)
   {
@@ -212,6 +215,7 @@ public sealed class ScapeCameraWarper : MonoBehaviour
     }
 
     SnapshotCamera();
+    OnWarpApplied?.Invoke();
   }
 
   private void ComputeTubeAxisAndOrigin()
@@ -245,33 +249,6 @@ public sealed class ScapeCameraWarper : MonoBehaviour
     _lastCamPos = ct.position;
     _lastCamRot = ct.rotation;
     _lastFov = cam.fieldOfView;
-  }
-
-  public void ApplyBaseNow()
-  {
-    if (_count <= 0 || _trs == null) return;
-
-    for (int i = 0; i < _count; i++)
-    {
-      var tr = _trs[i];
-      if (!tr) continue;
-
-      Vector3 baseWorld = layoutParent
-        ? layoutParent.TransformPoint(_baseLocal[i])
-        : _baseLocal[i];
-
-      tr.position = baseWorld;
-    }
-
-    // Next LateUpdate will recalculate warp if needed
-    _dirty = true;
-  }
-
-  public void ApplyWarpNow()
-  {
-    if (_count <= 0 || _trs == null || !cam) return;
-    ApplyWarp();
-    _dirty = false;
   }
 
   public bool TryGetBaseWorld(Transform tr, out Vector3 baseWorld)

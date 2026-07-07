@@ -71,8 +71,6 @@ public sealed class CullingManager : MonoBehaviour
 
   [SerializeField] private Camera targetCamera;
   [SerializeField] private bool requireCameraFrustumVisibility = true;
-  [SerializeField] private bool refreshBoundsInLateUpdate = true;
-  [SerializeField, Min(0f)] private float boundsRefreshInterval = 0f;
 
   private readonly List<NodeTarget> nodeTargets = new();
   // Scratch list reused during batch rebuilds to avoid per-node GetComponents allocations.
@@ -80,7 +78,6 @@ public sealed class CullingManager : MonoBehaviour
   private BoundingSphere[] boundingSpheres = Array.Empty<BoundingSphere>();
   private float[] boundingDistances = Array.Empty<float>();
   private CullingGroup cullingGroup;
-  private float nextBoundsRefreshTime;
 
   private void Awake()
   {
@@ -92,19 +89,6 @@ public sealed class CullingManager : MonoBehaviour
     DisposeCullingGroup();
     if (Active == this)
       Active = null;
-  }
-
-  private void LateUpdate()
-  {
-    if (!refreshBoundsInLateUpdate || nodeTargets.Count == 0)
-      return;
-
-    if (Time.unscaledTime < nextBoundsRefreshTime)
-      return;
-
-    RefreshBoundingSpheres();
-    ApplyCurrentVisibility();
-    nextBoundsRefreshTime = Time.unscaledTime + boundsRefreshInterval;
   }
 
   public void Rebuild()
@@ -211,6 +195,15 @@ public sealed class CullingManager : MonoBehaviour
   {
     for (int i = 0; i < nodeTargets.Count; i++)
       RefreshBoundingSphere(i);
+  }
+
+  public void RefreshTargets()
+  {
+    if (nodeTargets.Count == 0)
+      return;
+
+    RefreshBoundingSpheres();
+    ApplyCurrentVisibility();
   }
 
   private void RefreshBoundingSphere(int index)
