@@ -12,7 +12,7 @@ It exists to make the experiment less dependent on ad hoc decisions while still
 preserving owner taste as the final authority for visual quality.
 
 Related state:
-- Living journal: `docs/CARTOGRAPHER_ENGINE_EVAL_JOURNAL.md`
+- Living journal: `docs/experiments/ENGINE_EXPERIMENTS.md`
 - Unity verification policy: `docs/VERIFICATION.md`
 - Runtime architecture: `docs/ARCHITECTURE.md`
 - Repo-local agent skill: `.codex/skills/cartographer-engine-eval/SKILL.md`
@@ -269,7 +269,7 @@ Start a new process checkpoint when:
 ## Journal Update Rules
 
 After every completed eval iteration, update
-`docs/CARTOGRAPHER_ENGINE_EVAL_JOURNAL.md`.
+`docs/experiments/ENGINE_EXPERIMENTS.md`.
 
 Record:
 - date;
