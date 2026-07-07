@@ -3,7 +3,6 @@ using UnityEngine;
 
 public class TagNodeVisual : MonoBehaviour
 {
-  [SerializeField] private TextureRenderer symbolRenderer;
   [SerializeField] private TagNode tagNode;
   [SerializeField] private TextMeshPro tagText;
 
@@ -19,7 +18,6 @@ public class TagNodeVisual : MonoBehaviour
 
   public void ResetVisual()
   {
-    symbolRenderer.ClearTexture();
     tagText.text = string.Empty;
   }
 
