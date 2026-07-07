@@ -15,16 +15,23 @@ MonoBehaviour:
   materials:
   - sphereType: 1
     material: {fileID: 2100000, guid: 002d6ce59c4a2b449a45d973bc1d2617, type: 2}
+    cheapMaterial: {fileID: 2100000, guid: cca7b9bcdab55cd4b952d9a65d5084a6, type: 2}
   - sphereType: 2
     material: {fileID: 2100000, guid: 1006d7b1adb8c2d4fa2b8f61ea53e179, type: 2}
+    cheapMaterial: {fileID: 2100000, guid: c94abecde2228394f86d2174639d6fb9, type: 2}
   - sphereType: 3
     material: {fileID: 2100000, guid: 2b86209eeb54d1d4da9475c9d3d3ce3c, type: 2}
+    cheapMaterial: {fileID: 2100000, guid: c94abecde2228394f86d2174639d6fb9, type: 2}
   - sphereType: 4
     material: {fileID: 2100000, guid: 48ee49e565d8c614fae2e42b52bada91, type: 2}
+    cheapMaterial: {fileID: 2100000, guid: c94abecde2228394f86d2174639d6fb9, type: 2}
   - sphereType: 5
     material: {fileID: 2100000, guid: acb875342fce1be48a5a959ee930dda8, type: 2}
+    cheapMaterial: {fileID: 2100000, guid: c94abecde2228394f86d2174639d6fb9, type: 2}
   - sphereType: 6
     material: {fileID: 2100000, guid: b65386336b9891b48bc18162efdb1294, type: 2}
+    cheapMaterial: {fileID: 2100000, guid: c94abecde2228394f86d2174639d6fb9, type: 2}
   - sphereType: 10
     material: {fileID: 2100000, guid: 980cb5c153b23ea49a55227b6a901d21, type: 2}
+    cheapMaterial: {fileID: 2100000, guid: c94abecde2228394f86d2174639d6fb9, type: 2}
   defaultMaterial: {fileID: 2100000, guid: 2aab6752a5df16f46b1afe6a56a6843c, type: 2}

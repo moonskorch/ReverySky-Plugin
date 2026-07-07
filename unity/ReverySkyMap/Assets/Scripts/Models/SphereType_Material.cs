@@ -6,4 +6,5 @@ public class SphereType_Material
 {
   public SphereType sphereType;
   public Material material;
+  public Material cheapMaterial;
 }

@@ -209,6 +209,7 @@ GameObject:
   - component: {fileID: 253107240935385}
   - component: {fileID: 6198472612096341011}
   - component: {fileID: 6198472612096341012}
+  - component: {fileID: 7540673056812639315}
   m_Layer: 0
   m_Name: Star
   m_TagString: Untagged
@@ -315,6 +316,22 @@ MonoBehaviour:
   behaviour: {fileID: 3648089529239117995}
   radius: 1
   visibleDistance: 35
+--- !u!114 &7540673056812639315
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7720539063730227376}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5bb85f2248c07234197253474994c2a1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::StarSphereMaterialLodCullingTarget
+  referenceTransform: {fileID: 4724834818725577822}
+  starVisual: {fileID: 464120534183017938}
+  radius: 1
+  richMaterialDistance: 10000
 --- !u!1001 &4008444007065997251
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -16,6 +16,9 @@ public class StarVisual : MonoBehaviour
   [SerializeField] private GameObject crystal;
 
   private Vector3 crystalCoreBaseScale = Vector3.one;
+  private SphereType_Material selectedSphereMaterial;
+  private string selectedSphereMaterialKey;
+  private bool useCheapSphereMaterial;
 
   private void Start()
   {
@@ -71,8 +74,50 @@ public class StarVisual : MonoBehaviour
     sphere.SetActive(show);
     if (!show) return;
 
-    var sphereMap = ResolveRandomSphereMaterial();
-    sphereRenderer.sharedMaterial = sphereMap?.material ?? sphereMaterialCatalog.defaultMaterial;
+    EnsureSelectedSphereMaterial();
+    ApplySphereMaterial();
+  }
+
+  public void SetSphereMaterialLod(bool useCheapMaterial)
+  {
+    if (useCheapSphereMaterial == useCheapMaterial)
+      return;
+
+    useCheapSphereMaterial = useCheapMaterial;
+    EnsureSelectedSphereMaterial();
+    ApplySphereMaterial();
+  }
+
+  private void EnsureSelectedSphereMaterial()
+  {
+    string stableKey = star.Data.Path ?? string.Empty;
+    if (selectedSphereMaterialKey == stableKey)
+      return;
+
+    selectedSphereMaterialKey = stableKey;
+    selectedSphereMaterial = ResolveRandomSphereMaterial(stableKey);
+  }
+
+  private void ApplySphereMaterial()
+  {
+    if (sphereRenderer == null)
+      return;
+
+    sphereRenderer.sharedMaterial = ResolveSphereMaterial();
+  }
+
+  private Material ResolveSphereMaterial()
+  {
+    if (selectedSphereMaterial != null)
+    {
+      if (useCheapSphereMaterial && selectedSphereMaterial.cheapMaterial != null)
+        return selectedSphereMaterial.cheapMaterial;
+
+      if (selectedSphereMaterial.material != null)
+        return selectedSphereMaterial.material;
+    }
+
+    return sphereMaterialCatalog != null ? sphereMaterialCatalog.defaultMaterial : null;
   }
 
   private void ShowCrystal(bool show)
@@ -85,8 +130,11 @@ public class StarVisual : MonoBehaviour
     crystalCore.localScale = crystalCoreBaseScale * scaleMultiplier;
   }
 
-  private SphereType_Material ResolveRandomSphereMaterial()
+  private SphereType_Material ResolveRandomSphereMaterial(string stableKey)
   {
+    if (sphereMaterialCatalog == null || sphereMaterialCatalog.materials == null)
+      return null;
+
     var materials = sphereMaterialCatalog.materials;
     int validCount = 0;
     for (int i = 0; i < materials.Count; i++)
@@ -98,7 +146,7 @@ public class StarVisual : MonoBehaviour
     if (validCount == 0)
       return null;
 
-    int selectedOffset = StableIndex(BuildStableVisualSeed(), validCount);
+    int selectedOffset = StableIndex(BuildStableVisualSeed(stableKey), validCount);
 
     for (int i = 0; i < materials.Count; i++)
     {
@@ -133,10 +181,8 @@ public class StarVisual : MonoBehaviour
     }
   }
 
-  private int BuildStableVisualSeed()
+  private static int BuildStableVisualSeed(string stableKey)
   {
-    string stableKey = star.Data.Path ?? string.Empty;
-
     unchecked
     {
       int hash = 23;
