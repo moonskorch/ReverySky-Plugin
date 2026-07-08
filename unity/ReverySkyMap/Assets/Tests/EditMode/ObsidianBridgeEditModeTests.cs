@@ -157,6 +157,41 @@ public class ObsidianBridgeEditModeTests
     }
   }
 
+  [Test]
+  public void BuildGraph_EmptyNotes_ClearsStaleGraphIndex()
+  {
+    var cartographerObject = new GameObject("CartographerEmptyGraphIndexTests");
+    var staleStarObject = new GameObject("CartographerEmptyGraphIndexTests_StaleStar");
+    try
+    {
+      var cartographer = cartographerObject.AddComponent<Cartographer>();
+      var staleStar = staleStarObject.AddComponent<Star>();
+      staleStar.SetData(new NoteData { Id = "stale", Path = "notes/stale.md" });
+      MapGraphIndex staleIndex = MapGraphIndex.Build(
+        new List<Star> { staleStar },
+        new List<TagNode>(),
+        new List<MapRuntimeContext.RuntimeNoteLink>());
+
+      SetPrivateField(cartographer, "_dynamicLinksEngine", new TestCartographerEngine(MapLayoutMode.DynamicLinks));
+      SetPrivateField(cartographer, "<CurrentGraphIndex>k__BackingField", staleIndex);
+
+      Assert.That(cartographer.CurrentGraphIndex.TryGetStar("stale", out _), Is.True);
+
+      MethodInfo buildGraph = typeof(Cartographer).GetMethod("BuildGraph", BindingFlags.Instance | BindingFlags.NonPublic);
+      Assert.That(buildGraph, Is.Not.Null);
+
+      buildGraph.Invoke(cartographer, new object[] { new List<NoteData>(), MapLayoutMode.DynamicLinks });
+
+      Assert.That(cartographer.CurrentGraphIndex.Nodes, Is.Empty);
+      Assert.That(cartographer.CurrentGraphIndex.TryGetStar("stale", out _), Is.False);
+    }
+    finally
+    {
+      Object.DestroyImmediate(cartographerObject);
+      Object.DestroyImmediate(staleStarObject);
+    }
+  }
+
   [TestCase(MapLayoutMode.DynamicLinks)]
   [TestCase(MapLayoutMode.ScalableLinks)]
   [TestCase(MapLayoutMode.Dates)]

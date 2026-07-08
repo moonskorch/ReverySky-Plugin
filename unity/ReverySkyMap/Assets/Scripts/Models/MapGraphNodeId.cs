@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 /// <summary>
 /// Identity for a visual graph node within one engine-built map.
@@ -18,6 +19,13 @@ public readonly struct MapGraphNodeId : IEquatable<MapGraphNodeId>
   /// </summary>
   public int Value { get; }
   public bool IsValid => Value != 0;
+
+  public static MapGraphNodeId FromComponent(Component component)
+  {
+    return component != null
+      ? new MapGraphNodeId(component.GetInstanceID())
+      : None;
+  }
 
   public bool Equals(MapGraphNodeId other)
   {

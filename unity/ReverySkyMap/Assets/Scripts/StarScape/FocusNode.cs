@@ -7,10 +7,10 @@ public class FocusNode : MonoBehaviour
   [SerializeField] private CameraOrbitalController cameraController;
   [SerializeField] private float selectedDistance = 5.0f;
 
-  private Star selectedStar;
-  public string FocusRestoreNoteId;
+  private MapGraphNode selectedNode;
+  public MapGraphNode SelectedNode => selectedNode;
 
-  public Star SelectedStar => selectedStar;
+  public string FocusRestoreNoteId = string.Empty;
   public CameraOrbitalController CameraController => cameraController;
 
   private void Start()
@@ -34,48 +34,78 @@ public class FocusNode : MonoBehaviour
 
     if (tappedObj.TryGetComponent(out Star star))
     {
-      SelectStar(star);
-      FocusSelectedStar();
+      if (!SelectGraphNode(star))
+        return;
+
+      FocusSelectedNode();
       MapRuntimeContext.RequestOpenNote(star.Data);
     }
 
     else if (tappedObj.TryGetComponent(out TagNode tagNode))
     {
-      var nav = Cartographer.I.ActiveEngine;
-      Vector3 tagPos =
-        (nav != null && nav.TryGetNavigationWorld(tagNode.transform, out var p)) ? p
-        : tagNode.transform.position;
-      cameraController.SetActivePivot(tagNode.transform);
-      cameraController.Focus(tagPos, selectedDistance);
+      if (SelectGraphNode(tagNode))
+        FocusSelectedNode();
     }
   }
 
-  private void FocusSelectedStar()
+  private void FocusSelectedNode()
   {
-    var nav = Cartographer.I.ActiveEngine;
-    Vector3 starPos =
-      (nav != null && nav.TryGetNavigationWorld(selectedStar.transform, out var p)) ? p
-      : selectedStar.transform.position;
+    if (selectedNode == null || selectedNode.Transform == null)
+      return;
 
-    cameraController.SetActivePivot(selectedStar.transform);
-    cameraController.Focus(starPos, selectedDistance);
+    Transform selectedTransform = selectedNode.Transform;
+    var nav = Cartographer.I.ActiveEngine;
+    Vector3 nodePos =
+      (nav != null && nav.TryGetNavigationWorld(selectedTransform, out var p)) ? p
+      : selectedTransform.position;
+
+    cameraController.SetActivePivot(selectedTransform);
+    cameraController.Focus(nodePos, selectedDistance);
   }
 
   public void SetSelectedStar(Star star)
   {
-    SelectStar(star);
-    FocusSelectedStar();
+    if (star != null && !SelectGraphNode(star))
+      return;
+
+    if (star == null)
+      SelectNode(null);
+
+    FocusSelectedNode();
+  }
+
+  private bool SelectGraphNode(Component component)
+  {
+    // Resolve through the graph index so focus and LineBuilder use the same node id space.
+    var graphIndex = Cartographer.I.CurrentGraphIndex;
+    if (!graphIndex.TryGetNodeId(component, out var nodeId) ||
+        !graphIndex.TryGetNode(nodeId, out var node))
+    {
+      string componentName = component != null ? component.name : "<null>";
+      Debug.LogError($"[FocusNode] Selected component is missing from the graph index: {componentName}");
+      return false;
+    }
+
+    SelectNode(node);
+    return true;
   }
 
   public void ResetFocus() 
   {
-    selectedStar = null;
+    selectedNode = null;
+    // Keep FocusRestoreNoteId so graph rebuilds can restore note focus continuity.
     cameraController.ResetToStart();
   }
 
-  private void SelectStar(Star star)
+  private void SelectNode(MapGraphNode node)
   {
-    selectedStar = star;
-    FocusRestoreNoteId = star?.Data?.Id;
+    selectedNode = node;
+    if (node == null)
+      return;
+
+    if (node.Kind == MapGraphNodeKind.Star)
+      FocusRestoreNoteId = node.NoteId ?? string.Empty;
+    else
+      FocusRestoreNoteId = string.Empty;
   }
 }

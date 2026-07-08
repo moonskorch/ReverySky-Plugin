@@ -134,6 +134,8 @@ public class Cartographer : MonoBehaviour
       return;
     }
 
+    RebuildGraphConsumers(MapGraphIndex.Empty);
+
     var stopwatch = System.Diagnostics.Stopwatch.StartNew();
     _activeEngine.BuildGraph(notes);
     _activeEngine.ApplyView(CurrentView);
@@ -229,7 +231,7 @@ public class Cartographer : MonoBehaviour
     if (string.IsNullOrWhiteSpace(noteId))
       return;
 
-    if (CurrentGraphIndex == null || !CurrentGraphIndex.TryGetStar(noteId, out var star))
+    if (!CurrentGraphIndex.TryGetStar(noteId, out var star))
     {
       // The active engine has no instantiated star for this note yet, so keep the latest focus as pending.
       MapRuntimeContext.PendingFocusNoteId = noteId;
@@ -301,11 +303,16 @@ public class Cartographer : MonoBehaviour
 
   private void HandleEngineNodesChanged(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes)
   {
+    RebuildGraphConsumers(MapGraphIndex.Build(stars, tagNodes, MapRuntimeContext.Links));
+    OnGraphVisualsChanged?.Invoke(stars, tagNodes);
+  }
+
+  private void RebuildGraphConsumers(MapGraphIndex graphIndex)
+  {
+    CurrentGraphIndex = graphIndex;
     int activeLineLimit = _activeEngine?.MaxActiveLines ?? 0;
     int activeLongLineLimit = _activeEngine?.MaxActiveLongLines ?? 0;
-    CurrentGraphIndex = MapGraphIndex.Build(stars, tagNodes, MapRuntimeContext.Links);
     lineBuilder?.Rebuild(CurrentGraphIndex, activeLineLimit, activeLongLineLimit);
     cullingManager?.Rebuild(CurrentGraphIndex, lineBuilder);
-    OnGraphVisualsChanged?.Invoke(stars, tagNodes);
   }
 }

@@ -9,16 +9,14 @@ using UnityEngine.Pool;
 /// </summary>
 public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 {
-  private const int NoNodeId = 0;
-
   private readonly struct EdgeKey : IEquatable<EdgeKey>
   {
-    private readonly int nodeAId;
-    private readonly int nodeBId;
+    private readonly MapGraphNodeId nodeAId;
+    private readonly MapGraphNodeId nodeBId;
 
-    public EdgeKey(int nodeAId, int nodeBId)
+    public EdgeKey(MapGraphNodeId nodeAId, MapGraphNodeId nodeBId)
     {
-      if (nodeAId <= nodeBId)
+      if (nodeAId.Value <= nodeBId.Value)
       {
         this.nodeAId = nodeAId;
         this.nodeBId = nodeBId;
@@ -32,7 +30,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 
     public bool Equals(EdgeKey other)
     {
-      return nodeAId == other.nodeAId && nodeBId == other.nodeBId;
+      return nodeAId.Equals(other.nodeAId) && nodeBId.Equals(other.nodeBId);
     }
 
     public override bool Equals(object obj)
@@ -44,7 +42,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     {
       unchecked
       {
-        return (nodeAId * 397) ^ nodeBId;
+        return (nodeAId.GetHashCode() * 397) ^ nodeBId.GetHashCode();
       }
     }
   }
@@ -52,8 +50,8 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   private sealed class LineCandidate
   {
     public EdgeKey edgeKey;
-    public int nodeAId;
-    public int nodeBId;
+    public MapGraphNodeId nodeAId;
+    public MapGraphNodeId nodeBId;
     public Transform transformA;
     public Transform transformB;
   }
@@ -76,24 +74,24 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   [SerializeField, Range(0f, 1f)] private float visibleRegionRefreshLineRatio = 0.05f;
   [SerializeField, Min(1)] private int maxLinesPerNode = 50;
 
-  private readonly HashSet<int> registeredNodeIds = new();
-  private readonly Dictionary<int, List<LineCandidate>> candidatesByNodeId = new();
+  private readonly HashSet<MapGraphNodeId> registeredNodeIds = new();
+  private readonly Dictionary<MapGraphNodeId, List<LineCandidate>> candidatesByNodeId = new();
   private readonly Dictionary<EdgeKey, LineBinding> activeLinesByEdgeKey = new();
-  private readonly HashSet<int> visibleNodeIds = new();
+  private readonly HashSet<MapGraphNodeId> visibleNodeIds = new();
   // One-shot batch of nodes that crossed into visibility since the last reconciliation.
   // Current visibility remains authoritative, so fast fly-by nodes can be skipped lazily.
-  private readonly Queue<int> newlyVisibleNodeIds = new();
+  private readonly Queue<MapGraphNodeId> newlyVisibleNodeIds = new();
   private readonly HashSet<EdgeKey> desiredLineKeys = new();
   private readonly List<LineCandidate> desiredLineCandidates = new();
   private readonly List<EdgeKey> staleLineKeys = new();
-  private readonly Dictionary<int, int> selectedLineCountByNodeId = new();
+  private readonly Dictionary<MapGraphNodeId, int> selectedLineCountByNodeId = new();
   private ObjectPool<LineRenderer> linePool;
   private int activeLineLimit;
   private int activeLongLineLimit;
   private int linePoolMaxSize;
   private bool lineSetDirty;
   private bool linesVisible = true;
-  private int focusedNodeId;
+  private MapGraphNodeId focusedNodeId = MapGraphNodeId.None;
 
   public void Rebuild(
     MapGraphIndex graphIndex,
@@ -146,14 +144,14 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     newlyVisibleNodeIds.Clear();
     selectedLineCountByNodeId.Clear();
     lineSetDirty = false;
-    focusedNodeId = NoNodeId;
+    focusedNodeId = MapGraphNodeId.None;
   }
 
   public bool TryCreateDistanceEntry(Component node, out CullingManager.Entry entry)
   {
     entry = null;
 
-    if (node == null || !registeredNodeIds.Contains(NodeId(node)))
+    if (node == null || !registeredNodeIds.Contains(MapGraphNodeId.FromComponent(node)))
       return false;
 
     entry = new CullingManager.Entry
@@ -173,7 +171,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     if (node == null)
       return;
 
-    int nodeId = NodeId(node);
+    MapGraphNodeId nodeId = MapGraphNodeId.FromComponent(node);
     if (!registeredNodeIds.Contains(nodeId))
       return;
 
@@ -244,23 +242,18 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 
     IReadOnlyList<MapGraphNode> nodes = graphIndex.Nodes;
     for (int i = 0; i < nodes.Count; i++)
-    {
-      Component component = nodes[i].Component;
-      if (component != null)
-        RegisterNode(component);
-    }
+      RegisterNode(nodes[i]);
   }
 
-  private void RegisterNode(Component node)
+  private void RegisterNode(MapGraphNode node)
   {
-    if (node == null)
+    if (!node.Id.IsValid || node.Component == null)
       return;
 
-    int nodeId = NodeId(node);
-    if (!registeredNodeIds.Add(nodeId))
+    if (!registeredNodeIds.Add(node.Id))
       return;
 
-    EnsureCandidateList(nodeId);
+    EnsureCandidateList(node.Id);
   }
 
   private void BuildLineCandidates(MapGraphIndex graphIndex)
@@ -276,39 +269,37 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
           !graphIndex.TryGetNode(edge.NodeB, out var nodeB))
         continue;
 
-      TryAddCandidate(nodeA.Component, nodeB.Component);
+      TryAddCandidate(nodeA, nodeB);
     }
   }
 
-  private void TryAddCandidate(Component nodeA, Component nodeB)
+  private void TryAddCandidate(MapGraphNode nodeA, MapGraphNode nodeB)
   {
-    if (nodeA == null || nodeB == null)
+    if (!nodeA.Id.IsValid || !nodeB.Id.IsValid || nodeA.Transform == null || nodeB.Transform == null)
       return;
 
-    int nodeAId = NodeId(nodeA);
-    int nodeBId = NodeId(nodeB);
-    if (nodeAId == nodeBId ||
-        !registeredNodeIds.Contains(nodeAId) ||
-        !registeredNodeIds.Contains(nodeBId))
+    if (nodeA.Id.Equals(nodeB.Id) ||
+        !registeredNodeIds.Contains(nodeA.Id) ||
+        !registeredNodeIds.Contains(nodeB.Id))
     {
       return;
     }
 
-    EdgeKey edgeKey = new(nodeAId, nodeBId);
+    EdgeKey edgeKey = new(nodeA.Id, nodeB.Id);
     var candidate = new LineCandidate
     {
       edgeKey = edgeKey,
-      nodeAId = nodeAId,
-      nodeBId = nodeBId,
-      transformA = nodeA.transform,
-      transformB = nodeB.transform
+      nodeAId = nodeA.Id,
+      nodeBId = nodeB.Id,
+      transformA = nodeA.Transform,
+      transformB = nodeB.Transform
     };
 
-    EnsureCandidateList(nodeAId).Add(candidate);
-    EnsureCandidateList(nodeBId).Add(candidate);
+    EnsureCandidateList(nodeA.Id).Add(candidate);
+    EnsureCandidateList(nodeB.Id).Add(candidate);
   }
 
-  private List<LineCandidate> EnsureCandidateList(int nodeId)
+  private List<LineCandidate> EnsureCandidateList(MapGraphNodeId nodeId)
   {
     if (!candidatesByNodeId.TryGetValue(nodeId, out var candidates))
     {
@@ -349,7 +340,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 
   private void AddFocusedLines(ref int selectedLongLineCount)
   {
-    if (focusedNodeId == NoNodeId ||
+    if (!focusedNodeId.IsValid ||
         !visibleNodeIds.Contains(focusedNodeId) ||
         !candidatesByNodeId.TryGetValue(focusedNodeId, out var candidates))
     {
@@ -394,7 +385,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     int pendingCount = newlyVisibleNodeIds.Count;
     for (int i = 0; i < pendingCount; i++)
     {
-      int nodeId = newlyVisibleNodeIds.Dequeue();
+      MapGraphNodeId nodeId = newlyVisibleNodeIds.Dequeue();
 
       // The queue is an event batch, not the source of truth; visibility may
       // already have changed again before this reconciliation runs.
@@ -420,7 +411,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 
   private void FillVisibleLines(ref int selectedLongLineCount)
   {
-    foreach (int nodeId in visibleNodeIds)
+    foreach (MapGraphNodeId nodeId in visibleNodeIds)
     {
       if (HasFilledNodeLineLimit(nodeId) ||
           !candidatesByNodeId.TryGetValue(nodeId, out var candidates))
@@ -479,7 +470,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     return desiredLineKeys.Count >= activeLineLimit;
   }
 
-  private bool HasFilledNodeLineLimit(int nodeId)
+  private bool HasFilledNodeLineLimit(MapGraphNodeId nodeId)
   {
     return selectedLineCountByNodeId.TryGetValue(nodeId, out int selectedCount) &&
            selectedCount >= maxLinesPerNode;
@@ -491,7 +482,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     IncrementSelectedLineCount(candidate.nodeBId);
   }
 
-  private void IncrementSelectedLineCount(int nodeId)
+  private void IncrementSelectedLineCount(MapGraphNodeId nodeId)
   {
     selectedLineCountByNodeId.TryGetValue(nodeId, out int selectedCount);
     selectedLineCountByNodeId[nodeId] = selectedCount + 1;
@@ -505,9 +496,9 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     return Mathf.CeilToInt(activeLineLimit * Mathf.Clamp01(visibleRegionRefreshLineRatio));
   }
 
-  private void EnqueueNewlyVisibleNode(int nodeId)
+  private void EnqueueNewlyVisibleNode(MapGraphNodeId nodeId)
   {
-    if (nodeId == NoNodeId)
+    if (!nodeId.IsValid)
       return;
 
     newlyVisibleNodeIds.Enqueue(nodeId);
@@ -710,17 +701,12 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 
   private void UpdateFocusedNodeDirtyState()
   {
-    Star focusedStar = focusNode != null ? focusNode.SelectedStar : null;
-    int nextFocusedNodeId = NodeId(focusedStar);
-    if (focusedNodeId == nextFocusedNodeId)
+    MapGraphNode focusedNode = focusNode != null ? focusNode.SelectedNode : null;
+    MapGraphNodeId nextFocusedNodeId = focusedNode != null ? focusedNode.Id : MapGraphNodeId.None;
+    if (focusedNodeId.Equals(nextFocusedNodeId))
       return;
 
     focusedNodeId = nextFocusedNodeId;
     MarkLineSetDirty();
-  }
-
-  private static int NodeId(Component node)
-  {
-    return node != null ? node.GetInstanceID() : NoNodeId;
   }
 }

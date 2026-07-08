@@ -436,7 +436,7 @@ public class LineBuilderEditModeTests
         new MapRuntimeContext.RuntimeNoteLink { SourceId = "n2", TargetId = "n3", Weight = 1f }
       });
 
-      RebuildWithIndex(scope.Builder, new List<Star> { scope.NoteA, scope.NoteB, noteC }, new List<TagNode> { scope.Tag }, 1, 10);
+      MapGraphIndex graphIndex = RebuildWithIndex(scope.Builder, new List<Star> { scope.NoteA, scope.NoteB, noteC }, new List<TagNode> { scope.Tag }, 1, 10);
       scope.Builder.SetDistanceVisible(scope.NoteB, true);
       scope.Builder.SetDistanceVisible(scope.NoteA, true);
       FlushLineBuilder(scope.Builder);
@@ -445,7 +445,7 @@ public class LineBuilderEditModeTests
       Assert.That(firstLine.GetPosition(0), Is.EqualTo(scope.NoteB.transform.position));
       Assert.That(firstLine.GetPosition(1), Is.EqualTo(noteC.transform.position));
 
-      SetPrivateField(scope.Focus, "selectedStar", scope.NoteA);
+      SetFocusedStar(scope.Focus, graphIndex, scope.NoteA);
       FlushLineBuilder(scope.Builder);
 
       LineRenderer focusedLine = GetOnlyActiveLine(scope.LineParent);
@@ -537,14 +537,14 @@ public class LineBuilderEditModeTests
         new MapRuntimeContext.RuntimeNoteLink { SourceId = "n3", TargetId = "n4", Weight = 1f }
       });
 
-      RebuildWithIndex(
+      MapGraphIndex graphIndex = RebuildWithIndex(
         scope.Builder,
         new List<Star> { scope.NoteA, scope.NoteB, noteC, noteD },
         new List<TagNode>(),
         1,
         10);
       scope.Builder.SetDistanceVisible(scope.NoteA, true);
-      SetPrivateField(scope.Focus, "selectedStar", scope.NoteA);
+      SetFocusedStar(scope.Focus, graphIndex, scope.NoteA);
       FlushLineBuilder(scope.Builder);
 
       AssertLineConnects(GetOnlyActiveLine(scope.LineParent), scope.NoteA, scope.NoteB);
@@ -628,7 +628,6 @@ public class LineBuilderEditModeTests
       SetPosition(noteD, new Vector3(1f, 0f, 0f));
       SetPrivateField(scope.Builder, "longLineDistance", 5f);
       SetPrivateField(scope.Builder, "focusedLinesIgnoreLongLineLimit", false);
-      SetPrivateField(scope.Focus, "selectedStar", scope.NoteA);
 
       MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>
       {
@@ -637,12 +636,13 @@ public class LineBuilderEditModeTests
         new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n4", Weight = 1f }
       });
 
-      RebuildWithIndex(
+      MapGraphIndex graphIndex = RebuildWithIndex(
         scope.Builder,
         new List<Star> { scope.NoteA, scope.NoteB, noteC, noteD },
         new List<TagNode>(),
         3,
         0);
+      SetFocusedStar(scope.Focus, graphIndex, scope.NoteA);
       scope.Builder.SetDistanceVisible(scope.NoteA, true);
       FlushLineBuilder(scope.Builder);
 
@@ -760,14 +760,16 @@ public class LineBuilderEditModeTests
     Assert.That(forward || reverse, Is.True, "Line endpoints did not match the expected nodes.");
   }
 
-  private static void RebuildWithIndex(
+  private static MapGraphIndex RebuildWithIndex(
     LineBuilder builder,
     IReadOnlyList<Star> stars,
     IReadOnlyList<TagNode> tagNodes,
     int maxActiveLines,
     int maxActiveLongLines)
   {
-    builder.Rebuild(MapGraphIndex.Build(stars, tagNodes, MapRuntimeContext.Links), maxActiveLines, maxActiveLongLines);
+    MapGraphIndex graphIndex = MapGraphIndex.Build(stars, tagNodes, MapRuntimeContext.Links);
+    builder.Rebuild(graphIndex, maxActiveLines, maxActiveLongLines);
+    return graphIndex;
   }
 
   private static LineBuilderScope CreateScope()
@@ -782,6 +784,13 @@ public class LineBuilderEditModeTests
     FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
     Assert.That(field, Is.Not.Null, $"Missing field {fieldName}.");
     field.SetValue(target, value);
+  }
+
+  private static void SetFocusedStar(FocusNode focus, MapGraphIndex graphIndex, Star star)
+  {
+    Assert.That(graphIndex.TryGetNodeId(star, out var nodeId), Is.True);
+    Assert.That(graphIndex.TryGetNode(nodeId, out var node), Is.True);
+    SetPrivateField(focus, "selectedNode", node);
   }
 
   private static void FlushLineBuilder(LineBuilder builder)

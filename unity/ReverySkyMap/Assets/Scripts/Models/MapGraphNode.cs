@@ -4,7 +4,7 @@ using UnityEngine;
 /// Read-only view of one instantiated visual node in the current built map.
 /// It keeps live scene references, but does not own or mutate the referenced GameObject.
 /// </summary>
-public readonly struct MapGraphNode
+public sealed class MapGraphNode
 {
   public MapGraphNode(
     MapGraphNodeId id,
