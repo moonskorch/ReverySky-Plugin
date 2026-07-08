@@ -9,6 +9,10 @@ using UnityEngine.Pool;
 /// </summary>
 public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 {
+  // WARNING: The current LR_Unlit line material was verified to read _Color.
+  // Recheck this property if the line shader, material, or render pipeline changes.
+  private static readonly int ColorPropertyId = Shader.PropertyToID("_Color");
+
   private readonly struct EdgeKey : IEquatable<EdgeKey>
   {
     private readonly MapGraphNodeId nodeAId;
@@ -92,6 +96,9 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   private bool lineSetDirty;
   private bool linesVisible = true;
   private MapGraphNodeId focusedNodeId = MapGraphNodeId.None;
+  private MapGraphNodeId highlightedFocusNodeId = MapGraphNodeId.None;
+  private Color focusedLineColor;
+  private MaterialPropertyBlock focusedLinePropertyBlock;
 
   public void Rebuild(
     MapGraphIndex graphIndex,
@@ -201,6 +208,18 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   private void MarkLineSetDirty()
   {
     lineSetDirty = true;
+  }
+
+  public void ApplyFocusHighlightChange(
+    MapGraphNodeId previousFocusedNodeId,
+    MapGraphNodeId nextFocusedNodeId,
+    Color focusColor)
+  {
+    focusedLineColor = focusColor;
+    highlightedFocusNodeId = nextFocusedNodeId;
+    RestyleIncidentActiveLines(previousFocusedNodeId);
+    if (!previousFocusedNodeId.Equals(nextFocusedNodeId))
+      RestyleIncidentActiveLines(nextFocusedNodeId);
   }
 
   private void ReconcileActiveLinesIfDirty()
@@ -341,7 +360,6 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   private void AddFocusedLines(ref int selectedLongLineCount)
   {
     if (!focusedNodeId.IsValid ||
-        !visibleNodeIds.Contains(focusedNodeId) ||
         !candidatesByNodeId.TryGetValue(focusedNodeId, out var candidates))
     {
       return;
@@ -563,6 +581,8 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
       transformA = candidate.transformA,
       transformB = candidate.transformB
     };
+
+    ApplyLineStyle(line, IsFocusedLine(candidate));
   }
 
   private void RemoveLine(EdgeKey edgeKey)
@@ -650,11 +670,12 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     line.gameObject.SetActive(true);
   }
 
-  private static void PrepareLineForPool(LineRenderer line)
+  private void PrepareLineForPool(LineRenderer line)
   {
     if (line == null)
       return;
 
+    ApplyLineStyle(line, focused: false);
     line.positionCount = 0;
     line.gameObject.SetActive(false);
   }
@@ -683,7 +704,9 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   {
     return candidate != null &&
            (visibleNodeIds.Contains(candidate.nodeAId) ||
-            visibleNodeIds.Contains(candidate.nodeBId));
+            visibleNodeIds.Contains(candidate.nodeBId) ||
+            candidate.nodeAId.Equals(focusedNodeId) ||
+            candidate.nodeBId.Equals(focusedNodeId));
   }
 
   private bool IsLongLine(LineCandidate candidate)
@@ -708,5 +731,47 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 
     focusedNodeId = nextFocusedNodeId;
     MarkLineSetDirty();
+  }
+
+  private void RestyleIncidentActiveLines(MapGraphNodeId nodeId)
+  {
+    if (!nodeId.IsValid || !candidatesByNodeId.TryGetValue(nodeId, out var candidates))
+      return;
+
+    for (int i = 0; i < candidates.Count; i++)
+    {
+      LineCandidate candidate = candidates[i];
+      if (candidate != null &&
+          activeLinesByEdgeKey.TryGetValue(candidate.edgeKey, out LineBinding binding) &&
+          binding?.line != null)
+      {
+        ApplyLineStyle(binding.line, IsFocusedLine(binding.candidate));
+      }
+    }
+  }
+
+  private bool IsFocusedLine(LineCandidate candidate)
+  {
+    return highlightedFocusNodeId.IsValid &&
+           candidate != null &&
+           (candidate.nodeAId.Equals(highlightedFocusNodeId) ||
+            candidate.nodeBId.Equals(highlightedFocusNodeId));
+  }
+
+  private void ApplyLineStyle(LineRenderer line, bool focused)
+  {
+    if (line == null)
+      return;
+
+    if (!focused)
+    {
+      line.SetPropertyBlock(null);
+      return;
+    }
+
+    focusedLinePropertyBlock ??= new MaterialPropertyBlock();
+    focusedLinePropertyBlock.Clear();
+    focusedLinePropertyBlock.SetColor(ColorPropertyId, focusedLineColor);
+    line.SetPropertyBlock(focusedLinePropertyBlock);
   }
 }

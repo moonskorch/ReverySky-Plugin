@@ -2447,8 +2447,9 @@ GameObject:
   m_Component:
   - component: {fileID: 1780593169}
   - component: {fileID: 1780593168}
-  - component: {fileID: 1780593167}
   - component: {fileID: 1780593170}
+  - component: {fileID: 1780593167}
+  - component: {fileID: 1780593171}
   m_Layer: 0
   m_Name: Cartographer
   m_TagString: Untagged
@@ -2471,6 +2472,7 @@ MonoBehaviour:
   layoutParent: {fileID: 1327961058}
   cameraController: {fileID: 330585549}
   selectedDistance: 5
+  highlighter: {fileID: 1780593171}
   FocusRestoreNoteId: 
 --- !u!114 &1780593168
 MonoBehaviour:
@@ -2530,13 +2532,27 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
   injectSampleData: 0
-  connectionModel: 2
+  connectionModel: 3
   islands: 0
-  noteCount: 2500
-  tagPoolSize: 600
+  noteCount: 250
+  tagPoolSize: 50
   dateSpanDays: 365
   maxTagsPerNote: 4
   linkDensity: 31
+--- !u!114 &1780593171
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1780593166}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cacecb10f4aff394f8fb48e48ad65e98, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ReverySkyMap.Runtime::FocusHighlighter
+  lineBuilder: {fileID: 1217411434}
+  focusedLineColor: {r: 0, g: 2.828427, b: 2.828427, a: 1}
 --- !u!1 &1787028428
 GameObject:
   m_ObjectHideFlags: 0

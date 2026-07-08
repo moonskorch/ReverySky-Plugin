@@ -8,6 +8,8 @@ using UnityEngine.TestTools;
 
 public class LineBuilderEditModeTests
 {
+  private static readonly int LineColorPropertyId = Shader.PropertyToID("_Color");
+
   [UnityTest]
   public IEnumerator TryCreateDistanceEntry_RegisteredNodes_ReturnEntriesForStarsAndTags()
   {
@@ -438,7 +440,6 @@ public class LineBuilderEditModeTests
 
       MapGraphIndex graphIndex = RebuildWithIndex(scope.Builder, new List<Star> { scope.NoteA, scope.NoteB, noteC }, new List<TagNode> { scope.Tag }, 1, 10);
       scope.Builder.SetDistanceVisible(scope.NoteB, true);
-      scope.Builder.SetDistanceVisible(scope.NoteA, true);
       FlushLineBuilder(scope.Builder);
 
       LineRenderer firstLine = GetOnlyActiveLine(scope.LineParent);
@@ -455,6 +456,176 @@ public class LineBuilderEditModeTests
     finally
     {
       Object.DestroyImmediate(noteCObject);
+    }
+
+    yield return null;
+  }
+
+  [UnityTest]
+  public IEnumerator ApplyFocusHighlightChange_HighlightsActiveIncidentLines()
+  {
+    using var scope = CreateScope();
+    ConfigureStar(scope.NoteA, "n1", "notes/n1.md");
+    ConfigureStar(scope.NoteB, "n2", "notes/n2.md");
+
+    MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>
+    {
+      new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n2", Weight = 1f }
+    });
+
+    MapGraphIndex graphIndex = RebuildWithIndex(scope.Builder, new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode>(), 1, 10);
+    scope.Builder.SetDistanceVisible(scope.NoteA, true);
+    FlushLineBuilder(scope.Builder);
+
+    LineRenderer line = GetOnlyActiveLine(scope.LineParent);
+    Color focusColor = new(0f, 2.5f, 2.5f, 1f);
+
+    scope.Builder.ApplyFocusHighlightChange(MapGraphNodeId.None, GetNodeId(graphIndex, scope.NoteA), focusColor);
+
+    AssertLineHighlight(line, focusColor);
+    yield return null;
+  }
+
+  [UnityTest]
+  public IEnumerator ApplyFocusHighlightChange_ClearsPreviousFocusedLines()
+  {
+    using var scope = CreateScope();
+    var noteCObject = new GameObject("LineBuilderEditModeTests_NoteC");
+    var noteDObject = new GameObject("LineBuilderEditModeTests_NoteD");
+    var noteC = noteCObject.AddComponent<Star>();
+    var noteD = noteDObject.AddComponent<Star>();
+
+    try
+    {
+      ConfigureStar(scope.NoteA, "n1", "notes/n1.md");
+      ConfigureStar(scope.NoteB, "n2", "notes/n2.md");
+      ConfigureStar(noteC, "n3", "notes/n3.md");
+      ConfigureStar(noteD, "n4", "notes/n4.md");
+      SetPosition(scope.NoteA, new Vector3(-6f, 0f, 0f));
+      SetPosition(scope.NoteB, new Vector3(-4f, 0f, 0f));
+      SetPosition(noteC, new Vector3(4f, 0f, 0f));
+      SetPosition(noteD, new Vector3(6f, 0f, 0f));
+
+      MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>
+      {
+        new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n2", Weight = 1f },
+        new MapRuntimeContext.RuntimeNoteLink { SourceId = "n3", TargetId = "n4", Weight = 1f }
+      });
+
+      MapGraphIndex graphIndex = RebuildWithIndex(
+        scope.Builder,
+        new List<Star> { scope.NoteA, scope.NoteB, noteC, noteD },
+        new List<TagNode>(),
+        2,
+        10);
+      scope.Builder.SetDistanceVisible(scope.NoteA, true);
+      scope.Builder.SetDistanceVisible(noteC, true);
+      FlushLineBuilder(scope.Builder);
+
+      LineRenderer lineAB = GetActiveLineConnecting(scope.LineParent, scope.NoteA, scope.NoteB);
+      LineRenderer lineCD = GetActiveLineConnecting(scope.LineParent, noteC, noteD);
+      Color focusColor = new(0f, 2.5f, 2.5f, 1f);
+      MapGraphNodeId nodeAId = GetNodeId(graphIndex, scope.NoteA);
+      MapGraphNodeId nodeCId = GetNodeId(graphIndex, noteC);
+
+      scope.Builder.ApplyFocusHighlightChange(MapGraphNodeId.None, nodeAId, focusColor);
+      AssertLineHighlight(lineAB, focusColor);
+      AssertLineHighlightCleared(lineCD);
+
+      scope.Builder.ApplyFocusHighlightChange(nodeAId, nodeCId, focusColor);
+      AssertLineHighlightCleared(lineAB);
+      AssertLineHighlight(lineCD, focusColor);
+    }
+    finally
+    {
+      Object.DestroyImmediate(noteCObject);
+      Object.DestroyImmediate(noteDObject);
+    }
+
+    yield return null;
+  }
+
+  [UnityTest]
+  public IEnumerator FocusedLine_AppliesHighlightWithoutDistanceVisibleEndpoint()
+  {
+    using var scope = CreateScope();
+    ConfigureStar(scope.NoteA, "n1", "notes/n1.md");
+    ConfigureStar(scope.NoteB, "n2", "notes/n2.md");
+
+    MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>
+    {
+      new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n2", Weight = 1f }
+    });
+
+    MapGraphIndex graphIndex = RebuildWithIndex(scope.Builder, new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode>(), 1, 10);
+    Color focusColor = new(0f, 2.5f, 2.5f, 1f);
+    SetFocusedStar(scope.Focus, graphIndex, scope.NoteA);
+    scope.Builder.ApplyFocusHighlightChange(MapGraphNodeId.None, GetNodeId(graphIndex, scope.NoteA), focusColor);
+
+    FlushLineBuilder(scope.Builder);
+
+    LineRenderer line = GetOnlyActiveLine(scope.LineParent);
+    AssertLineConnects(line, scope.NoteA, scope.NoteB);
+    AssertLineHighlight(line, focusColor);
+    yield return null;
+  }
+
+  [UnityTest]
+  public IEnumerator PrepareLineForPool_ClearsHighlightBeforeReuse()
+  {
+    using var scope = CreateScope();
+    var noteCObject = new GameObject("LineBuilderEditModeTests_NoteC");
+    var noteDObject = new GameObject("LineBuilderEditModeTests_NoteD");
+    var noteC = noteCObject.AddComponent<Star>();
+    var noteD = noteDObject.AddComponent<Star>();
+
+    try
+    {
+      ConfigureStar(scope.NoteA, "n1", "notes/n1.md");
+      ConfigureStar(scope.NoteB, "n2", "notes/n2.md");
+      ConfigureStar(noteC, "n3", "notes/n3.md");
+      ConfigureStar(noteD, "n4", "notes/n4.md");
+      SetPosition(scope.NoteA, new Vector3(-6f, 0f, 0f));
+      SetPosition(scope.NoteB, new Vector3(-4f, 0f, 0f));
+      SetPosition(noteC, new Vector3(4f, 0f, 0f));
+      SetPosition(noteD, new Vector3(6f, 0f, 0f));
+
+      MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>
+      {
+        new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n2", Weight = 1f },
+        new MapRuntimeContext.RuntimeNoteLink { SourceId = "n3", TargetId = "n4", Weight = 1f }
+      });
+
+      MapGraphIndex graphIndex = RebuildWithIndex(
+        scope.Builder,
+        new List<Star> { scope.NoteA, scope.NoteB, noteC, noteD },
+        new List<TagNode>(),
+        1,
+        10);
+      scope.Builder.SetDistanceVisible(scope.NoteA, true);
+      FlushLineBuilder(scope.Builder);
+
+      LineRenderer highlightedLine = GetOnlyActiveLine(scope.LineParent);
+      Color focusColor = new(0f, 2.5f, 2.5f, 1f);
+      scope.Builder.ApplyFocusHighlightChange(MapGraphNodeId.None, GetNodeId(graphIndex, scope.NoteA), focusColor);
+      AssertLineHighlight(highlightedLine, focusColor);
+
+      scope.Builder.SetDistanceVisible(scope.NoteA, false);
+      FlushLineBuilder(scope.Builder);
+      AssertLineHighlightCleared(highlightedLine);
+
+      scope.Builder.SetDistanceVisible(noteC, true);
+      FlushLineBuilder(scope.Builder);
+
+      LineRenderer reusedLine = GetOnlyActiveLine(scope.LineParent);
+      Assert.That(reusedLine, Is.SameAs(highlightedLine));
+      AssertLineHighlightCleared(reusedLine);
+      AssertLineConnects(reusedLine, noteC, noteD);
+    }
+    finally
+    {
+      Object.DestroyImmediate(noteCObject);
+      Object.DestroyImmediate(noteDObject);
     }
 
     yield return null;
@@ -543,7 +714,6 @@ public class LineBuilderEditModeTests
         new List<TagNode>(),
         1,
         10);
-      scope.Builder.SetDistanceVisible(scope.NoteA, true);
       SetFocusedStar(scope.Focus, graphIndex, scope.NoteA);
       FlushLineBuilder(scope.Builder);
 
@@ -643,7 +813,6 @@ public class LineBuilderEditModeTests
         3,
         0);
       SetFocusedStar(scope.Focus, graphIndex, scope.NoteA);
-      scope.Builder.SetDistanceVisible(scope.NoteA, true);
       FlushLineBuilder(scope.Builder);
 
       Assert.That(GetActiveLineCount(scope.LineParent), Is.EqualTo(1));
@@ -760,6 +929,53 @@ public class LineBuilderEditModeTests
     Assert.That(forward || reverse, Is.True, "Line endpoints did not match the expected nodes.");
   }
 
+  private static void AssertLineHighlight(LineRenderer line, Color expectedColor)
+  {
+    var block = new MaterialPropertyBlock();
+    line.GetPropertyBlock(block);
+
+    AssertColorApproximately(block.GetColor(LineColorPropertyId), expectedColor);
+  }
+
+  private static void AssertLineHighlightCleared(LineRenderer line)
+  {
+    var block = new MaterialPropertyBlock();
+    line.GetPropertyBlock(block);
+
+    Assert.That(block.GetColor(LineColorPropertyId), Is.EqualTo(Color.clear));
+  }
+
+  private static void AssertColorApproximately(Color actual, Color expected)
+  {
+    const float tolerance = 0.001f;
+
+    Assert.That(Mathf.Abs(actual.r - expected.r), Is.LessThanOrEqualTo(tolerance), $"r actual={actual.r:R} expected={expected.r:R}");
+    Assert.That(Mathf.Abs(actual.g - expected.g), Is.LessThanOrEqualTo(tolerance), $"g actual={actual.g:R} expected={expected.g:R}");
+    Assert.That(Mathf.Abs(actual.b - expected.b), Is.LessThanOrEqualTo(tolerance), $"b actual={actual.b:R} expected={expected.b:R}");
+    Assert.That(Mathf.Abs(actual.a - expected.a), Is.LessThanOrEqualTo(tolerance), $"a actual={actual.a:R} expected={expected.a:R}");
+  }
+
+  private static LineRenderer GetActiveLineConnecting(Transform lineParent, Component nodeA, Component nodeB)
+  {
+    LineRenderer[] lines = lineParent.GetComponentsInChildren<LineRenderer>(true);
+
+    for (int i = 0; i < lines.Length; i++)
+    {
+      if (!lines[i].gameObject.activeSelf)
+        continue;
+
+      Vector3 positionA = nodeA.transform.position;
+      Vector3 positionB = nodeB.transform.position;
+      bool forward = lines[i].GetPosition(0) == positionA && lines[i].GetPosition(1) == positionB;
+      bool reverse = lines[i].GetPosition(0) == positionB && lines[i].GetPosition(1) == positionA;
+      if (forward || reverse)
+        return lines[i];
+    }
+
+    Assert.Fail("Expected active line connecting the requested nodes.");
+    return null;
+  }
+
   private static MapGraphIndex RebuildWithIndex(
     LineBuilder builder,
     IReadOnlyList<Star> stars,
@@ -770,6 +986,12 @@ public class LineBuilderEditModeTests
     MapGraphIndex graphIndex = MapGraphIndex.Build(stars, tagNodes, MapRuntimeContext.Links);
     builder.Rebuild(graphIndex, maxActiveLines, maxActiveLongLines);
     return graphIndex;
+  }
+
+  private static MapGraphNodeId GetNodeId(MapGraphIndex graphIndex, Component component)
+  {
+    Assert.That(graphIndex.TryGetNodeId(component, out var nodeId), Is.True);
+    return nodeId;
   }
 
   private static LineBuilderScope CreateScope()

@@ -1,11 +1,11 @@
-﻿using System.Linq;
-using UnityEngine;
+﻿using UnityEngine;
 
 public class FocusNode : MonoBehaviour
 {
   [SerializeField] Transform layoutParent;
   [SerializeField] private CameraOrbitalController cameraController;
   [SerializeField] private float selectedDistance = 5.0f;
+  [SerializeField] private FocusHighlighter highlighter;
 
   private MapGraphNode selectedNode;
   public MapGraphNode SelectedNode => selectedNode;
@@ -93,6 +93,7 @@ public class FocusNode : MonoBehaviour
   public void ResetFocus() 
   {
     selectedNode = null;
+    ApplyHighlightFocus(null);
     // Keep FocusRestoreNoteId so graph rebuilds can restore note focus continuity.
     cameraController.ResetToStart();
   }
@@ -100,6 +101,8 @@ public class FocusNode : MonoBehaviour
   private void SelectNode(MapGraphNode node)
   {
     selectedNode = node;
+    ApplyHighlightFocus(node);
+
     if (node == null)
       return;
 
@@ -107,5 +110,13 @@ public class FocusNode : MonoBehaviour
       FocusRestoreNoteId = node.NoteId ?? string.Empty;
     else
       FocusRestoreNoteId = string.Empty;
+  }
+
+  private void ApplyHighlightFocus(MapGraphNode node)
+  {
+    if (highlighter == null)
+      return;
+
+    highlighter.SetFocus(node);
   }
 }
