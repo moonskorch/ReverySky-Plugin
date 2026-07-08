@@ -4,11 +4,26 @@
 
 This Unity project renders the Obsidian note graph in a WebGL scene that is embedded in the parent plugin. The Unity-side scope is the runtime scene, bridge ingestion, graph layout, camera and interaction handling, and Unity tests that guard those paths.
 
-High-level flow:
+Runtime shape:
 
-`Obsidian plugin -> WebGL bridge -> MapRuntimeContext -> Cartographer -> active engine -> camera/UI`
+```text
+Obsidian plugin
+  -> ObsidianBridge
+  -> MapRuntimeContext
+  -> Cartographer
+  -> active ICartographerEngine
+  -> MapGraphIndex
+  -> LineBuilder / CullingManager / focus lookup
+```
 
 The Unity runtime consumes bridge payloads and never derives the vault graph on its own. Parent plugin lifecycle, packaging, and local host orchestration live outside this project boundary.
+
+Core ownership rule:
+
+- `MapRuntimeContext` owns normalized source data from the bridge.
+- Active engines own instantiated `Star` and `TagNode` scene objects.
+- `MapGraphIndex` owns the read-only topology index for the current engine-built map.
+- `LineBuilder`, `CullingManager`, and focus lookup consume the index instead of rebuilding graph relationships.
 
 ## System Overview
 
@@ -17,21 +32,25 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Main code location: `Assets/Scenes/StarScapeScene.unity`
   - Important dependencies: `GameInput`, `CameraOrbitalController`, `Cartographer`, `CartographerForcesEngine`, `Cartographer25DEngine`, the serialized `StaticLinks` slot engine, `ScapeCameraWarper`, `ChangeViewControl`, `RotateCameraUI`, `Notification`
 - Bridge and runtime state:
-  - Responsibility: validates inbound bridge envelopes, converts payloads into runtime models, stores the current graph snapshot, and raises outbound runtime events for parent bridge messages.
+  - Responsibility: validates inbound bridge envelopes, converts payloads into runtime models, stores the current normalized source graph data, and raises outbound runtime events for parent bridge messages.
   - Main code location: `Assets/Scripts/Bridge/ObsidianBridge.cs`, `Assets/Scripts/Bridge/MapRuntimeContext.cs`, `Assets/Scripts/Models/NoteData.cs`
-  - Important dependencies: `GameSettings`, `CartographerEngine`, `MapRuntimeContext.OnNotesChanged`, `MapRuntimeContext.OnOpenNoteRequested`, `MapRuntimeContext.OnGraphReady`
+  - Important dependencies: `GameSettings`, `Cartographer`, `MapRuntimeContext.OnNotesChanged`, `MapRuntimeContext.OnOpenNoteRequested`, `MapRuntimeContext.OnGraphReady`
 - Graph orchestration:
-  - Responsibility: chooses the active layout engine, rebuilds the graph when runtime notes change, forwards rebuilt node lists into `LineBuilder` and `CullingManager`, and restores focus after ingest or selection.
+  - Responsibility: chooses the active layout engine, rebuilds the graph when runtime notes change, creates the shared visual graph index, forwards that index to consumers, and restores focus after ingest or selection.
   - Main code location: `Assets/Scripts/StarScape/Cartographer.cs`
-  - Important dependencies: `ICartographerEngine`, `FocusNode`, `ChangeViewControl`, `Notification`, `SampleDataGenerator`, `MapRuntimeContext`, `LineBuilder`, `CullingManager`, `OnGraphVisualsChanged`
+  - Important dependencies: `ICartographerEngine`, `MapGraphIndex`, `FocusNode`, `ChangeViewControl`, `Notification`, `SampleDataGenerator`, `MapRuntimeContext`, `LineBuilder`, `CullingManager`, `OnGraphVisualsChanged`
+- Visual graph index:
+  - Responsibility: provides the read-only topology index for the current engine-built scene graph: star nodes, tag nodes, note-note edges, note-tag edges, lookups, and adjacency.
+  - Main code location: `Assets/Scripts/StarScape/MapGraphIndex.cs`, `Assets/Scripts/Models/MapGraphNodeId.cs`, `Assets/Scripts/Models/MapGraphNode.cs`, `Assets/Scripts/Models/MapGraphEdge.cs`, `Assets/Scripts/Models/MapGraphEnums.cs`
+  - Important dependencies: active engine `Star`/`TagNode` scene objects, `MapRuntimeContext.RuntimeNoteLink`, `NoteData.TagIds`
 - Graph layout engines:
-  - Responsibility: build and clear the active graph layout, tick when needed, and publish the star/tag node lists plus line budgets consumed by `LineBuilder`.
+  - Responsibility: build and clear the active visual node layout, tick when needed, and publish the star/tag node lists plus line budgets consumed by `Cartographer`.
   - Main code location: `Assets/Scripts/StarScape/CartographerForcesEngine.cs`, `Assets/Scripts/StarScape/Cartographer25DEngine.cs`, `Assets/Scripts/StarScape/CartographerEngineRecursiveHubsEngine.cs`, `Assets/Scripts/StarScape/EngineExperiments/*`, `Assets/Scripts/Interfaces/ICartographerEngine.cs`
   - Important dependencies: `StarSO`, `TagNodeSO`, `ScapeCameraWarper`, `NoteData`, `MapRuntimeContext.RuntimeNoteLink`, `MaxActiveLines`, `MaxActiveLongLines`, `OnNodesChanged`
 - Line rendering and culling:
-  - Responsibility: build pooled line renderers for active note-note and note-tag connections, keep the visible edge set in sync with node visibility and focus, and share the distance-culling pipeline with other consumers.
+  - Responsibility: consume `MapGraphIndex`, build pooled line renderers for indexed edges, keep the visible edge set in sync with node visibility and focus, and share the distance-culling pipeline with other consumers.
   - Main code location: `Assets/Scripts/StarScape/LineBuilder.cs`, `Assets/Scripts/StarScape/CullingManager.cs`, `Assets/Scripts/StarScape/BehaviourCullingTarget.cs`, `Assets/Scripts/StarScape/LabelCullingTarget.cs`
-  - Important dependencies: `MapRuntimeContext.Links`, `Star.Data.TagIds`, `FocusNode.SelectedStar`, `ICullingConsumer`, `LineRenderer`, `ObjectPool<LineRenderer>`, `CullingGroup`
+  - Important dependencies: `MapGraphIndex`, `FocusNode.SelectedStar`, `ICullingConsumer`, `LineRenderer`, `ObjectPool<LineRenderer>`, `CullingGroup`
 - Interaction and camera:
   - Responsibility: turns device input into selection, pan, orbit, zoom, view switching, and note-open actions.
   - Main code location: `Assets/Scripts/GameInput/GameInput.cs`, `Assets/Scripts/StarScape/FocusNode.cs`, `Assets/Scripts/Camera/CameraOrbitalController.cs`, `Assets/Scripts/UI/ChangeViewControl.cs`, `Assets/Scripts/UI/RotateCameraUI.cs`
@@ -39,7 +58,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 - Visual assets and support objects:
   - Responsibility: provide prefabs, scale calibration, labels, shared culling consumers, and the optional sample graph injector.
   - Main code location: `Assets/Scripts/ScriptableObjects/StarSO.cs`, `Assets/Scripts/ScriptableObjects/TagNodeSO.cs`, `Assets/Scripts/StarScape/CullingManager.cs`, `Assets/Scripts/StarScape/LabelCullingTarget.cs`, `Assets/Scripts/StarScape/BehaviourCullingTarget.cs`, `Assets/Scripts/Notification/Notification.cs`, `Assets/Scripts/StarScape/SampleDataGenerator.cs`
-  - Important dependencies: `Cartographer.OnGraphVisualsChanged`, `MapRuntimeContext.NotesVersion`, `MapRuntimeContext.HasRuntimeNotes`, prefab assets in `Assets/Prefabs`
+  - Important dependencies: `MapRuntimeContext.NotesVersion`, `MapRuntimeContext.HasRuntimeNotes`, prefab assets in `Assets/Prefabs`
 - Automated checks:
   - Responsibility: guard bridge parsing, layout rules, and PlayMode bootstrap/visual stability.
   - Main code location: `Assets/Tests/EditMode/*`, `Assets/Tests/PlayMode/*`
@@ -63,10 +82,13 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 4. `MapRuntimeContext.SetTagNames`, `SetLinks`, and `SetNotes` store the runtime source of truth and raise `OnNotesChanged`.
 5. `Cartographer.HandleRuntimeNotesChanged()` calls `RebuildGraph(MapRuntimeContext.MapLayoutPreference)`.
 6. `Cartographer.ResolveModeByNotesCount()` uses `defaultEngine` first. Without an override, explicit `Static25D` and `StaticLinks` stay fixed, while `Auto` and `Forces` resolve by note count: small graphs use `Forces`, large graphs use `StaticLinks`.
-7. The chosen engine runs `BuildGraph(notes)`, which emits `OnNodesChanged`; `Cartographer.HandleEngineNodesChanged(...)` immediately rebuilds `LineBuilder` and `CullingManager` from the same node lists and line budgets, then `ApplyView(CurrentView)` and `Cartographer`'s `ScapeCameraWarper` rebinding follow.
-8. After `BuildGraph()`, `Cartographer` restores focus only from `FocusNode.FocusRestoreNoteId`; missing focus calls `ResetFocus()`.
-9. Incremental engines retry delayed focus through `MapRuntimeContext.PendingFocusNoteId`.
-10. When the active engine reaches its ready point, it calls `MapRuntimeContext.RequestGraphReady()`. `ObsidianBridge` forwards the matching `requestId` to JavaScript as `graph:ready`, unless the id is empty.
+7. The chosen engine runs `BuildGraph(notes)` and emits `OnNodesChanged` with the instantiated `Star` and `TagNode` scene objects.
+8. `Cartographer.HandleEngineNodesChanged(...)` builds `CurrentGraphIndex = MapGraphIndex.Build(stars, tagNodes, MapRuntimeContext.Links)`.
+9. `Cartographer` passes the same `CurrentGraphIndex` to `LineBuilder.Rebuild(...)` and `CullingManager.Rebuild(...)`; `OnGraphVisualsChanged` remains as the legacy raw-node notification surface.
+10. `BuildGraph(...)` applies `CurrentView`, rebinds the active `ScapeCameraWarper`, and logs build timing.
+11. After `BuildGraph()`, `Cartographer` restores focus only from `FocusNode.FocusRestoreNoteId`; missing focus calls `ResetFocus()`.
+12. Incremental engines retry delayed focus through `MapRuntimeContext.PendingFocusNoteId`.
+13. When the active engine reaches its ready point, it calls `MapRuntimeContext.RequestGraphReady()`. `ObsidianBridge` forwards the matching `requestId` to JavaScript as `graph:ready`, unless the id is empty.
 
 ### 3. Note focus and open-note callback
 
@@ -74,7 +96,8 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 2. Selecting a `Star` focuses the camera and calls `MapRuntimeContext.RequestOpenNote(star.Data)`.
 3. `MapRuntimeContext.OnOpenNoteRequested` reaches `ObsidianBridge.HandleOpenNoteRequested`.
 4. In WebGL builds, `ObsidianBridge` forwards the event to JavaScript via `ReverySkyBridgePostNoteOpen(noteId, notePath)`.
-5. Incoming `note:focus` messages call `ObsidianBridge.OnNoteFocus()`, which resolves the note through `Cartographer.FocusRuntimeNote()` and defers focus restore when the graph rebuild has not yet materialized the star.
+5. Incoming `note:focus` messages call `ObsidianBridge.OnNoteFocus()`, which reaches `Cartographer.FocusRuntimeNote()`.
+6. `Cartographer.FocusRuntimeNote()` resolves the star through `CurrentGraphIndex.TryGetStar(noteId, out star)` and defers focus restore when the current visual graph has not materialized that star.
 
 `note:focus` is the live-follow path for active note changes without a graph rebuild and carries full note identity.
 
@@ -96,9 +119,9 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 
 ### 6. Line rendering and node distance culling
 
-1. `Cartographer.HandleEngineNodesChanged(...)` receives the rebuilt `Star` and `TagNode` lists from the active engine, then forwards them with the active engine's line budgets to `LineBuilder.Rebuild(...)`.
-2. `LineBuilder.Rebuild(...)` stores the new limits, clears active line renderers and cached state, resizes its `ObjectPool<LineRenderer>`, registers the graph nodes, and creates candidate note-note edges from `MapRuntimeContext.Links` plus note-tag edges from each star's `TagIds`.
-3. `CullingManager.Rebuild(stars, tagNodes, lineBuilder)` scans the same physical nodes and asks each `ICullingConsumer` for an `Entry`; `LineBuilder.TryCreateDistanceEntry(...)` provides one consumer-specific culling rule per registered graph node.
+1. `Cartographer.HandleEngineNodesChanged(...)` receives rebuilt `Star` and `TagNode` scene objects, builds `CurrentGraphIndex`, and forwards it with the active engine's line budgets.
+2. `LineBuilder.Rebuild(MapGraphIndex, ...)` stores the new limits, clears active line renderers and cached state, resizes its `ObjectPool<LineRenderer>`, registers indexed graph nodes, and creates line candidates directly from `MapGraphIndex.Edges`.
+3. `CullingManager.Rebuild(MapGraphIndex, lineBuilder)` scans `MapGraphIndex.Nodes` and asks each `ICullingConsumer` for an `Entry`; `LineBuilder.TryCreateDistanceEntry(...)` provides one consumer-specific culling rule per indexed graph node.
 4. `Cartographer.Update()` refreshes culling targets after ticking moving engines, and `ScapeCameraWarper.OnWarpApplied` refreshes them after 2.5D warp movement; static layouts do not refresh bounds every frame.
 5. When `CullingGroup` changes a node's visibility, `CullingManager` calls `LineBuilder.SetDistanceVisible(...)`, which updates the visible-node set and marks the edge set dirty.
 6. `LineBuilder.LateUpdate()` applies the focused-node priority, keeps recently visible regions within a refresh budget, reconciles the desired edge set against the pooled renderers, and rewrites each active line's endpoints from the live transforms.
@@ -114,7 +137,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Entry point: bridge messages from the parent runtime
   - Calls / sends to: `MapRuntimeContext`, `Cartographer`, `ReverySkyBridgePostNoteOpen`, `ReverySkyBridgePostGraphReady`
 - `MapRuntimeContext`
-  - Responsibility: owns the live runtime graph snapshot, current graph request id, and pending focus note id.
+  - Responsibility: owns the normalized source graph data from the bridge, current graph request id, and pending focus note id.
   - Code anchor: `Assets/Scripts/Bridge/MapRuntimeContext.cs`
   - Entry point: `SetNotes`, `SetLinks`, `SetTagNames`, `SetGraphRequestId`, `RequestOpenNote`, `RequestGraphReady`
   - Calls / sends to: `Cartographer`, `StarSO`, `FocusNode`, `ObsidianBridge`
@@ -127,15 +150,20 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 ### Graph engines and layout
 
 - `Cartographer`
-  - Responsibility: chooses the active engine, rebuilds the graph, applies the current view, restores focus from the last selected star, and applies pending focus when stars appear asynchronously.
-  - Code anchor: `Assets/Scripts/StarScape/Cartographer.cs::Start`, `RebuildGraph`, `BuildGraph`, `FocusRuntimeNote`
+  - Responsibility: chooses the active engine, rebuilds the graph, builds `CurrentGraphIndex`, applies the current view, restores focus from the last selected star, and applies pending focus when stars appear asynchronously.
+  - Code anchor: `Assets/Scripts/StarScape/Cartographer.cs::Start`, `RebuildGraph`, `BuildGraph`, `HandleEngineNodesChanged`, `FocusRuntimeNote`
   - Entry point: `MapRuntimeContext.OnNotesChanged`, UI events, scene start
-  - Calls / sends to: `ICartographerEngine`, `FocusNode`, `Notification`, `ScapeCameraWarper`
+  - Calls / sends to: `ICartographerEngine`, `MapGraphIndex`, `LineBuilder`, `CullingManager`, `FocusNode`, `Notification`, `ScapeCameraWarper`
 - `ICartographerEngine`
-  - Responsibility: defines the common contract for engine selection, graph building, and navigation lookup.
+  - Responsibility: defines the common contract for engine selection, graph building, ticking, active line budgets, and published scene nodes.
   - Code anchor: `Assets/Scripts/Interfaces/ICartographerEngine.cs`
   - Entry point: implemented by active layout engines
   - Calls / sends to: `Cartographer`, `CameraOrbitalController`, `FocusNode`
+- `MapGraphIndex`
+  - Responsibility: indexes the current instantiated map as read-only visual topology: nodes, edges, note/tag/component lookups, and adjacency.
+  - Code anchor: `Assets/Scripts/StarScape/MapGraphIndex.cs::Build`, `TryGetStar`, `GetNeighborIds`, `GetIncidentEdges`
+  - Entry point: `Cartographer.HandleEngineNodesChanged`
+  - Calls / sends to: `LineBuilder`, `CullingManager`, `Cartographer.FocusRuntimeNote`
 - `CartographerForcesEngine`
   - Responsibility: builds a force-directed layout with note-tag edges, note-note links, and per-frame ticks.
   - Code anchor: `Assets/Scripts/StarScape/CartographerForcesEngine.cs::BuildGraph`, `Tick`, `ClearGraph`
@@ -176,15 +204,15 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 ### Line rendering and culling
 
 - `LineBuilder`
-  - Responsibility: owns pooled line renderers, candidate edge selection, focus-priority ordering, recent-visibility refresh, and per-frame endpoint updates for the active graph.
+  - Responsibility: consumes `MapGraphIndex`, owns pooled line renderers, focus-priority ordering, recent-visibility refresh, and per-frame endpoint updates for visible indexed edges.
   - Code anchor: `Assets/Scripts/StarScape/LineBuilder.cs::Rebuild`, `SetDistanceVisible`, `LateUpdate`, `ShowLine`
   - Entry point: `Cartographer.HandleEngineNodesChanged`, `CullingManager`, `Cartographer.CycleView`
-  - Calls / sends to: `CullingManager`, `MapRuntimeContext.Links`, `FocusNode`, `LineRenderer`
+  - Calls / sends to: `CullingManager`, `MapGraphIndex`, `FocusNode`, `LineRenderer`
 - `CullingManager`
   - Responsibility: shares one `CullingGroup` across graph-node consumers and dispatches visibility changes only when a threshold actually changes.
   - Code anchor: `Assets/Scripts/StarScape/CullingManager.cs::Rebuild`, `Register`, `RefreshTargets`, `ApplyTargetVisibility`
-  - Entry point: `Cartographer.HandleEngineNodesChanged`, `Cartographer.Update`, `ScapeCameraWarper.OnWarpApplied`, `LineBuilder.Rebuild`
-  - Calls / sends to: `LineBuilder`, `LabelCullingTarget`, `BehaviourCullingTarget`
+  - Entry point: `Cartographer.HandleEngineNodesChanged`, `Cartographer.Update`, `ScapeCameraWarper.OnWarpApplied`
+  - Calls / sends to: `MapGraphIndex`, `LineBuilder`, `LabelCullingTarget`, `BehaviourCullingTarget`
 - `ICullingConsumer` and prefab culling targets
   - Responsibility: define the distance-visibility contract used by graph-level consumers such as `LineBuilder`, `LabelCullingTarget`, and `BehaviourCullingTarget`.
   - Code anchor: `Assets/Scripts/StarScape/CullingManager.cs::ICullingConsumer`, `Assets/Scripts/StarScape/LabelCullingTarget.cs`, `Assets/Scripts/StarScape/BehaviourCullingTarget.cs`
@@ -233,9 +261,10 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
 
 - `MapRuntimeContext` is the source of truth for live runtime notes, links, tag names, runtime mode, pending focus note id, layout preference, and the `NotesVersion` counter.
 - `ObsidianBridge` owns bridge validation and all conversion from the JSON envelope into runtime models.
-- `Cartographer` owns engine selection, rebuild timing, current view, rebuild focus restoration, and pending focus application.
+- `Cartographer` owns engine selection, rebuild timing, current view, `CurrentGraphIndex` creation, rebuild focus restoration, and pending focus application.
 - `CartographerForcesEngine`, `Cartographer25DEngine`, and the engine assigned to `Cartographer.staticLinksEngineBehaviour` own placement and cleanup of instantiated stars and tags for their respective layout strategies; line visuals are handed off to `LineBuilder` after the engine raises `OnNodesChanged`.
-- `LineBuilder` owns pooled line renderers, candidate edge selection, focus-priority ordering, recent-visibility refresh, and the per-frame endpoint refresh for the active graph.
+- `MapGraphIndex` is the shared read-only topology index for the current engine-built visual map. It is built once per engine node publication from engine-owned `Star`/`TagNode` objects and `MapRuntimeContext.Links`, remains valid until the next graph rebuild, and is read by line rendering, culling, and focus lookup.
+- `LineBuilder` owns pooled line renderers, focus-priority ordering, recent-visibility refresh, and the per-frame endpoint refresh for indexed edges. It does not rebuild note/tag lookups or own graph topology.
 - The current scene wiring assigns the `StaticLinks` slot to the RecursiveHubs baseline under eval, which can continue construction or refinement through `Tick()` after `BuildGraph()`. `Engine_EmptySpheres` remains a static fallback/evaluation engine with EditMode coverage for its radius calculations and static contract.
 - RecursiveHubs space preservation is owned by the engine, not by Unity physics. The engine applies a deterministic spatial-grid node-spacing projection during refinement, after link contraction, and caps per-node collision checks for dense maps.
 - `ScapeCameraWarper` owns the 2.5D warp state and only participates when the active engine is `Static25D`.
@@ -278,7 +307,7 @@ The Unity runtime consumes bridge payloads and never derives the vault graph on 
   - Automated checks: `Assets/Tests/EditMode/CartographerForcesEngineRadiusEditModeTests.cs`, `Assets/Tests/EditMode/CartographerScalableLinksEngineEditModeTests.cs`, PlayMode engine-preference checks in `Assets/Tests/PlayMode/StarScapeRuntimePlayModeTests.cs`
   - Manual checks when needed: inspect force layout, static-link slot output, RecursiveHubs node spacing on hub-heavy maps, date-range behavior, and the `Static25D` camera slider
 - Line rendering and culling:
-  - Automated checks: `Assets/Tests/EditMode/LineBuilderEditModeTests.cs`
+  - Automated checks: `Assets/Tests/EditMode/MapGraphIndexEditModeTests.cs`, `Assets/Tests/EditMode/LineBuilderEditModeTests.cs`
   - Manual checks when needed: load a populated graph, switch between `Planets` and `Plain`, and confirm lines appear only in `Planets`, react to focus and visibility changes, and keep their endpoints attached to moving nodes
 - PlayMode bootstrap and visual stability:
   - Automated checks: `Assets/Tests/PlayMode/StarScapeRuntimePlayModeTests.cs` (`StarScapeRuntimePlayModeTests`)

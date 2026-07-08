@@ -523,11 +523,6 @@ public class ObsidianBridgeEditModeTests
       remove { }
     }
 
-    public Star FindStarByNoteId(string noteId)
-    {
-      return null;
-    }
-
     public void Tick(float dt) { }
     public void BuildGraph(List<NoteData> notes) { }
     public void ClearGraph() { }

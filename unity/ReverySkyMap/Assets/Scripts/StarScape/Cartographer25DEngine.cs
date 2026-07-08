@@ -259,19 +259,6 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
     }
   }
 
-  public Star FindStarByNoteId(string noteId)
-  {
-    if (string.IsNullOrEmpty(noteId)) return null;
-
-    for (int i = 0; i < _stars.Count; i++)
-    {
-      var star = _stars[i];
-      if (star != null && star.Data != null && star.Data.Id == noteId)
-        return star;
-    }
-    return null;
-  }
-
   private static float RandomRange(System.Random rng, float min, float max)
   {
     return min + (float)rng.NextDouble() * (max - min);

@@ -77,11 +77,8 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   [SerializeField, Min(1)] private int maxLinesPerNode = 50;
 
   private readonly HashSet<int> registeredNodeIds = new();
-  private readonly Dictionary<string, Star> starByNoteId = new(StringComparer.Ordinal);
-  private readonly Dictionary<int, TagNode> tagNodeById = new();
   private readonly Dictionary<int, List<LineCandidate>> candidatesByNodeId = new();
   private readonly Dictionary<EdgeKey, LineBinding> activeLinesByEdgeKey = new();
-  private readonly HashSet<EdgeKey> edgeKeys = new();
   private readonly HashSet<int> visibleNodeIds = new();
   // One-shot batch of nodes that crossed into visibility since the last reconciliation.
   // Current visibility remains authoritative, so fast fly-by nodes can be skipped lazily.
@@ -99,8 +96,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   private int focusedNodeId;
 
   public void Rebuild(
-    IReadOnlyList<Star> stars,
-    IReadOnlyList<TagNode> tagNodes,
+    MapGraphIndex graphIndex,
     int maxActiveLines,
     int maxActiveLongLines)
   {
@@ -114,10 +110,8 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     if (activeLineLimit == 0)
       return;
 
-    RegisterStarNodes(stars);
-    RegisterTagNodes(tagNodes);
-    BuildNoteNoteCandidates();
-    BuildNoteTagCandidates(stars);
+    RegisterGraphNodes(graphIndex);
+    BuildLineCandidates(graphIndex);
   }
 
   private void OnDestroy()
@@ -139,10 +133,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   private void ClearLineState()
   {
     registeredNodeIds.Clear();
-    starByNoteId.Clear();
-    tagNodeById.Clear();
     candidatesByNodeId.Clear();
-    edgeKeys.Clear();
     visibleNodeIds.Clear();
     ClearReconciliationScratch();
   }
@@ -246,41 +237,17 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
       RemoveLine(staleLineKeys[i]);
   }
 
-  private void RegisterStarNodes(IReadOnlyList<Star> stars)
+  private void RegisterGraphNodes(MapGraphIndex graphIndex)
   {
-    if (stars == null)
+    if (graphIndex == null)
       return;
 
-    for (int i = 0; i < stars.Count; i++)
+    IReadOnlyList<MapGraphNode> nodes = graphIndex.Nodes;
+    for (int i = 0; i < nodes.Count; i++)
     {
-      Star star = stars[i];
-      if (star == null || star.Data == null || string.IsNullOrWhiteSpace(star.Data.Id))
-        continue;
-
-      if (starByNoteId.ContainsKey(star.Data.Id))
-        continue;
-
-      starByNoteId[star.Data.Id] = star;
-      RegisterNode(star);
-    }
-  }
-
-  private void RegisterTagNodes(IReadOnlyList<TagNode> tagNodes)
-  {
-    if (tagNodes == null)
-      return;
-
-    for (int i = 0; i < tagNodes.Count; i++)
-    {
-      TagNode tagNode = tagNodes[i];
-      if (tagNode == null)
-        continue;
-
-      if (tagNodeById.ContainsKey(tagNode.UserTagId))
-        continue;
-
-      tagNodeById[tagNode.UserTagId] = tagNode;
-      RegisterNode(tagNode);
+      Component component = nodes[i].Component;
+      if (component != null)
+        RegisterNode(component);
     }
   }
 
@@ -296,50 +263,20 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     EnsureCandidateList(nodeId);
   }
 
-  private void BuildNoteNoteCandidates()
+  private void BuildLineCandidates(MapGraphIndex graphIndex)
   {
-    if (MapRuntimeContext.Links == null)
+    if (graphIndex == null)
       return;
 
-    foreach (var link in MapRuntimeContext.Links)
+    IReadOnlyList<MapGraphEdge> edges = graphIndex.Edges;
+    for (int i = 0; i < edges.Count; i++)
     {
-      if (link == null ||
-          string.IsNullOrWhiteSpace(link.SourceId) ||
-          string.IsNullOrWhiteSpace(link.TargetId) ||
-          string.Equals(link.SourceId, link.TargetId, StringComparison.Ordinal))
-      {
+      MapGraphEdge edge = edges[i];
+      if (!graphIndex.TryGetNode(edge.NodeA, out var nodeA) ||
+          !graphIndex.TryGetNode(edge.NodeB, out var nodeB))
         continue;
-      }
 
-      if (!starByNoteId.TryGetValue(link.SourceId, out Star sourceStar) ||
-          !starByNoteId.TryGetValue(link.TargetId, out Star targetStar))
-      {
-        continue;
-      }
-
-      TryAddCandidate(sourceStar, targetStar);
-    }
-  }
-
-  private void BuildNoteTagCandidates(IReadOnlyList<Star> stars)
-  {
-    if (stars == null)
-      return;
-
-    for (int i = 0; i < stars.Count; i++)
-    {
-      Star star = stars[i];
-      if (star == null || star.Data == null || star.Data.TagIds == null ||
-          !registeredNodeIds.Contains(NodeId(star)))
-      {
-        continue;
-      }
-
-      for (int tagIndex = 0; tagIndex < star.Data.TagIds.Count; tagIndex++)
-      {
-        if (tagNodeById.TryGetValue(star.Data.TagIds[tagIndex], out TagNode tagNode))
-          TryAddCandidate(star, tagNode);
-      }
+      TryAddCandidate(nodeA.Component, nodeB.Component);
     }
   }
 
@@ -358,9 +295,6 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     }
 
     EdgeKey edgeKey = new(nodeAId, nodeBId);
-    if (!edgeKeys.Add(edgeKey))
-      return;
-
     var candidate = new LineCandidate
     {
       edgeKey = edgeKey,

@@ -681,20 +681,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     }
   }
 
-  public Star FindStarByNoteId(string noteId)
-  {
-    if (string.IsNullOrEmpty(noteId)) return null;
-
-    for (int i = 0; i < _stars.Count; i++)
-    {
-      var star = _stars[i];
-      if (star != null && star.Data != null && star.Data.Id == noteId)
-        return star;
-    }
-
-    return null;
-  }
-
   private void BuildLogicalGraph(List<NoteData> notes)
   {
     var orderedNotes = (notes ?? new List<NoteData>())

@@ -320,19 +320,6 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
     }
   }
 
-  public Star FindStarByNoteId(string noteId)
-  {
-    if (string.IsNullOrEmpty(noteId)) return null;
-
-    for (int i = 0; i < _stars.Count; i++)
-    {
-      var star = _stars[i];
-      if (star != null && star.Data != null && star.Data.Id == noteId)
-        return star;
-    }
-    return null;
-  }
-
   public static void CalculateLayoutRadii(
     int totalNodeCount,
     float nodeSpacingFactor,

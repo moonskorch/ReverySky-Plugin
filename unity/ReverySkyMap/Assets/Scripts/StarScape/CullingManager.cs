@@ -106,14 +106,8 @@ public sealed class CullingManager : MonoBehaviour
     ApplyCurrentVisibility();
   }
 
-  public void Rebuild(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes)
-  {
-    Rebuild(stars, tagNodes, null);
-  }
-
   public void Rebuild(
-    IReadOnlyList<Star> stars,
-    IReadOnlyList<TagNode> tagNodes,
+    MapGraphIndex graphIndex,
     ICullingConsumer extraConsumer)
   {
     DisposeCullingGroup();
@@ -121,8 +115,7 @@ public sealed class CullingManager : MonoBehaviour
     nodeTargets.Clear();
 
     // Cartographer owns graph lifecycle, so culling registrations are rebuilt in one batch.
-    AddTargetsFromStars(stars, extraConsumer);
-    AddTargetsFromTagNodes(tagNodes, extraConsumer);
+    AddTargetsFromGraphIndex(graphIndex, extraConsumer);
 
     EnsureCullingGroup();
     EnsureSphereCapacity(nodeTargets.Count);
@@ -420,26 +413,16 @@ public sealed class CullingManager : MonoBehaviour
     return -1;
   }
 
-  private void AddTargetsFromStars(
-    IReadOnlyList<Star> stars,
+  private void AddTargetsFromGraphIndex(
+    MapGraphIndex graphIndex,
     ICullingConsumer extraConsumer)
   {
-    if (stars == null)
+    if (graphIndex == null)
       return;
 
-    for (int i = 0; i < stars.Count; i++)
-      AddTargetFromComponent(stars[i], extraConsumer);
-  }
-
-  private void AddTargetsFromTagNodes(
-    IReadOnlyList<TagNode> tagNodes,
-    ICullingConsumer extraConsumer)
-  {
-    if (tagNodes == null)
-      return;
-
-    for (int i = 0; i < tagNodes.Count; i++)
-      AddTargetFromComponent(tagNodes[i], extraConsumer);
+    IReadOnlyList<MapGraphNode> nodes = graphIndex.Nodes;
+    for (int i = 0; i < nodes.Count; i++)
+      AddTargetFromComponent(nodes[i].Component, extraConsumer);
   }
 
   private void AddTargetFromComponent(

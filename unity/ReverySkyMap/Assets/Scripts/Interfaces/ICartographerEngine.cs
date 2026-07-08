@@ -18,7 +18,6 @@ public interface ICartographerEngine
   ScapeCameraWarper ScapeWarper { get; }
   IReadOnlyList<Star> Stars { get; }
   IReadOnlyList<TagNode> TagNodes { get; }
-  Star FindStarByNoteId(string noteId);
 
   void BuildGraph(List<NoteData> notes);
   void ClearGraph();
