@@ -2552,7 +2552,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ReverySkyMap.Runtime::FocusHighlighter
   lineBuilder: {fileID: 1217411434}
-  focusedLineColor: {r: 0, g: 2.297397, b: 2.297397, a: 1}
+  focusedLineColor: {r: 0, g: 2, b: 2, a: 1}
 --- !u!1 &1787028428
 GameObject:
   m_ObjectHideFlags: 0

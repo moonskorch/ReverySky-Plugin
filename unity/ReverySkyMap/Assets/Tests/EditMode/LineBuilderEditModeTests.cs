@@ -462,7 +462,7 @@ public class LineBuilderEditModeTests
   }
 
   [UnityTest]
-  public IEnumerator ApplyFocusHighlightChange_HighlightsActiveIncidentLines()
+  public IEnumerator ApplyHighlight_HighlightsActiveIncidentLines()
   {
     using var scope = CreateScope();
     ConfigureStar(scope.NoteA, "n1", "notes/n1.md");
@@ -480,14 +480,14 @@ public class LineBuilderEditModeTests
     LineRenderer line = GetOnlyActiveLine(scope.LineParent);
     Color focusColor = new(0f, 2.5f, 2.5f, 1f);
 
-    scope.Builder.ApplyFocusHighlightChange(MapGraphNodeId.None, GetNodeId(graphIndex, scope.NoteA), focusColor);
+    scope.Builder.ApplyHighlight(MapGraphNodeId.None, GetNodeId(graphIndex, scope.NoteA), focusColor);
 
     AssertLineHighlight(line, focusColor);
     yield return null;
   }
 
   [UnityTest]
-  public IEnumerator ApplyFocusHighlightChange_ClearsPreviousFocusedLines()
+  public IEnumerator ApplyHighlight_ClearsPreviousFocusedLines()
   {
     using var scope = CreateScope();
     var noteCObject = new GameObject("LineBuilderEditModeTests_NoteC");
@@ -528,11 +528,11 @@ public class LineBuilderEditModeTests
       MapGraphNodeId nodeAId = GetNodeId(graphIndex, scope.NoteA);
       MapGraphNodeId nodeCId = GetNodeId(graphIndex, noteC);
 
-      scope.Builder.ApplyFocusHighlightChange(MapGraphNodeId.None, nodeAId, focusColor);
+      scope.Builder.ApplyHighlight(MapGraphNodeId.None, nodeAId, focusColor);
       AssertLineHighlight(lineAB, focusColor);
       AssertLineHighlightCleared(lineCD);
 
-      scope.Builder.ApplyFocusHighlightChange(nodeAId, nodeCId, focusColor);
+      scope.Builder.ApplyHighlight(nodeAId, nodeCId, focusColor);
       AssertLineHighlightCleared(lineAB);
       AssertLineHighlight(lineCD, focusColor);
     }
@@ -560,7 +560,7 @@ public class LineBuilderEditModeTests
     MapGraphIndex graphIndex = RebuildWithIndex(scope.Builder, new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode>(), 1, 10);
     Color focusColor = new(0f, 2.5f, 2.5f, 1f);
     SetFocusedStar(scope.Focus, graphIndex, scope.NoteA);
-    scope.Builder.ApplyFocusHighlightChange(MapGraphNodeId.None, GetNodeId(graphIndex, scope.NoteA), focusColor);
+    scope.Builder.ApplyHighlight(MapGraphNodeId.None, GetNodeId(graphIndex, scope.NoteA), focusColor);
 
     FlushLineBuilder(scope.Builder);
 
@@ -607,7 +607,7 @@ public class LineBuilderEditModeTests
 
       LineRenderer highlightedLine = GetOnlyActiveLine(scope.LineParent);
       Color focusColor = new(0f, 2.5f, 2.5f, 1f);
-      scope.Builder.ApplyFocusHighlightChange(MapGraphNodeId.None, GetNodeId(graphIndex, scope.NoteA), focusColor);
+      scope.Builder.ApplyHighlight(MapGraphNodeId.None, GetNodeId(graphIndex, scope.NoteA), focusColor);
       AssertLineHighlight(highlightedLine, focusColor);
 
       scope.Builder.SetDistanceVisible(scope.NoteA, false);

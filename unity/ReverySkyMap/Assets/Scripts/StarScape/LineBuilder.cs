@@ -210,7 +210,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     lineSetDirty = true;
   }
 
-  public void ApplyFocusHighlightChange(
+  public void ApplyHighlight(
     MapGraphNodeId previousFocusedNodeId,
     MapGraphNodeId nextFocusedNodeId,
     Color focusColor)

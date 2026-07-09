@@ -66,6 +66,8 @@
 - Never broad-delete, move, or restructure in one batch.
 - Do not modify `*.unity`, `*.prefab`, `*.asset`, or `*.meta` unless the task explicitly requires it.
 - Do not add or keep unrealistic defensive guards or guards that can never fire; if you can prove a guard cannot trigger, remove it instead of preserving filler logic.
+- Do not add null or missing-wiring checks for project-owned invariants that are already guaranteed by scene setup, constructors, field initializers, or private call paths; rely on the contract and let real violations fail visibly.
+- Prefer short, precise names for methods, variables, and tests; avoid long compound names when the owning type or local context already supplies the missing meaning.
 - Do not introduce one-to-one local aliases that are assigned once and only read; use the original name unless the source expression or name is long enough that a local improves readability.
 - Generated state:
   - `Library/`

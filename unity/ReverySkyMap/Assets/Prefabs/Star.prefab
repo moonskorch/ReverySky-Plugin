@@ -284,6 +284,8 @@ MonoBehaviour:
   - {fileID: 4709714922754719655}
   radius: 1.5
   visibleDistance: 35
+  focusedTextColor: {r: 1, g: 0.9466307, b: 0.332884, a: 1}
+  linkedTextColor: {r: 1, g: 0.95882356, b: 0.49999994, a: 1}
 --- !u!114 &6198472612096341012
 MonoBehaviour:
   m_ObjectHideFlags: 0

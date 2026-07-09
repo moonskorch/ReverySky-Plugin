@@ -177,6 +177,8 @@ MonoBehaviour:
   - {fileID: 8817344900950793421}
   radius: 1
   visibleDistance: 200
+  focusedTextColor: {r: 0.7137255, g: 1, b: 1, a: 1}
+  linkedTextColor: {r: 0.83962256, g: 1, b: 1, a: 1}
 --- !u!1001 &4410025161415576194
 PrefabInstance:
   m_ObjectHideFlags: 0
