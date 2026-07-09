@@ -67,7 +67,7 @@ public sealed class CullingManager : MonoBehaviour
     public bool lastVisible;
   }
 
-  public static CullingManager Active { get; private set; }
+  public static CullingManager I { get; private set; }
 
   [SerializeField] private Camera targetCamera;
   [SerializeField] private bool requireCameraFrustumVisibility = true;
@@ -81,14 +81,14 @@ public sealed class CullingManager : MonoBehaviour
 
   private void Awake()
   {
-    Active = this;
+    I = this;
   }
 
   private void OnDestroy()
   {
     DisposeCullingGroup();
-    if (Active == this)
-      Active = null;
+    if (I == this)
+      I = null;
   }
 
   public void Rebuild()

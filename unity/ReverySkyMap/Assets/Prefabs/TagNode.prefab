@@ -102,7 +102,6 @@ GameObject:
   - component: {fileID: 5030748995284649589}
   - component: {fileID: 2862403751441914159}
   - component: {fileID: 559747653965777}
-  - component: {fileID: 6831974125027816031}
   m_Layer: 0
   m_Name: TagNode
   m_TagString: Untagged
@@ -174,22 +173,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   referenceTransform: {fileID: 3397622264585741943}
   labelRoot: {fileID: 7207405654732485564}
-  radius: 1
-  visibleDistance: 200
---- !u!114 &6831974125027816031
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4970363305891615080}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2f0cc707da174079b7f35e66ee850c63, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  referenceTransform: {fileID: 3397622264585741943}
-  behaviour: {fileID: 8817344900950793421}
+  relatedBehaviours:
+  - {fileID: 8817344900950793421}
   radius: 1
   visibleDistance: 200
 --- !u!1001 &4410025161415576194

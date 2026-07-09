@@ -173,17 +173,17 @@ public class ObsidianBridgeEditModeTests
         new List<MapRuntimeContext.RuntimeNoteLink>());
 
       SetPrivateField(cartographer, "_dynamicLinksEngine", new TestCartographerEngine(MapLayoutMode.DynamicLinks));
-      SetPrivateField(cartographer, "<CurrentGraphIndex>k__BackingField", staleIndex);
+      SetPrivateField(cartographer, "<GraphIndex>k__BackingField", staleIndex);
 
-      Assert.That(cartographer.CurrentGraphIndex.TryGetStar("stale", out _), Is.True);
+      Assert.That(cartographer.GraphIndex.TryGetStar("stale", out _), Is.True);
 
       MethodInfo buildGraph = typeof(Cartographer).GetMethod("BuildGraph", BindingFlags.Instance | BindingFlags.NonPublic);
       Assert.That(buildGraph, Is.Not.Null);
 
       buildGraph.Invoke(cartographer, new object[] { new List<NoteData>(), MapLayoutMode.DynamicLinks });
 
-      Assert.That(cartographer.CurrentGraphIndex.Nodes, Is.Empty);
-      Assert.That(cartographer.CurrentGraphIndex.TryGetStar("stale", out _), Is.False);
+      Assert.That(cartographer.GraphIndex.Nodes, Is.Empty);
+      Assert.That(cartographer.GraphIndex.TryGetStar("stale", out _), Is.False);
     }
     finally
     {

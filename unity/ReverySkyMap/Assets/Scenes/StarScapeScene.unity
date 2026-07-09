@@ -2534,8 +2534,8 @@ MonoBehaviour:
   injectSampleData: 0
   connectionModel: 3
   islands: 0
-  noteCount: 250
-  tagPoolSize: 50
+  noteCount: 2500
+  tagPoolSize: 400
   dateSpanDays: 365
   maxTagsPerNote: 4
   linkDensity: 31
@@ -2552,7 +2552,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ReverySkyMap.Runtime::FocusHighlighter
   lineBuilder: {fileID: 1217411434}
-  focusedLineColor: {r: 0, g: 2.828427, b: 2.828427, a: 1}
+  focusedLineColor: {r: 0, g: 2.297397, b: 2.297397, a: 1}
 --- !u!1 &1787028428
 GameObject:
   m_ObjectHideFlags: 0

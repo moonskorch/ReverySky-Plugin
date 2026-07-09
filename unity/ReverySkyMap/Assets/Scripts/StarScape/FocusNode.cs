@@ -77,7 +77,7 @@ public class FocusNode : MonoBehaviour
   private bool SelectGraphNode(Component component)
   {
     // Resolve through the graph index so focus and LineBuilder use the same node id space.
-    var graphIndex = Cartographer.I.CurrentGraphIndex;
+    var graphIndex = Cartographer.I.GraphIndex;
     if (!graphIndex.TryGetNodeId(component, out var nodeId) ||
         !graphIndex.TryGetNode(nodeId, out var node))
     {

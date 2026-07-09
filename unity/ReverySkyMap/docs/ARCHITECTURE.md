@@ -49,7 +49,7 @@ Core ownership rule:
   - Important dependencies: `StarSO`, `TagNodeSO`, `ScapeCameraWarper`, `NoteData`, `MapRuntimeContext.RuntimeNoteLink`, `MaxActiveLines`, `MaxActiveLongLines`, `OnNodesChanged`
 - Line rendering and culling:
   - Responsibility: consume `MapGraphIndex`, build pooled line renderers for indexed edges, keep the visible edge set in sync with node visibility and focus, and share the distance-culling pipeline with other consumers.
-  - Main code location: `Assets/Scripts/StarScape/LineBuilder.cs`, `Assets/Scripts/StarScape/CullingManager.cs`, `Assets/Scripts/StarScape/BehaviourCullingTarget.cs`, `Assets/Scripts/StarScape/LabelCullingTarget.cs`
+  - Main code location: `Assets/Scripts/StarScape/LineBuilder.cs`, `Assets/Scripts/StarScape/CullingManager.cs`, `Assets/Scripts/StarScape/BehaviourCullingTarget.cs`, `Assets/Scripts/StarScape/LabelPresenter.cs`
   - Important dependencies: `MapGraphIndex`, `FocusNode.SelectedStar`, `ICullingConsumer`, `LineRenderer`, `ObjectPool<LineRenderer>`, `CullingGroup`
 - Interaction and camera:
   - Responsibility: turns device input into selection, pan, orbit, zoom, view switching, and note-open actions.
@@ -57,7 +57,7 @@ Core ownership rule:
   - Important dependencies: `EventSystem`, `Camera.main`, `MapRuntimeContext`, `Cartographer.I`, `GameSettings`
 - Visual assets and support objects:
   - Responsibility: provide prefabs, scale calibration, labels, shared culling consumers, and the optional sample graph injector.
-  - Main code location: `Assets/Scripts/ScriptableObjects/StarSO.cs`, `Assets/Scripts/ScriptableObjects/TagNodeSO.cs`, `Assets/Scripts/StarScape/CullingManager.cs`, `Assets/Scripts/StarScape/LabelCullingTarget.cs`, `Assets/Scripts/StarScape/BehaviourCullingTarget.cs`, `Assets/Scripts/Notification/Notification.cs`, `Assets/Scripts/StarScape/SampleDataGenerator.cs`
+  - Main code location: `Assets/Scripts/ScriptableObjects/StarSO.cs`, `Assets/Scripts/ScriptableObjects/TagNodeSO.cs`, `Assets/Scripts/StarScape/CullingManager.cs`, `Assets/Scripts/StarScape/LabelPresenter.cs`, `Assets/Scripts/StarScape/BehaviourCullingTarget.cs`, `Assets/Scripts/Notification/Notification.cs`, `Assets/Scripts/StarScape/SampleDataGenerator.cs`
   - Important dependencies: `MapRuntimeContext.NotesVersion`, `MapRuntimeContext.HasRuntimeNotes`, prefab assets in `Assets/Prefabs`
 - Automated checks:
   - Responsibility: guard bridge parsing, layout rules, and PlayMode bootstrap/visual stability.
@@ -83,8 +83,8 @@ Core ownership rule:
 5. `Cartographer.HandleRuntimeNotesChanged()` calls `RebuildGraph(MapRuntimeContext.MapLayoutPreference)`.
 6. `Cartographer.ResolveModeByNotesCount()` uses `defaultEngine` first. Without an override, explicit `Static25D` and `StaticLinks` stay fixed, while `Auto` and `Forces` resolve by note count: small graphs use `Forces`, large graphs use `StaticLinks`.
 7. The chosen engine runs `BuildGraph(notes)` and emits `OnNodesChanged` with the instantiated `Star` and `TagNode` scene objects.
-8. `Cartographer.HandleEngineNodesChanged(...)` builds `CurrentGraphIndex = MapGraphIndex.Build(stars, tagNodes, MapRuntimeContext.Links)`.
-9. `Cartographer` passes the same `CurrentGraphIndex` to `LineBuilder.Rebuild(...)` and `CullingManager.Rebuild(...)`; `OnGraphVisualsChanged` remains as the legacy raw-node notification surface.
+8. `Cartographer.HandleEngineNodesChanged(...)` builds `GraphIndex = MapGraphIndex.Build(stars, tagNodes, MapRuntimeContext.Links)`.
+9. `Cartographer` passes the same `GraphIndex` to `LineBuilder.Rebuild(...)` and `CullingManager.Rebuild(...)`; `OnGraphVisualsChanged` remains as the legacy raw-node notification surface.
 10. `BuildGraph(...)` applies `CurrentView`, rebinds the active `ScapeCameraWarper`, and logs build timing.
 11. After `BuildGraph()`, `Cartographer` restores focus only from `FocusNode.FocusRestoreNoteId`; missing focus calls `ResetFocus()`.
 12. Incremental engines retry delayed focus through `MapRuntimeContext.PendingFocusNoteId`.
@@ -97,7 +97,7 @@ Core ownership rule:
 3. `MapRuntimeContext.OnOpenNoteRequested` reaches `ObsidianBridge.HandleOpenNoteRequested`.
 4. In WebGL builds, `ObsidianBridge` forwards the event to JavaScript via `ReverySkyBridgePostNoteOpen(noteId, notePath)`.
 5. Incoming `note:focus` messages call `ObsidianBridge.OnNoteFocus()`, which reaches `Cartographer.FocusRuntimeNote()`.
-6. `Cartographer.FocusRuntimeNote()` resolves the star through `CurrentGraphIndex.TryGetStar(noteId, out star)` and defers focus restore when the current visual graph has not materialized that star.
+6. `Cartographer.FocusRuntimeNote()` resolves the star through `GraphIndex.TryGetStar(noteId, out star)` and defers focus restore when the current visual graph has not materialized that star.
 
 `note:focus` is the live-follow path for active note changes without a graph rebuild and carries full note identity.
 
@@ -119,7 +119,7 @@ Core ownership rule:
 
 ### 6. Line rendering and node distance culling
 
-1. `Cartographer.HandleEngineNodesChanged(...)` receives rebuilt `Star` and `TagNode` scene objects, builds `CurrentGraphIndex`, and forwards it with the active engine's line budgets.
+1. `Cartographer.HandleEngineNodesChanged(...)` receives rebuilt `Star` and `TagNode` scene objects, builds `GraphIndex`, and forwards it with the active engine's line budgets.
 2. `LineBuilder.Rebuild(MapGraphIndex, ...)` stores the new limits, clears active line renderers and cached state, resizes its `ObjectPool<LineRenderer>`, registers indexed graph nodes, and creates line candidates directly from `MapGraphIndex.Edges`.
 3. `CullingManager.Rebuild(MapGraphIndex, lineBuilder)` scans `MapGraphIndex.Nodes` and asks each `ICullingConsumer` for an `Entry`; `LineBuilder.TryCreateDistanceEntry(...)` provides one consumer-specific culling rule per indexed graph node.
 4. `Cartographer.Update()` refreshes culling targets after ticking moving engines, and `ScapeCameraWarper.OnWarpApplied` refreshes them after 2.5D warp movement; static layouts do not refresh bounds every frame.
@@ -150,7 +150,7 @@ Core ownership rule:
 ### Graph engines and layout
 
 - `Cartographer`
-  - Responsibility: chooses the active engine, rebuilds the graph, builds `CurrentGraphIndex`, applies the current view, restores focus from the last selected star, and applies pending focus when stars appear asynchronously.
+  - Responsibility: chooses the active engine, rebuilds the graph, builds `GraphIndex`, applies the current view, restores focus from the last selected star, and applies pending focus when stars appear asynchronously.
   - Code anchor: `Assets/Scripts/StarScape/Cartographer.cs::Start`, `RebuildGraph`, `BuildGraph`, `HandleEngineNodesChanged`, `FocusRuntimeNote`
   - Entry point: `MapRuntimeContext.OnNotesChanged`, UI events, scene start
   - Calls / sends to: `ICartographerEngine`, `MapGraphIndex`, `LineBuilder`, `CullingManager`, `FocusNode`, `Notification`, `ScapeCameraWarper`
@@ -212,10 +212,10 @@ Core ownership rule:
   - Responsibility: shares one `CullingGroup` across graph-node consumers and dispatches visibility changes only when a threshold actually changes.
   - Code anchor: `Assets/Scripts/StarScape/CullingManager.cs::Rebuild`, `Register`, `RefreshTargets`, `ApplyTargetVisibility`
   - Entry point: `Cartographer.HandleEngineNodesChanged`, `Cartographer.Update`, `ScapeCameraWarper.OnWarpApplied`
-  - Calls / sends to: `MapGraphIndex`, `LineBuilder`, `LabelCullingTarget`, `BehaviourCullingTarget`
+  - Calls / sends to: `MapGraphIndex`, `LineBuilder`, `LabelPresenter`, `BehaviourCullingTarget`
 - `ICullingConsumer` and prefab culling targets
-  - Responsibility: define the distance-visibility contract used by graph-level consumers such as `LineBuilder`, `LabelCullingTarget`, and `BehaviourCullingTarget`.
-  - Code anchor: `Assets/Scripts/StarScape/CullingManager.cs::ICullingConsumer`, `Assets/Scripts/StarScape/LabelCullingTarget.cs`, `Assets/Scripts/StarScape/BehaviourCullingTarget.cs`
+  - Responsibility: define the distance-visibility contract used by graph-level consumers such as `LineBuilder`, `LabelPresenter`, and `BehaviourCullingTarget`.
+  - Code anchor: `Assets/Scripts/StarScape/CullingManager.cs::ICullingConsumer`, `Assets/Scripts/StarScape/LabelPresenter.cs`, `Assets/Scripts/StarScape/BehaviourCullingTarget.cs`
   - Entry point: `CullingManager.Rebuild`
   - Calls / sends to: `CullingManager`
 
@@ -261,7 +261,7 @@ Core ownership rule:
 
 - `MapRuntimeContext` is the source of truth for live runtime notes, links, tag names, runtime mode, pending focus note id, layout preference, and the `NotesVersion` counter.
 - `ObsidianBridge` owns bridge validation and all conversion from the JSON envelope into runtime models.
-- `Cartographer` owns engine selection, rebuild timing, current view, `CurrentGraphIndex` creation, rebuild focus restoration, and pending focus application.
+- `Cartographer` owns engine selection, rebuild timing, current view, `GraphIndex` creation, rebuild focus restoration, and pending focus application.
 - `CartographerForcesEngine`, `Cartographer25DEngine`, and the engine assigned to `Cartographer.staticLinksEngineBehaviour` own placement and cleanup of instantiated stars and tags for their respective layout strategies; line visuals are handed off to `LineBuilder` after the engine raises `OnNodesChanged`.
 - `MapGraphIndex` is the shared read-only topology index for the current engine-built visual map. It is built once per engine node publication from engine-owned `Star`/`TagNode` objects and `MapRuntimeContext.Links`, remains valid until the next graph rebuild, and is read by line rendering, culling, and focus lookup.
 - `LineBuilder` owns pooled line renderers, focus-priority ordering, recent-visibility refresh, and the per-frame endpoint refresh for indexed edges. It does not rebuild note/tag lookups or own graph topology.
@@ -270,7 +270,7 @@ Core ownership rule:
 - `ScapeCameraWarper` owns the 2.5D warp state and only participates when the active engine is `Static25D`.
 - `StarSO` recomputes note-length scale buckets whenever `MapRuntimeContext.NotesVersion` changes.
 - `CullingManager` owns the shared `CullingGroup` and threshold transitions for graph nodes. Runtime tracking is split into `NodeTarget` and `Interest`: a `NodeTarget` is one physical graph node and one culling sphere, while each `Interest` is one consumer-specific distance rule and last visibility state. Bounds refreshes are explicit after engine ticks and warp application, not a standalone every-frame manager loop.
-- `ICullingConsumer` is the prefab-side contract for distance-driven behavior. A consumer describes its own `Entry` request and receives `SetDistanceVisible(node, visible)` only for first application or real threshold changes. Current consumers are `LabelCullingTarget` for label roots and `BehaviourCullingTarget` for one serialized `Behaviour`.
+- `ICullingConsumer` is the prefab-side contract for distance-driven behavior. A consumer describes its own `Entry` request and receives `SetDistanceVisible(node, visible)` only for first application or real threshold changes. Current consumers are `LabelPresenter` for label roots and related label behaviors, and `BehaviourCullingTarget` for one serialized `Behaviour`.
 - `GameInput` treats UI hits as blocked input and only forwards gestures that originate on the map.
 - Bridge contract rules that matter locally:
   - `protocolVersion` must match `2.0.0`.

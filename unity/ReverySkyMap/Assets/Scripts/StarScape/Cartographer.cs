@@ -2,7 +2,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 public class Cartographer : MonoBehaviour
@@ -32,7 +31,6 @@ public class Cartographer : MonoBehaviour
   [Header("Debug sample data")]
   [SerializeField] private SampleDataGenerator sampleDataGenerator;
   [SerializeField] private LineBuilder lineBuilder;
-  [FormerlySerializedAs("nodeDistanceCullingManager")]
   [SerializeField] private CullingManager cullingManager;
 
   private ScapeView currentView = ScapeView.Planets;
@@ -50,7 +48,7 @@ public class Cartographer : MonoBehaviour
   public ICartographerEngine ActiveEngine => _activeEngine;
   public ICartographerEngine StaticSlotEngine => _scalableLinksEngine;
   public Cartographer25DEngine Static25DEngine => (Cartographer25DEngine)_datesEngine;
-  public MapGraphIndex CurrentGraphIndex { get; private set; } = MapGraphIndex.Empty;
+  public MapGraphIndex GraphIndex { get; private set; } = MapGraphIndex.Empty;
 
   public event Action<MapLayoutMode> OnEngineChanged;
   public event Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnGraphVisualsChanged;
@@ -231,7 +229,7 @@ public class Cartographer : MonoBehaviour
     if (string.IsNullOrWhiteSpace(noteId))
       return;
 
-    if (!CurrentGraphIndex.TryGetStar(noteId, out var star))
+    if (!GraphIndex.TryGetStar(noteId, out var star))
     {
       // The active engine has no instantiated star for this note yet, so keep the latest focus as pending.
       MapRuntimeContext.PendingFocusNoteId = noteId;
@@ -309,10 +307,10 @@ public class Cartographer : MonoBehaviour
 
   private void RebuildGraphConsumers(MapGraphIndex graphIndex)
   {
-    CurrentGraphIndex = graphIndex;
+    GraphIndex = graphIndex;
     int activeLineLimit = _activeEngine?.MaxActiveLines ?? 0;
     int activeLongLineLimit = _activeEngine?.MaxActiveLongLines ?? 0;
-    lineBuilder?.Rebuild(CurrentGraphIndex, activeLineLimit, activeLongLineLimit);
-    cullingManager?.Rebuild(CurrentGraphIndex, lineBuilder);
+    lineBuilder?.Rebuild(GraphIndex, activeLineLimit, activeLongLineLimit);
+    cullingManager?.Rebuild(GraphIndex, lineBuilder);
   }
 }
