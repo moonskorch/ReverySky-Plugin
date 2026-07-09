@@ -9,6 +9,7 @@ using UnityEngine.TestTools;
 public class LineBuilderEditModeTests
 {
   private static readonly int LineColorPropertyId = Shader.PropertyToID("_Color");
+  private static readonly Color FocusLineColor = new(0f, 2.5f, 2.5f, 1f);
 
   [UnityTest]
   public IEnumerator TryCreateDistanceEntry_RegisteredNodes_ReturnEntriesForStarsAndTags()
@@ -478,11 +479,9 @@ public class LineBuilderEditModeTests
     FlushLineBuilder(scope.Builder);
 
     LineRenderer line = GetOnlyActiveLine(scope.LineParent);
-    Color focusColor = new(0f, 2.5f, 2.5f, 1f);
+    scope.Builder.ApplyHighlight(MapGraphNodeId.None, GetNodeId(graphIndex, scope.NoteA));
 
-    scope.Builder.ApplyHighlight(MapGraphNodeId.None, GetNodeId(graphIndex, scope.NoteA), focusColor);
-
-    AssertLineHighlight(line, focusColor);
+    AssertLineHighlight(line, FocusLineColor);
     yield return null;
   }
 
@@ -524,17 +523,16 @@ public class LineBuilderEditModeTests
 
       LineRenderer lineAB = GetActiveLineConnecting(scope.LineParent, scope.NoteA, scope.NoteB);
       LineRenderer lineCD = GetActiveLineConnecting(scope.LineParent, noteC, noteD);
-      Color focusColor = new(0f, 2.5f, 2.5f, 1f);
       MapGraphNodeId nodeAId = GetNodeId(graphIndex, scope.NoteA);
       MapGraphNodeId nodeCId = GetNodeId(graphIndex, noteC);
 
-      scope.Builder.ApplyHighlight(MapGraphNodeId.None, nodeAId, focusColor);
-      AssertLineHighlight(lineAB, focusColor);
+      scope.Builder.ApplyHighlight(MapGraphNodeId.None, nodeAId);
+      AssertLineHighlight(lineAB, FocusLineColor);
       AssertLineHighlightCleared(lineCD);
 
-      scope.Builder.ApplyHighlight(nodeAId, nodeCId, focusColor);
+      scope.Builder.ApplyHighlight(nodeAId, nodeCId);
       AssertLineHighlightCleared(lineAB);
-      AssertLineHighlight(lineCD, focusColor);
+      AssertLineHighlight(lineCD, FocusLineColor);
     }
     finally
     {
@@ -558,15 +556,14 @@ public class LineBuilderEditModeTests
     });
 
     MapGraphIndex graphIndex = RebuildWithIndex(scope.Builder, new List<Star> { scope.NoteA, scope.NoteB }, new List<TagNode>(), 1, 10);
-    Color focusColor = new(0f, 2.5f, 2.5f, 1f);
     SetFocusedStar(scope.Focus, graphIndex, scope.NoteA);
-    scope.Builder.ApplyHighlight(MapGraphNodeId.None, GetNodeId(graphIndex, scope.NoteA), focusColor);
+    scope.Builder.ApplyHighlight(MapGraphNodeId.None, GetNodeId(graphIndex, scope.NoteA));
 
     FlushLineBuilder(scope.Builder);
 
     LineRenderer line = GetOnlyActiveLine(scope.LineParent);
     AssertLineConnects(line, scope.NoteA, scope.NoteB);
-    AssertLineHighlight(line, focusColor);
+    AssertLineHighlight(line, FocusLineColor);
     yield return null;
   }
 
@@ -606,9 +603,8 @@ public class LineBuilderEditModeTests
       FlushLineBuilder(scope.Builder);
 
       LineRenderer highlightedLine = GetOnlyActiveLine(scope.LineParent);
-      Color focusColor = new(0f, 2.5f, 2.5f, 1f);
-      scope.Builder.ApplyHighlight(MapGraphNodeId.None, GetNodeId(graphIndex, scope.NoteA), focusColor);
-      AssertLineHighlight(highlightedLine, focusColor);
+      scope.Builder.ApplyHighlight(MapGraphNodeId.None, GetNodeId(graphIndex, scope.NoteA));
+      AssertLineHighlight(highlightedLine, FocusLineColor);
 
       scope.Builder.SetDistanceVisible(scope.NoteA, false);
       FlushLineBuilder(scope.Builder);
@@ -1078,6 +1074,7 @@ public class LineBuilderEditModeTests
       SetPrivateField(Builder, "linePrefab", LinePrefab);
       SetPrivateField(Builder, "lineParent", LineParent);
       SetPrivateField(Builder, "focusNode", Focus);
+      SetPrivateField(Builder, "focusedLineColor", FocusLineColor);
     }
 
     public void Dispose()

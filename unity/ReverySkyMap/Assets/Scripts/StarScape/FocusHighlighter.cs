@@ -4,8 +4,6 @@ using UnityEngine;
 public sealed class FocusHighlighter : MonoBehaviour
 {
   [SerializeField] private LineBuilder lineBuilder;
-  [ColorUsage(true, true)]
-  [SerializeField] private Color focusedLineColor = Color.cyan;
 
   private MapGraphNodeId focusedNodeId = MapGraphNodeId.None;
   private readonly Dictionary<MapGraphNodeId, LabelHighlightState> labelStatesByNodeId = new();
@@ -26,7 +24,7 @@ public sealed class FocusHighlighter : MonoBehaviour
     MapGraphNodeId previousFocusedNodeId = focusedNodeId;
     focusedNodeId = nextFocusedNodeId;
     ApplyHighlight(graphIndex, focusedNodeId);
-    lineBuilder?.ApplyHighlight(previousFocusedNodeId, focusedNodeId, focusedLineColor);
+    lineBuilder?.ApplyHighlight(previousFocusedNodeId, focusedNodeId);
   }
 
   private void ApplyHighlight(MapGraphIndex graphIndex, MapGraphNodeId nextFocusedNodeId)

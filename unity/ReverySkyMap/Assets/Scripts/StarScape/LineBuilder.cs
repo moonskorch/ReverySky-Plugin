@@ -75,6 +75,8 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   [SerializeField, Min(0.01f)] private float visibleDistance = 80f;
   [SerializeField, Min(0f)] private float longLineDistance = 50f;
   [SerializeField] private bool focusedLinesIgnoreLongLineLimit = true;
+  [ColorUsage(true, true)]
+  [SerializeField] private Color focusedLineColor = new(2f, 2f, 2f, 1f);
   [SerializeField, Range(0f, 1f)] private float visibleRegionRefreshLineRatio = 0.05f;
   [SerializeField, Min(1)] private int maxLinesPerNode = 50;
 
@@ -97,7 +99,6 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   private bool linesVisible = true;
   private MapGraphNodeId focusedNodeId = MapGraphNodeId.None;
   private MapGraphNodeId highlightedFocusNodeId = MapGraphNodeId.None;
-  private Color focusedLineColor;
   private MaterialPropertyBlock focusedLinePropertyBlock;
 
   public void Rebuild(
@@ -212,10 +213,8 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 
   public void ApplyHighlight(
     MapGraphNodeId previousFocusedNodeId,
-    MapGraphNodeId nextFocusedNodeId,
-    Color focusColor)
+    MapGraphNodeId nextFocusedNodeId)
   {
-    focusedLineColor = focusColor;
     highlightedFocusNodeId = nextFocusedNodeId;
     RestyleIncidentActiveLines(previousFocusedNodeId);
     if (!previousFocusedNodeId.Equals(nextFocusedNodeId))

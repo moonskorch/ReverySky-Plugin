@@ -27,6 +27,7 @@ public class FocusLabelHighlightEditModeTests
     var linkedColor = new Color(0.4f, 0.9f, 1f, 1f);
 
     label.Text.color = normalColor;
+    SetPrivateField(label.Presenter, "normalTextColor", normalColor);
     SetPrivateField(label.Presenter, "focusedTextColor", focusColor);
     SetPrivateField(label.Presenter, "linkedTextColor", linkedColor);
 
@@ -55,38 +56,40 @@ public class FocusLabelHighlightEditModeTests
   public void LabelPresenter_RequeriesCurrentTmpTextWhenApplyingState()
   {
     using var label = new LabelScope("FocusLabelHighlightTests_RequeryLabel");
-    var firstNormalColor = new Color(0.8f, 0.7f, 0.4f, 1f);
-    var secondNormalColor = new Color(0.3f, 0.6f, 0.9f, 1f);
+    var normalColor = new Color(0.8f, 0.7f, 0.4f, 1f);
+    var replacementColor = new Color(0.3f, 0.6f, 0.9f, 1f);
     var focusColor = new Color(0f, 2f, 2f, 1f);
     var linkedColor = new Color(0.4f, 0.9f, 1f, 1f);
 
-    label.Text.color = firstNormalColor;
+    label.Text.color = normalColor;
+    SetPrivateField(label.Presenter, "normalTextColor", normalColor);
     SetPrivateField(label.Presenter, "focusedTextColor", focusColor);
     SetPrivateField(label.Presenter, "linkedTextColor", linkedColor);
 
     label.Presenter.SetHighlightState(LabelHighlightState.Focused);
     AssertColorApproximately(label.Text.color, focusColor);
 
-    label.ReplaceText(secondNormalColor);
+    label.ReplaceText(replacementColor);
     label.Presenter.SetHighlightState(LabelHighlightState.Linked);
 
     AssertColorApproximately(label.Text.color, linkedColor);
 
     label.Presenter.SetHighlightState(LabelHighlightState.Normal);
 
-    AssertColorApproximately(label.Text.color, secondNormalColor);
+    AssertColorApproximately(label.Text.color, normalColor);
   }
 
   [Test]
   public void LabelPresenter_ColorsAllTmpTextsUnderLabelRoot()
   {
     using var label = new LabelScope("FocusLabelHighlightTests_MultipleTexts");
-    var firstNormalColor = new Color(0.8f, 0.7f, 0.4f, 1f);
-    var secondNormalColor = new Color(0.3f, 0.6f, 0.9f, 1f);
+    var normalColor = new Color(0.8f, 0.7f, 0.4f, 1f);
+    var secondInitialColor = new Color(0.3f, 0.6f, 0.9f, 1f);
     var focusColor = new Color(0f, 2f, 2f, 1f);
 
-    label.Text.color = firstNormalColor;
-    TMP_Text secondText = label.AddText(secondNormalColor);
+    label.Text.color = normalColor;
+    TMP_Text secondText = label.AddText(secondInitialColor);
+    SetPrivateField(label.Presenter, "normalTextColor", normalColor);
     SetPrivateField(label.Presenter, "focusedTextColor", focusColor);
 
     label.Presenter.SetHighlightState(LabelHighlightState.Focused);
@@ -96,8 +99,8 @@ public class FocusLabelHighlightEditModeTests
 
     label.Presenter.SetHighlightState(LabelHighlightState.Normal);
 
-    AssertColorApproximately(label.Text.color, firstNormalColor);
-    AssertColorApproximately(secondText.color, secondNormalColor);
+    AssertColorApproximately(label.Text.color, normalColor);
+    AssertColorApproximately(secondText.color, normalColor);
   }
 
   [Test]
@@ -344,6 +347,7 @@ public class FocusLabelHighlightEditModeTests
       star = nodeObject.AddComponent<Star>();
       label = new LabelScope($"{name}_Label", nodeObject);
       label.Text.color = NormalColor;
+      SetPrivateField(label.Presenter, "normalTextColor", NormalColor);
       SetPrivateField(label.Presenter, "focusedTextColor", FocusColor);
       SetPrivateField(label.Presenter, "linkedTextColor", LinkedColor);
 

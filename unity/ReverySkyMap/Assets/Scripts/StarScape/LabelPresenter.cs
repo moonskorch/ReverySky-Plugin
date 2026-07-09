@@ -16,11 +16,11 @@ public sealed class LabelPresenter : MonoBehaviour, ICullingConsumer
   [SerializeField] private Behaviour[] relatedBehaviours;
   [SerializeField, Min(0.01f)] private float radius = 1f;
   [SerializeField, Min(0.01f)] private float visibleDistance = 25f;
+  [SerializeField] private Color normalTextColor = Color.white;
   [SerializeField] private Color focusedTextColor = Color.cyan;
   [SerializeField] private Color linkedTextColor = new(0.65f, 0.95f, 1f, 1f);
 
-  private readonly List<TMP_Text> texts = new();
-  private readonly Dictionary<TMP_Text, Color> normalColors = new();
+  private List<TMP_Text> texts;
   private bool distanceVisible;
   private LabelHighlightState highlightState;
 
@@ -69,18 +69,16 @@ public sealed class LabelPresenter : MonoBehaviour, ICullingConsumer
 
   private void ApplyTextColor()
   {
+    texts ??= new List<TMP_Text>();
     labelRoot.GetComponentsInChildren<TMP_Text>(true, texts);
     for (int i = 0; i < texts.Count; i++)
     {
       TMP_Text text = texts[i];
-      if (!normalColors.ContainsKey(text))
-        normalColors[text] = text.color;
-
       Color nextColor = highlightState switch
       {
         LabelHighlightState.Focused => focusedTextColor,
         LabelHighlightState.Linked => linkedTextColor,
-        _ => normalColors[text]
+        _ => normalTextColor
       };
 
       if (text.color != nextColor)
