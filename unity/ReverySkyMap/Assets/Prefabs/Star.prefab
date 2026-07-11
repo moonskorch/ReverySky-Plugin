@@ -285,8 +285,8 @@ MonoBehaviour:
   radius: 1.5
   visibleDistance: 35
   normalTextColor: {r: 1, g: 0.96862745, b: 0.60784316, a: 1}
-  focusedTextColor: {r: 1, g: 0.92, b: 0, a: 1}
-  linkedTextColor: {r: 1, g: 0.9461995, b: 0.3274932, a: 1}
+  focusedTextColor: {r: 0, g: 1, b: 1, a: 1}
+  linkedTextColor: {r: 0.49803922, g: 1, b: 1, a: 1}
 --- !u!114 &6198472612096341012
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -178,8 +178,8 @@ MonoBehaviour:
   radius: 1
   visibleDistance: 200
   normalTextColor: {r: 1, g: 1, b: 1, a: 1}
-  focusedTextColor: {r: 0.39757407, g: 1, b: 1, a: 1}
-  linkedTextColor: {r: 0.7137255, g: 1, b: 1, a: 1}
+  focusedTextColor: {r: 0, g: 1, b: 1, a: 1}
+  linkedTextColor: {r: 0.49803922, g: 1, b: 1, a: 1}
 --- !u!1001 &4410025161415576194
 PrefabInstance:
   m_ObjectHideFlags: 0
