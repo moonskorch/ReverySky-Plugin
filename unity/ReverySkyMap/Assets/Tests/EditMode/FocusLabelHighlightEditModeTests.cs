@@ -19,17 +19,17 @@ public class FocusLabelHighlightEditModeTests
   }
 
   [Test]
-  public void LabelPresenter_FocusStateOverridesDistanceVisibilityAndRestoresNormalColor()
+  public void LabelPresenter_FocusStateOverridesDistanceVisibilityAndRestoresNormalMaterial()
   {
     using var label = new LabelScope("FocusLabelHighlightTests_Label");
-    var normalColor = new Color(0.8f, 0.7f, 0.4f, 1f);
-    var focusColor = new Color(0f, 2f, 2f, 1f);
-    var linkedColor = new Color(0.4f, 0.9f, 1f, 1f);
+    Material normalMaterial = CreateMaterial("Normal");
+    Material focusMaterial = CreateMaterial("Focus");
+    Material linkedMaterial = CreateMaterial("Linked");
 
-    label.Text.color = normalColor;
-    SetPrivateField(label.Presenter, "normalTextColor", normalColor);
-    SetPrivateField(label.Presenter, "focusedTextColor", focusColor);
-    SetPrivateField(label.Presenter, "linkedTextColor", linkedColor);
+    label.Text.fontSharedMaterial = normalMaterial;
+    SetPrivateField(label.Presenter, "normalMaterialPreset", normalMaterial);
+    SetPrivateField(label.Presenter, "focusedMaterialPreset", focusMaterial);
+    SetPrivateField(label.Presenter, "linkedMaterialPreset", linkedMaterial);
 
     label.Presenter.SetDistanceVisible(null, false);
 
@@ -38,69 +38,82 @@ public class FocusLabelHighlightEditModeTests
     label.Presenter.SetHighlightState(LabelHighlightState.Focused);
 
     Assert.That(label.LabelRoot.activeSelf, Is.True);
-    AssertColorApproximately(label.Text.color, focusColor);
+    Assert.That(label.Text.fontSharedMaterial, Is.SameAs(focusMaterial));
 
     label.Presenter.SetHighlightState(LabelHighlightState.Normal);
 
     Assert.That(label.LabelRoot.activeSelf, Is.False);
-    AssertColorApproximately(label.Text.color, normalColor);
+    Assert.That(label.Text.fontSharedMaterial, Is.SameAs(normalMaterial));
 
     label.Presenter.SetHighlightState(LabelHighlightState.Linked);
     label.Presenter.SetDistanceVisible(null, false);
 
     Assert.That(label.LabelRoot.activeSelf, Is.True);
-    AssertColorApproximately(label.Text.color, linkedColor);
+    Assert.That(label.Text.fontSharedMaterial, Is.SameAs(linkedMaterial));
+
+    Object.DestroyImmediate(linkedMaterial);
+    Object.DestroyImmediate(focusMaterial);
+    Object.DestroyImmediate(normalMaterial);
   }
 
   [Test]
   public void LabelPresenter_RequeriesCurrentTmpTextWhenApplyingState()
   {
     using var label = new LabelScope("FocusLabelHighlightTests_RequeryLabel");
-    var normalColor = new Color(0.8f, 0.7f, 0.4f, 1f);
-    var replacementColor = new Color(0.3f, 0.6f, 0.9f, 1f);
-    var focusColor = new Color(0f, 2f, 2f, 1f);
-    var linkedColor = new Color(0.4f, 0.9f, 1f, 1f);
+    Material normalMaterial = CreateMaterial("Normal");
+    Material replacementMaterial = CreateMaterial("Replacement");
+    Material focusMaterial = CreateMaterial("Focus");
+    Material linkedMaterial = CreateMaterial("Linked");
 
-    label.Text.color = normalColor;
-    SetPrivateField(label.Presenter, "normalTextColor", normalColor);
-    SetPrivateField(label.Presenter, "focusedTextColor", focusColor);
-    SetPrivateField(label.Presenter, "linkedTextColor", linkedColor);
+    label.Text.fontSharedMaterial = normalMaterial;
+    SetPrivateField(label.Presenter, "normalMaterialPreset", normalMaterial);
+    SetPrivateField(label.Presenter, "focusedMaterialPreset", focusMaterial);
+    SetPrivateField(label.Presenter, "linkedMaterialPreset", linkedMaterial);
 
     label.Presenter.SetHighlightState(LabelHighlightState.Focused);
-    AssertColorApproximately(label.Text.color, focusColor);
+    Assert.That(label.Text.fontSharedMaterial, Is.SameAs(focusMaterial));
 
-    label.ReplaceText(replacementColor);
+    label.ReplaceText(replacementMaterial);
     label.Presenter.SetHighlightState(LabelHighlightState.Linked);
 
-    AssertColorApproximately(label.Text.color, linkedColor);
+    Assert.That(label.Text.fontSharedMaterial, Is.SameAs(linkedMaterial));
 
     label.Presenter.SetHighlightState(LabelHighlightState.Normal);
 
-    AssertColorApproximately(label.Text.color, normalColor);
+    Assert.That(label.Text.fontSharedMaterial, Is.SameAs(normalMaterial));
+
+    Object.DestroyImmediate(linkedMaterial);
+    Object.DestroyImmediate(focusMaterial);
+    Object.DestroyImmediate(replacementMaterial);
+    Object.DestroyImmediate(normalMaterial);
   }
 
   [Test]
-  public void LabelPresenter_ColorsAllTmpTextsUnderLabelRoot()
+  public void LabelPresenter_AppliesMaterialToAllTmpTextsUnderLabelRoot()
   {
     using var label = new LabelScope("FocusLabelHighlightTests_MultipleTexts");
-    var normalColor = new Color(0.8f, 0.7f, 0.4f, 1f);
-    var secondInitialColor = new Color(0.3f, 0.6f, 0.9f, 1f);
-    var focusColor = new Color(0f, 2f, 2f, 1f);
+    Material normalMaterial = CreateMaterial("Normal");
+    Material secondInitialMaterial = CreateMaterial("SecondInitial");
+    Material focusMaterial = CreateMaterial("Focus");
 
-    label.Text.color = normalColor;
-    TMP_Text secondText = label.AddText(secondInitialColor);
-    SetPrivateField(label.Presenter, "normalTextColor", normalColor);
-    SetPrivateField(label.Presenter, "focusedTextColor", focusColor);
+    label.Text.fontSharedMaterial = normalMaterial;
+    TMP_Text secondText = label.AddText(secondInitialMaterial);
+    SetPrivateField(label.Presenter, "normalMaterialPreset", normalMaterial);
+    SetPrivateField(label.Presenter, "focusedMaterialPreset", focusMaterial);
 
     label.Presenter.SetHighlightState(LabelHighlightState.Focused);
 
-    AssertColorApproximately(label.Text.color, focusColor);
-    AssertColorApproximately(secondText.color, focusColor);
+    Assert.That(label.Text.fontSharedMaterial, Is.SameAs(focusMaterial));
+    Assert.That(secondText.fontSharedMaterial, Is.SameAs(focusMaterial));
 
     label.Presenter.SetHighlightState(LabelHighlightState.Normal);
 
-    AssertColorApproximately(label.Text.color, normalColor);
-    AssertColorApproximately(secondText.color, normalColor);
+    Assert.That(label.Text.fontSharedMaterial, Is.SameAs(normalMaterial));
+    Assert.That(secondText.fontSharedMaterial, Is.SameAs(normalMaterial));
+
+    Object.DestroyImmediate(focusMaterial);
+    Object.DestroyImmediate(secondInitialMaterial);
+    Object.DestroyImmediate(normalMaterial);
   }
 
   [Test]
@@ -130,8 +143,8 @@ public class FocusLabelHighlightEditModeTests
     Assert.That(graph.LabelA.LabelRoot.activeSelf, Is.True);
     Assert.That(graph.LabelB.LabelRoot.activeSelf, Is.True);
     Assert.That(graph.LabelC.LabelRoot.activeSelf, Is.False);
-    AssertColorApproximately(graph.LabelA.Text.color, graph.FocusColor);
-    AssertColorApproximately(graph.LabelB.Text.color, graph.LinkedColor);
+    Assert.That(graph.LabelA.Text.fontSharedMaterial, Is.SameAs(graph.FocusMaterial));
+    Assert.That(graph.LabelB.Text.fontSharedMaterial, Is.SameAs(graph.LinkedMaterial));
   }
 
   [Test]
@@ -162,9 +175,9 @@ public class FocusLabelHighlightEditModeTests
     Assert.That(graph.LabelA.LabelRoot.activeSelf, Is.False);
     Assert.That(graph.LabelB.LabelRoot.activeSelf, Is.False);
     Assert.That(graph.LabelC.LabelRoot.activeSelf, Is.True);
-    AssertColorApproximately(graph.LabelA.Text.color, graph.NormalColor);
-    AssertColorApproximately(graph.LabelB.Text.color, graph.NormalColor);
-    AssertColorApproximately(graph.LabelC.Text.color, graph.FocusColor);
+    Assert.That(graph.LabelA.Text.fontSharedMaterial, Is.SameAs(graph.NormalMaterial));
+    Assert.That(graph.LabelB.Text.fontSharedMaterial, Is.SameAs(graph.NormalMaterial));
+    Assert.That(graph.LabelC.Text.fontSharedMaterial, Is.SameAs(graph.FocusMaterial));
   }
 
   [Test]
@@ -192,8 +205,8 @@ public class FocusLabelHighlightEditModeTests
 
     Assert.That(graph.LabelA.LabelRoot.activeSelf, Is.True);
     Assert.That(graph.LabelB.LabelRoot.activeSelf, Is.True);
-    AssertColorApproximately(graph.LabelA.Text.color, graph.LinkedColor);
-    AssertColorApproximately(graph.LabelB.Text.color, graph.FocusColor);
+    Assert.That(graph.LabelA.Text.fontSharedMaterial, Is.SameAs(graph.LinkedMaterial));
+    Assert.That(graph.LabelB.Text.fontSharedMaterial, Is.SameAs(graph.FocusMaterial));
   }
 
   [Test]
@@ -250,13 +263,14 @@ public class FocusLabelHighlightEditModeTests
     field.SetValue(target, value);
   }
 
-  private static void AssertColorApproximately(Color actual, Color expected)
+  private static Material CreateMaterial(string name)
   {
-    const float tolerance = 0.001f;
-    Assert.That(Mathf.Abs(actual.r - expected.r), Is.LessThanOrEqualTo(tolerance), $"r actual={actual.r:R} expected={expected.r:R}");
-    Assert.That(Mathf.Abs(actual.g - expected.g), Is.LessThanOrEqualTo(tolerance), $"g actual={actual.g:R} expected={expected.g:R}");
-    Assert.That(Mathf.Abs(actual.b - expected.b), Is.LessThanOrEqualTo(tolerance), $"b actual={actual.b:R} expected={expected.b:R}");
-    Assert.That(Mathf.Abs(actual.a - expected.a), Is.LessThanOrEqualTo(tolerance), $"a actual={actual.a:R} expected={expected.a:R}");
+    Shader shader = Shader.Find("TextMeshPro/Distance Field");
+    if (shader == null)
+      shader = Shader.Find("Sprites/Default");
+
+    Assert.That(shader, Is.Not.Null, "Expected a built-in shader for test materials.");
+    return new Material(shader) { name = $"FocusLabelHighlightTests_{name}" };
   }
 
   private sealed class LabelScope : System.IDisposable
@@ -271,7 +285,7 @@ public class FocusLabelHighlightEditModeTests
       Presenter = hostObject.AddComponent<LabelPresenter>();
       LabelRoot = new GameObject($"{name}_Root");
       LabelRoot.transform.SetParent(hostObject.transform, false);
-      ReplaceText(Color.white);
+      ReplaceText(null);
 
       SetPrivateField(Presenter, "labelRoot", LabelRoot);
     }
@@ -280,21 +294,22 @@ public class FocusLabelHighlightEditModeTests
     public GameObject LabelRoot { get; }
     public TMP_Text Text { get; private set; }
 
-    public void ReplaceText(Color color)
+    public void ReplaceText(Material material)
     {
       if (textObject != null)
         Object.DestroyImmediate(textObject);
 
-      Text = AddText(color);
+      Text = AddText(material);
       textObject = Text.gameObject;
     }
 
-    public TMP_Text AddText(Color color)
+    public TMP_Text AddText(Material material)
     {
       var textGameObject = new GameObject($"{LabelRoot.name}_Text");
       textGameObject.transform.SetParent(LabelRoot.transform, false);
       TMP_Text text = textGameObject.AddComponent<TextMeshPro>();
-      text.color = color;
+      if (material != null)
+        text.fontSharedMaterial = material;
       return text;
     }
 
@@ -312,12 +327,16 @@ public class FocusLabelHighlightEditModeTests
     private readonly GameObject noteBObject;
     private readonly GameObject noteCObject;
 
-    public readonly Color NormalColor = new(0.8f, 0.7f, 0.4f, 1f);
-    public readonly Color FocusColor = new(0f, 2f, 2f, 1f);
-    public readonly Color LinkedColor = new(0.4f, 0.9f, 1f, 1f);
+    public readonly Material NormalMaterial;
+    public readonly Material FocusMaterial;
+    public readonly Material LinkedMaterial;
 
     public GraphScope()
     {
+      NormalMaterial = CreateMaterial("GraphNormal");
+      FocusMaterial = CreateMaterial("GraphFocus");
+      LinkedMaterial = CreateMaterial("GraphLinked");
+
       highlighterObject = new GameObject("FocusLabelHighlightTests_Highlighter");
       Highlighter = highlighterObject.AddComponent<FocusHighlighter>();
 
@@ -346,10 +365,10 @@ public class FocusLabelHighlightEditModeTests
       var nodeObject = new GameObject(name);
       star = nodeObject.AddComponent<Star>();
       label = new LabelScope($"{name}_Label", nodeObject);
-      label.Text.color = NormalColor;
-      SetPrivateField(label.Presenter, "normalTextColor", NormalColor);
-      SetPrivateField(label.Presenter, "focusedTextColor", FocusColor);
-      SetPrivateField(label.Presenter, "linkedTextColor", LinkedColor);
+      label.Text.fontSharedMaterial = NormalMaterial;
+      SetPrivateField(label.Presenter, "normalMaterialPreset", NormalMaterial);
+      SetPrivateField(label.Presenter, "focusedMaterialPreset", FocusMaterial);
+      SetPrivateField(label.Presenter, "linkedMaterialPreset", LinkedMaterial);
 
       return nodeObject;
     }
@@ -360,6 +379,9 @@ public class FocusLabelHighlightEditModeTests
       Object.DestroyImmediate(noteBObject);
       Object.DestroyImmediate(noteAObject);
       Object.DestroyImmediate(highlighterObject);
+      Object.DestroyImmediate(LinkedMaterial);
+      Object.DestroyImmediate(FocusMaterial);
+      Object.DestroyImmediate(NormalMaterial);
     }
   }
 }

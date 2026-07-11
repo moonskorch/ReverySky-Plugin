@@ -16,9 +16,9 @@ public sealed class LabelPresenter : MonoBehaviour, ICullingConsumer
   [SerializeField] private Behaviour[] relatedBehaviours;
   [SerializeField, Min(0.01f)] private float radius = 1f;
   [SerializeField, Min(0.01f)] private float visibleDistance = 25f;
-  [SerializeField] private Color normalTextColor = Color.white;
-  [SerializeField] private Color focusedTextColor = Color.cyan;
-  [SerializeField] private Color linkedTextColor = new(0.65f, 0.95f, 1f, 1f);
+  [SerializeField] private Material normalMaterialPreset;
+  [SerializeField] private Material focusedMaterialPreset;
+  [SerializeField] private Material linkedMaterialPreset;
 
   private List<TMP_Text> texts;
   private bool distanceVisible;
@@ -54,7 +54,7 @@ public sealed class LabelPresenter : MonoBehaviour, ICullingConsumer
       return;
 
     highlightState = state;
-    ApplyTextColor();
+    ApplyTextMaterial();
     ApplyVisibility();
   }
 
@@ -67,23 +67,31 @@ public sealed class LabelPresenter : MonoBehaviour, ICullingConsumer
       labelRoot.SetActive(visible);
   }
 
-  private void ApplyTextColor()
+  private void ApplyTextMaterial()
   {
+    if (labelRoot == null)
+      return;
+
     texts ??= new List<TMP_Text>();
     labelRoot.GetComponentsInChildren<TMP_Text>(true, texts);
     for (int i = 0; i < texts.Count; i++)
     {
       TMP_Text text = texts[i];
-      Color nextColor = highlightState switch
-      {
-        LabelHighlightState.Focused => focusedTextColor,
-        LabelHighlightState.Linked => linkedTextColor,
-        _ => normalTextColor
-      };
+      Material nextMaterial = ResolveMaterialPreset();
 
-      if (text.color != nextColor)
-        text.color = nextColor;
+      if (text.fontSharedMaterial != nextMaterial)
+        text.fontSharedMaterial = nextMaterial;
     }
+  }
+
+  private Material ResolveMaterialPreset()
+  {
+    return highlightState switch
+    {
+      LabelHighlightState.Focused => focusedMaterialPreset,
+      LabelHighlightState.Linked => linkedMaterialPreset,
+      _ => normalMaterialPreset
+    };
   }
 
   private void SetRelatedBehavioursVisible(bool visible)

@@ -177,9 +177,9 @@ MonoBehaviour:
   - {fileID: 8817344900950793421}
   radius: 1
   visibleDistance: 200
-  normalTextColor: {r: 1, g: 1, b: 1, a: 1}
-  focusedTextColor: {r: 0, g: 1, b: 1, a: 1}
-  linkedTextColor: {r: 0.49803922, g: 1, b: 1, a: 1}
+  normalMaterialPreset: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  focusedMaterialPreset: {fileID: 2100000, guid: 627d0c7f87e9bc644b5e9448cd8b1e54, type: 2}
+  linkedMaterialPreset: {fileID: 2100000, guid: 6b7ced4a5e025e84293d331734b88831, type: 2}
 --- !u!1001 &4410025161415576194
 PrefabInstance:
   m_ObjectHideFlags: 0

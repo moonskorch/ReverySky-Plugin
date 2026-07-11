@@ -169,6 +169,50 @@ MonoBehaviour:
       m_LigatureGlyphID: 1436
     - m_ComponentGlyphIDs: cf030000120000000c050000
       m_LigatureGlyphID: 1436
+    - m_ComponentGlyphIDs: 76020000ec0100001200000052000000
+      m_LigatureGlyphID: 630
+    - m_ComponentGlyphIDs: 76020000ec0100001200000053000000
+      m_LigatureGlyphID: 630
+    - m_ComponentGlyphIDs: 76020000ed0100001200000052000000
+      m_LigatureGlyphID: 630
+    - m_ComponentGlyphIDs: 76020000ed0100001200000053000000
+      m_LigatureGlyphID: 630
+    - m_ComponentGlyphIDs: 76020000ee0100001200000052000000
+      m_LigatureGlyphID: 630
+    - m_ComponentGlyphIDs: 76020000ee0100001200000053000000
+      m_LigatureGlyphID: 630
+    - m_ComponentGlyphIDs: 76020000ef0100001200000052000000
+      m_LigatureGlyphID: 630
+    - m_ComponentGlyphIDs: 76020000ef0100001200000053000000
+      m_LigatureGlyphID: 630
+    - m_ComponentGlyphIDs: 76020000f00100001200000052000000
+      m_LigatureGlyphID: 630
+    - m_ComponentGlyphIDs: 76020000f00100001200000053000000
+      m_LigatureGlyphID: 630
+    - m_ComponentGlyphIDs: 760200001200000052000000
+      m_LigatureGlyphID: 630
+    - m_ComponentGlyphIDs: 760200001200000053000000
+      m_LigatureGlyphID: 630
+    - m_ComponentGlyphIDs: 76020000ec010000
+      m_LigatureGlyphID: 630
+    - m_ComponentGlyphIDs: 76020000ed010000
+      m_LigatureGlyphID: 630
+    - m_ComponentGlyphIDs: 76020000ee010000
+      m_LigatureGlyphID: 630
+    - m_ComponentGlyphIDs: 76020000ef010000
+      m_LigatureGlyphID: 630
+    - m_ComponentGlyphIDs: 76020000f0010000
+      m_LigatureGlyphID: 630
+    - m_ComponentGlyphIDs: 41020000ec010000
+      m_LigatureGlyphID: 577
+    - m_ComponentGlyphIDs: 41020000ed010000
+      m_LigatureGlyphID: 577
+    - m_ComponentGlyphIDs: 41020000ee010000
+      m_LigatureGlyphID: 577
+    - m_ComponentGlyphIDs: 41020000ef010000
+      m_LigatureGlyphID: 577
+    - m_ComponentGlyphIDs: 41020000f0010000
+      m_LigatureGlyphID: 577
     m_GlyphPairAdjustmentRecords:
     - m_FirstAdjustmentRecord:
         m_GlyphIndex: 975
