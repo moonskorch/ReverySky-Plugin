@@ -188,7 +188,8 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 
 `graph:set` and `note:focus` are latest-intent messages, not durable queues.
 Before `bridge:ready`, `MapSession` keeps only the latest pending graph payload.
-The first graph build reads the current Obsidian `metadataCache.resolvedLinks` snapshot; graph-relevant live metadata changes use the `metadataCache.resolved` barrier described below.
+The first graph build reads the current Obsidian `metadataCache.resolvedLinks` snapshot, then accepts the first following `metadataCache.resolved` event as a one-time startup correction refresh.
+Graph-relevant live metadata changes use the `metadataCache.resolved` barrier described below.
 If Unity WebGL boot fails, the iframe wrapper treats the failure as terminal for that iframe, keeps the failure status visible, and intentionally does not emit `bridge:ready` or receive `graph:set`.
 When an incremental Unity engine has not materialized a target star yet, `Cartographer.FocusRuntimeNote(...)` stores the target in `MapRuntimeContext.PendingFocusNoteId` and `RecursiveHubs` retries it after construction.
 
@@ -207,6 +208,7 @@ When an incremental Unity engine has not materialized a target star yet, `Cartog
 For graph-relevant Obsidian metadata changes, `MapSession` first marks semantic refresh pending and sends `runtime:status` with `Updating map data...`.
 It does not rebuild from `metadataCache.resolvedLinks` until Obsidian emits `metadataCache.resolved`.
 This prevents an intermediate `resolvedLinks` snapshot from being cached and then reused by later filters.
+Startup correction is intentionally different: after the runtime receives the initial graph, the first `metadataCache.resolved` event may trigger one extra graph rebuild without showing the metadata update status.
 
 Render-scale changes are intentionally different from graph-significant changes. `MapFilterPanelController` calls `MapSession.setRenderScale()`, which updates persisted state and UI restart guidance without re-emitting `graph:set`; the new scale is applied the next time the iframe is created.
 
@@ -381,6 +383,7 @@ Focus before bridge readiness is out of scope. Plugin-side focus requests pass t
 - Raw vault files, metadata cache, and resolved links are owned by Obsidian.
   They are the source of truth for note existence and links.
   `MapSession` waits for `metadataCache.resolved` after graph-relevant `metadataCache.changed` events before treating `resolvedLinks` as ready for a live rebuild.
+  On view startup, it also allows one correction refresh after the first `metadataCache.resolved` event so an early restored view does not keep an incomplete initial snapshot.
 
 - Stable note ids, normalized paths, normalized tags, and canonical note date are owned by the TypeScript graph layer.
   They are built in `VaultGraphBuilder` and `GraphNormalizer`.

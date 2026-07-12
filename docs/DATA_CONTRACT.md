@@ -165,6 +165,7 @@ type GraphLink = {
 ## Current Producer Semantics
 - `graph:set` is the effective filtered payload emitted by the plugin view, not the raw vault snapshot.
 - Each emitted `graph:set` gets a unique `requestId` so stale `graph:ready` messages cannot complete a newer graph status.
+- After startup graph emission, `MapSession` accepts the first Obsidian `metadataCache.resolved` event as a one-time correction refresh for the initial `resolvedLinks` snapshot.
 - After graph-relevant metadata changes, `MapSession` waits for Obsidian `metadataCache.resolved` before rebuilding from `metadataCache.resolvedLinks`; while waiting, it may send `runtime:status` instead of `graph:set`.
 - Filter-only changes reuse the latest source graph snapshot and emit only a newly filtered payload.
 - `notes[].date` uses `frontmatter.date`, then `frontmatter.created`, then `frontmatter.created_at`, then file creation time. Missing, blank, or invalid candidates are skipped, and the field is omitted when no valid source exists.
