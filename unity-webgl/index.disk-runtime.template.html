@@ -141,6 +141,7 @@
         let latestNoteFocusMessage = null;
         let isRuntimeStatusLocked = false;
         let resizeTimerId = 0;
+        let resizePendingDuringBoot = false;
 
         function setStatus(text) {
           if (isRuntimeStatusLocked) {
@@ -257,6 +258,10 @@
 
         function scheduleResizeCanvas() {
           if (isShuttingDown || runtimeMode === "failed") {
+            return;
+          }
+          if (runtimeMode === "boot") {
+            resizePendingDuringBoot = true;
             return;
           }
           if (resizeTimerId) {
@@ -517,6 +522,10 @@
 
           runtimeMode = "unity";
           setStatus("Unity runtime ready");
+          if (resizePendingDuringBoot) {
+            resizePendingDuringBoot = false;
+            scheduleResizeCanvas();
+          }
           sendReady();
 
           if (latestGraphSetMessage) {
