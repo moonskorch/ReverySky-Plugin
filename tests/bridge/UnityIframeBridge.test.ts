@@ -125,6 +125,23 @@ describe("UnityIframeBridge", () => {
     bridge.detach();
   });
 
+  it("sends runtime:status when status text is provided", () => {
+    const bridge = new UnityIframeBridge();
+    const postMessage = vi.fn();
+    const iframeWindow = { postMessage } as unknown as Window;
+
+    bridge.attach(iframeWindow, {});
+    bridge.sendStatus(" Updating map data... ");
+
+    expect(postMessage).toHaveBeenCalledTimes(1);
+    const [message, targetOrigin] = postMessage.mock.calls[0] as [Record<string, unknown>, string];
+    expect(targetOrigin).toBe("*");
+    expect(message.type).toBe("runtime:status");
+    expect(message.protocolVersion).toBe(BRIDGE_PROTOCOL_VERSION);
+    expect(message.payload).toEqual({ text: "Updating map data..." });
+    bridge.detach();
+  });
+
   it("reports error and does not send note:focus when payload is incomplete", () => {
     const bridge = new UnityIframeBridge();
     const postMessage = vi.fn();

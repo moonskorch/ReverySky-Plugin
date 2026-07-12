@@ -19,8 +19,8 @@ import { GraphPathFilter, type ParsedPathFilter, type PathFilterParseResult } fr
 import { MapFocusController } from "./MapFocusController";
 
 const GRAPH_REFRESH_DEBOUNCE_MS = 250;
-const GRAPH_RESOLVE_BARRIER_FALLBACK_MS = 700;
 const FILTER_INPUT_DEBOUNCE_MS = 250;
+const METADATA_RESOLVE_STATUS = "Updating map data...";
 const MAX_FOLDER_SUGGESTIONS = 80;
 const MAX_TAG_SUGGESTIONS = 200;
 export const DEFAULT_RENDER_SCALE = 1;
@@ -68,6 +68,7 @@ export type MapSessionDependencies = {
   buildGraph: (app: App) => GraphPayload;
   now: () => number;
   sendGraph: (payload: GraphPayload) => void;
+  sendStatus?: (message: string) => void;
   sendFocus: (payload: NoteFocusPayload) => void;
 };
 
@@ -80,6 +81,7 @@ export class MapSession {
   private readonly buildGraph: (app: App) => GraphPayload;
   private readonly now: () => number;
   private readonly sendGraph: (payload: GraphPayload) => void;
+  private readonly sendStatus?: (message: string) => void;
   private readonly focus: MapFocusController;
 
   private sourceGraphPayload: GraphPayload | null = null;
@@ -90,8 +92,6 @@ export class MapSession {
   private bridgeReady = false;
   private refreshTimer: number | null = null;
   private refreshTimerWindow: Window | null = null;
-  private resolveBarrierFallbackTimer: number | null = null;
-  private resolveBarrierFallbackTimerWindow: Window | null = null;
   private refreshSubscriptionsRegistered = false;
   private refreshActive = false;
   private pathFilterQuery = "";
@@ -112,6 +112,7 @@ export class MapSession {
     this.buildGraph = deps.buildGraph;
     this.now = deps.now;
     this.sendGraph = deps.sendGraph;
+    this.sendStatus = deps.sendStatus;
     this.focus = new MapFocusController({
       app: this.app,
       isBridgeReady: () => this.bridgeReady,
@@ -149,14 +150,12 @@ export class MapSession {
     this.focus.start(registerEvent);
     this.semanticRefreshPending = false;
     this.clearRefreshTimer();
-    this.clearResolveBarrierFallbackTimer();
     this.ensureRefreshSubscriptions(registerEvent);
   }
 
   stop(): void {
     this.refreshActive = false;
     this.clearRefreshTimer();
-    this.clearResolveBarrierFallbackTimer();
     this.clearFilterInputDebounceTimer();
     this.bridgeReady = false;
     this.sourceGraphPayload = null;
@@ -375,7 +374,6 @@ export class MapSession {
           }
 
           this.semanticRefreshPending = false;
-          this.clearResolveBarrierFallbackTimer();
           this.scheduleGraphRefresh();
         })
       );
@@ -423,20 +421,7 @@ export class MapSession {
     }
 
     this.semanticRefreshPending = true;
-    this.clearResolveBarrierFallbackTimer();
-    // `metadataCache.resolved` is the ideal flush point; fall back if it never arrives.
-    const timerWindow = this.getTimerWindow();
-    this.resolveBarrierFallbackTimerWindow = timerWindow;
-    this.resolveBarrierFallbackTimer = timerWindow.setTimeout(() => {
-      this.resolveBarrierFallbackTimer = null;
-      this.resolveBarrierFallbackTimerWindow = null;
-      if (!this.semanticRefreshPending) {
-        return;
-      }
-
-      this.semanticRefreshPending = false;
-      this.scheduleGraphRefresh();
-    }, GRAPH_RESOLVE_BARRIER_FALLBACK_MS);
+    this.sendStatus?.(METADATA_RESOLVE_STATUS);
   }
 
   private scheduleGraphRefresh(): void {
@@ -782,16 +767,6 @@ export class MapSession {
     (this.refreshTimerWindow ?? this.getTimerWindow()).clearTimeout(this.refreshTimer);
     this.refreshTimer = null;
     this.refreshTimerWindow = null;
-  }
-
-  private clearResolveBarrierFallbackTimer(): void {
-    if (!this.resolveBarrierFallbackTimer) {
-      return;
-    }
-
-    (this.resolveBarrierFallbackTimerWindow ?? this.getTimerWindow()).clearTimeout(this.resolveBarrierFallbackTimer);
-    this.resolveBarrierFallbackTimer = null;
-    this.resolveBarrierFallbackTimerWindow = null;
   }
 
   private clearFilterInputDebounceTimer(): void {

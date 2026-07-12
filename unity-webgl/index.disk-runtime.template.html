@@ -367,6 +367,21 @@
           setStatus(formatGraphStatus(latestGraphNoteCount, latestGraphLinkCount, false));
         }
 
+        function applyRuntimeStatus(message) {
+          if (isShuttingDown || runtimeMode === "failed") {
+            return;
+          }
+
+          const text = message && message.payload && typeof message.payload.text === "string"
+            ? message.payload.text.trim()
+            : "";
+          if (!text) {
+            return;
+          }
+
+          setStatus(text);
+        }
+
         function applyNoteFocus(message) {
           if (isShuttingDown) {
             return;
@@ -486,6 +501,11 @@
 
           if (data.type === "note:focus") {
             applyNoteFocus(data);
+            return;
+          }
+
+          if (data.type === "runtime:status") {
+            applyRuntimeStatus(data);
           }
         }
 

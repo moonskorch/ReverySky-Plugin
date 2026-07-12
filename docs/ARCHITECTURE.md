@@ -30,7 +30,7 @@ Main system parts:
   Depends on: `MapSession`, `MapFilterPanelController`, `MapNoteOpenRouter`, `UnityIframeBridge`
 
 - Map session and filter UI
-  Owns persisted map state, graph refresh timing, filter derivation, render-scale preference, and the transient filter-panel interaction state.
+  Owns persisted map state, graph refresh timing, Obsidian metadata-resolution gating, filter derivation, render-scale preference, and the transient filter-panel interaction state.
   Main code: `src/view/MapSession.ts`, `src/view/MapFilterPanelController.ts`
   Depends on: `VaultGraphBuilder`, `GraphPathFilter`, Obsidian workspace APIs, browser DOM events
 
@@ -139,7 +139,7 @@ The bridge is implemented across several runtime boundaries:
 
 - `src/view/MapView.ts` - creates the iframe and attaches the bridge to `iframe.contentWindow`.
 - `src/bridge/UnityIframeBridge.ts` - sends plugin-to-runtime messages and receives runtime-to-plugin messages.
-- `unity-webgl/index.template.html` and `unity-webgl/index.disk-runtime.template.html` - contain the iframe JavaScript wrapper. This wrapper listens for `postMessage` events, calls `unityInstance.SendMessage(...)`, and posts runtime events back to `window.parent`.
+- `unity-webgl/index.template.html` and `unity-webgl/index.disk-runtime.template.html` - contain the iframe JavaScript wrapper. This wrapper listens for `postMessage` events, applies wrapper-only status updates, calls `unityInstance.SendMessage(...)` for Unity-bound messages, and posts runtime events back to `window.parent`.
 - `unity/ReverySkyMap/Assets/Scripts/Bridge/ObsidianBridge.cs` - Unity-side bridge component. It receives graph and focus messages from JavaScript, normalizes payloads, updates `MapRuntimeContext`, and forwards note-open events back to the iframe JavaScript wrapper.
 
 ### ObsidianBridge lifetime
@@ -188,6 +188,7 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 
 `graph:set` and `note:focus` are latest-intent messages, not durable queues.
 Before `bridge:ready`, `MapSession` keeps only the latest pending graph payload.
+The first graph build reads the current Obsidian `metadataCache.resolvedLinks` snapshot; graph-relevant live metadata changes use the `metadataCache.resolved` barrier described below.
 If Unity WebGL boot fails, the iframe wrapper treats the failure as terminal for that iframe, keeps the failure status visible, and intentionally does not emit `bridge:ready` or receive `graph:set`.
 When an incremental Unity engine has not materialized a target star yet, `Cartographer.FocusRuntimeNote(...)` stores the target in `MapRuntimeContext.PendingFocusNoteId` and `RecursiveHubs` retries it after construction.
 
@@ -196,12 +197,16 @@ When an incremental Unity engine has not materialized a target star yet, `Cartog
 2. A graph-significant change happens:
    vault metadata changes, path filter input changes, tag visibility toggles, or map layout changes.
 3. `src/view/MapFilterPanelController.ts` updates session-owned state through `MapSession.setFilterQuery()`, `setShowTags()`, or `MapSession.setMapLayoutPreference()`.
-4. `src/view/MapSession.ts` re-enters `emitGraphFromSource()`.
+4. For filter, tag-visibility, and layout changes, `src/view/MapSession.ts` re-enters `emitGraphFromSource()` using the latest source graph snapshot.
 5. `src/graph/GraphPathFilter.ts`
    Parses the query and returns the filtered `GraphPayload` subset.
 6. `src/view/MapView.ts` receives the `sendGraph` callback from `MapSession`, forwards the payload through `UnityIframeBridge`, and asks `MapFilterPanelController` to refresh visible suggestions when needed.
 7. `src/bridge/UnityIframeBridge.ts` -> `sendGraphSet()`
    Sends the effective graph that Unity should render now.
+
+For graph-relevant Obsidian metadata changes, `MapSession` first marks semantic refresh pending and sends `runtime:status` with `Updating map data...`.
+It does not rebuild from `metadataCache.resolvedLinks` until Obsidian emits `metadataCache.resolved`.
+This prevents an intermediate `resolvedLinks` snapshot from being cached and then reused by later filters.
 
 Render-scale changes are intentionally different from graph-significant changes. `MapFilterPanelController` calls `MapSession.setRenderScale()`, which updates persisted state and UI restart guidance without re-emitting `graph:set`; the new scale is applied the next time the iframe is created.
 
@@ -269,8 +274,9 @@ Focus before bridge readiness is out of scope. Plugin-side focus requests pass t
   Expected: refresh the graph; keep the focused node if it still exists.
   Current code:
   `metadataCache.on("changed", ...)` detects a changed tags/links signature ->
-  `markSemanticRefreshPending()` waits for metadata stabilization ->
+  `markSemanticRefreshPending()` sets the pending flag and sends `runtime:status` (`Updating map data...`) ->
   `metadataCache.on("resolved", ...)` schedules the graph refresh ->
+  `refreshGraphNow()` rebuilds from `metadataCache.resolvedLinks` ->
   `emitGraphFromSource()` sends `graph:set` ->
   Unity `ObsidianBridge.OnGraphSet(...)` updates `MapRuntimeContext` ->
   `Cartographer.RebuildGraph(...)` rebuilds and `SetCameraFocus(...)` restores visible `LastSelectedStarId`.
@@ -343,7 +349,7 @@ Focus before bridge readiness is out of scope. Plugin-side focus requests pass t
   Owns the shell execution paths after the view exists: iframe startup, bridge wiring, and collaborator orchestration.
 
 - `src/view/MapSession.ts` -> `MapSession`
-  Owns persisted map state, graph refresh timing, graph emission, and render-scale restart tracking. It delegates plugin-side focus policy to `MapFocusController`.
+  Owns persisted map state, graph refresh timing, metadata-resolution waiting, graph emission, and render-scale restart tracking. It delegates plugin-side focus policy to `MapFocusController`.
 
 - `src/view/MapFocusController.ts` -> `MapFocusController`
   Owns plugin-side focus event routing for workspace `file-open`, markdown editor focus, and active-note rename.
@@ -363,7 +369,7 @@ Focus before bridge readiness is out of scope. Plugin-side focus requests pass t
 - `src/graph/GraphPathFilter.ts` -> parse/apply helpers
   Owns query parsing and graph narrowing before handoff to Unity.
 
-- `src/bridge/UnityIframeBridge.ts` -> `attach()`, `sendGraphSet()`, `sendNoteFocus()`, `onMessage()`
+- `src/bridge/UnityIframeBridge.ts` -> `attach()`, `sendGraphSet()`, `sendStatus()`, `sendNoteFocus()`, `onMessage()`
   Owns browser-side message transport and validation handoff points.
 
 - `src/runtime/UnityWebglLocalServer.ts` -> `getBaseUrl()`, `startServer()`, `handleRequest()`
@@ -374,6 +380,7 @@ Focus before bridge readiness is out of scope. Plugin-side focus requests pass t
 
 - Raw vault files, metadata cache, and resolved links are owned by Obsidian.
   They are the source of truth for note existence and links.
+  `MapSession` waits for `metadataCache.resolved` after graph-relevant `metadataCache.changed` events before treating `resolvedLinks` as ready for a live rebuild.
 
 - Stable note ids, normalized paths, normalized tags, and canonical note date are owned by the TypeScript graph layer.
   They are built in `VaultGraphBuilder` and `GraphNormalizer`.
@@ -413,10 +420,11 @@ Important current contract facts:
 - successful startup order is `bridge:ready` first, then `graph:set`;
 - Unity WebGL boot failure is terminal inside the iframe wrapper and does not emit `bridge:ready`;
 - runtime-to-plugin messages are `bridge:ready`, `graph:ready`, `note:open`, and `runtime:shutdown-complete`;
-- plugin-to-runtime messages are `graph:set`, `note:focus`, and `runtime:shutdown`;
+- plugin-to-runtime messages are `graph:set`, `runtime:status`, `note:focus`, and `runtime:shutdown`;
 - `path` values must stay vault-relative and use `/` separators;
 - `graph:set` carries the effective filtered graph; focus changes are sent separately via `note:focus`, which must include both `id` and `path`;
 - `graph:ready` must echo the latest `graph:set` `requestId` before the iframe clears the loading status;
+- `runtime:status` updates iframe wrapper status text only and is not forwarded into Unity;
 - `runtime:shutdown` is a bridge/runtime-wrapper lifecycle handshake, not a full Unity engine shutdown;
 - `mapLayout` is an optional plugin-owned runtime hint;
 - `renderScale` is a plugin-owned iframe startup hint and does not belong to the bridge payload contract;

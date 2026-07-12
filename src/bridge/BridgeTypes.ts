@@ -55,6 +55,14 @@ export type RuntimeShutdownCompleteMessage = {
   requestId: string;
 };
 
+export type RuntimeStatusMessage = {
+  protocolVersion: string;
+  type: "runtime:status";
+  payload: {
+    text: string;
+  };
+};
+
 export type ShutdownResult = "complete" | "timeout" | "not-attached" | "superseded";
 
 export type GraphNoteNode = {
@@ -96,4 +104,8 @@ export type IncomingBridgeMessage =
   | GraphReadyMessage
   | NoteOpenMessage
   | RuntimeShutdownCompleteMessage;
-export type OutgoingBridgeMessage = GraphSetMessage | NoteFocusMessage | RuntimeShutdownMessage;
+export type OutgoingBridgeMessage =
+  | GraphSetMessage
+  | NoteFocusMessage
+  | RuntimeShutdownMessage
+  | RuntimeStatusMessage;

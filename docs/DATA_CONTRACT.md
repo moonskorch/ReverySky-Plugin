@@ -25,6 +25,7 @@ Fields:
 Plugin -> runtime:
 - `graph:set`: effective filtered graph payload.
 - `note:focus`: current-note focus hint with required `id` and `path`.
+- `runtime:status`: iframe-wrapper status text update that does not change Unity graph state.
 - `runtime:shutdown`: lifecycle message requesting the iframe runtime wrapper to stop bridge activity before the parent view detaches.
 
 Runtime -> plugin:
@@ -53,6 +54,27 @@ Rules:
 - `graph:ready` must echo the matching `graph:set` `requestId`.
 - The iframe status UI must ignore stale `graph:ready` messages whose `requestId` does not match the latest `graph:set`.
 - The runtime sends `graph:ready` after the active layout engine reaches its user-visible ready point; engines with continuous background refinement must still provide a finite ready point.
+
+## Runtime Status Messages
+`runtime:status` updates the iframe status text without sending graph data to Unity.
+
+Parent -> runtime wrapper:
+
+```json
+{
+  "protocolVersion": "2.0.0",
+  "type": "runtime:status",
+  "payload": {
+    "text": "Updating map data..."
+  }
+}
+```
+
+Rules:
+- `runtime:status` has no `requestId`.
+- `payload.text` must be non-empty after trimming.
+- The iframe wrapper applies the text to the status UI only; it must not call Unity `SendMessage`.
+- Runtime failure and shutdown states keep precedence over status updates.
 
 ## Runtime Shutdown Messages
 `runtime:shutdown` is a bridge/runtime-wrapper lifecycle handshake, not a full Unity engine teardown.
@@ -127,6 +149,7 @@ type GraphLink = {
 
 ## Validation Requirements
 - Outgoing `graph:set` payloads are validated before postMessage dispatch.
+- Outgoing `runtime:status` messages are skipped when the status text is empty after trimming.
 - Incoming `bridge:ready` is accepted only when `protocolVersion` matches exactly.
 - Incoming `graph:ready` is accepted only when `protocolVersion` matches and `requestId` is a non-empty string.
 - Incoming `note:open` is accepted only when `protocolVersion` matches and the payload includes non-empty `id` and `path`.
@@ -142,6 +165,8 @@ type GraphLink = {
 ## Current Producer Semantics
 - `graph:set` is the effective filtered payload emitted by the plugin view, not the raw vault snapshot.
 - Each emitted `graph:set` gets a unique `requestId` so stale `graph:ready` messages cannot complete a newer graph status.
+- After graph-relevant metadata changes, `MapSession` waits for Obsidian `metadataCache.resolved` before rebuilding from `metadataCache.resolvedLinks`; while waiting, it may send `runtime:status` instead of `graph:set`.
+- Filter-only changes reuse the latest source graph snapshot and emit only a newly filtered payload.
 - `notes[].date` uses `frontmatter.date`, then `frontmatter.created`, then `frontmatter.created_at`, then file creation time. Missing, blank, or invalid candidates are skipped, and the field is omitted when no valid source exists.
 - `notes[].tags` are produced by merging inline tags and frontmatter tags, then normalizing and deduplicating the result.
 - `notes[].size` is emitted as file size in bytes.

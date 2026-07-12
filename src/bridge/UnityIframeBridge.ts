@@ -7,6 +7,7 @@ import {
   IncomingBridgeMessage,
   NoteOpenPayload,
   RuntimeShutdownMessage,
+  RuntimeStatusMessage,
   ShutdownResult
 } from "./BridgeTypes";
 import { MessageValidator } from "./MessageValidator";
@@ -121,6 +122,27 @@ export class UnityIframeBridge {
       type: "graph:set",
       requestId: this.createRequestId(),
       payload
+    };
+
+    this.iframeWindow.postMessage(message, "*");
+  }
+
+  sendStatus(text: string): void {
+    if (!this.iframeWindow) {
+      return;
+    }
+
+    const safeText = typeof text === "string" ? text.trim() : "";
+    if (!safeText) {
+      return;
+    }
+
+    const message: RuntimeStatusMessage = {
+      protocolVersion: BRIDGE_PROTOCOL_VERSION,
+      type: "runtime:status",
+      payload: {
+        text: safeText
+      }
     };
 
     this.iframeWindow.postMessage(message, "*");

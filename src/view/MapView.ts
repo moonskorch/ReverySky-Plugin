@@ -10,7 +10,8 @@ import { MapSession } from "./MapSession";
 
 export const MAP_VIEW_TYPE = "reverysky-map-view";
 
-type BridgePort = Pick<UnityIframeBridge, "attach" | "detach" | "shutdown" | "sendGraphSet" | "sendNoteFocus">;
+type BridgePort = Pick<UnityIframeBridge, "attach" | "detach" | "shutdown" | "sendGraphSet" | "sendNoteFocus"> &
+  Partial<Pick<UnityIframeBridge, "sendStatus">>;
 type ObsidianHTMLElement = HTMLElement & {
   empty?: () => void;
   setAttr?: (name: string, value: string) => void;
@@ -59,6 +60,9 @@ export class MapView extends ItemView {
       sendGraph: (payload) => {
         this.bridge.sendGraphSet(payload);
         this.filterPanelController?.refreshSuggestions();
+      },
+      sendStatus: (message) => {
+        this.bridge.sendStatus?.(message);
       },
       sendFocus: (payload) => {
         this.bridge.sendNoteFocus(payload);
