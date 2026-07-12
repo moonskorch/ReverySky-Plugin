@@ -28,10 +28,12 @@ Plugin -> runtime:
 - `runtime:shutdown`: lifecycle message requesting the iframe runtime wrapper to stop bridge activity before the parent view detaches.
 
 Runtime -> plugin:
-- `bridge:ready`: runtime is initialized and ready to receive payloads.
+- `bridge:ready`: runtime is initialized and ready to receive payloads after successful Unity WebGL boot.
 - `graph:ready`: runtime has finished the current graph build or stabilization phase for a matching `graph:set` request.
 - `note:open`: request for Obsidian to open a note by required `id` and `path`.
 - `runtime:shutdown-complete`: acknowledgement for a matching `runtime:shutdown` request.
+
+If Unity WebGL boot fails, the iframe wrapper keeps the failure status visible and intentionally does not emit `bridge:ready`; no `graph:set` is expected for that iframe.
 
 ## Graph Ready Messages
 `graph:ready` is a completion acknowledgement for a specific `graph:set` request.

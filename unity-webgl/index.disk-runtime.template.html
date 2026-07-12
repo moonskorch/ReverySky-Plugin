@@ -123,6 +123,11 @@
         const buildPath = "Build/";
         const buildConfigPath = buildPath + "build-config.json";
         const renderScale = getRenderScale();
+        const runtimeBootFailureStatus = "Unity runtime failed. Try restarting Obsidian.";
+        const webglContextLostStatus = "WebGL context lost. Reload the map view.";
+        const resizeDebounceMs = 200;
+        const maxCanvasSidePixels = 8192;
+        const maxCanvasPixels = maxCanvasSidePixels * maxCanvasSidePixels;
 
         let runtimeMode = "boot";
         let unityInstance = null;
@@ -134,8 +139,17 @@
         let latestGraphLinkCount = 0;
         let graphSetDispatchToken = 0;
         let latestNoteFocusMessage = null;
+        let isRuntimeStatusLocked = false;
+        let resizeTimerId = 0;
 
         function setStatus(text) {
+          if (isRuntimeStatusLocked) {
+            return;
+          }
+          setStatusText(text);
+        }
+
+        function setStatusText(text) {
           if (statusValueEl) {
             statusValueEl.textContent = text;
           }
@@ -212,14 +226,43 @@
         }
 
         function resizeCanvas() {
+          resizeTimerId = 0;
+          if (isShuttingDown || runtimeMode === "failed") {
+            return;
+          }
+
           const ratio = getEffectiveDevicePixelRatio();
           const rect = viewportEl.getBoundingClientRect();
-          const nextWidth = Math.max(1, Math.floor(rect.width * ratio));
-          const nextHeight = Math.max(1, Math.floor(rect.height * ratio));
+          const requestedWidth = Math.max(1, Math.floor(rect.width * ratio));
+          const requestedHeight = Math.max(1, Math.floor(rect.height * ratio));
+          const requestedPixels = requestedWidth * requestedHeight;
+          const pixelBudgetScale =
+            requestedPixels > maxCanvasPixels ? Math.sqrt(maxCanvasPixels / requestedPixels) : 1;
+          const widthScale =
+            requestedWidth > maxCanvasSidePixels ? maxCanvasSidePixels / requestedWidth : 1;
+          const heightScale =
+            requestedHeight > maxCanvasSidePixels ? maxCanvasSidePixels / requestedHeight : 1;
+          const safeScale = Math.min(pixelBudgetScale, widthScale, heightScale);
+          const nextWidth = Math.max(1, Math.floor(requestedWidth * safeScale));
+          const nextHeight = Math.max(1, Math.floor(requestedHeight * safeScale));
+          if (safeScale < 1 && runtimeMode === "unity") {
+            console.warn("[ReverySky] Canvas backing buffer was scaled down to stay within the safe pixel budget.");
+          }
+
           if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
             canvas.width = nextWidth;
             canvas.height = nextHeight;
           }
+        }
+
+        function scheduleResizeCanvas() {
+          if (isShuttingDown || runtimeMode === "failed") {
+            return;
+          }
+          if (resizeTimerId) {
+            window.clearTimeout(resizeTimerId);
+          }
+          resizeTimerId = window.setTimeout(resizeCanvas, resizeDebounceMs);
         }
 
         async function loadBuildConfig() {
@@ -288,6 +331,9 @@
           if (isShuttingDown) {
             return;
           }
+          if (runtimeMode === "failed") {
+            return;
+          }
 
           latestGraphSetMessage = message;
           const payload = message.payload || { notes: [], links: [] };
@@ -304,6 +350,10 @@
         }
 
         function applyGraphReady(requestId) {
+          if (runtimeMode === "failed") {
+            return;
+          }
+
           const readyRequestId = typeof requestId === "string" ? requestId : "";
           if (readyRequestId !== latestGraphSetRequestId) {
             return;
@@ -327,10 +377,20 @@
           }
         }
 
-        function handleWebglContextLoss() {
+        function setRuntimeFailed(statusText) {
           runtimeMode = "failed";
           unityInstance = null;
-          setStatus("WebGL context lost. Reload the map view.");
+          graphSetDispatchToken++;
+          if (resizeTimerId) {
+            window.clearTimeout(resizeTimerId);
+            resizeTimerId = 0;
+          }
+          isRuntimeStatusLocked = true;
+          setStatusText(statusText);
+        }
+
+        function handleWebglContextLoss() {
+          setRuntimeFailed(webglContextLostStatus);
         }
 
         function onWebglContextLost(event) {
@@ -340,7 +400,7 @@
         }
 
         function onWindowResize() {
-          resizeCanvas();
+          scheduleResizeCanvas();
         }
 
         function postShutdownComplete(requestId) {
@@ -374,6 +434,10 @@
           latestGraphLinkCount = 0;
           graphSetDispatchToken++;
           latestNoteFocusMessage = null;
+          if (resizeTimerId) {
+            window.clearTimeout(resizeTimerId);
+            resizeTimerId = 0;
+          }
           window.ReverySkyBridgePostNoteOpen = function () {};
           window.ReverySkyBridgePostGraphReady = function () {};
           window.removeEventListener("resize", onWindowResize);
@@ -481,10 +545,8 @@
           try {
             await tryBootUnityRuntime();
           } catch (err) {
-            runtimeMode = "failed";
-            setStatus("Unity runtime failed to start. See console.");
+            setRuntimeFailed(runtimeBootFailureStatus);
             console.error("[ReverySky] Unity runtime boot failed.", err);
-            sendReady();
           }
         }
 

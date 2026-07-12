@@ -163,6 +163,34 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
     expect((harness.plugin as unknown as { unityWebglServer: unknown }).unityWebglServer).toBeNull();
   });
 
+  it("stops the runtime server during unload when state persistence fails", async () => {
+    const runtimeServer = {
+      stop: vi.fn().mockResolvedValue(undefined)
+    };
+    const activeLeaf: MockLeaf = {
+      view: {
+        getState: () => ({
+          pathFilterQuery: "path:Projects"
+        })
+      },
+      setViewState: vi.fn()
+    };
+    const harness = createPluginHarness({
+      existingLeaves: [activeLeaf]
+    });
+    const saveError = new Error("save failed");
+
+    harness.saveData.mockRejectedValueOnce(saveError);
+    (harness.plugin as unknown as { unityWebglServer: typeof runtimeServer | null }).unityWebglServer = runtimeServer;
+
+    await expect(
+      (harness.plugin as unknown as { cleanupOnUnload: () => Promise<void> }).cleanupOnUnload()
+    ).rejects.toThrow(saveError);
+
+    expect(runtimeServer.stop).toHaveBeenCalledTimes(1);
+    expect((harness.plugin as unknown as { unityWebglServer: unknown }).unityWebglServer).toBeNull();
+  });
+
   it("restores persisted map state loaded during plugin startup", async () => {
     const newLeaf: MockLeaf = {
       setViewState: vi.fn().mockResolvedValue(undefined)

@@ -64,8 +64,11 @@ export default class ReverySkyMapPlugin extends Plugin {
   }
 
   private async cleanupOnUnload(): Promise<void> {
-    await this.captureAndPersistMapViewState();
-    await this.stopUnityRuntimeServer();
+    try {
+      await this.captureAndPersistMapViewState();
+    } finally {
+      await this.stopUnityRuntimeServer();
+    }
   }
 
   /**

@@ -171,7 +171,7 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 8. On iframe load, `MapView.onOpen()` calls `bridge.attach(iframe.contentWindow, callbacks)`.
 
 ### Path 2. Handshake -> graph build -> postMessage -> Unity ingest
-1. The runtime posts `bridge:ready`.
+1. After successful Unity WebGL boot, the runtime posts `bridge:ready`.
 2. `src/bridge/UnityIframeBridge.ts` -> `onMessage()`
    Validates the incoming message and calls the registered `onReady` callback.
 3. `src/view/MapView.ts` -> `session.setBridgeReady(true)` -> `session.flushOrRefresh()`
@@ -188,6 +188,7 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 
 `graph:set` and `note:focus` are latest-intent messages, not durable queues.
 Before `bridge:ready`, `MapSession` keeps only the latest pending graph payload.
+If Unity WebGL boot fails, the iframe wrapper treats the failure as terminal for that iframe, keeps the failure status visible, and intentionally does not emit `bridge:ready` or receive `graph:set`.
 When an incremental Unity engine has not materialized a target star yet, `Cartographer.FocusRuntimeNote(...)` stores the target in `MapRuntimeContext.PendingFocusNoteId` and `RecursiveHubs` retries it after construction.
 
 ### Path 3. Vault or UI change -> filtered graph refresh
@@ -409,7 +410,8 @@ The canonical plugin-side contract lives in:
 
 Important current contract facts:
 - protocol version is `2.0.0`;
-- startup order is `bridge:ready` first, then `graph:set`;
+- successful startup order is `bridge:ready` first, then `graph:set`;
+- Unity WebGL boot failure is terminal inside the iframe wrapper and does not emit `bridge:ready`;
 - runtime-to-plugin messages are `bridge:ready`, `graph:ready`, `note:open`, and `runtime:shutdown-complete`;
 - plugin-to-runtime messages are `graph:set`, `note:focus`, and `runtime:shutdown`;
 - `path` values must stay vault-relative and use `/` separators;
