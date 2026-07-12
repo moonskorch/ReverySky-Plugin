@@ -74,11 +74,16 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   [SerializeField, Min(0.01f)] private float radius = 1f;
   [SerializeField, Min(0.01f)] private float visibleDistance = 80f;
   [SerializeField, Min(0f)] private float longLineDistance = 50f;
+  [SerializeField, Min(1)] private int maxLinesPerNode = 50;
   [SerializeField] private bool focusedLinesIgnoreLongLineLimit = true;
+  [SerializeField, Range(0f, 1f)] private float visibleRegionRefreshLineRatio = 0.05f;
+
+  [Header("Focused line highlight")]
   [ColorUsage(true, true)]
   [SerializeField] private Color focusedLineColor = new(2f, 2f, 2f, 1f);
-  [SerializeField, Range(0f, 1f)] private float visibleRegionRefreshLineRatio = 0.05f;
-  [SerializeField, Min(1)] private int maxLinesPerNode = 50;
+  [SerializeField, Min(0)] private int focusedLineOverflowThreshold = 50;
+  [ColorUsage(true, true)]
+  [SerializeField] private Color focusedLineOverflowColor = new(4f, 1.5f, 0.25f, 1f);
 
   private readonly HashSet<MapGraphNodeId> registeredNodeIds = new();
   private readonly Dictionary<MapGraphNodeId, List<LineCandidate>> candidatesByNodeId = new();
@@ -99,6 +104,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
   private bool linesVisible = true;
   private MapGraphNodeId focusedNodeId = MapGraphNodeId.None;
   private MapGraphNodeId highlightedFocusNodeId = MapGraphNodeId.None;
+  private bool useFocusedLineOverflowColor;
   private MaterialPropertyBlock focusedLinePropertyBlock;
 
   public void Rebuild(
@@ -216,6 +222,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     MapGraphNodeId nextFocusedNodeId)
   {
     highlightedFocusNodeId = nextFocusedNodeId;
+    UpdateFocusedLineOverflowState();
     RestyleIncidentActiveLines(previousFocusedNodeId);
     if (!previousFocusedNodeId.Equals(nextFocusedNodeId))
       RestyleIncidentActiveLines(nextFocusedNodeId);
@@ -336,8 +343,12 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
       return;
     }
 
+    bool previousUseFocusedLineOverflowColor = useFocusedLineOverflowColor;
     BuildDesiredLineSetStreaming();
+    UpdateFocusedLineOverflowState();
     RemoveLinesOutsideDesiredSet();
+    if (useFocusedLineOverflowColor != previousUseFocusedLineOverflowColor)
+      RestyleIncidentActiveLines(highlightedFocusNodeId);
     AddMissingDesiredLines();
   }
 
@@ -757,6 +768,13 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
             candidate.nodeBId.Equals(highlightedFocusNodeId));
   }
 
+  private void UpdateFocusedLineOverflowState()
+  {
+    useFocusedLineOverflowColor =
+      selectedLineCountByNodeId.TryGetValue(highlightedFocusNodeId, out int highlightedLineCount) &&
+      highlightedLineCount > focusedLineOverflowThreshold;
+  }
+
   private void ApplyLineStyle(LineRenderer line, bool focused)
   {
     if (line == null)
@@ -770,7 +788,9 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
 
     focusedLinePropertyBlock ??= new MaterialPropertyBlock();
     focusedLinePropertyBlock.Clear();
-    focusedLinePropertyBlock.SetColor(ColorPropertyId, focusedLineColor);
+    focusedLinePropertyBlock.SetColor(
+      ColorPropertyId,
+      useFocusedLineOverflowColor ? focusedLineOverflowColor : focusedLineColor);
     line.SetPropertyBlock(focusedLinePropertyBlock);
   }
 }

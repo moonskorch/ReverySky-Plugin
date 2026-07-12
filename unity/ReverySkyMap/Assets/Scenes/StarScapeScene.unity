@@ -1681,10 +1681,12 @@ MonoBehaviour:
   radius: 1
   visibleDistance: 60
   longLineDistance: 40
-  focusedLinesIgnoreLongLineLimit: 1
-  focusedLineColor: {r: 2, g: 2, b: 2, a: 1}
-  visibleRegionRefreshLineRatio: 0.1
   maxLinesPerNode: 80
+  focusedLinesIgnoreLongLineLimit: 1
+  visibleRegionRefreshLineRatio: 0.1
+  focusedLineColor: {r: 2, g: 2, b: 2, a: 1}
+  focusedLineOverflowThreshold: 15
+  focusedLineOverflowColor: {r: 1.0717734, g: 1.0717734, b: 1.0717734, a: 1}
 --- !u!4 &1217411435
 Transform:
   m_ObjectHideFlags: 0
@@ -2533,13 +2535,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
   injectSampleData: 0
-  connectionModel: 3
-  islands: 0
+  connectionModel: 1
+  islands: 2
   noteCount: 250
   tagPoolSize: 60
   dateSpanDays: 365
   maxTagsPerNote: 4
-  linkDensity: 31
+  linkDensity: 13
 --- !u!114 &1780593171
 MonoBehaviour:
   m_ObjectHideFlags: 0

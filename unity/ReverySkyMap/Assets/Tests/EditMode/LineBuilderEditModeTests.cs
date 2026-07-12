@@ -10,6 +10,7 @@ public class LineBuilderEditModeTests
 {
   private static readonly int LineColorPropertyId = Shader.PropertyToID("_Color");
   private static readonly Color FocusLineColor = new(0f, 2.5f, 2.5f, 1f);
+  private static readonly Color OverflowFocusLineColor = new(4f, 0.5f, 0f, 1f);
 
   [UnityTest]
   public IEnumerator TryCreateDistanceEntry_RegisteredNodes_ReturnEntriesForStarsAndTags()
@@ -482,6 +483,64 @@ public class LineBuilderEditModeTests
     scope.Builder.ApplyHighlight(MapGraphNodeId.None, GetNodeId(graphIndex, scope.NoteA));
 
     AssertLineHighlight(line, FocusLineColor);
+    yield return null;
+  }
+
+  [UnityTest]
+  public IEnumerator ApplyHighlight_UsesOverflowColorOnlyAboveConfiguredLineLimit()
+  {
+    using var scope = CreateScope();
+    var noteCObject = new GameObject("LineBuilderEditModeTests_NoteC");
+    var noteDObject = new GameObject("LineBuilderEditModeTests_NoteD");
+    var noteC = noteCObject.AddComponent<Star>();
+    var noteD = noteDObject.AddComponent<Star>();
+
+    try
+    {
+      ConfigureStar(scope.NoteA, "n1", "notes/n1.md");
+      ConfigureStar(scope.NoteB, "n2", "notes/n2.md");
+      ConfigureStar(noteC, "n3", "notes/n3.md");
+      ConfigureStar(noteD, "n4", "notes/n4.md");
+
+      MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>
+      {
+        new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n2", Weight = 1f },
+        new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n3", Weight = 1f },
+        new MapRuntimeContext.RuntimeNoteLink { SourceId = "n1", TargetId = "n4", Weight = 1f }
+      });
+
+      MapGraphIndex graphIndex = RebuildWithIndex(
+        scope.Builder,
+        new List<Star> { scope.NoteA, scope.NoteB, noteC, noteD },
+        new List<TagNode>(),
+        3,
+        10);
+      scope.Builder.SetDistanceVisible(scope.NoteA, true);
+      FlushLineBuilder(scope.Builder);
+
+      MapGraphNodeId nodeAId = GetNodeId(graphIndex, scope.NoteA);
+      LineRenderer lineAB = GetActiveLineConnecting(scope.LineParent, scope.NoteA, scope.NoteB);
+      LineRenderer lineAC = GetActiveLineConnecting(scope.LineParent, scope.NoteA, noteC);
+      LineRenderer lineAD = GetActiveLineConnecting(scope.LineParent, scope.NoteA, noteD);
+
+      SetPrivateField(scope.Builder, "focusedLineOverflowThreshold", 3);
+      scope.Builder.ApplyHighlight(MapGraphNodeId.None, nodeAId);
+      AssertLineHighlight(lineAB, FocusLineColor);
+      AssertLineHighlight(lineAC, FocusLineColor);
+      AssertLineHighlight(lineAD, FocusLineColor);
+
+      SetPrivateField(scope.Builder, "focusedLineOverflowThreshold", 2);
+      scope.Builder.ApplyHighlight(MapGraphNodeId.None, nodeAId);
+      AssertLineHighlight(lineAB, OverflowFocusLineColor);
+      AssertLineHighlight(lineAC, OverflowFocusLineColor);
+      AssertLineHighlight(lineAD, OverflowFocusLineColor);
+    }
+    finally
+    {
+      Object.DestroyImmediate(noteCObject);
+      Object.DestroyImmediate(noteDObject);
+    }
+
     yield return null;
   }
 
@@ -1075,6 +1134,7 @@ public class LineBuilderEditModeTests
       SetPrivateField(Builder, "lineParent", LineParent);
       SetPrivateField(Builder, "focusNode", Focus);
       SetPrivateField(Builder, "focusedLineColor", FocusLineColor);
+      SetPrivateField(Builder, "focusedLineOverflowColor", OverflowFocusLineColor);
     }
 
     public void Dispose()
