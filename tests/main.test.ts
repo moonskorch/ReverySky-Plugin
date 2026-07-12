@@ -127,7 +127,7 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
     expect(harness.revealLeaf).toHaveBeenCalledWith(reopenedLeaf);
   });
 
-  it("captures map state during plugin unload without detaching the workspace leaf", async () => {
+  it("captures map state during plugin unload before detaching the workspace leaf", async () => {
     const runtimeServer = {
       stop: vi.fn().mockResolvedValue(undefined)
     };
@@ -158,8 +158,10 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
         mapLayout: "chronological"
       }
     });
-    expect(harness.detachLeavesOfType).not.toHaveBeenCalled();
+    expect(harness.detachLeavesOfType).toHaveBeenCalledWith(MAP_VIEW_TYPE);
+    expect(harness.saveData.mock.invocationCallOrder[0]).toBeLessThan(harness.detachLeavesOfType.mock.invocationCallOrder[0]);
     expect(runtimeServer.stop).toHaveBeenCalledTimes(1);
+    expect(harness.detachLeavesOfType.mock.invocationCallOrder[0]).toBeLessThan(runtimeServer.stop.mock.invocationCallOrder[0]);
     expect((harness.plugin as unknown as { unityWebglServer: unknown }).unityWebglServer).toBeNull();
   });
 
@@ -187,7 +189,9 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
       (harness.plugin as unknown as { cleanupOnUnload: () => Promise<void> }).cleanupOnUnload()
     ).rejects.toThrow(saveError);
 
+    expect(harness.detachLeavesOfType).toHaveBeenCalledWith(MAP_VIEW_TYPE);
     expect(runtimeServer.stop).toHaveBeenCalledTimes(1);
+    expect(harness.detachLeavesOfType.mock.invocationCallOrder[0]).toBeLessThan(runtimeServer.stop.mock.invocationCallOrder[0]);
     expect((harness.plugin as unknown as { unityWebglServer: unknown }).unityWebglServer).toBeNull();
   });
 

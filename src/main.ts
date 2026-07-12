@@ -67,7 +67,11 @@ export default class ReverySkyMapPlugin extends Plugin {
     try {
       await this.captureAndPersistMapViewState();
     } finally {
-      await this.stopUnityRuntimeServer();
+      try {
+        this.app.workspace.detachLeavesOfType(MAP_VIEW_TYPE);
+      } finally {
+        await this.stopUnityRuntimeServer();
+      }
     }
   }
 
@@ -181,6 +185,7 @@ export default class ReverySkyMapPlugin extends Plugin {
       }
     }
 
+    // Preserve the last persisted state when no map leaf is open during unload.
     return this.lastMapViewState;
   }
 

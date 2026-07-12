@@ -328,8 +328,8 @@ Focus before bridge readiness is out of scope. Plugin-side focus requests pass t
 1. `src/main.ts` -> ribbon callback -> `toggleMapView()`, or `src/main.ts` -> `onunload()`.
 2. `src/main.ts` -> `captureAndPersistMapViewState()`
    Reads `leaf.view.getState()` from the current map leaf when present and writes the result through `saveData(...)`.
-3. During an explicit toggle close, `workspace.detachLeavesOfType(MAP_VIEW_TYPE)` removes the active map leaves.
-4. During plugin unload, the plugin leaves existing map leaves attached so Obsidian can preserve their user-chosen workspace location.
+3. During an explicit toggle close or plugin unload, `workspace.detachLeavesOfType(MAP_VIEW_TYPE)` removes the active map leaves.
+4. The detach path lets Obsidian call `MapView.onClose()`, which shuts down bridge activity and removes the iframe surface before the runtime server stops.
 5. On a later startup or `toggleMapView()` reopen, `ReverySkyMapPlugin.onload()` and `activateMapView()` reuse `lastMapViewState`.
 6. `leaf.setViewState({ type: MAP_VIEW_TYPE, active: true, state })` hands the persisted state back to `MapView`, which then forwards it into `MapSession.setState(...)`.
 7. Persisted view state currently includes `pathFilterQuery`, `showTags`, `mapLayout`, and `renderScale`.
