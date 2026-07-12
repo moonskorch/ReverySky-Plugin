@@ -88,6 +88,7 @@ export class MapSession {
   private lastGraphPayload: GraphPayload | null = null;
   private pendingGraphPayload: GraphPayload | null = null;
   private semanticRefreshPending = false;
+  private startupRefreshPending = false;
   private noteSignatureByPath = new Map<string, string>();
   private bridgeReady = false;
   private refreshTimer: number | null = null;
@@ -149,6 +150,7 @@ export class MapSession {
     this.pendingGraphPayload = null;
     this.focus.start(registerEvent);
     this.semanticRefreshPending = false;
+    this.startupRefreshPending = false;
     this.clearRefreshTimer();
     this.ensureRefreshSubscriptions(registerEvent);
   }
@@ -164,6 +166,7 @@ export class MapSession {
     this.pendingGraphPayload = null;
     this.focus.reset();
     this.semanticRefreshPending = false;
+    this.startupRefreshPending = false;
     this.lastGraphPayload = null;
   }
 
@@ -294,8 +297,8 @@ export class MapSession {
   }
 
   /**
-   * Prefer reusing already-built graph state.
-   * If a snapshot is queued for bridge readiness, flush it; otherwise reuse the cached source graph or rebuild only when needed.
+   * Send the current graph after the runtime becomes ready.
+   * Use a queued payload first, then a cached source graph, and rebuild only when neither exists.
    */
   flushOrRefresh(): void {
     if (this.pendingGraphPayload) {
@@ -303,15 +306,13 @@ export class MapSession {
       this.pendingGraphPayload = null;
       this.lastGraphPayload = payload;
       this.sendGraph(payload);
-      return;
-    }
-
-    if (this.sourceGraphPayload) {
+    } else if (this.sourceGraphPayload) {
       this.emitGraphFromSource();
-      return;
+    } else {
+      this.refreshGraphNow();
     }
 
-    this.refreshGraphNow();
+    this.startupRefreshPending = true;
   }
 
   resolveRequestedPath(payload: NoteOpenPayload): string | null {
@@ -369,12 +370,17 @@ export class MapSession {
       );
       registerEvent(
         metadataCache.on("resolved", () => {
-          if (!this.semanticRefreshPending) {
+          if (this.semanticRefreshPending) {
+            this.semanticRefreshPending = false;
+            this.startupRefreshPending = false;
+            this.scheduleGraphRefresh();
             return;
           }
 
-          this.semanticRefreshPending = false;
-          this.scheduleGraphRefresh();
+          if (this.startupRefreshPending) {
+            this.startupRefreshPending = false;
+            this.scheduleGraphRefresh();
+          }
         })
       );
     }

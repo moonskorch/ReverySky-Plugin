@@ -342,6 +342,134 @@ describe("MapSession", () => {
     expect(sendGraph).toHaveBeenCalledTimes(2);
   });
 
+  it("refreshes the startup graph once when metadata resolves after the first build", () => {
+    vi.useFakeTimers();
+
+    const metadataCallbacks: {
+      changed?: (file: { path?: string }, data: string, cache: { links?: Array<{ link: string }>; tags?: Array<{ tag: string }> }) => void;
+      resolved?: () => void;
+    } = {};
+
+    const app = {
+      metadataCache: {
+        on: vi.fn((name: "changed" | "resolved", callback: (...args: never[]) => void) => {
+          if (name === "changed") {
+            metadataCallbacks.changed = callback as typeof metadataCallbacks.changed;
+          } else {
+            metadataCallbacks.resolved = callback as () => void;
+          }
+          return { id: `metadata-${name}` };
+        })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+      },
+      workspace: {
+        activeLeaf: null,
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+
+    const firstPayload = makePayload();
+    firstPayload.notes[0].id = "initial";
+    const resolvedPayload = makePayload();
+    resolvedPayload.notes[0].id = "resolved";
+    const buildGraph = vi.fn()
+      .mockReturnValueOnce(firstPayload)
+      .mockReturnValue(resolvedPayload);
+    const sendGraph = vi.fn();
+    const session = new MapSession({
+      app: app as never,
+      buildGraph,
+      now: () => 1700000000000,
+      sendGraph,
+      sendFocus: vi.fn()
+    });
+
+    session.start(() => undefined);
+    session.setBridgeReady(true);
+    session.flushOrRefresh();
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(sendGraph).toHaveBeenCalledTimes(1);
+
+    metadataCallbacks.resolved?.();
+    vi.advanceTimersByTime(250);
+
+    expect(buildGraph).toHaveBeenCalledTimes(2);
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+    expect(sendGraph.mock.calls[1]?.[0]).toMatchObject({
+      notes: [expect.objectContaining({ id: "resolved" })]
+    });
+
+    metadataCallbacks.resolved?.();
+    vi.advanceTimersByTime(250);
+
+    expect(buildGraph).toHaveBeenCalledTimes(2);
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+  });
+
+  it("ignores metadata resolved before the startup graph is emitted", () => {
+    vi.useFakeTimers();
+
+    const metadataCallbacks: {
+      changed?: (file: { path?: string }, data: string, cache: { links?: Array<{ link: string }>; tags?: Array<{ tag: string }> }) => void;
+      resolved?: () => void;
+    } = {};
+
+    const app = {
+      metadataCache: {
+        on: vi.fn((name: "changed" | "resolved", callback: (...args: never[]) => void) => {
+          if (name === "changed") {
+            metadataCallbacks.changed = callback as typeof metadataCallbacks.changed;
+          } else {
+            metadataCallbacks.resolved = callback as () => void;
+          }
+          return { id: `metadata-${name}` };
+        })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+      },
+      workspace: {
+        activeLeaf: null,
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+
+    const buildGraph = vi.fn().mockReturnValue(makePayload());
+    const sendGraph = vi.fn();
+    const session = new MapSession({
+      app: app as never,
+      buildGraph,
+      now: () => 1700000000000,
+      sendGraph,
+      sendFocus: vi.fn()
+    });
+
+    session.start(() => undefined);
+    metadataCallbacks.resolved?.();
+    vi.advanceTimersByTime(250);
+    expect(buildGraph).not.toHaveBeenCalled();
+    expect(sendGraph).not.toHaveBeenCalled();
+
+    session.setBridgeReady(true);
+    session.flushOrRefresh();
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(sendGraph).toHaveBeenCalledTimes(1);
+
+    metadataCallbacks.resolved?.();
+    vi.advanceTimersByTime(250);
+
+    expect(buildGraph).toHaveBeenCalledTimes(2);
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+  });
+
   it("keeps an ordinary graph refresh focus-free when no focus event occurred", () => {
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
