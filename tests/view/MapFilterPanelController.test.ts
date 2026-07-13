@@ -172,6 +172,7 @@ describe("MapFilterPanelController", () => {
 
   it("updates render scale from the slider and shows reopen guidance", () => {
     const session = createSession();
+    const persistRenderScale = vi.spyOn(session, "persistRenderScale");
     session.start(() => undefined);
     const controller = new MapFilterPanelController(session);
     const container = document.createElement("div");
@@ -185,8 +186,13 @@ describe("MapFilterPanelController", () => {
     renderScaleInput.dispatchEvent(new Event("input"));
 
     expect(session.getState()).toMatchObject({ renderScale: 1.3 });
+    expect(persistRenderScale).not.toHaveBeenCalled();
     expect(renderScaleValue.textContent).toBe("1.3x");
     expect(renderScaleMessage.textContent).toBe("Reopen the map view to apply.");
     expect(renderScaleMessage.classList.contains("reverysky-map-render-scale-message--hidden")).toBe(false);
+
+    renderScaleInput.dispatchEvent(new Event("change"));
+
+    expect(persistRenderScale).toHaveBeenCalledTimes(1);
   });
 });

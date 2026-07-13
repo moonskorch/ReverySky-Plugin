@@ -63,6 +63,7 @@ function makePathPayload(): GraphPayload {
 
 function createSessionForStateTests(options?: {
   sendGraph?: (payload: GraphPayload) => void;
+  onStateChanged?: (state: Record<string, unknown>) => void;
 }) {
   return new MapSession({
     app: {
@@ -82,7 +83,8 @@ function createSessionForStateTests(options?: {
     buildGraph: makeBuildGraphMock(makePayload()),
     now: () => 1700000000000,
     sendGraph: options?.sendGraph ?? makeVoidCallback<[GraphPayload]>(),
-    sendFocus: makeVoidCallback<[NoteFocusPayload]>()
+    sendFocus: makeVoidCallback<[NoteFocusPayload]>(),
+    onStateChanged: options?.onStateChanged
   });
 }
 
@@ -138,6 +140,64 @@ describe("MapSession", () => {
       renderScale: 1,
       renderScaleRestartRequired: false
     });
+  });
+
+  it("reports user state changes without reporting restored state", async () => {
+    vi.useFakeTimers();
+    const onStateChanged = vi.fn();
+    const session = createSessionForStateTests({ onStateChanged });
+    session.start(() => undefined);
+
+    await session.setState({
+      pathFilterQuery: "tag:#restored",
+      showTags: false,
+      mapLayout: "dates",
+      renderScale: 1.2
+    });
+    expect(onStateChanged).not.toHaveBeenCalled();
+
+    session.setFilterQuery("tag:#project");
+
+    expect(onStateChanged).toHaveBeenLastCalledWith({
+      pathFilterQuery: "tag:#project",
+      showTags: false,
+      mapLayout: "dates",
+      renderScale: 1.2
+    }, { persist: false });
+
+    vi.runOnlyPendingTimers();
+
+    expect(onStateChanged).toHaveBeenLastCalledWith({
+      pathFilterQuery: "tag:#project",
+      showTags: false,
+      mapLayout: "dates",
+      renderScale: 1.2
+    }, undefined);
+  });
+
+  it("persists render scale only after the slider commits", () => {
+    const onStateChanged = vi.fn();
+    const session = createSessionForStateTests({ onStateChanged });
+    session.start(() => undefined);
+
+    session.setRenderScale(1.2);
+
+    expect(session.getState()).toMatchObject({ renderScale: 1.2 });
+    expect(onStateChanged).toHaveBeenLastCalledWith({
+      pathFilterQuery: "",
+      showTags: true,
+      mapLayout: "auto",
+      renderScale: 1.2
+    }, { persist: false });
+
+    session.persistRenderScale();
+
+    expect(onStateChanged).toHaveBeenLastCalledWith({
+      pathFilterQuery: "",
+      showTags: true,
+      mapLayout: "auto",
+      renderScale: 1.2
+    }, undefined);
   });
 
   it("does not refresh when only frontmatter date changes and tags/links stay stable", () => {
@@ -736,7 +796,7 @@ describe("MapSession", () => {
     session.flushOrRefresh();
 
     session.setFilterQuery("path:Archive");
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(500);
     session.requestEditorFocus("Projects/ReverySky/Spec.md");
 
     expect(sendGraph).toHaveBeenCalledTimes(2);
@@ -918,7 +978,7 @@ describe("MapSession", () => {
     expect(restoredPayload.mapLayout).toBe("dates");
 
     session.setFilterQuery("path:archive");
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(500);
 
     expect(buildGraph).toHaveBeenCalledTimes(1);
     expect(sendGraph).toHaveBeenCalledTimes(2);

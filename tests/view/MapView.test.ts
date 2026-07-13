@@ -1401,7 +1401,7 @@ describe("MapView bridge integration", () => {
     const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
     searchInput.value = "path:daily";
     searchInput.dispatchEvent(new Event("input"));
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(500);
 
     expect(buildGraph).toHaveBeenCalledTimes(1);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
@@ -1416,7 +1416,7 @@ describe("MapView bridge integration", () => {
 
     searchInput.value = 'path:"';
     searchInput.dispatchEvent(new Event("input"));
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(500);
 
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
     expect(filterMessage.classList.contains(FILTER_MESSAGE_HIDDEN_CLASS)).toBe(true);
@@ -1834,7 +1834,7 @@ describe("MapView bridge integration", () => {
 
     searchInput.value = "path:Notes";
     searchInput.dispatchEvent(new Event("input"));
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(500);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
   });
 
@@ -1917,7 +1917,7 @@ describe("MapView bridge integration", () => {
     expect(searchInput.value).toBe("tag:#work/subtag");
     expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
 
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(500);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
     const filteredPayload = bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload;
     expect(filteredPayload.notes.map((note) => note.id)).toEqual(["project"]);
@@ -1981,7 +1981,7 @@ describe("MapView bridge integration", () => {
     const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
     searchInput.value = "tag:#work";
     searchInput.dispatchEvent(new Event("input"));
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(500);
 
     searchInput.value = `${searchInput.value} `;
     searchInput.dispatchEvent(new Event("input"));
@@ -2008,7 +2008,7 @@ describe("MapView bridge integration", () => {
     expect(searchInput.value).toBe("tag:#work tag:#project");
     expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
 
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(500);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(3);
     const filteredPayload = bridge.sendGraphSet.mock.calls[2]?.[0] as GraphPayload;
     expect(filteredPayload.notes.map((note) => note.id)).toEqual(["project"]);
@@ -2246,7 +2246,7 @@ describe("MapView bridge integration", () => {
     const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
     searchInput.value = 'date:>2026-04-01 path:"Demo/Plugin tests"';
     searchInput.dispatchEvent(new Event("input"));
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(500);
 
     searchInput.dispatchEvent(new Event("click"));
     const suggestions = view.contentEl.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
@@ -2254,7 +2254,7 @@ describe("MapView bridge integration", () => {
 
     searchInput.value = `${searchInput.value} `;
     searchInput.dispatchEvent(new Event("input"));
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(500);
     searchInput.dispatchEvent(new Event("click"));
     expect(suggestions.textContent).toContain("Search settings");
 
@@ -2329,7 +2329,7 @@ describe("MapView bridge integration", () => {
     const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
     searchInput.value = "tag:#wo";
     searchInput.dispatchEvent(new Event("input"));
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(500);
 
     searchInput.dispatchEvent(new Event("click"));
     const suggestions = view.contentEl.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
@@ -2396,7 +2396,7 @@ describe("MapView bridge integration", () => {
     const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
     searchInput.value = "path:Projects tag:#wo";
     searchInput.dispatchEvent(new Event("input"));
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(500);
 
     searchInput.dispatchEvent(new Event("click"));
     const suggestions = view.contentEl.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
@@ -2468,7 +2468,7 @@ describe("MapView bridge integration", () => {
     const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
     searchInput.value = "date:>2026-04-01";
     searchInput.dispatchEvent(new Event("input"));
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(500);
 
     searchInput.dispatchEvent(new Event("click"));
     let suggestions = view.contentEl.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
@@ -2477,7 +2477,7 @@ describe("MapView bridge integration", () => {
 
     searchInput.value = "date:>2026-04-01 ";
     searchInput.dispatchEvent(new Event("input"));
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(500);
     searchInput.dispatchEvent(new Event("click"));
 
     suggestions = view.contentEl.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
@@ -2550,7 +2550,7 @@ describe("MapView bridge integration", () => {
     const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
     searchInput.value = "date:>2026-01-01 date:<2026-02-01";
     searchInput.dispatchEvent(new Event("input"));
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(500);
 
     expect(buildGraph).toHaveBeenCalledTimes(1);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
@@ -2608,14 +2608,13 @@ describe("MapView bridge integration", () => {
         createBridge: () => bridge,
         buildGraph: buildGraph as BuildGraphForTest,
         notify: vi.fn(),
-        now: () => 1700000000000
+        now: () => 1700000000000,
+        initialState: {
+          pathFilterQuery: "date:>2026-01-01 date:<2026-02-01",
+          showTags: false
+        }
       }
     );
-
-    await view.setState({
-      pathFilterQuery: "date:>2026-01-01 date:<2026-02-01",
-      showTags: false
-    });
 
     await view.onOpen();
     const iframe = view.contentEl.querySelector("iframe");
@@ -2640,7 +2639,7 @@ describe("MapView bridge integration", () => {
     const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
     searchInput.value = "date:>=2026-01-01 date:<2026-02-01";
     searchInput.dispatchEvent(new Event("input"));
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(500);
 
     expect(buildGraph).toHaveBeenCalledTimes(1);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
@@ -2692,14 +2691,13 @@ describe("MapView bridge integration", () => {
         createBridge: () => bridge,
         buildGraph: buildGraph as BuildGraphForTest,
         notify: vi.fn(),
-        now: () => 1700000000000
+        now: () => 1700000000000,
+        initialState: {
+          pathFilterQuery: "tag:#project",
+          showTags: false
+        }
       }
     );
-
-    await view.setState({
-      pathFilterQuery: "tag:#project",
-      showTags: false
-    });
 
     await view.onOpen();
     const iframe = view.contentEl.querySelector("iframe");
@@ -2726,7 +2724,7 @@ describe("MapView bridge integration", () => {
 
     searchInput.value = "tag:#daily";
     searchInput.dispatchEvent(new Event("input"));
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(500);
 
     expect(buildGraph).toHaveBeenCalledTimes(1);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
@@ -2931,12 +2929,12 @@ describe("MapView bridge integration", () => {
     const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
     searchInput.value = "path:\"daily";
     searchInput.dispatchEvent(new Event("input"));
-    vi.advanceTimersByTime(250);
+    vi.advanceTimersByTime(500);
 
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
   });
 
-  it("restores path filter query from view state", async () => {
+  it("restores path filter query from initial plugin state", async () => {
     const app = {
       metadataCache: {
         on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
@@ -2976,16 +2974,12 @@ describe("MapView bridge integration", () => {
         createBridge: () => bridge,
         buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
-        now: () => 1700000000000
+        now: () => 1700000000000,
+        initialState: {
+          pathFilterQuery: "path:archive"
+        }
       }
     );
-
-    await view.setState({
-      pathFilterQuery: "path:archive"
-    });
-    expect(view.getState()).toMatchObject({
-      pathFilterQuery: "path:archive"
-    });
 
     await view.onOpen();
     const iframe = view.contentEl.querySelector("iframe");
@@ -3003,7 +2997,7 @@ describe("MapView bridge integration", () => {
     expect(searchInput.value).toBe("path:archive");
   });
 
-  it("restores engine preference from view state", async () => {
+  it("restores engine preference from initial plugin state", async () => {
     const app = {
       metadataCache: {
         on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
@@ -3043,18 +3037,13 @@ describe("MapView bridge integration", () => {
         createBridge: () => bridge,
         buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
-        now: () => 1700000000000
+        now: () => 1700000000000,
+        initialState: {
+          mapLayout: "dates",
+          renderScale: 1.2
+        }
       }
     );
-
-    await view.setState({
-      mapLayout: "dates",
-      renderScale: 1.2
-    });
-    expect(view.getState()).toMatchObject({
-      mapLayout: "dates",
-      renderScale: 1.2
-    });
 
     await view.onOpen();
     const iframe = view.contentEl.querySelector("iframe");
@@ -3124,7 +3113,7 @@ describe("MapView bridge integration", () => {
     );
   });
 
-  it("does not override restored view state with initial plugin snapshot", async () => {
+  it("ignores Obsidian state before open when plugin state exists", async () => {
     const app = {
       metadataCache: {
         on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
@@ -3169,11 +3158,58 @@ describe("MapView bridge integration", () => {
 
     const iframe = view.contentEl.querySelector("iframe");
     expect(iframe?.getAttribute("src")).toBe(
-      "http://127.0.0.1:7777/index.html?t=1700000000000&renderScale=1.2"
+      "http://127.0.0.1:7777/index.html?t=1700000000000&renderScale=1.5"
     );
   });
 
-  it("restores tag filter query from view state", async () => {
+  it("ignores Obsidian state after open when plugin state exists", async () => {
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+    const bridge = {
+      attach: vi.fn(),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
+    };
+
+    const view = new MapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: vi.fn().mockReturnValue(makePathPayload()) as BuildGraphForTest,
+        notify: vi.fn(),
+        now: () => 1700000000000,
+        initialState: { pathFilterQuery: "tag:#new", renderScale: 1.5 }
+      }
+    );
+
+    await view.onOpen();
+    await view.setState({ pathFilterQuery: "tag:#old", renderScale: 1.2 });
+
+    const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
+    expect(searchInput.value).toBe("tag:#new");
+  });
+
+  it("restores tag filter query from initial plugin state", async () => {
     const app = {
       metadataCache: {
         on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
@@ -3213,16 +3249,12 @@ describe("MapView bridge integration", () => {
         createBridge: () => bridge,
         buildGraph: vi.fn().mockReturnValue(payload) as BuildGraphForTest,
         notify: vi.fn(),
-        now: () => 1700000000000
+        now: () => 1700000000000,
+        initialState: {
+          pathFilterQuery: "tag:#project"
+        }
       }
     );
-
-    await view.setState({
-      pathFilterQuery: "tag:#project"
-    });
-    expect(view.getState()).toMatchObject({
-      pathFilterQuery: "tag:#project"
-    });
 
     await view.onOpen();
     const iframe = view.contentEl.querySelector("iframe");

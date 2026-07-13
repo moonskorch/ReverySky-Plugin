@@ -66,6 +66,7 @@
 - English only: write code, tests, comments, documentation, runbooks, and user-facing strings in English. No exceptions.
 - Keep wording concise, professional, and implementation-focused.
 - Keep analysis brief, code-grounded, and directly tied to the user's question; avoid long speculative narratives.
+- When explaining code, include relevant file paths and line numbers.
 - Avoid Markdown/text tables in documentation; prefer short bullet lists or explicit per-mode subsections.
 - Prefer existing `src/*` patterns before introducing new abstractions.
 - Do not modify application code when only documentation maintenance is requested.

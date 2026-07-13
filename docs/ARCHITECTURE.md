@@ -157,9 +157,9 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 
 ### Path 1. Command -> view activation -> iframe startup
 1. `src/main.ts` -> `ReverySkyMapPlugin.onload()`
-   Loads persisted `mapViewState`, registers `MAP_VIEW_TYPE`, and registers the `open-map` command.
+   Loads plugin data `mapViewState`, registers `MAP_VIEW_TYPE`, and registers the `open-map` command.
 2. `src/main.ts` -> command callback -> `activateMapView()`
-   Finds an existing map leaf or creates one with `workspace.getRightLeaf(false)` and `leaf.setViewState(...)`, including the last persisted `mapViewState` when available.
+   Finds an existing map leaf or creates one with `workspace.getRightLeaf(false)` and `leaf.setViewState(...)`.
 3. Obsidian opens the custom view and calls `src/view/MapView.ts` -> `onOpen()`.
 4. `MapView.onOpen()` starts `MapSession`, creates `MapFilterPanelController`, and calls `plugin.getUnityRuntimeUrl()`.
 5. `src/main.ts` -> `getUnityRuntimeUrl()` chooses the runtime source:
@@ -199,7 +199,7 @@ When an incremental Unity engine has not materialized a target star yet, `Cartog
 2. A graph-significant change happens:
    vault metadata changes, path filter input changes, tag visibility toggles, or map layout changes.
 3. `src/view/MapFilterPanelController.ts` updates session-owned state through `MapSession.setFilterQuery()`, `setShowTags()`, or `MapSession.setMapLayoutPreference()`.
-4. For filter, tag-visibility, and layout changes, `src/view/MapSession.ts` re-enters `emitGraphFromSource()` using the latest source graph snapshot.
+4. For valid filter, tag-visibility, and layout changes, `src/view/MapSession.ts` re-enters `emitGraphFromSource()` using the latest source graph snapshot. Filter input is debounced before graph emission; invalid filter input updates UI and persistence state but does not emit `graph:set`.
 5. `src/graph/GraphPathFilter.ts`
    Parses the query and returns the filtered `GraphPayload` subset.
 6. `src/view/MapView.ts` receives the `sendGraph` callback from `MapSession`, forwards the payload through `UnityIframeBridge`, and asks `MapFilterPanelController` to refresh visible suggestions when needed.
@@ -213,7 +213,7 @@ Startup correction is intentionally different: after the runtime receives the in
 This one-shot startup refresh is left unconditional by design.
 When the plugin is opened after Obsidian has already settled, the next global `resolved` can still spend the startup refresh after a content-only edit; avoiding that would require a startup-only graph equality pass, which is not worth the extra complexity until the edge case proves costly.
 
-Render-scale changes are intentionally different from graph-significant changes. `MapFilterPanelController` calls `MapSession.setRenderScale()`, which updates persisted state and UI restart guidance without re-emitting `graph:set`; the new scale is applied the next time the iframe is created.
+Render-scale changes are intentionally different from graph-significant changes. `MapFilterPanelController` calls `MapSession.setRenderScale()` on slider input, which updates session state, the plugin's in-memory snapshot, and UI restart guidance without re-emitting `graph:set`. The controller requests persistence on slider commit through `MapSession.persistRenderScale()`, and the new scale is applied the next time the iframe is created.
 
 ### Path 4. Markdown editor focus -> map focus
 1. `src/main.ts` -> `ReverySkyMapPlugin.onload()` -> `registerEditorExtension(...)`
@@ -337,15 +337,16 @@ Focus before bridge readiness is out of scope. Plugin-side focus requests pass t
   `ObsidianBridge.HandleOpenNoteRequested(...)` emits `note:open` ->
   iframe `onNoteOpen` callback passes the payload to `MapNoteOpenRouter.openRequestedNote(payload)`.
 
-### Path 6. Toggle close or plugin unload -> capture map state -> next open restore
-1. `src/main.ts` -> ribbon callback -> `toggleMapView()`, or `src/main.ts` -> `onunload()`.
-2. `src/main.ts` -> `captureAndPersistMapViewState()`
-   Reads `leaf.view.getState()` from the current map leaf when present and writes the result through `saveData(...)`.
-3. During an explicit toggle close or plugin unload, `workspace.detachLeavesOfType(MAP_VIEW_TYPE)` removes the active map leaves.
-4. The detach path lets Obsidian call `MapView.onClose()`, which shuts down bridge activity and removes the iframe surface before the runtime server stops.
-5. On a later startup or `toggleMapView()` reopen, `ReverySkyMapPlugin.onload()` and `activateMapView()` reuse `lastMapViewState`.
-6. `leaf.setViewState({ type: MAP_VIEW_TYPE, active: true, state })` hands the persisted state back to `MapView`, which then forwards it into `MapSession.setState(...)`.
-7. Persisted view state currently includes `pathFilterQuery`, `showTags`, `mapLayout`, and `renderScale`.
+### Path 6. Map settings persistence -> next open restore
+1. `src/main.ts` -> `ReverySkyMapPlugin.onload()` reads plugin data with `loadData()` and stores `mapViewState` in the plugin-owned `mapViewState` snapshot.
+2. New `MapView` instances receive that snapshot as `initialState`.
+3. `src/view/MapView.ts` -> `MapView.onOpen()` applies `initialState` to `MapSession`.
+4. `src/view/MapSession.ts` reports user setting changes through `onStateChanged(...)`.
+5. Filter text changes update the in-memory snapshot immediately and reuse the existing filter debounce before requesting `saveData(...)`.
+6. Render-scale slider input updates the in-memory snapshot immediately and requests `saveData(...)` on slider commit.
+7. Other map setting changes request `saveData(...)` directly because they are low-frequency actions.
+8. `toggleMapView()` close, `onunload()`, and workspace `quit` flush the latest in-memory snapshot before shutdown paths continue.
+9. Obsidian workspace view state is intentionally not used as a persistence source for `pathFilterQuery`, `showTags`, `mapLayout`, or `renderScale`.
 
 ### Key plugin-side control points
 
@@ -397,7 +398,7 @@ Focus before bridge readiness is out of scope. Plugin-side focus requests pass t
   The session emits the filtered payload that Unity receives through the shell view.
 
 - `pathFilterQuery`, `showTags`, `mapLayout`, and `renderScale` are owned by `MapSession`.
-  They are persisted as view state and re-applied on open.
+  They are reported to `ReverySkyMapPlugin`, persisted in plugin data under `mapViewState`, and re-applied on open.
 
 - Markdown focus events are routed by `MapFocusController`.
   The controller does not store focus history or a focus queue. It sends bridge-ready `note:focus` events from workspace `file-open`, markdown editor focus, and active-note rename. Unity owns pending focus application when the target star is not available yet.
@@ -405,8 +406,8 @@ Focus before bridge readiness is out of scope. Plugin-side focus requests pass t
 - `renderScale` is applied at iframe startup, not through the bridge.
   `MapSession` tracks the selected value and whether it differs from the currently applied iframe value so the UI can ask the user to reopen the map.
 
-- The most recently closed map-view state is owned by `ReverySkyMapPlugin`.
-  It is stored as plugin data under `mapViewState`, then handed back into a newly created map leaf on the next open.
+- The latest map settings snapshot is owned by `ReverySkyMapPlugin`.
+  It is stored as plugin data under `mapViewState`, then passed to a newly created `MapView` as `initialState` on the next open.
 
 - Filter panel visibility, active suggestion pane, and hide-delay timers are owned by `MapFilterPanelController`.
   They are UI-only transient state and are intentionally not persisted in plugin data.

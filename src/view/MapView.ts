@@ -23,6 +23,7 @@ export type MapViewDependencies = {
   notify?: (message: string) => void;
   now?: () => number;
   initialState?: Record<string, unknown> | null;
+  onStateChanged?: (state: Record<string, unknown>, options?: { persist?: boolean }) => void;
 };
 
 /**
@@ -39,7 +40,6 @@ export class MapView extends ItemView {
   private filterPanelController: MapFilterPanelController | null = null;
   private iframeLoadAbortController: AbortController | null = null;
   private lifecycleGeneration = 0;
-  private hasReceivedViewState = false;
   private readonly initialState: Record<string, unknown> | null;
 
   constructor(
@@ -66,6 +66,9 @@ export class MapView extends ItemView {
       },
       sendFocus: (payload) => {
         this.bridge.sendNoteFocus(payload);
+      },
+      onStateChanged: (state, options) => {
+        deps.onStateChanged?.(state, options);
       }
     });
     this.noteOpenRouter = new MapNoteOpenRouter(this.app, this.session, this.notify);
@@ -79,25 +82,14 @@ export class MapView extends ItemView {
     return "ReverySky Map";
   }
 
-  getState(): Record<string, unknown> {
-    return this.session.getState();
-  }
-
-  async setState(state: unknown): Promise<void> {
-    this.hasReceivedViewState = true;
-    await this.session.setState(state);
-    this.filterPanelController?.syncFromSession();
-  }
-
   requestEditorFocus(path: string): void {
     this.session.requestEditorFocus(path);
   }
 
   async onOpen(): Promise<void> {
     const lifecycleGeneration = ++this.lifecycleGeneration;
-    const initialState = this.getInitialViewState();
-    if (initialState) {
-      await this.session.setState(initialState);
+    if (this.initialState) {
+      await this.session.setState(this.initialState);
     }
     this.session.start(this.registerEvent.bind(this));
 
@@ -182,10 +174,6 @@ export class MapView extends ItemView {
 
     this.bridge.detach();
     emptyElement(this.contentEl);
-  }
-
-  private getInitialViewState(): Record<string, unknown> | null {
-    return this.hasReceivedViewState ? null : this.initialState;
   }
 
   private createRuntimeIframeSrc(iframeSrc: string, cacheBust: number): string {

@@ -19,7 +19,7 @@ import { GraphPathFilter, type ParsedPathFilter, type PathFilterParseResult } fr
 import { MapFocusController } from "./MapFocusController";
 
 const GRAPH_REFRESH_DEBOUNCE_MS = 250;
-const FILTER_INPUT_DEBOUNCE_MS = 250;
+const FILTER_INPUT_DEBOUNCE_MS = 500;
 const METADATA_RESOLVE_STATUS = "Updating map data...";
 const MAX_FOLDER_SUGGESTIONS = 80;
 const MAX_TAG_SUGGESTIONS = 200;
@@ -70,6 +70,7 @@ export type MapSessionDependencies = {
   sendGraph: (payload: GraphPayload) => void;
   sendStatus?: (message: string) => void;
   sendFocus: (payload: NoteFocusPayload) => void;
+  onStateChanged?: (state: Record<string, unknown>, options?: { persist?: boolean }) => void;
 };
 
 /**
@@ -82,6 +83,7 @@ export class MapSession {
   private readonly now: () => number;
   private readonly sendGraph: (payload: GraphPayload) => void;
   private readonly sendStatus?: (message: string) => void;
+  private readonly onStateChanged?: (state: Record<string, unknown>, options?: { persist?: boolean }) => void;
   private readonly focus: MapFocusController;
 
   private sourceGraphPayload: GraphPayload | null = null;
@@ -114,6 +116,7 @@ export class MapSession {
     this.now = deps.now;
     this.sendGraph = deps.sendGraph;
     this.sendStatus = deps.sendStatus;
+    this.onStateChanged = deps.onStateChanged;
     this.focus = new MapFocusController({
       app: this.app,
       isBridgeReady: () => this.bridgeReady,
@@ -176,27 +179,31 @@ export class MapSession {
 
   setFilterQuery(query: string): void {
     this.pathFilterQuery = typeof query === "string" ? query : "";
+    this.notifyStateChanged({ persist: false });
     const parseResult = GraphPathFilter.parsePathQuery(this.pathFilterQuery);
     this.applyParsedFilterResult(parseResult);
-    if (!parseResult.isValid) {
-      return;
-    }
-
-    this.scheduleFilterRefresh();
+    this.scheduleFilterRefresh(parseResult.isValid);
   }
 
   setShowTags(showTags: boolean): void {
     this.showTags = showTags;
+    this.notifyStateChanged();
     this.emitGraphFromSource();
   }
 
   setMapLayoutPreference(mapLayout: unknown): void {
     this.mapLayout = normalizeMapLayoutPreference(mapLayout);
+    this.notifyStateChanged();
     this.emitGraphFromSource();
   }
 
   setRenderScale(renderScale: unknown): void {
     this.renderScale = normalizeRenderScale(renderScale);
+    this.notifyStateChanged({ persist: false });
+  }
+
+  persistRenderScale(): void {
+    this.notifyStateChanged();
   }
 
   getRenderScale(): number {
@@ -455,8 +462,9 @@ export class MapSession {
     this.emitGraphFromSource();
   }
 
-  private scheduleFilterRefresh(): void {
+  private scheduleFilterRefresh(shouldEmitGraph: boolean): void {
     if (!this.refreshActive) {
+      this.notifyStateChanged();
       return;
     }
 
@@ -466,7 +474,10 @@ export class MapSession {
     this.filterInputDebounceTimer = timerWindow.setTimeout(() => {
       this.filterInputDebounceTimer = null;
       this.filterInputDebounceTimerWindow = null;
-      this.emitGraphFromSource();
+      this.notifyStateChanged();
+      if (shouldEmitGraph) {
+        this.emitGraphFromSource();
+      }
     }, FILTER_INPUT_DEBOUNCE_MS);
   }
 
@@ -544,6 +555,8 @@ export class MapSession {
 
   private primeNoteSignatureForPath(pathValue: unknown): void {
     const path = this.normalizeVaultPath(pathValue);
+    // Editor focus can repeat for the same note; only the first focus primes
+    // the baseline, and metadataCache.changed owns later signature updates.
     if (!this.isGraphRelevantPath(path) || this.noteSignatureByPath.has(path)) {
       return;
     }
@@ -714,6 +727,10 @@ export class MapSession {
       ? "Only path:, date:, and tag: terms are applied in this view."
       : "";
     this.activePathFilter = parseResult.hasPathTerms ? parseResult.parsed : null;
+  }
+
+  private notifyStateChanged(options?: { persist?: boolean }): void {
+    this.onStateChanged?.(this.getState(), options);
   }
 
   private ensureFolderSuggestionsReady(): void {

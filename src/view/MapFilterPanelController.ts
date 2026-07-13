@@ -224,6 +224,9 @@ export class MapFilterPanelController {
       this.session.setRenderScale(renderScaleInput.value);
       this.refreshRenderScaleUi();
     });
+    renderScaleInput.addEventListener("change", () => {
+      this.session.persistRenderScale();
+    });
 
     this.renderScaleMessageEl = createChild(renderScaleSection as ObsidianHTMLElement, "div");
     this.renderScaleMessageEl.className =

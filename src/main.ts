@@ -1,4 +1,4 @@
-import { Plugin, WorkspaceLeaf } from "obsidian";
+import { Plugin, WorkspaceLeaf, type Tasks } from "obsidian";
 import { MAP_VIEW_TYPE, MapView } from "./view/MapView";
 import { createMarkdownEditorFocusExtension } from "./view/MarkdownEditorFocus";
 import {
@@ -25,16 +25,19 @@ type PersistedPluginData = {
 export default class ReverySkyMapPlugin extends Plugin {
   private unityWebglServer: UnityWebglLocalServer | null = null;
   private readonly unityRuntimeInstaller = new EmbeddedUnityRuntimeInstaller();
-  private lastMapViewState: Record<string, unknown> | null = null;
+  private mapViewState: Record<string, unknown> | null = null;
 
   async onload(): Promise<void> {
     const persistedData = this.normalizePersistedData(await this.loadData());
-    this.lastMapViewState = persistedData.mapViewState ?? null;
+    this.mapViewState = persistedData.mapViewState ?? null;
 
     this.registerView(
       MAP_VIEW_TYPE,
       (leaf: WorkspaceLeaf) => new MapView(leaf, this, {
-        initialState: this.lastMapViewState ? { ...this.lastMapViewState } : null
+        initialState: this.mapViewState ? { ...this.mapViewState } : null,
+        onStateChanged: (state, options) => {
+          this.updateMapViewState(state, options?.persist ?? true);
+        }
       })
     );
 
@@ -55,6 +58,12 @@ export default class ReverySkyMapPlugin extends Plugin {
         this.requestEditorFocus(path);
       })
     );
+
+    this.registerEvent(
+      this.app.workspace.on("quit", (tasks: Tasks) => {
+        tasks.addPromise(this.flushPersistedMapViewState());
+      })
+    );
   }
 
   onunload(): void {
@@ -65,7 +74,7 @@ export default class ReverySkyMapPlugin extends Plugin {
 
   private async cleanupOnUnload(): Promise<void> {
     try {
-      await this.captureAndPersistMapViewState();
+      await this.flushPersistedMapViewState();
     } finally {
       try {
         this.app.workspace.detachLeavesOfType(MAP_VIEW_TYPE);
@@ -118,8 +127,7 @@ export default class ReverySkyMapPlugin extends Plugin {
       }
       await leaf.setViewState({
         type: MAP_VIEW_TYPE,
-        active: true,
-        state: this.lastMapViewState ?? undefined
+        active: true
       });
     }
 
@@ -131,7 +139,7 @@ export default class ReverySkyMapPlugin extends Plugin {
     const leaves = workspace.getLeavesOfType(MAP_VIEW_TYPE);
 
     if (leaves.length > 0) {
-      await this.captureAndPersistMapViewState();
+      await this.flushPersistedMapViewState();
       workspace.detachLeavesOfType(MAP_VIEW_TYPE);
       await this.stopUnityRuntimeServer();
       return;
@@ -169,24 +177,26 @@ export default class ReverySkyMapPlugin extends Plugin {
     return path.join(adapter.getBasePath(), this.app.vault.configDir, "plugins", this.manifest.id);
   }
 
-  private async captureAndPersistMapViewState(): Promise<void> {
-    const leaves = this.app.workspace.getLeavesOfType(MAP_VIEW_TYPE);
-    this.lastMapViewState = this.captureMapViewState(leaves);
-    await this.saveData({
-      mapViewState: this.lastMapViewState ?? undefined
-    } satisfies PersistedPluginData);
-  }
-
-  private captureMapViewState(leaves: WorkspaceLeaf[]): Record<string, unknown> | null {
-    for (const leaf of leaves) {
-      const state = (leaf.view as { getState?: () => Record<string, unknown> } | undefined)?.getState?.();
-      if (state && typeof state === "object") {
-        return state;
-      }
+  private updateMapViewState(state: Record<string, unknown>, persist: boolean = true): void {
+    this.mapViewState = { ...state };
+    if (!persist) {
+      return;
     }
 
-    // Preserve the last persisted state when no map leaf is open during unload.
-    return this.lastMapViewState;
+    void this.persistMapViewState().catch((error: unknown) => {
+      console.error("Failed to persist ReverySky Map state.", error);
+    });
+  }
+
+  private async flushPersistedMapViewState(): Promise<void> {
+    await this.persistMapViewState();
+  }
+
+  private persistMapViewState(): Promise<void> {
+    const data = {
+      mapViewState: this.mapViewState ?? undefined
+    } satisfies PersistedPluginData;
+    return this.saveData(data);
   }
 
   private normalizePersistedData(data: unknown): PersistedPluginData {
