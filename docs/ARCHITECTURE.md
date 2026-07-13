@@ -190,6 +190,7 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 Before `bridge:ready`, `MapSession` keeps only the latest pending graph payload.
 The first graph build reads the current Obsidian `metadataCache.resolvedLinks` snapshot, then accepts the first following `metadataCache.resolved` event as a one-time startup correction refresh.
 Graph-relevant live metadata changes use the `metadataCache.resolved` barrier described below.
+Markdown editor focus primes the graph-relevant signature for that one note from the current file cache, so the first content-only edit after focus does not look like a tags/links change.
 If Unity WebGL boot fails, the iframe wrapper treats the failure as terminal for that iframe, keeps the failure status visible, and intentionally does not emit `bridge:ready` or receive `graph:set`.
 When an incremental Unity engine has not materialized a target star yet, `Cartographer.FocusRuntimeNote(...)` stores the target in `MapRuntimeContext.PendingFocusNoteId` and `RecursiveHubs` retries it after construction.
 
@@ -209,6 +210,8 @@ For graph-relevant Obsidian metadata changes, `MapSession` first marks semantic 
 It does not rebuild from `metadataCache.resolvedLinks` until Obsidian emits `metadataCache.resolved`.
 This prevents an intermediate `resolvedLinks` snapshot from being cached and then reused by later filters.
 Startup correction is intentionally different: after the runtime receives the initial graph, the first `metadataCache.resolved` event may trigger one extra graph rebuild without showing the metadata update status.
+This one-shot startup refresh is left unconditional by design.
+When the plugin is opened after Obsidian has already settled, the next global `resolved` can still spend the startup refresh after a content-only edit; avoiding that would require a startup-only graph equality pass, which is not worth the extra complexity until the edge case proves costly.
 
 Render-scale changes are intentionally different from graph-significant changes. `MapFilterPanelController` calls `MapSession.setRenderScale()`, which updates persisted state and UI restart guidance without re-emitting `graph:set`; the new scale is applied the next time the iframe is created.
 
@@ -267,10 +270,12 @@ Focus before bridge readiness is out of scope. Plugin-side focus requests pass t
 - Note content edit:
   Expected: do not refresh the graph or change focus for content-only edits.
   Current code:
+  markdown editor focus primes the note signature from `metadataCache.getFileCache(...)` when possible ->
   `metadataCache.on("changed", ...)` receives the metadata cache update ->
   `buildGraphRelevantSignature(cache)` derives tags and outgoing links only ->
   unchanged signature returns before `markSemanticRefreshPending()` ->
   no `graph:set` or `note:focus`.
+  Known limitation: an outstanding startup correction can still send one `graph:set` on the next global `metadataCache.resolved`; this is kept as a simple one-shot startup repair instead of adding graph equality comparison.
 
 - Graph-relevant metadata or link change:
   Expected: refresh the graph; keep the focused node if it still exists.

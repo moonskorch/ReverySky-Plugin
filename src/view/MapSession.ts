@@ -379,6 +379,9 @@ export class MapSession {
           }
 
           if (this.startupRefreshPending) {
+            // Keep startup correction one-shot and unconditional: a late plugin enable can
+            // spend it on the next resolved event, but avoiding that would require a graph
+            // equality pass for a narrow edge case.
             this.startupRefreshPending = false;
             this.scheduleGraphRefresh();
           }
