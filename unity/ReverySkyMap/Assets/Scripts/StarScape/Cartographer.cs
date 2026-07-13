@@ -18,6 +18,7 @@ public class Cartographer : MonoBehaviour
 
   [Tooltip("Auto/Forces: large graphs use the static-slot engine; small graphs use Forces. Static25D and StaticLinks stay explicit.")]
   [SerializeField] private int autoSwitchThreshold = 500;
+  public int AutoSwitchThreshold => autoSwitchThreshold;
 
   [Header("Change view button")]
   [SerializeField] private ChangeViewControl changeViewControl;

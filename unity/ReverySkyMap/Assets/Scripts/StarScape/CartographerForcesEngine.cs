@@ -11,7 +11,8 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
   [SerializeField] private TagNodeSO tagNodeTemplate;
 
   [Header("Layout (force-directed)")]
-  [SerializeField] private float idealEdgeLen = 3.2f;
+  [SerializeField, Min(0.5f)] private float idealEdgeLenMin = 4f;
+  [SerializeField, Min(0.5f)] private float idealEdgeLenMax = 8f;
   [SerializeField] private float repelStrength = 40f;
   [SerializeField] private float springK = 8f;
   [SerializeField] private float gravityK = 1.0f;
@@ -92,7 +93,13 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
 
     _rng = new System.Random(STABLE_SEED);
 
+    int noteCount = notes?.Count ?? 0;
     int totalNodeCount = CountPhysicalNodeCount(notes);
+    float idealEdgeLen = CalculateIdealEdgeLength(
+      noteCount,
+      idealEdgeLenMin,
+      idealEdgeLenMax,
+      Cartographer.I.AutoSwitchThreshold);
 
     CalculateLayoutRadii(
       totalNodeCount,
@@ -184,7 +191,10 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
         {
           noteInd = srcIdx,
           tagInd = dstIdx,
-          restLen = Mathf.Clamp(idealEdgeLen / Mathf.Sqrt(weight), 0.8f, idealEdgeLen * 1.5f)
+          restLen = Mathf.Clamp(
+            idealEdgeLen / Mathf.Sqrt(weight),
+            0.8f,
+            idealEdgeLen * 1.5f)
         });
       }
     }
@@ -348,6 +358,21 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
 
     spawnRadius =
       boundRadius * safeSpawnFillRatio;
+  }
+
+  public static float CalculateIdealEdgeLength(
+    int noteCount,
+    float minIdealEdgeLen,
+    float maxIdealEdgeLen,
+    int maxNodeCount)
+  {
+    int safeMaxNodeCount =
+      Mathf.Max(1, maxNodeCount);
+
+    float t =
+      Mathf.Clamp01((float)Mathf.Max(0, noteCount) / safeMaxNodeCount);
+
+    return Mathf.Lerp(minIdealEdgeLen, maxIdealEdgeLen, t);
   }
 
   private static int CountPhysicalNodeCount(

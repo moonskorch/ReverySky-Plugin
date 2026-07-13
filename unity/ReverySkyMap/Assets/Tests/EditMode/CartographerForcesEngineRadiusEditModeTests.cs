@@ -2,6 +2,25 @@ using NUnit.Framework;
 
 public class CartographerForcesEngineRadiusEditModeTests
 {
+  [TestCase(-10, 4f)]
+  [TestCase(0, 4f)]
+  [TestCase(250, 6f)]
+  [TestCase(500, 8f)]
+  [TestCase(750, 8f)]
+  public void CalculateIdealEdgeLength_LinearlyGrowsToCap(
+    int noteCount,
+    float expected)
+  {
+    float actual =
+      CartographerForcesEngine.CalculateIdealEdgeLength(
+        noteCount,
+        4f,
+        8f,
+        500);
+
+    Assert.That(actual, Is.EqualTo(expected).Within(0.0001f));
+  }
+
   [Test]
   public void CalculateLayoutRadii_SameInputs_GiveSameResults()
   {

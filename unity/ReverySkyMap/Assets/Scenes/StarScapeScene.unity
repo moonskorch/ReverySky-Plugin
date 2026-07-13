@@ -301,16 +301,17 @@ MonoBehaviour:
   starTemplate: {fileID: 11400000, guid: 105638a6c060bc34997ae09e2ad40236, type: 2}
   layoutParent: {fileID: 1327961058}
   tagNodeTemplate: {fileID: 11400000, guid: db3616be3438896459ca1f461abf2b0b, type: 2}
-  idealEdgeLen: 4
+  idealEdgeLenMin: 4
+  idealEdgeLenMax: 8
   repelStrength: 40
   springK: 2.5
-  gravityK: 0.8
+  gravityK: 0.6
   damping: 0.8
   nodeSpacingFactor: 5
   minimumBoundRadius: 6
   spawnFillRatio: 0.3
   tagScale: 0.7
-  maxActiveLines: 500
+  maxActiveLines: 400
   maxActiveLongLines: 10
   orbitAngularSpeed: 0.1
 --- !u!4 &280067060
@@ -2535,13 +2536,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ReverySkyMap.Runtime::CartographerSampleDataGenerator
   injectSampleData: 0
-  connectionModel: 1
+  connectionModel: 2
   islands: 2
-  noteCount: 250
-  tagPoolSize: 60
+  noteCount: 15
+  tagPoolSize: 50
   dateSpanDays: 365
   maxTagsPerNote: 4
-  linkDensity: 13
+  linkDensity: 32
 --- !u!114 &1780593171
 MonoBehaviour:
   m_ObjectHideFlags: 0
