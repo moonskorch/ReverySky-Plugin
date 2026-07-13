@@ -44,6 +44,12 @@ export class Notice {
 
 export class WorkspaceLeaf {}
 
+export abstract class TAbstractFile {
+  constructor(public path: string) {}
+}
+
+export class TFile extends TAbstractFile {}
+
 export function setIcon(parent: HTMLElement, iconId: string): void {
   parent.setAttribute("data-icon", iconId);
 }

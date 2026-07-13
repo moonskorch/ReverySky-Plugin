@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { TFile } from "obsidian";
 import type { GraphPayload, NoteFocusPayload } from "../../src/bridge/BridgeTypes";
 import { makeStableNoteId } from "../../src/graph/VaultGraphBuilder";
 import { MapSession } from "../../src/view/MapSession";
@@ -342,6 +343,84 @@ describe("MapSession", () => {
     expect(sendGraph).toHaveBeenCalledTimes(2);
   });
 
+  it("primes editor-focus signature before the first plain text edit", () => {
+    vi.useFakeTimers();
+
+    const noteFile = new TFile("Folder/Note.md");
+    const focusedCache = {
+      links: [{ link: "RefA" }],
+      tags: [{ tag: "#tag-a" }]
+    };
+    const metadataCallbacks: {
+      changed?: (file: { path?: string }, data: string, cache: { links?: Array<{ link: string }>; tags?: Array<{ tag: string }> }) => void;
+      resolved?: () => void;
+    } = {};
+
+    const app = {
+      metadataCache: {
+        getFileCache: vi.fn().mockReturnValue(focusedCache),
+        on: vi.fn((name: "changed" | "resolved", callback: (...args: never[]) => void) => {
+          if (name === "changed") {
+            metadataCallbacks.changed = callback as typeof metadataCallbacks.changed;
+          } else {
+            metadataCallbacks.resolved = callback as () => void;
+          }
+          return { id: `metadata-${name}` };
+        })
+      },
+      vault: {
+        getAbstractFileByPath: vi.fn((path: string) => path === noteFile.path ? noteFile : null),
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+      },
+      workspace: {
+        activeLeaf: null,
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+
+    const buildGraph = makeBuildGraphMock(makePayload());
+    const sendGraph = vi.fn();
+    const sendFocus = vi.fn();
+    const session = new MapSession({
+      app: app as never,
+      buildGraph,
+      now: () => 1700000000000,
+      sendGraph,
+      sendFocus
+    });
+
+    session.start(() => undefined);
+    expect(buildGraph).toHaveBeenCalledTimes(0);
+    expect(sendGraph).toHaveBeenCalledTimes(0);
+
+    session.requestEditorFocus(noteFile.path);
+    metadataCallbacks.changed?.(
+      noteFile,
+      "plain text changed",
+      { links: [{ link: "RefA" }], tags: [{ tag: "#tag-a" }] }
+    );
+    metadataCallbacks.resolved?.();
+    vi.advanceTimersByTime(250);
+
+    expect(app.metadataCache.getFileCache).toHaveBeenCalledWith(noteFile);
+    expect(sendFocus).toHaveBeenCalledTimes(0);
+    expect(buildGraph).toHaveBeenCalledTimes(0);
+    expect(sendGraph).toHaveBeenCalledTimes(0);
+
+    metadataCallbacks.changed?.(
+      noteFile,
+      "link changed",
+      { links: [{ link: "RefA" }, { link: "RefB" }], tags: [{ tag: "#tag-a" }] }
+    );
+    metadataCallbacks.resolved?.();
+    vi.advanceTimersByTime(250);
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(sendGraph).toHaveBeenCalledTimes(0);
+  });
+
   it("refreshes the startup graph once when metadata resolves after the first build", () => {
     vi.useFakeTimers();
 
@@ -530,15 +609,18 @@ describe("MapSession", () => {
         file: { path: "Projects/ReverySky/Spec.md" }
       }
     };
+    const projectFile = new TFile(projectLeaf.view.file.path);
 
     const payload = makePathPayload();
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
     const app = {
       metadataCache: {
+        getFileCache: vi.fn().mockReturnValue(null),
         on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
       },
       vault: {
+        getAbstractFileByPath: vi.fn((path: string) => path === projectFile.path ? projectFile : null),
         on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
       },
       workspace: {
@@ -585,14 +667,17 @@ describe("MapSession", () => {
 
   it("does not send editor focus before the bridge is ready", () => {
     const payload = makePathPayload();
+    const projectFile = new TFile("Projects/ReverySky/Spec.md");
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
     const session = new MapSession({
       app: {
         metadataCache: {
+          getFileCache: vi.fn().mockReturnValue(null),
           on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
         },
         vault: {
+          getAbstractFileByPath: vi.fn((path: string) => path === projectFile.path ? projectFile : null),
           on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
         },
         workspace: {
@@ -620,14 +705,17 @@ describe("MapSession", () => {
     vi.useFakeTimers();
 
     const payload = makePathPayload();
+    const projectFile = new TFile("Projects/ReverySky/Spec.md");
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
     const session = new MapSession({
       app: {
         metadataCache: {
+          getFileCache: vi.fn().mockReturnValue(null),
           on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
         },
         vault: {
+          getAbstractFileByPath: vi.fn((path: string) => path === projectFile.path ? projectFile : null),
           on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
         },
         workspace: {

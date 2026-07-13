@@ -1,9 +1,9 @@
 import {
+  TFile,
   type App,
   type CachedMetadata,
   type EventRef,
-  type TAbstractFile,
-  type TFile
+  type TAbstractFile
 } from "obsidian";
 import type {
   MapLayoutPreference,
@@ -338,6 +338,7 @@ export class MapSession {
   }
 
   requestEditorFocus(path: string): void {
+    this.primeNoteSignatureForPath(path);
     this.focus.onMarkdownFocus(path);
   }
 
@@ -536,6 +537,21 @@ export class MapSession {
       tags,
       links
     });
+  }
+
+  private primeNoteSignatureForPath(pathValue: unknown): void {
+    const path = this.normalizeVaultPath(pathValue);
+    if (!this.isGraphRelevantPath(path) || this.noteSignatureByPath.has(path)) {
+      return;
+    }
+
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) {
+      return;
+    }
+
+    const cache = this.app.metadataCache.getFileCache(file) ?? null;
+    this.noteSignatureByPath.set(path, this.buildGraphRelevantSignature(cache));
   }
 
   private normalizeLinkValue(linkValue: unknown): string {
