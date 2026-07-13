@@ -1842,6 +1842,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
         continue;
 
       Vector3 targetPosition = ToWorldPosition(_nodes[nodeIndex].LocalPosition);
+      Vector3 currentPosition = visualTransform.position;
       if (!smoothVisuals)
       {
         visualTransform.position = targetPosition;
@@ -1849,11 +1850,13 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       }
 
       Vector3 nextPosition = Vector3.Lerp(
-        visualTransform.position,
+        currentPosition,
         targetPosition,
         smoothingBlend);
 
-      if ((targetPosition - nextPosition).sqrMagnitude <= finishDistanceSqr)
+      // Large layouts can lose tiny smoothing steps to float precision; snap when progress stalls.
+      if ((targetPosition - nextPosition).sqrMagnitude <= finishDistanceSqr ||
+        nextPosition == currentPosition)
       {
         nextPosition = targetPosition;
       }
