@@ -194,7 +194,7 @@ public class CartographerScalableLinksEngineEditModeTests
   }
 
   [Test]
-  public void BuildGraph_TimedConstructionKeepsNavigationPivotStable()
+  public void BuildGraph_TimedConstructionUsesLayoutOriginPivot()
   {
     var graph = BuildTaglessComponentsGraph(64);
     using var scope = CreateEngineScope(
@@ -211,12 +211,14 @@ public class CartographerScalableLinksEngineEditModeTests
       });
 
     Vector3 initialPivot = scope.Engine.Pivot;
+    Assert.That(initialPivot, Is.EqualTo(scope.Engine.transform.position));
 
     Assert.That(scope.Engine.RequiresTick, Is.True);
 
     TickUntilStopped(scope);
 
     Vector3 finalPivot = scope.Engine.Pivot;
+    Assert.That(finalPivot, Is.EqualTo(scope.Engine.transform.position));
     Assert.That(finalPivot.x, Is.EqualTo(initialPivot.x).Within(0.0001f));
     Assert.That(finalPivot.y, Is.EqualTo(initialPivot.y).Within(0.0001f));
     Assert.That(finalPivot.z, Is.EqualTo(initialPivot.z).Within(0.0001f));

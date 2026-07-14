@@ -115,6 +115,7 @@ public class ObsidianBridgeEditModeTests
     var cartographerObject = new GameObject("CartographerResolveFocusTests");
     var focusObject = new GameObject("CartographerResolveFocusNodeTests");
     var cameraObject = new GameObject("CartographerResolveFocusCameraTests");
+    var startObject = new GameObject("CartographerResolveFocusCameraStartTests");
     var starObject = new GameObject("CartographerResolveFocusStarTests");
     try
     {
@@ -149,15 +150,22 @@ public class ObsidianBridgeEditModeTests
 
       MapRuntimeContext.PendingFocusNoteId = string.Empty;
       focusNode.FocusRestoreNoteId = "missing";
+      var unchangedCameraTarget = new Vector3(4f, 5f, 6f);
+      var resetCameraTarget = new Vector3(8f, 0f, 9f);
+      SetPrivateField(cameraController, "targetPos", unchangedCameraTarget);
+      startObject.transform.position = new Vector3(resetCameraTarget.x, 3f, resetCameraTarget.z);
+      SetPrivateField(cameraController, "startPosition", startObject.transform);
       applyGraphFocus.Invoke(cartographer, null);
       Assert.That(MapRuntimeContext.PendingFocusNoteId, Is.EqualTo(string.Empty));
       Assert.That(focusNode.FocusRestoreNoteId, Is.EqualTo("missing"));
+      Assert.That(GetPrivateField<Vector3>(cameraController, "targetPos"), Is.EqualTo(resetCameraTarget));
     }
     finally
     {
       Object.DestroyImmediate(cartographerObject);
       Object.DestroyImmediate(focusObject);
       Object.DestroyImmediate(cameraObject);
+      Object.DestroyImmediate(startObject);
       Object.DestroyImmediate(starObject);
     }
   }
@@ -166,10 +174,14 @@ public class ObsidianBridgeEditModeTests
   public void BuildGraph_EmptyNotes_ClearsStaleGraphIndex()
   {
     var cartographerObject = new GameObject("CartographerEmptyGraphIndexTests");
+    var focusObject = new GameObject("CartographerEmptyGraphIndexTests_Focus");
+    var cameraObject = new GameObject("CartographerEmptyGraphIndexTests_Camera");
     var staleStarObject = new GameObject("CartographerEmptyGraphIndexTests_StaleStar");
     try
     {
       var cartographer = cartographerObject.AddComponent<Cartographer>();
+      var focusNode = focusObject.AddComponent<FocusNode>();
+      var cameraController = cameraObject.AddComponent<CameraOrbitalController>();
       var staleStar = staleStarObject.AddComponent<Star>();
       staleStar.SetData(new NoteData { Id = "stale", Path = "notes/stale.md" });
       MapGraphIndex staleIndex = MapGraphIndex.Build(
@@ -177,6 +189,9 @@ public class ObsidianBridgeEditModeTests
         new List<TagNode>(),
         new List<MapRuntimeContext.RuntimeNoteLink>());
 
+      SetCartographerSingleton(cartographer);
+      SetPrivateField(cartographer, "focusNode", focusNode);
+      SetPrivateField(focusNode, "cameraController", cameraController);
       SetPrivateField(cartographer, "_dynamicLinksEngine", new TestCartographerEngine(MapLayoutMode.DynamicLinks));
       SetPrivateField(cartographer, "<GraphIndex>k__BackingField", staleIndex);
 
@@ -193,6 +208,8 @@ public class ObsidianBridgeEditModeTests
     finally
     {
       Object.DestroyImmediate(cartographerObject);
+      Object.DestroyImmediate(focusObject);
+      Object.DestroyImmediate(cameraObject);
       Object.DestroyImmediate(staleStarObject);
     }
   }

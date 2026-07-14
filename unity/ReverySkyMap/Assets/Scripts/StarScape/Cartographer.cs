@@ -78,8 +78,7 @@ public class Cartographer : MonoBehaviour
 
     UpdateViewButtonIcon();
     ApplyLineVisibility();
-    if (focusNode != null && focusNode.CameraController != null)
-      focusNode.CameraController.UpdateDateSlider();
+    focusNode.CameraController.UpdateDateSlider();
   }
 
   private void OnDestroy()
@@ -218,7 +217,7 @@ public class Cartographer : MonoBehaviour
   {
     yield return null;
 
-    if (star != null && focusNode != null)
+    if (star != null)
       focusNode.SetSelectedStar(star);
   }
 
@@ -298,11 +297,11 @@ public class Cartographer : MonoBehaviour
         return;
     }
 
-    var restoreFocusNoteId = focusNode?.FocusRestoreNoteId;
+    var restoreFocusNoteId = focusNode.FocusRestoreNoteId;
     if (!string.IsNullOrWhiteSpace(restoreFocusNoteId) && TryFocusRuntimeNote(restoreFocusNoteId))
       return;
 
-    focusNode?.ResetFocus();
+    focusNode.ResetFocus();
   }
 
   private void RebuildGraphConsumers(MapGraphIndex graphIndex)

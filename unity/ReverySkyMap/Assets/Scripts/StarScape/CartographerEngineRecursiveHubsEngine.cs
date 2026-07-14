@@ -134,7 +134,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   private const float VISUAL_SMOOTHING_FINISH_DISTANCE = 0.001f;
 
   private float _navigationRadius;
-  private Vector3 _layoutCenter;
   private ScapeView _currentView = ScapeView.Planets;
 
   private int _noteCount;
@@ -347,7 +346,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     _visualSmoothingActive || (_continuousLinkRefinement && _graphHasNodes);
   public event Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnNodesChanged;
   public float BoundRadius => _navigationRadius;
-  public Vector3 Pivot => layoutParent ? layoutParent.TransformPoint(_layoutCenter) : _layoutCenter;
+  public Vector3 Pivot => layoutParent ? layoutParent.position : transform.position;
   public ScapeCameraWarper ScapeWarper => null;
   public IReadOnlyList<Star> Stars => _stars;
   public IReadOnlyList<TagNode> TagNodes => _tagNodes;
@@ -355,7 +354,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   private void Awake()
   {
     _navigationRadius = Mathf.Max(0.1f, minimumNavigationRadius);
-    _layoutCenter = Vector3.zero;
   }
 
   public void Tick(float dt)
@@ -490,8 +488,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
     var seedStopwatch = Stopwatch.StartNew();
     InitializeStructuralRoots();
-    // Keep the camera pivot stable after reset; construction only refines radius later.
-    UpdateNavigationCenter();
     UpdateNavigationRadius();
     seedStopwatch.Stop();
 
@@ -661,7 +657,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     _constructionActive = false;
     _visualSmoothingActive = false;
     _nextPlacementSequence = 0;
-    _layoutCenter = Vector3.zero;
     _navigationRadius = Mathf.Max(0.1f, minimumNavigationRadius);
     PublishVisualNodesChanged();
   }
@@ -1424,11 +1419,11 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   {
     _constructionActive = false;
     InstantiatePlacedNodesWithoutVisuals();
-    UpdateNavigationRadius();
 
     if (_animateRefinement)
     {
       _remainingRefinementPasses = _resolvedLinkRefinementPasses;
+      UpdateNavigationRadius();
       PublishVisualNodesChanged();
     }
     else
@@ -1878,29 +1873,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     return Mathf.Clamp01(1f - Mathf.Exp(-dt / smoothingSeconds));
   }
 
-  private void UpdateNavigationCenter()
-  {
-    if (_placedCount == 0)
-    {
-      _layoutCenter = Vector3.zero;
-      return;
-    }
-
-    Vector3 center = Vector3.zero;
-    int count = 0;
-    for (int i = 0; i < _nodes.Count; i++)
-    {
-      if (!_nodes[i].IsPlaced)
-        continue;
-
-      center += _nodes[i].LocalPosition;
-      count++;
-    }
-
-    center /= Mathf.Max(1, count);
-    _layoutCenter = center;
-  }
-
   private void UpdateNavigationRadius()
   {
     float maxDistance = 0f;
@@ -1909,7 +1881,7 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       if (!_nodes[i].IsPlaced)
         continue;
 
-      maxDistance = Mathf.Max(maxDistance, Vector3.Distance(_layoutCenter, _nodes[i].LocalPosition));
+      maxDistance = Mathf.Max(maxDistance, _nodes[i].LocalPosition.magnitude);
     }
 
     _navigationRadius = Mathf.Max(
