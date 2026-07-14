@@ -7,14 +7,20 @@ import {
 import type { NoteFocusPayload } from "../bridge/BridgeTypes";
 import { makeStableNoteId } from "../graph/VaultGraphBuilder";
 
+const FOCUS_GATE_WINDOW_MS = 250;
+
 export type MapFocusControllerDependencies = {
   app: App;
   isBridgeReady: () => boolean;
+  now: () => number;
   sendFocus: (payload: NoteFocusPayload) => void;
 };
 
 export class MapFocusController {
   private workspaceFocusRegistered = false;
+  // One short-lived gate covers both Unity-open focus echoes and duplicate Obsidian focus signals.
+  private gatePath = "";
+  private gateAt = Number.NEGATIVE_INFINITY;
 
   constructor(private readonly deps: MapFocusControllerDependencies) {}
 
@@ -36,7 +42,26 @@ export class MapFocusController {
     );
   }
 
-  reset(): void {}
+  reset(): void {
+    this.clearGate();
+  }
+
+  expectFocusEchoForPath(path: unknown): void {
+    const normalizedPath = this.normalizePath(path);
+    if (this.isRelevantPath(normalizedPath)) {
+      // Obsidian will often emit file-open/editor focus after we open a Unity-requested note.
+      this.rememberGate(normalizedPath);
+    } else {
+      this.clearGate();
+    }
+  }
+
+  clearExpectedFocusEchoForPath(path: unknown): void {
+    const normalizedPath = this.normalizePath(path);
+    if (this.gatePath === normalizedPath) {
+      this.clearGate();
+    }
+  }
 
   resolveOpenLinkSourcePath(): string {
     return this.getLeafSourcePath(this.resolveOpenLinkSourceLeaf());
@@ -66,11 +91,33 @@ export class MapFocusController {
       return false;
     }
 
+    if (this.isGatedFocus(normalizedPath)) {
+      // Slide the gate forward so file-open and editor-focus bursts collapse into one decision.
+      this.rememberGate(normalizedPath);
+      return false;
+    }
+
+    this.rememberGate(normalizedPath);
     this.deps.sendFocus({
       id: makeStableNoteId(normalizedPath),
       path: normalizedPath
     });
     return true;
+  }
+
+  private isGatedFocus(path: string): boolean {
+    return this.gatePath === path &&
+      this.deps.now() - this.gateAt <= FOCUS_GATE_WINDOW_MS;
+  }
+
+  private rememberGate(path: string): void {
+    this.gatePath = path;
+    this.gateAt = this.deps.now();
+  }
+
+  private clearGate(): void {
+    this.gatePath = "";
+    this.gateAt = Number.NEGATIVE_INFINITY;
   }
 
   private resolveOpenLinkSourceLeaf(): WorkspaceLeaf | null {

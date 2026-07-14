@@ -32,6 +32,7 @@ type SendFocusMock = MockedFunction<MapFocusControllerDependencies["sendFocus"]>
 
 function createController(options?: {
   isBridgeReady?: () => boolean;
+  now?: () => number;
   sendFocus?: SendFocusMock;
   workspace?: WorkspaceMock;
 }) {
@@ -47,6 +48,7 @@ function createController(options?: {
       workspace
     } as never,
     isBridgeReady: options?.isBridgeReady ?? (() => true),
+    now: options?.now ?? (() => 0),
     sendFocus
   });
 
@@ -136,6 +138,92 @@ describe("MapFocusController", () => {
 
     expect(sendFocus).toHaveBeenCalledTimes(1);
     expectFocusPayload(sendFocus, "Folder/Next.md");
+  });
+
+  it("coalesces duplicate focus for the same note in a short window", () => {
+    let currentTime = 1000;
+    const { controller, sendFocus } = createController({
+      now: () => currentTime
+    });
+
+    controller.onMarkdownFocus("Folder/Current.md");
+    controller.onMarkdownFocus("Folder/Current.md");
+
+    expect(sendFocus).toHaveBeenCalledTimes(1);
+    expectFocusPayload(sendFocus, "Folder/Current.md");
+
+    currentTime += 251;
+    controller.onMarkdownFocus("Folder/Current.md");
+
+    expect(sendFocus).toHaveBeenCalledTimes(2);
+    expectFocusPayload(sendFocus, "Folder/Current.md");
+  });
+
+  it("consumes the expected focus echo after a Unity note open", () => {
+    let currentTime = 1000;
+    const { controller, sendFocus } = createController({
+      now: () => currentTime
+    });
+
+    controller.expectFocusEchoForPath("Folder/Current.md");
+    controller.onMarkdownFocus("Folder/Current.md");
+
+    expect(sendFocus).not.toHaveBeenCalled();
+
+    controller.onMarkdownFocus("Folder/Current.md");
+
+    expect(sendFocus).not.toHaveBeenCalled();
+
+    currentTime += 251;
+    controller.onMarkdownFocus("Folder/Current.md");
+
+    expect(sendFocus).toHaveBeenCalledTimes(1);
+    expectFocusPayload(sendFocus, "Folder/Current.md");
+  });
+
+  it("extends the focus gate while consuming duplicate focus", () => {
+    let currentTime = 1000;
+    const { controller, sendFocus } = createController({
+      now: () => currentTime
+    });
+
+    controller.expectFocusEchoForPath("Folder/Current.md");
+    currentTime += 200;
+    controller.onMarkdownFocus("Folder/Current.md");
+    currentTime += 200;
+    controller.onMarkdownFocus("Folder/Current.md");
+
+    expect(sendFocus).not.toHaveBeenCalled();
+
+    currentTime += 251;
+    controller.onMarkdownFocus("Folder/Current.md");
+
+    expect(sendFocus).toHaveBeenCalledTimes(1);
+    expectFocusPayload(sendFocus, "Folder/Current.md");
+  });
+
+  it("does not consume a stale expected focus echo", () => {
+    let currentTime = 1000;
+    const { controller, sendFocus } = createController({
+      now: () => currentTime
+    });
+
+    controller.expectFocusEchoForPath("Folder/Current.md");
+    currentTime += 251;
+    controller.onMarkdownFocus("Folder/Current.md");
+
+    expect(sendFocus).toHaveBeenCalledTimes(1);
+    expectFocusPayload(sendFocus, "Folder/Current.md");
+  });
+
+  it("clears expected focus echo when another note receives focus", () => {
+    const { controller, sendFocus } = createController();
+
+    controller.expectFocusEchoForPath("Folder/Opened.md");
+    controller.onMarkdownFocus("Folder/Other.md");
+
+    expect(sendFocus).toHaveBeenCalledTimes(1);
+    expectFocusPayload(sendFocus, "Folder/Other.md");
   });
 
   it("sends rename focus only when the renamed markdown note is active", () => {

@@ -460,6 +460,7 @@ describe("MapView bridge integration", () => {
   });
 
   it("opens note on note:open with strict note identity", async () => {
+    let onFileOpen: ((file: { path?: string } | null) => void) | null = null;
     const activeLeaf = {
       view: {
         getViewType: () => "markdown"
@@ -481,7 +482,12 @@ describe("MapView bridge integration", () => {
         getMostRecentLeaf: vi.fn().mockReturnValue(activeLeaf),
         getLeavesOfType: vi.fn().mockReturnValue([activeLeaf]),
         iterateAllLeaves: vi.fn(),
-        on: vi.fn().mockReturnValue({ id: "event-ref" })
+        on: vi.fn((eventName: string, callback: (file: { path?: string } | null) => void) => {
+          if (eventName === "file-open") {
+            onFileOpen = callback;
+          }
+          return { id: "event-ref" };
+        })
       }
     };
     const plugin = {
@@ -528,12 +534,16 @@ describe("MapView bridge integration", () => {
 
     callbacks.onNoteOpen?.({ id: "note_abc", path: "Folder/Note.md" });
     await Promise.resolve();
+    callMaybe(onFileOpen, { path: "Folder/Note.md" });
+    expect(bridge.sendNoteFocus).not.toHaveBeenCalled();
 
     callbacks.onNoteOpen?.({
       id: "missing",
       path: "Fallback/Other.md"
     });
     await Promise.resolve();
+    callMaybe(onFileOpen, { path: "Fallback/Other.md" });
+    expect(bridge.sendNoteFocus).not.toHaveBeenCalled();
 
     expect(openLinkText).toHaveBeenCalledTimes(2);
     expect(openLinkText).toHaveBeenNthCalledWith(1, "Folder/Note.md", "", false, {

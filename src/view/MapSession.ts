@@ -120,6 +120,7 @@ export class MapSession {
     this.focus = new MapFocusController({
       app: this.app,
       isBridgeReady: () => this.bridgeReady,
+      now: this.now,
       sendFocus: deps.sendFocus
     });
   }
@@ -347,6 +348,14 @@ export class MapSession {
   requestEditorFocus(path: string): void {
     this.primeNoteSignatureForPath(path);
     this.focus.onMarkdownFocus(path);
+  }
+
+  expectFocusEchoForPath(path: string): void {
+    this.focus.expectFocusEchoForPath(path);
+  }
+
+  clearExpectedFocusEchoForPath(path: string): void {
+    this.focus.clearExpectedFocusEchoForPath(path);
   }
 
   private ensureRefreshSubscriptions(registerEvent: (eventRef: EventRef) => void): void {

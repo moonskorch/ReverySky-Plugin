@@ -225,11 +225,15 @@ Render-scale changes are intentionally different from graph-significant changes.
 4. `src/view/MapView.ts` -> `requestEditorFocus(path)` -> `MapSession.requestEditorFocus(path)`
    The view shell does not decide focus policy; it only forwards the signal into session state.
 5. `src/view/MapSession.ts` -> `MapFocusController.onMarkdownFocus(path)`
-   Sends the markdown editor focus event immediately when the bridge is ready.
+   Passes the markdown editor focus event through the shared focus gate before bridge dispatch.
 6. `src/bridge/UnityIframeBridge.ts` -> `sendNoteFocus(...)`
    Sends `note:focus` with a deterministic note id derived from the normalized vault path.
 
 This path is intentionally separate from graph refresh. It updates the runtime's focus target without rebuilding the graph unless some other change already triggered a refresh.
+
+`MapFocusController` keeps one short-lived 250 ms focus gate keyed by normalized vault path.
+The gate collapses duplicate Obsidian focus signals, such as `file-open` followed by markdown editor focus for the same note.
+The gate slides forward while matching duplicate focus signals are consumed, so a short burst stays collapsed without blocking a later deliberate refocus.
 
 ### Path 5. Unity note-open request -> Obsidian note open
 1. Unity sends `note:open`.
@@ -237,7 +241,9 @@ This path is intentionally separate from graph refresh. It updates the runtime's
    Validates the message and calls `onNoteOpen(payload)`.
 3. `src/view/MapView.ts` -> `MapNoteOpenRouter.openRequestedNote(payload)`
 4. `src/view/MapNoteOpenRouter.ts` resolves the target note from the required `id` and `path`, passes the current markdown path only as `openLinkText(...)` link context, and leaves final navigation routing to Obsidian.
-5. Control returns to Obsidian, which opens or focuses the requested note.
+5. Before calling `openLinkText(...)`, `MapNoteOpenRouter` marks the target path in the same focus gate used by normal Obsidian focus routing.
+6. Control returns to Obsidian, which opens or focuses the requested note.
+7. If Obsidian emits `file-open` or markdown editor focus for that same path within the 250 ms gate, `MapFocusController` consumes it and does not send `note:focus` back to Unity.
 
 ### Plugin focus scenarios
 
@@ -360,7 +366,7 @@ Focus before bridge readiness is out of scope. Plugin-side focus requests pass t
   Owns persisted map state, graph refresh timing, metadata-resolution waiting, graph emission, and render-scale restart tracking. It delegates plugin-side focus policy to `MapFocusController`.
 
 - `src/view/MapFocusController.ts` -> `MapFocusController`
-  Owns plugin-side focus event routing for workspace `file-open`, markdown editor focus, and active-note rename.
+  Owns plugin-side focus event routing for workspace `file-open`, markdown editor focus, active-note rename, and short-lived suppression of Unity-open focus echo.
 
 - `src/view/MarkdownEditorFocus.ts` -> `handleMarkdownEditorFocusUpdate(...)`
   Owns the markdown-editor focus detection logic that feeds the map-focus path.
@@ -401,7 +407,7 @@ Focus before bridge readiness is out of scope. Plugin-side focus requests pass t
   They are reported to `ReverySkyMapPlugin`, persisted in plugin data under `mapViewState`, and re-applied on open.
 
 - Markdown focus events are routed by `MapFocusController`.
-  The controller does not store focus history or a focus queue. It sends bridge-ready `note:focus` events from workspace `file-open`, markdown editor focus, and active-note rename. Unity owns pending focus application when the target star is not available yet.
+  The controller does not store focus history or a focus queue. It keeps only a short-lived path gate to collapse duplicate Obsidian focus signals and consume Unity-open echo, then sends bridge-ready `note:focus` events from workspace `file-open`, markdown editor focus, and active-note rename. Unity owns pending focus application when the target star is not available yet.
 
 - `renderScale` is applied at iframe startup, not through the bridge.
   `MapSession` tracks the selected value and whether it differs from the currently applied iframe value so the UI can ask the user to reopen the map.

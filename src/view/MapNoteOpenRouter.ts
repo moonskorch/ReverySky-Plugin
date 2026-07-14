@@ -27,6 +27,7 @@ export class MapNoteOpenRouter {
 
     const sourcePath = this.session.resolveOpenLinkSourcePath();
     try {
+      this.session.expectFocusEchoForPath(noteFile.path);
       await this.app.workspace.openLinkText(
         noteFile.path,
         sourcePath,
@@ -36,6 +37,7 @@ export class MapNoteOpenRouter {
         }
       );
     } catch (error) {
+      this.session.clearExpectedFocusEchoForPath(noteFile.path);
       this.notify(`Unable to open note: ${String(error)}`);
     }
   }
