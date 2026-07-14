@@ -1330,6 +1330,12 @@ describe("MapView bridge integration", () => {
       mapLayout: "auto"
     });
     expect(bridge.sendNoteFocus).not.toHaveBeenCalled();
+    view.requestEditorFocus("Folder/Old.md");
+    expect(bridge.sendNoteFocus).toHaveBeenLastCalledWith({
+      id: makeStableNoteId("Folder/Old.md"),
+      path: "Folder/Old.md"
+    });
+    bridge.sendNoteFocus.mockClear();
 
     vaultCallbacks.rename?.({ path: "Folder/New.md" }, "Folder/Old.md");
     vi.advanceTimersByTime(250);

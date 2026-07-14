@@ -855,6 +855,7 @@ describe("MapSession", () => {
 
     session.start(() => undefined);
     session.setBridgeReady(true);
+    session.recordRuntimeFocusPath("Folder/Old.md");
 
     vaultCallbacks.rename?.({ path: "Folder/New.md" }, "Folder/Old.md");
     vi.advanceTimersByTime(250);
@@ -868,6 +869,81 @@ describe("MapSession", () => {
     expect(sendFocus).toHaveBeenLastCalledWith({
       id: makeStableNoteId("Folder/New.md"),
       path: "Folder/New.md"
+    });
+  });
+
+  it("preserves focus on the last focused note after moving it outside the active markdown leaf", () => {
+    vi.useFakeTimers();
+
+    const vaultCallbacks: {
+      rename?: (file: { path?: string }, oldPath: string) => void;
+    } = {};
+
+    const oldPath = "Folder/Old.md";
+    const newPath = "Moved/New.md";
+    const noteFile = new TFile(oldPath);
+    const payloadBefore = makePayload();
+    payloadBefore.notes = [
+      { id: makeStableNoteId(oldPath), path: oldPath, title: "Old", tags: [], date: "2026-01-03T00:00:00.000Z", size: 30 }
+    ];
+    payloadBefore.vault.noteCount = payloadBefore.notes.length;
+
+    const payloadAfter = makePayload();
+    payloadAfter.notes = [
+      { id: makeStableNoteId(newPath), path: newPath, title: "New", tags: [], date: "2026-01-03T00:00:00.000Z", size: 30 }
+    ];
+    payloadAfter.vault.noteCount = payloadAfter.notes.length;
+
+    const sendGraph = vi.fn();
+    const sendFocus = vi.fn();
+    const session = new MapSession({
+      app: {
+        metadataCache: {
+          getFileCache: vi.fn().mockReturnValue(null),
+          on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+        },
+        vault: {
+          getAbstractFileByPath: vi.fn((path: string) => path === oldPath ? noteFile : null),
+          on: vi.fn((name: "create" | "delete" | "rename", callback: (...args: never[]) => void) => {
+            if (name === "rename") {
+              vaultCallbacks.rename = callback as typeof vaultCallbacks.rename;
+            }
+            return { id: `vault-${name}` };
+          })
+        },
+        workspace: {
+          activeLeaf: null,
+          getLeavesOfType: vi.fn().mockReturnValue([]),
+          iterateAllLeaves: vi.fn(),
+          on: vi.fn().mockReturnValue({ id: "event-ref" })
+        }
+      } as never,
+      buildGraph: vi
+        .fn()
+        .mockReturnValueOnce(payloadBefore)
+        .mockReturnValueOnce(payloadAfter),
+      now: () => 1700000000000,
+      sendGraph,
+      sendFocus
+    });
+
+    session.start(() => undefined);
+    session.setBridgeReady(true);
+    session.flushOrRefresh();
+    session.requestEditorFocus(oldPath);
+    expect(sendFocus).toHaveBeenLastCalledWith({
+      id: makeStableNoteId(oldPath),
+      path: oldPath
+    });
+
+    vaultCallbacks.rename?.({ path: newPath }, oldPath);
+    vi.advanceTimersByTime(250);
+
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+    expect(sendFocus).toHaveBeenCalledTimes(2);
+    expect(sendFocus).toHaveBeenLastCalledWith({
+      id: makeStableNoteId(newPath),
+      path: newPath
     });
   });
 

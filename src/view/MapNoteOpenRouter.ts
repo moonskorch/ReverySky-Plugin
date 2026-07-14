@@ -27,6 +27,7 @@ export class MapNoteOpenRouter {
 
     const sourcePath = this.session.resolveOpenLinkSourcePath();
     try {
+      this.session.recordRuntimeFocusPath(noteFile.path);
       this.session.expectFocusEchoForPath(noteFile.path);
       await this.app.workspace.openLinkText(
         noteFile.path,

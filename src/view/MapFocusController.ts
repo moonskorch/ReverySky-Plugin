@@ -11,6 +11,7 @@ export type MapFocusControllerDependencies = {
   app: App;
   now: () => number;
   requestFocus: (path: string, options?: { skipGraphCheck?: boolean }) => boolean;
+  getFocusPath: () => string;
 };
 
 export class MapFocusController {
@@ -76,8 +77,8 @@ export class MapFocusController {
   onRename(_oldPath: unknown, newPath: unknown): void {
     const normalizedOldPath = this.normalizePath(_oldPath);
     const normalizedNewPath = this.normalizePath(newPath);
-    const activeMarkdownPath = this.getActiveMarkdownPath();
-    if (activeMarkdownPath === normalizedOldPath || activeMarkdownPath === normalizedNewPath) {
+    const focusPath = this.normalizePath(this.deps.getFocusPath());
+    if (focusPath === normalizedOldPath) {
       // Rename is the only focus source allowed to outrun the current graph:
       // the new path-derived id may not exist in MapSession.lastGraphPayload yet.
       this.deps.requestFocus(normalizedNewPath, { skipGraphCheck: true });

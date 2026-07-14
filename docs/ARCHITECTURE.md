@@ -248,7 +248,7 @@ The gate slides forward while matching duplicate focus signals are consumed, so 
    Validates the message and calls `onNoteOpen(payload)`.
 3. `src/view/MapView.ts` -> `MapNoteOpenRouter.openRequestedNote(payload)`
 4. `src/view/MapNoteOpenRouter.ts` resolves the target note from the required `id` and `path`, passes the current markdown path only as `openLinkText(...)` link context, and leaves final navigation routing to Obsidian.
-5. Before calling `openLinkText(...)`, `MapNoteOpenRouter` marks the target path in the same focus gate used by normal Obsidian focus routing.
+5. Before calling `openLinkText(...)`, `MapNoteOpenRouter` records the target as the current plugin-side map focus and marks the target path in the same focus gate used by normal Obsidian focus routing.
 6. Control returns to Obsidian, which opens or focuses the requested note.
 7. If Obsidian emits `file-open` or markdown editor focus for that same path within the 250 ms gate, `MapFocusController` consumes it and does not send `note:focus` back to Unity.
 
@@ -258,7 +258,7 @@ These scenarios define the intended focus behavior for the current focus work an
 
 Focus before bridge readiness is out of scope. Plugin-side focus requests pass through the `bridgeReady` guard in `MapSession.trySendFocusForPath(...)`; Unity pending focus starts only after `note:focus` reaches `ObsidianBridge.OnNoteFocus(...)`.
 For ordinary focus, `MapSession.trySendFocusForPath(...)` also requires the note to belong to the latest effective graph payload.
-For active-note rename, `MapFocusController.onRename(...)` requests focus with `skipGraphCheck` so the new id can be handed to Unity before the following graph rebuild reaches the runtime.
+For rename, `MapFocusController.onRename(...)` preserves focus only when the renamed old path matches `MapSession`'s plugin-side `focusPath`, then requests focus with `skipGraphCheck` so the new id can be handed to Unity before the following graph rebuild reaches the runtime.
 
 - Startup / map open:
   Expected: no focused note; show the start panorama.
@@ -423,7 +423,9 @@ For active-note rename, `MapFocusController.onRename(...)` requests focus with `
   The controller does not store focus history or a focus queue. It keeps only a short-lived path gate to collapse duplicate Obsidian focus signals and consume Unity-open echo, then emits a focus intent to `MapSession`.
 
 - Bridge focus dispatch is owned by `MapSession`.
-  Ordinary focus is sent only when the requested note is part of the latest effective graph payload. Active-note rename may bypass that membership check because the new path can legitimately arrive before the renamed graph payload reaches Unity.
+  Ordinary focus is sent only when the requested note is part of the latest effective graph payload.
+  `MapSession` stores the current plugin-side map `focusPath` after successful TypeScript focus dispatch and after Unity-originated `note:open` requests.
+  Rename may bypass the membership check only when the renamed old path matches that `focusPath`, because the new path can legitimately arrive before the renamed graph payload reaches Unity.
 
 - Focus responsibility is split across the bridge boundary.
   TypeScript decides whether a focus request belongs to the map Unity should be rendering now. Unity does not decide vault/filter membership; its pending focus exists only for the short gap between receiving a valid `note:focus` and exposing the target star in `MapGraphIndex`.

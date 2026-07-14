@@ -94,6 +94,8 @@ export class MapSession {
   private semanticRefreshPending = false;
   private startupRefreshPending = false;
   private noteSignatureByPath = new Map<string, string>();
+  // Plugin-side map focus, updated from both TS focus dispatch and Unity note-open.
+  private focusPath = "";
   private bridgeReady = false;
   private refreshTimer: number | null = null;
   private refreshTimerWindow: Window | null = null;
@@ -122,7 +124,8 @@ export class MapSession {
     this.focus = new MapFocusController({
       app: this.app,
       now: this.now,
-      requestFocus: (path, options) => this.trySendFocusForPath(path, options)
+      requestFocus: (path, options) => this.trySendFocusForPath(path, options),
+      getFocusPath: () => this.focusPath
     });
     this.sendFocus = deps.sendFocus;
   }
@@ -157,6 +160,7 @@ export class MapSession {
     this.focus.start(registerEvent);
     this.semanticRefreshPending = false;
     this.startupRefreshPending = false;
+    this.focusPath = "";
     this.clearRefreshTimer();
     this.ensureRefreshSubscriptions(registerEvent);
   }
@@ -174,6 +178,7 @@ export class MapSession {
     this.semanticRefreshPending = false;
     this.startupRefreshPending = false;
     this.lastGraphPayload = null;
+    this.focusPath = "";
   }
 
   setBridgeReady(isReady: boolean): void {
@@ -371,6 +376,7 @@ export class MapSession {
       id: makeStableNoteId(path),
       path
     });
+    this.focusPath = path;
     return true;
   }
 
@@ -388,6 +394,13 @@ export class MapSession {
 
   expectFocusEchoForPath(path: string): void {
     this.focus.expectFocusEchoForPath(path);
+  }
+
+  recordRuntimeFocusPath(pathValue: unknown): void {
+    const path = this.normalizeVaultPath(pathValue);
+    if (this.isGraphRelevantPath(path)) {
+      this.focusPath = path;
+    }
   }
 
   clearExpectedFocusEchoForPath(path: string): void {
@@ -457,6 +470,9 @@ export class MapSession {
           }
           const normalizedPath = this.normalizeVaultPath(file.path);
           this.noteSignatureByPath.delete(normalizedPath);
+          if (this.focusPath === normalizedPath) {
+            this.focusPath = "";
+          }
           this.scheduleGraphRefresh();
         })
       );

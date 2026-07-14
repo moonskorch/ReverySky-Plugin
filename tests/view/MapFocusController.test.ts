@@ -32,6 +32,7 @@ type RequestFocusMock = MockedFunction<MapFocusControllerDependencies["requestFo
 function createController(options?: {
   now?: () => number;
   requestFocus?: RequestFocusMock;
+  getFocusPath?: () => string;
   workspace?: WorkspaceMock;
 }) {
   const requestFocus = (options?.requestFocus ?? vi.fn(() => true)) as RequestFocusMock;
@@ -46,7 +47,8 @@ function createController(options?: {
       workspace
     } as never,
     now: options?.now ?? (() => 0),
-    requestFocus
+    requestFocus,
+    getFocusPath: options?.getFocusPath ?? (() => "")
   });
 
   return {
@@ -232,9 +234,10 @@ describe("MapFocusController", () => {
     expectFocusPath(requestFocus, "Folder/Other.md");
   });
 
-  it("requests rename focus without checking the current graph when the renamed markdown note is active", () => {
+  it("requests rename focus without checking the current graph when the renamed note is focused", () => {
     const renamedLeaf = makeMarkdownLeaf("Folder/New.md");
     const { controller, requestFocus } = createController({
+      getFocusPath: () => "Folder/Old.md",
       workspace: {
         getActiveViewOfType: vi.fn().mockReturnValue({ leaf: renamedLeaf }),
         getLeavesOfType: vi.fn().mockReturnValue([renamedLeaf]),
@@ -247,6 +250,23 @@ describe("MapFocusController", () => {
 
     expect(requestFocus).toHaveBeenCalledTimes(1);
     expect(requestFocus).toHaveBeenLastCalledWith("Folder/New.md", { skipGraphCheck: true });
+  });
+
+  it("preserves rename focus for the last focused map note when markdown is not active", () => {
+    const { controller, requestFocus } = createController({
+      getFocusPath: () => "Folder/Old.md",
+      workspace: {
+        getActiveViewOfType: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    });
+
+    controller.onRename("Folder/Old.md", "Moved/New.md");
+
+    expect(requestFocus).toHaveBeenCalledTimes(1);
+    expect(requestFocus).toHaveBeenLastCalledWith("Moved/New.md", { skipGraphCheck: true });
   });
 
   it("resolves open-link source from current workspace without cached history", () => {
