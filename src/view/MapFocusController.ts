@@ -4,16 +4,13 @@ import {
   type EventRef,
   type WorkspaceLeaf
 } from "obsidian";
-import type { NoteFocusPayload } from "../bridge/BridgeTypes";
-import { makeStableNoteId } from "../graph/VaultGraphBuilder";
 
 const FOCUS_GATE_WINDOW_MS = 250;
 
 export type MapFocusControllerDependencies = {
   app: App;
-  isBridgeReady: () => boolean;
   now: () => number;
-  sendFocus: (payload: NoteFocusPayload) => void;
+  requestFocus: (path: string, options?: { skipGraphCheck?: boolean }) => boolean;
 };
 
 export class MapFocusController {
@@ -81,13 +78,15 @@ export class MapFocusController {
     const normalizedNewPath = this.normalizePath(newPath);
     const activeMarkdownPath = this.getActiveMarkdownPath();
     if (activeMarkdownPath === normalizedOldPath || activeMarkdownPath === normalizedNewPath) {
-      this.sendFocusForPath(normalizedNewPath);
+      // Rename is the only focus source allowed to outrun the current graph:
+      // the new path-derived id may not exist in MapSession.lastGraphPayload yet.
+      this.deps.requestFocus(normalizedNewPath, { skipGraphCheck: true });
     }
   }
 
   private sendFocusForPath(path: unknown): boolean {
     const normalizedPath = this.normalizePath(path);
-    if (!this.deps.isBridgeReady() || !this.isRelevantPath(normalizedPath)) {
+    if (!this.isRelevantPath(normalizedPath)) {
       return false;
     }
 
@@ -97,11 +96,11 @@ export class MapFocusController {
       return false;
     }
 
+    if (!this.deps.requestFocus(normalizedPath)) {
+      return false;
+    }
+
     this.rememberGate(normalizedPath);
-    this.deps.sendFocus({
-      id: makeStableNoteId(normalizedPath),
-      path: normalizedPath
-    });
     return true;
   }
 

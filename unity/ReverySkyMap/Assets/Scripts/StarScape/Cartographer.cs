@@ -119,7 +119,6 @@ public class Cartographer : MonoBehaviour
     SetCurrentView(CurrentView);
     ApplyLineVisibility();
     BuildGraph(noteList, layoutPreference);
-    SetCameraFocus(noteList);
   }
 
   private void BuildGraph(List<NoteData> notes, MapLayoutMode layoutPreference)
@@ -195,51 +194,24 @@ public class Cartographer : MonoBehaviour
     ApplyLineVisibility();
   }
 
-  private void SetCameraFocus(List<NoteData> visibleNotes)
-  {
-    if (visibleNotes == null || visibleNotes.Count == 0)
-    {
-      focusNode?.ResetFocus();
-      return;
-    }
-
-    var previousFocusId = focusNode?.FocusRestoreNoteId;
-    if (string.IsNullOrWhiteSpace(previousFocusId))
-    {
-      focusNode?.ResetFocus();
-      return;
-    }
-
-    foreach (var note in visibleNotes)
-    {
-      if (note == null || string.IsNullOrWhiteSpace(note.Id))
-        continue;
-
-      if (string.Equals(note.Id, previousFocusId, StringComparison.Ordinal))
-      {
-        FocusRuntimeNote(note.Id);
-        return;
-      }
-    }
-
-    focusNode?.ResetFocus();
-  }
-
   public void FocusRuntimeNote(string noteId)
   {
-    if (string.IsNullOrWhiteSpace(noteId))
-      return;
-
-    if (!GraphIndex.TryGetStar(noteId, out var star))
-    {
-      // The active engine has no instantiated star for this note yet, so keep the latest focus as pending.
+    // A bridge focus miss does not mean "focus this someday"; it means the
+    // current runtime may still be materializing the accepted graph.
+    if (!TryFocusRuntimeNote(noteId))
       MapRuntimeContext.PendingFocusNoteId = noteId;
-      return;
-    }
+  }
+
+  private bool TryFocusRuntimeNote(string noteId)
+  {
+    if (string.IsNullOrWhiteSpace(noteId) || !GraphIndex.TryGetStar(noteId, out var star))
+      return false;
 
     StartCoroutine(SetFocusNextFrame(star));
     if (string.Equals(MapRuntimeContext.PendingFocusNoteId, noteId, StringComparison.Ordinal))
       MapRuntimeContext.PendingFocusNoteId = string.Empty;
+
+    return true;
   }
 
   private IEnumerator SetFocusNextFrame(Star star)
@@ -303,7 +275,34 @@ public class Cartographer : MonoBehaviour
   private void HandleEngineNodesChanged(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes)
   {
     RebuildGraphConsumers(MapGraphIndex.Build(stars, tagNodes, MapRuntimeContext.Links));
+    if (!IsTransientEmptyGraph(stars))
+      ApplyGraphFocus();
+
     OnGraphVisualsChanged?.Invoke(stars, tagNodes);
+  }
+
+  private static bool IsTransientEmptyGraph(IReadOnlyList<Star> stars)
+  {
+    return MapRuntimeContext.HasRuntimeNotes && (stars == null || stars.Count == 0);
+  }
+
+  private void ApplyGraphFocus()
+  {
+    var pendingFocusNoteId = MapRuntimeContext.PendingFocusNoteId;
+    if (!string.IsNullOrWhiteSpace(pendingFocusNoteId))
+    {
+      // Pending is a newer explicit focus intent than restore, but only for
+      // this index publication; a miss falls back to restore instead of waiting forever.
+      MapRuntimeContext.PendingFocusNoteId = string.Empty;
+      if (TryFocusRuntimeNote(pendingFocusNoteId))
+        return;
+    }
+
+    var restoreFocusNoteId = focusNode?.FocusRestoreNoteId;
+    if (!string.IsNullOrWhiteSpace(restoreFocusNoteId) && TryFocusRuntimeNote(restoreFocusNoteId))
+      return;
+
+    focusNode?.ResetFocus();
   }
 
   private void RebuildGraphConsumers(MapGraphIndex graphIndex)

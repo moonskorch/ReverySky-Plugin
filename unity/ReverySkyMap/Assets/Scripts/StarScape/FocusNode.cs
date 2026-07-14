@@ -10,6 +10,11 @@ public class FocusNode : MonoBehaviour
   private MapGraphNode selectedNode;
   public MapGraphNode SelectedNode => selectedNode;
 
+  /// <summary>
+  /// Last successfully focused note id used as long-lived graph-rebuild continuity.
+  /// Unlike <see cref="MapRuntimeContext.PendingFocusNoteId"/>, this is not a queued focus request;
+  /// Cartographer uses it only as a fallback when no pending focus is waiting.
+  /// </summary>
   public string FocusRestoreNoteId = string.Empty;
   public CameraOrbitalController CameraController => cameraController;
 
@@ -81,6 +86,11 @@ public class FocusNode : MonoBehaviour
     if (!graphIndex.TryGetNodeId(component, out var nodeId) ||
         !graphIndex.TryGetNode(nodeId, out var node))
     {
+      // TODO: RecursiveHubs stars can be clicked before the final index is built.
+      // Fix by publishing index entries incrementally as visible nodes are placed.
+      if (graphIndex.IsEmpty)
+        return false;
+
       string componentName = component != null ? component.name : "<null>";
       Debug.LogError($"[FocusNode] Selected component is missing from the graph index: {componentName}");
       return false;

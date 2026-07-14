@@ -110,50 +110,55 @@ public class ObsidianBridgeEditModeTests
   }
 
   [Test]
-  public void SetCameraFocus_UsesLastFocusOnlyAndResetsWhenMissing()
+  public void ApplyGraphFocus_UsesPendingThenRestoreAndResetsWhenMissing()
   {
     var cartographerObject = new GameObject("CartographerResolveFocusTests");
     var focusObject = new GameObject("CartographerResolveFocusNodeTests");
     var cameraObject = new GameObject("CartographerResolveFocusCameraTests");
+    var starObject = new GameObject("CartographerResolveFocusStarTests");
     try
     {
       var cartographer = cartographerObject.AddComponent<Cartographer>();
       var focusNode = focusObject.AddComponent<FocusNode>();
       var cameraController = cameraObject.AddComponent<CameraOrbitalController>();
+      var restoreStar = starObject.AddComponent<Star>();
+      restoreStar.SetData(new NoteData { Id = "old", Path = "notes/old.md" });
       SetCartographerSingleton(cartographer);
       FieldInfo focusField = typeof(Cartographer).GetField("focusNode", BindingFlags.Instance | BindingFlags.NonPublic);
       FieldInfo cameraField = typeof(FocusNode).GetField("cameraController", BindingFlags.Instance | BindingFlags.NonPublic);
-      MethodInfo focusAfterRebuild = typeof(Cartographer).GetMethod("SetCameraFocus", BindingFlags.Instance | BindingFlags.NonPublic);
+      MethodInfo applyGraphFocus = typeof(Cartographer).GetMethod("ApplyGraphFocus", BindingFlags.Instance | BindingFlags.NonPublic);
 
       Assert.That(focusField, Is.Not.Null);
       Assert.That(cameraField, Is.Not.Null);
-      Assert.That(focusAfterRebuild, Is.Not.Null);
+      Assert.That(applyGraphFocus, Is.Not.Null);
 
       focusField.SetValue(cartographer, focusNode);
       cameraField.SetValue(focusNode, cameraController);
       focusNode.FocusRestoreNoteId = "old";
+      SetPrivateField(
+        cartographer,
+        "<GraphIndex>k__BackingField",
+        MapGraphIndex.Build(
+          new List<Star> { restoreStar },
+          new List<TagNode>(),
+          new List<MapRuntimeContext.RuntimeNoteLink>()));
 
-      var notes = new List<NoteData>
-      {
-        new NoteData { Id = "old", Path = "notes/old.md", DateTime = System.DateTime.Parse("2025-01-01T00:00:00Z") },
-        new NoteData { Id = "active", Path = "notes/active.md", DateTime = System.DateTime.Parse("2025-01-02T00:00:00Z") },
-        new NoteData { Id = "latest", Path = "notes/latest.md", DateTime = System.DateTime.Parse("2025-01-03T00:00:00Z") }
-      };
-
-      focusAfterRebuild.Invoke(cartographer, new object[] { notes });
-      Assert.That(MapRuntimeContext.PendingFocusNoteId, Is.EqualTo("old"));
-
-      notes.RemoveAt(0);
-      MapRuntimeContext.PendingFocusNoteId = string.Empty;
-      focusAfterRebuild.Invoke(cartographer, new object[] { notes });
+      MapRuntimeContext.PendingFocusNoteId = "old";
+      applyGraphFocus.Invoke(cartographer, null);
       Assert.That(MapRuntimeContext.PendingFocusNoteId, Is.EqualTo(string.Empty));
-      Assert.That(focusNode.FocusRestoreNoteId, Is.EqualTo("old"));
+
+      MapRuntimeContext.PendingFocusNoteId = string.Empty;
+      focusNode.FocusRestoreNoteId = "missing";
+      applyGraphFocus.Invoke(cartographer, null);
+      Assert.That(MapRuntimeContext.PendingFocusNoteId, Is.EqualTo(string.Empty));
+      Assert.That(focusNode.FocusRestoreNoteId, Is.EqualTo("missing"));
     }
     finally
     {
       Object.DestroyImmediate(cartographerObject);
       Object.DestroyImmediate(focusObject);
       Object.DestroyImmediate(cameraObject);
+      Object.DestroyImmediate(starObject);
     }
   }
 

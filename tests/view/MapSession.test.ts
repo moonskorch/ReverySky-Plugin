@@ -761,7 +761,7 @@ describe("MapSession", () => {
     expect(sendFocus).not.toHaveBeenCalled();
   });
 
-  it("sends editor focus even when the note is filtered out because Unity owns pending focus", () => {
+  it("does not send editor focus when the note is filtered out of the effective graph", () => {
     vi.useFakeTimers();
 
     const payload = makePathPayload();
@@ -800,11 +800,7 @@ describe("MapSession", () => {
     session.requestEditorFocus("Projects/ReverySky/Spec.md");
 
     expect(sendGraph).toHaveBeenCalledTimes(2);
-    expect(sendFocus).toHaveBeenCalledTimes(1);
-    expect(sendFocus).toHaveBeenLastCalledWith({
-      id: makeStableNoteId("Projects/ReverySky/Spec.md"),
-      path: "Projects/ReverySky/Spec.md"
-    });
+    expect(sendFocus).not.toHaveBeenCalled();
   });
 
   it("preserves focus on active note after rename commit", () => {

@@ -1430,7 +1430,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     {
       _remainingRefinementPasses = _resolvedLinkRefinementPasses;
       PublishVisualNodesChanged();
-      Cartographer.I?.FocusRuntimeNote(MapRuntimeContext.PendingFocusNoteId);
     }
     else
     {
@@ -1444,7 +1443,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       _remainingRefinementPasses = 0;
       UpdateNavigationRadius();
       PublishVisualNodesChanged();
-      Cartographer.I?.FocusRuntimeNote(MapRuntimeContext.PendingFocusNoteId);
     }
 
     UnityEngine.Debug.Log(

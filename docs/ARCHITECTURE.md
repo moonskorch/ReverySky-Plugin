@@ -183,16 +183,19 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 6. `src/view/MapView.ts` -> `bridge.sendGraphSet(outgoingPayload)`
 7. `src/bridge/UnityIframeBridge.ts` -> `sendGraphSet()`
    Validates the payload with `MessageValidator`, builds a `graph:set` envelope, and calls `iframeWindow.postMessage(...)`.
-8. Unity receives `graph:set`, replaces the runtime graph snapshot, rebuilds through `Cartographer`, and restores focus only from `FocusNode.LastSelectedStarId`; missing focus resets the camera.
+8. Unity receives `graph:set`, replaces the runtime graph snapshot, rebuilds through `Cartographer`, publishes `MapGraphIndex`, and reconciles focus from pending focus first, then `FocusNode.FocusRestoreNoteId`, then reset.
 9. When the active Unity engine reaches its ready point, Unity emits `graph:ready` with the matching `requestId`; the iframe status UI ignores stale ready messages and clears `loading...` only for the latest `graph:set`.
 
 `graph:set` and `note:focus` are latest-intent messages, not durable queues.
 Before `bridge:ready`, `MapSession` keeps only the latest pending graph payload.
+After a graph has been emitted, `MapSession` keeps the latest effective `GraphPayload` and sends ordinary `note:focus` only when the requested note path or id belongs to that payload.
+Active-note rename is the one intentional exception: the new path bypasses the graph-membership gate because the rename focus can arrive before Unity ingests the next graph.
 The first graph build reads the current Obsidian `metadataCache.resolvedLinks` snapshot, then accepts the first following `metadataCache.resolved` event as a one-time startup correction refresh.
 Graph-relevant live metadata changes use the `metadataCache.resolved` barrier described below.
 Markdown editor focus primes the graph-relevant signature for that one note from the current file cache, so the first content-only edit after focus does not look like a tags/links change.
 If Unity WebGL boot fails, the iframe wrapper treats the failure as terminal for that iframe, keeps the failure status visible, and intentionally does not emit `bridge:ready` or receive `graph:set`.
-When an incremental Unity engine has not materialized a target star yet, `Cartographer.FocusRuntimeNote(...)` stores the target in `MapRuntimeContext.PendingFocusNoteId` and `RecursiveHubs` retries it after construction.
+When Unity receives `note:focus` before the target star is present in `MapGraphIndex`, `Cartographer.FocusRuntimeNote(...)` stores the note id in `MapRuntimeContext.PendingFocusNoteId`.
+The next non-transient graph-index publication applies pending focus once, then falls back to restore focus, then resets.
 
 ### Path 3. Vault or UI change -> filtered graph refresh
 1. `MapSession` registers vault and workspace listeners during startup, and `MapFilterPanelController` registers filter-panel DOM listeners when the view renders.
@@ -225,11 +228,15 @@ Render-scale changes are intentionally different from graph-significant changes.
 4. `src/view/MapView.ts` -> `requestEditorFocus(path)` -> `MapSession.requestEditorFocus(path)`
    The view shell does not decide focus policy; it only forwards the signal into session state.
 5. `src/view/MapSession.ts` -> `MapFocusController.onMarkdownFocus(path)`
-   Passes the markdown editor focus event through the shared focus gate before bridge dispatch.
-6. `src/bridge/UnityIframeBridge.ts` -> `sendNoteFocus(...)`
+   Passes the markdown editor focus event through the shared duplicate-suppression gate.
+6. `src/view/MapSession.ts` -> `trySendFocusForPath(path)`
+   Validates bridge readiness, markdown path shape, and membership in the latest effective graph.
+7. `src/bridge/UnityIframeBridge.ts` -> `sendNoteFocus(...)`
    Sends `note:focus` with a deterministic note id derived from the normalized vault path.
 
 This path is intentionally separate from graph refresh. It updates the runtime's focus target without rebuilding the graph unless some other change already triggered a refresh.
+Ordinary editor and file-open focus for notes outside the current effective graph is ignored on the TypeScript side.
+Active-note rename uses the same dispatch path with `skipGraphCheck` because the new note id may not be present in the previously emitted graph.
 
 `MapFocusController` keeps one short-lived 250 ms focus gate keyed by normalized vault path.
 The gate collapses duplicate Obsidian focus signals, such as `file-open` followed by markdown editor focus for the same note.
@@ -249,7 +256,9 @@ The gate slides forward while matching duplicate focus signals are consumed, so 
 
 These scenarios define the intended focus behavior for the current focus work and record what the code currently does. `Warning` marks a known mismatch between the desired behavior and the implementation.
 
-Focus before bridge readiness is out of scope. Plugin-side focus requests pass through the `bridgeReady` guard in `sendFocusForPath(...)`; Unity pending focus starts only after `note:focus` reaches `ObsidianBridge.OnNoteFocus(...)`.
+Focus before bridge readiness is out of scope. Plugin-side focus requests pass through the `bridgeReady` guard in `MapSession.trySendFocusForPath(...)`; Unity pending focus starts only after `note:focus` reaches `ObsidianBridge.OnNoteFocus(...)`.
+For ordinary focus, `MapSession.trySendFocusForPath(...)` also requires the note to belong to the latest effective graph payload.
+For active-note rename, `MapFocusController.onRename(...)` requests focus with `skipGraphCheck` so the new id can be handed to Unity before the following graph rebuild reaches the runtime.
 
 - Startup / map open:
   Expected: no focused note; show the start panorama.
@@ -264,14 +273,16 @@ Focus before bridge readiness is out of scope. Plugin-side focus requests pass t
   `handleMarkdownEditorFocusUpdate(...)` accepts a real CodeMirror focus gain and extracts the markdown path ->
   plugin `requestEditorFocus(path)` forwards that path to open map views ->
   `MapSession.requestEditorFocus(path)` delegates to `MapFocusController.onMarkdownFocus(path)` ->
-  `sendFocusForPath(path)` validates bridge/path and calls `UnityIframeBridge.sendNoteFocus(...)`.
+  `MapSession.trySendFocusForPath(path)` validates bridge/path and latest-graph membership ->
+  `UnityIframeBridge.sendNoteFocus(...)` sends `note:focus`.
 
 - Active file change:
   Expected: focus the opened note after link navigation, file explorer selection, or native graph selection.
   Current code:
   `MapFocusController.start(...)` registers Obsidian `file-open` handling ->
-  the callback passes the opened file path into `sendFocusForPath(...)` ->
-  `sendFocusForPath(...)` uses the same bridge/path validation and `UnityIframeBridge.sendNoteFocus(...)` call as editor focus.
+  the callback passes the opened file path through `MapFocusController` ->
+  `MapSession.trySendFocusForPath(path)` uses the same bridge/path and latest-graph membership checks as editor focus ->
+  `UnityIframeBridge.sendNoteFocus(...)` sends `note:focus`.
 
 - Note content edit:
   Expected: do not refresh the graph or change focus for content-only edits.
@@ -292,7 +303,8 @@ Focus before bridge readiness is out of scope. Plugin-side focus requests pass t
   `refreshGraphNow()` rebuilds from `metadataCache.resolvedLinks` ->
   `emitGraphFromSource()` sends `graph:set` ->
   Unity `ObsidianBridge.OnGraphSet(...)` updates `MapRuntimeContext` ->
-  `Cartographer.RebuildGraph(...)` rebuilds and `SetCameraFocus(...)` restores visible `LastSelectedStarId`.
+  `Cartographer.RebuildGraph(...)` rebuilds the active engine ->
+  `Cartographer.HandleEngineNodesChanged(...)` publishes `MapGraphIndex` and `ApplyGraphFocus()` tries pending focus, then restore focus, then reset.
 
 - Filter change:
   Expected: keep focus if the node remains visible. Empty or irrelevant intermediate filters should not erase map focus; until the user explicitly selects another node, Unity's last focus should survive and return when that node is visible again.
@@ -300,7 +312,7 @@ Focus before bridge readiness is out of scope. Plugin-side focus requests pass t
   `setFilterQuery(...)` parses the filter and ignores invalid input ->
   valid input schedules debounced `emitGraphFromSource()` ->
   `emitGraphFromSource()` applies active filters and sends filtered `graph:set` ->
-  Unity `SetCameraFocus(...)` restores visible `LastSelectedStarId`; `ResetFocus()` resets the camera but keeps `LastSelectedStarId`.
+  Unity `ApplyGraphFocus()` tries pending focus if one exists, otherwise restores visible `FocusRestoreNoteId`; `ResetFocus()` resets the camera but keeps `FocusRestoreNoteId`.
 
 - Layout change:
   Expected: change layout; keep focus if the node remains visible.
@@ -308,14 +320,14 @@ Focus before bridge readiness is out of scope. Plugin-side focus requests pass t
   `setMapLayoutPreference(...)` normalizes the selected layout ->
   `emitGraphFromSource()` sends `graph:set` with `mapLayout` ->
   Unity `ObsidianBridge.OnGraphSet(...)` stores `MapRuntimeContext.MapLayoutPreference` ->
-  `Cartographer.RebuildGraph(...)` rebuilds and restores visible `LastSelectedStarId`.
+  `Cartographer.RebuildGraph(...)` rebuilds and `ApplyGraphFocus()` restores focus from pending or `FocusRestoreNoteId`.
 
 - Create:
   Expected: focus the new note once Obsidian opens or focuses it after creation; until then the previous focus may remain visible.
   Current code:
   `vault.on("create", file)` checks for a markdown path and schedules graph refresh ->
   no code passes the created path to `MapFocusController` directly ->
-  if Obsidian emits `file-open` or markdown-editor focus for the created note, `sendFocusForPath(...)` sends `note:focus` ->
+  if Obsidian emits `file-open` or markdown-editor focus for the created note, `MapSession.trySendFocusForPath(...)` may send `note:focus` after the note appears in the latest effective graph ->
   `UnityIframeBridge.sendNoteFocus(...)` can then move focus to the new note.
   Warning: create focus is order-sensitive and best-effort; the old focus can stay in place if `file-open` or editor focus does not arrive, but later user editing will still correct it.
 
@@ -324,15 +336,16 @@ Focus before bridge readiness is out of scope. Plugin-side focus requests pass t
   Current code:
   `vault.on("rename", file, oldPath)` forwards old/new paths to `MapFocusController.onRename(...)` ->
   `onRename(...)` compares the active markdown path with old/new path ->
-  matching active note calls `sendFocusForPath(newPath)` ->
-  `UnityIframeBridge.sendNoteFocus(...)` sends `note:focus`.
+  matching active note calls `requestFocus(newPath, { skipGraphCheck: true })` ->
+  `MapSession.trySendFocusForPath(...)` sends `note:focus` without requiring the new id in the previously emitted graph ->
+  Unity applies it immediately if the star is indexed, or stores it in `MapRuntimeContext.PendingFocusNoteId` until the next real graph-index publication.
 
 - Delete:
   Expected: no separate delete-specific focus trigger; keep the visible focused note when it still exists and fall back cleanly when it does not.
   Current code:
   `vault.on("delete", file)` removes the cached signature and schedules graph refresh ->
   `emitGraphFromSource()` sends `graph:set` ->
-  Unity `SetCameraFocus(...)` restores visible `LastSelectedStarId`; otherwise `ResetFocus()` clears the camera.
+  Unity `ApplyGraphFocus()` restores visible `FocusRestoreNoteId`; otherwise `ResetFocus()` clears the camera view while keeping the restore id for a later graph where it may return.
   No additional delete focus routing is needed.
 
 - Unity note open:
@@ -363,10 +376,10 @@ Focus before bridge readiness is out of scope. Plugin-side focus requests pass t
   Owns the shell execution paths after the view exists: iframe startup, bridge wiring, and collaborator orchestration.
 
 - `src/view/MapSession.ts` -> `MapSession`
-  Owns persisted map state, graph refresh timing, metadata-resolution waiting, graph emission, and render-scale restart tracking. It delegates plugin-side focus policy to `MapFocusController`.
+  Owns persisted map state, graph refresh timing, metadata-resolution waiting, graph emission, render-scale restart tracking, and the bridge-facing focus membership gate.
 
 - `src/view/MapFocusController.ts` -> `MapFocusController`
-  Owns plugin-side focus event routing for workspace `file-open`, markdown editor focus, active-note rename, and short-lived suppression of Unity-open focus echo.
+  Owns plugin-side focus event routing for workspace `file-open`, markdown editor focus, active-note rename, and short-lived suppression of Unity-open focus echo. It emits focus intents to `MapSession` instead of sending bridge payloads directly.
 
 - `src/view/MarkdownEditorFocus.ts` -> `handleMarkdownEditorFocusUpdate(...)`
   Owns the markdown-editor focus detection logic that feeds the map-focus path.
@@ -407,7 +420,13 @@ Focus before bridge readiness is out of scope. Plugin-side focus requests pass t
   They are reported to `ReverySkyMapPlugin`, persisted in plugin data under `mapViewState`, and re-applied on open.
 
 - Markdown focus events are routed by `MapFocusController`.
-  The controller does not store focus history or a focus queue. It keeps only a short-lived path gate to collapse duplicate Obsidian focus signals and consume Unity-open echo, then sends bridge-ready `note:focus` events from workspace `file-open`, markdown editor focus, and active-note rename. Unity owns pending focus application when the target star is not available yet.
+  The controller does not store focus history or a focus queue. It keeps only a short-lived path gate to collapse duplicate Obsidian focus signals and consume Unity-open echo, then emits a focus intent to `MapSession`.
+
+- Bridge focus dispatch is owned by `MapSession`.
+  Ordinary focus is sent only when the requested note is part of the latest effective graph payload. Active-note rename may bypass that membership check because the new path can legitimately arrive before the renamed graph payload reaches Unity.
+
+- Focus responsibility is split across the bridge boundary.
+  TypeScript decides whether a focus request belongs to the map Unity should be rendering now. Unity does not decide vault/filter membership; its pending focus exists only for the short gap between receiving a valid `note:focus` and exposing the target star in `MapGraphIndex`.
 
 - `renderScale` is applied at iframe startup, not through the bridge.
   `MapSession` tracks the selected value and whether it differs from the currently applied iframe value so the UI can ask the user to reopen the map.
@@ -419,7 +438,7 @@ Focus before bridge readiness is out of scope. Plugin-side focus requests pass t
   They are UI-only transient state and are intentionally not persisted in plugin data.
 
 - Runtime notes, links, tag names, runtime mode, pending focus note id, and layout preference are owned by the Unity runtime.
-  They are stored in `MapRuntimeContext` and consumed by `Cartographer`.
+  They are stored in `MapRuntimeContext` and consumed by `Cartographer`. `PendingFocusNoteId` is a one-shot runtime delivery/materialization buffer; `FocusNode.FocusRestoreNoteId` is the map-continuity fallback across graph rebuilds.
 
 - WebGL runtime serving is owned by `UnityWebglLocalServer`.
   The runtime is hosted locally from the selected runtime source, not from an external site.
@@ -438,6 +457,7 @@ Important current contract facts:
 - plugin-to-runtime messages are `graph:set`, `runtime:status`, `note:focus`, and `runtime:shutdown`;
 - `path` values must stay vault-relative and use `/` separators;
 - `graph:set` carries the effective filtered graph; focus changes are sent separately via `note:focus`, which must include both `id` and `path`;
+- ordinary `note:focus` dispatch is gated by the latest effective graph on the TypeScript side; active-note rename can bypass this gate to cover bridge ordering around path-derived ids;
 - `graph:ready` must echo the latest `graph:set` `requestId` before the iframe clears the loading status;
 - `runtime:status` updates iframe wrapper status text only and is not forwarded into Unity;
 - `runtime:shutdown` is a bridge/runtime-wrapper lifecycle handshake, not a full Unity engine shutdown;

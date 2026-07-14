@@ -16,6 +16,7 @@ import {
   normalizeMapLayoutPreference
 } from "../bridge/LayoutPreference";
 import { GraphPathFilter, type ParsedPathFilter, type PathFilterParseResult } from "../graph/GraphPathFilter";
+import { makeStableNoteId } from "../graph/VaultGraphBuilder";
 import { MapFocusController } from "./MapFocusController";
 
 const GRAPH_REFRESH_DEBOUNCE_MS = 250;
@@ -83,6 +84,7 @@ export class MapSession {
   private readonly now: () => number;
   private readonly sendGraph: (payload: GraphPayload) => void;
   private readonly sendStatus?: (message: string) => void;
+  private readonly sendFocus: (payload: NoteFocusPayload) => void;
   private readonly onStateChanged?: (state: Record<string, unknown>, options?: { persist?: boolean }) => void;
   private readonly focus: MapFocusController;
 
@@ -119,10 +121,10 @@ export class MapSession {
     this.onStateChanged = deps.onStateChanged;
     this.focus = new MapFocusController({
       app: this.app,
-      isBridgeReady: () => this.bridgeReady,
       now: this.now,
-      sendFocus: deps.sendFocus
+      requestFocus: (path, options) => this.trySendFocusForPath(path, options)
     });
+    this.sendFocus = deps.sendFocus;
   }
 
   getState(): Record<string, unknown> {
@@ -348,6 +350,40 @@ export class MapSession {
   requestEditorFocus(path: string): void {
     this.primeNoteSignatureForPath(path);
     this.focus.onMarkdownFocus(path);
+  }
+
+  private trySendFocusForPath(
+    pathValue: unknown,
+    options?: { skipGraphCheck?: boolean }
+  ): boolean {
+    const path = this.normalizeVaultPath(pathValue);
+    // TypeScript owns graph membership: ordinary focus is sent only for notes
+    // that belong to the effective graph Unity is rendering now.
+    // Rename bypasses this because the path-derived id can change before the
+    // renamed graph payload reaches Unity.
+    if (!this.bridgeReady ||
+        !this.isGraphRelevantPath(path) ||
+        (!options?.skipGraphCheck && !this.isPathInLastGraph(path))) {
+      return false;
+    }
+
+    this.sendFocus({
+      id: makeStableNoteId(path),
+      path
+    });
+    return true;
+  }
+
+  private isPathInLastGraph(path: string): boolean {
+    if (!this.lastGraphPayload) {
+      return false;
+    }
+
+    const noteId = makeStableNoteId(path);
+    return this.lastGraphPayload.notes.some((note) => {
+      const notePath = this.normalizeVaultPath(note.path);
+      return notePath === path || note.id === noteId;
+    });
   }
 
   expectFocusEchoForPath(path: string): void {

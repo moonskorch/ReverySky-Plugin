@@ -52,6 +52,8 @@ public sealed class MapGraphIndex
   /// </summary>
   public IReadOnlyList<MapGraphNode> Nodes => nodes;
 
+  public bool IsEmpty => nodes.Length == 0;
+
   /// <summary>
   /// Deduplicated visual edges between registered nodes only.
   /// </summary>

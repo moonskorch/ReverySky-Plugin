@@ -29,7 +29,7 @@ Obsidian plugin
   - Main code location: `Assets/Scripts/Bridge/ObsidianBridge.cs`, `Assets/Scripts/Bridge/MapRuntimeContext.cs`, `Assets/Scripts/Models/NoteData.cs`
   - Important dependencies: `Cartographer`, `MapRuntimeContext.OnNotesChanged`, `MapRuntimeContext.OnOpenNoteRequested`, `MapRuntimeContext.OnGraphReady`
 - Graph orchestration
-  - Responsibility: chooses the active layout engine, rebuilds the graph when runtime notes change, creates the shared visual graph index, forwards that index to consumers, and restores focus after ingest or selection.
+  - Responsibility: chooses the active layout engine, rebuilds the graph when runtime notes change, creates the shared visual graph index, forwards that index to consumers, and reconciles pending or restored focus after real index publications.
   - Main code location: `Assets/Scripts/StarScape/Cartographer.cs`
   - Important dependencies: `ICartographerEngine`, `MapGraphIndex`, `FocusNode`, `FocusHighlighter`, `ChangeViewControl`, `Notification`, `SampleDataGenerator`, `MapRuntimeContext`, `LineBuilder`, `CullingManager`
 - Visual graph index
@@ -79,19 +79,20 @@ Obsidian plugin
 8. `Cartographer.HandleEngineNodesChanged(...)` builds `GraphIndex = MapGraphIndex.Build(stars, tagNodes, MapRuntimeContext.Links)`.
 9. `Cartographer` passes the same `GraphIndex` to `LineBuilder.Rebuild(...)` and `CullingManager.Rebuild(...)`; `OnGraphVisualsChanged` remains the raw-node notification surface.
 10. `BuildGraph(...)` applies `CurrentView`, rebinds the active `ScapeCameraWarper`, and logs build timing.
-11. After `BuildGraph()`, `Cartographer` restores focus only from `FocusNode.FocusRestoreNoteId`; missing focus calls `ResetFocus()`.
-12. Incremental engines retry delayed focus through `MapRuntimeContext.PendingFocusNoteId`.
+11. After each non-transient index publication, `Cartographer.ApplyGraphFocus()` tries `MapRuntimeContext.PendingFocusNoteId` once, then tries `FocusNode.FocusRestoreNoteId`, then calls `ResetFocus()`.
+12. Transient empty publications from engine cleanup are ignored for focus reconciliation while runtime notes still exist, so a rebuild clear step does not erase pending or restored focus.
 13. When the active engine reaches its ready point, it calls `MapRuntimeContext.RequestGraphReady()`. `ObsidianBridge` forwards the matching `requestId` to JavaScript as `graph:ready`, unless the id is empty.
 
 ### 3. Note focus, label emphasis, and open-note callback
 
 1. `FocusNode.HandleSelect()` raycasts against `GameInput.Instance.InteractableLayers`.
-2. Selecting a `Star` resolves the node through `MapGraphIndex`, focuses the camera, and calls `MapRuntimeContext.RequestOpenNote(star.Data)`.
+2. Selecting a `Star` resolves the node through `MapGraphIndex`, focuses the camera, and calls `MapRuntimeContext.RequestOpenNote(star.Data)`. If RecursiveHubs stars are clickable before the final index exists, the current code ignores the click instead of logging an error.
 3. `MapRuntimeContext.OnOpenNoteRequested` reaches `ObsidianBridge.HandleOpenNoteRequested`.
 4. In WebGL builds, `ObsidianBridge` forwards the event to JavaScript via `ReverySkyBridgePostNoteOpen(noteId, notePath)`.
 5. Incoming `note:focus` messages call `ObsidianBridge.OnNoteFocus()`, which reaches `Cartographer.FocusRuntimeNote()`.
-6. `Cartographer.FocusRuntimeNote()` resolves the star through `GraphIndex.TryGetStar(noteId, out star)` and defers focus restore when the current visual graph has not materialized that star.
-7. `FocusHighlighter.SetFocus(...)` reads `MapGraphIndex.GetNeighborIds(...)`, marks the focused node as `Focused`, marks adjacent nodes as `Linked`, and calls `LineBuilder.ApplyHighlight(...)` so incident edges restyle together with the labels.
+6. `Cartographer.FocusRuntimeNote()` resolves the star through `GraphIndex.TryGetStar(noteId, out star)` and stores `noteId` in `MapRuntimeContext.PendingFocusNoteId` when the current visual graph has not materialized that star.
+7. The next non-transient `HandleEngineNodesChanged(...)` call rebuilds `GraphIndex` and lets `ApplyGraphFocus()` consume pending focus before falling back to restore focus.
+8. `FocusHighlighter.SetFocus(...)` reads `MapGraphIndex.GetNeighborIds(...)`, marks the focused node as `Focused`, marks adjacent nodes as `Linked`, and calls `LineBuilder.ApplyHighlight(...)` so incident edges restyle together with the labels.
 
 ### 4. Runtime shutdown guard
 
@@ -143,8 +144,8 @@ Obsidian plugin
 ### Graph engines and layout
 
 - `Cartographer`
-  - Responsibility: chooses the active engine, rebuilds the graph, builds `GraphIndex`, applies the current view, restores focus from the last selected star, and applies pending focus when stars appear asynchronously.
-  - Code anchor: `Assets/Scripts/StarScape/Cartographer.cs::Start`, `RebuildGraph`, `BuildGraph`, `HandleEngineNodesChanged`, `FocusRuntimeNote`
+  - Responsibility: chooses the active engine, rebuilds the graph, builds `GraphIndex`, applies the current view, and reconciles focus from pending focus, restore focus, or reset after real index publications.
+  - Code anchor: `Assets/Scripts/StarScape/Cartographer.cs::Start`, `RebuildGraph`, `BuildGraph`, `HandleEngineNodesChanged`, `ApplyGraphFocus`, `FocusRuntimeNote`
   - Entry point: `MapRuntimeContext.OnNotesChanged`, UI events, scene start
   - Calls / sends to: `ICartographerEngine`, `MapGraphIndex`, `LineBuilder`, `CullingManager`, `FocusNode`, `FocusHighlighter`, `Notification`, `ScapeCameraWarper`
 - `ICartographerEngine`
@@ -256,11 +257,13 @@ Obsidian plugin
 
 ## State Ownership and Contracts
 
-- `MapRuntimeContext` is the source of truth for live runtime notes, links, tag names, runtime mode, pending focus note id, layout preference, and the `NotesVersion` counter.
+- `MapRuntimeContext` is the source of truth for live runtime notes, links, tag names, runtime mode, pending focus note id, layout preference, and the `NotesVersion` counter. `PendingFocusNoteId` is a one-shot focus delivery/materialization buffer, not a durable remembered selection.
 - `ObsidianBridge` owns bridge validation and all conversion from the JSON envelope into runtime models.
-- `Cartographer` owns engine selection, rebuild timing, current view, `GraphIndex` creation, rebuild focus restoration, and pending focus application.
+- `Cartographer` owns engine selection, rebuild timing, current view, `GraphIndex` creation, and focus reconciliation after the index changes. The focus order is pending once, restore, then reset.
+- Unity does not decide whether a focused note belongs to the active Obsidian filter. The parent plugin gates ordinary focus by the effective graph; Unity pending only bridges the delay between a valid focus message and an indexed star.
 - `CartographerForcesEngine`, `Cartographer25DEngine`, and `CartographerEngineRecursiveHubsEngine` own placement and cleanup of instantiated stars and tags for `DynamicLinks`, `Dates`, and `ScalableLinks`; line visuals are handed off to `LineBuilder` after the engine raises `OnNodesChanged`.
 - `MapGraphIndex` is the shared read-only topology index for the current engine-built visual map. It is built once per engine node publication from engine-owned `Star` and `TagNode` objects and `MapRuntimeContext.Links`, remains valid until the next graph rebuild, and is read by line rendering, culling, label emphasis, and focus lookup.
+- `FocusNode.FocusRestoreNoteId` is the continuity fallback for graph rebuilds. It is updated by successful focus selection and is not copied into pending focus during reconciliation.
 - `FocusHighlighter` derives label and line emphasis from `MapGraphIndex` adjacency. It does not own graph topology or source notes.
 - `LineBuilder` owns pooled line renderers, focus-priority ordering, recent-visibility refresh, and the per-frame endpoint refresh for indexed edges. It does not rebuild note/tag lookups or own graph topology.
 - `ScapeCameraWarper` owns the 2.5D warp state and only participates when the active engine is `Dates`.
@@ -302,7 +305,7 @@ Obsidian plugin
   - Automated checks: `Assets/Tests/EditMode/CartographerForcesEngineRadiusEditModeTests.cs`, `Assets/Tests/EditMode/CartographerScalableLinksEngineEditModeTests.cs`, PlayMode engine-preference checks in `Assets/Tests/PlayMode/StarScapeRuntimePlayModeTests.cs`
   - Manual checks when needed: inspect `DynamicLinks`, `ScalableLinks`, and `Dates`, RecursiveHubs node spacing on hub-heavy maps, and the `Dates` camera slider
 - Focus, labels, and line highlights
-  - Automated checks: `Assets/Tests/EditMode/MapGraphIndexEditModeTests.cs`, `Assets/Tests/EditMode/FocusLabelHighlightEditModeTests.cs`, `Assets/Tests/EditMode/LineBuilderEditModeTests.cs`
+  - Automated checks: `Assets/Tests/EditMode/ObsidianBridgeEditModeTests.cs`, `Assets/Tests/EditMode/MapGraphIndexEditModeTests.cs`, `Assets/Tests/EditMode/FocusLabelHighlightEditModeTests.cs`, `Assets/Tests/EditMode/LineBuilderEditModeTests.cs`
   - Manual checks when needed: focus stars and tags, confirm focused and linked label states, and confirm incident lines restyle together with selection
 - PlayMode bootstrap and visual stability
   - Automated checks: `Assets/Tests/PlayMode/StarScapeRuntimePlayModeTests.cs`
@@ -320,3 +323,4 @@ Use `docs/VERIFICATION.md` for the exact check order, MCP-first policy, and fall
 - `Cartographer25DEngine` still contains TODOs for date labels, radial movement, LOD, and the preferred camera start position.
 - `GameInput` still depends on legacy `Input` and `EventSystem` APIs rather than the newer Input System package.
 - `CartographerEngineRecursiveHubsEngine` remains serialized through the scene, so active large-graph ownership still depends on scene wiring.
+- RecursiveHubs can make stars clickable before the final `MapGraphIndex` exists. Current click handling suppresses the early missing-index error; a complete UX fix would publish index entries incrementally as visible nodes are placed.

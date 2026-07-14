@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import type { MockedFunction } from "vitest";
-import { makeStableNoteId } from "../../src/graph/VaultGraphBuilder";
 import {
   MapFocusController,
   type MapFocusControllerDependencies
@@ -28,15 +27,14 @@ type WorkspaceMock = {
   on: (eventName: string, callback: FileOpenCallback) => { id: string };
 };
 
-type SendFocusMock = MockedFunction<MapFocusControllerDependencies["sendFocus"]>;
+type RequestFocusMock = MockedFunction<MapFocusControllerDependencies["requestFocus"]>;
 
 function createController(options?: {
-  isBridgeReady?: () => boolean;
   now?: () => number;
-  sendFocus?: SendFocusMock;
+  requestFocus?: RequestFocusMock;
   workspace?: WorkspaceMock;
 }) {
-  const sendFocus = (options?.sendFocus ?? vi.fn()) as SendFocusMock;
+  const requestFocus = (options?.requestFocus ?? vi.fn(() => true)) as RequestFocusMock;
   const workspace: WorkspaceMock = options?.workspace ?? {
     getActiveViewOfType: vi.fn(),
     getLeavesOfType: vi.fn().mockReturnValue([]),
@@ -47,28 +45,24 @@ function createController(options?: {
     app: {
       workspace
     } as never,
-    isBridgeReady: options?.isBridgeReady ?? (() => true),
     now: options?.now ?? (() => 0),
-    sendFocus
+    requestFocus
   });
 
   return {
     controller,
-    sendFocus
+    requestFocus
   };
 }
 
-function expectFocusPayload(sendFocus: SendFocusMock, path: string): void {
-  expect(sendFocus).toHaveBeenLastCalledWith({
-    id: makeStableNoteId(path),
-    path
-  });
+function expectFocusPath(requestFocus: RequestFocusMock, path: string): void {
+  expect(requestFocus).toHaveBeenLastCalledWith(path);
 }
 
 describe("MapFocusController", () => {
   it("does not send startup focus", () => {
     const activeLeaf = makeMarkdownLeaf("Folder/Active.md");
-    const { controller, sendFocus } = createController({
+    const { controller, requestFocus } = createController({
       workspace: {
         getActiveViewOfType: vi.fn().mockReturnValue({ leaf: activeLeaf }),
         getLeavesOfType: vi.fn().mockReturnValue([activeLeaf]),
@@ -79,22 +73,21 @@ describe("MapFocusController", () => {
 
     controller.start(() => undefined);
 
-    expect(sendFocus).not.toHaveBeenCalled();
+    expect(requestFocus).not.toHaveBeenCalled();
   });
 
-  it("sends focus immediately for markdown editor focus when the bridge is ready", () => {
-    const { controller, sendFocus } = createController();
+  it("requests focus immediately for markdown editor focus", () => {
+    const { controller, requestFocus } = createController();
 
     controller.onMarkdownFocus("Folder/Current.md");
 
-    expect(sendFocus).toHaveBeenCalledTimes(1);
-    expectFocusPayload(sendFocus, "Folder/Current.md");
+    expect(requestFocus).toHaveBeenCalledTimes(1);
+    expectFocusPath(requestFocus, "Folder/Current.md");
   });
 
-  it("drops focus while the bridge is not ready", () => {
+  it("ignores non-markdown focus paths", () => {
     let onFileOpen: ((file: { path?: string } | null) => void) | null = null;
-    const { controller, sendFocus } = createController({
-      isBridgeReady: () => false,
+    const { controller, requestFocus } = createController({
       workspace: {
         getActiveViewOfType: vi.fn(),
         getLeavesOfType: vi.fn().mockReturnValue([]),
@@ -109,16 +102,16 @@ describe("MapFocusController", () => {
     });
 
     controller.start(() => undefined);
-    controller.onMarkdownFocus("Folder/Current.md");
+    controller.onMarkdownFocus("Folder/Current.txt");
     const handleFileOpen = onFileOpen as unknown as FileOpenCallback;
-    handleFileOpen(makeFile("Folder/New.md"));
+    handleFileOpen(makeFile("Folder/New.txt"));
 
-    expect(sendFocus).not.toHaveBeenCalled();
+    expect(requestFocus).not.toHaveBeenCalled();
   });
 
-  it("sends focus for active file changes", () => {
+  it("requests focus for active file changes", () => {
     let onFileOpen: ((file: { path?: string } | null) => void) | null = null;
-    const { controller, sendFocus } = createController({
+    const { controller, requestFocus } = createController({
       workspace: {
         getActiveViewOfType: vi.fn(),
         getLeavesOfType: vi.fn().mockReturnValue([]),
@@ -136,54 +129,67 @@ describe("MapFocusController", () => {
     const handleFileOpen = onFileOpen as unknown as FileOpenCallback;
     handleFileOpen(makeFile("Folder/Next.md"));
 
-    expect(sendFocus).toHaveBeenCalledTimes(1);
-    expectFocusPayload(sendFocus, "Folder/Next.md");
+    expect(requestFocus).toHaveBeenCalledTimes(1);
+    expectFocusPath(requestFocus, "Folder/Next.md");
   });
 
   it("coalesces duplicate focus for the same note in a short window", () => {
     let currentTime = 1000;
-    const { controller, sendFocus } = createController({
+    const { controller, requestFocus } = createController({
       now: () => currentTime
     });
 
     controller.onMarkdownFocus("Folder/Current.md");
     controller.onMarkdownFocus("Folder/Current.md");
 
-    expect(sendFocus).toHaveBeenCalledTimes(1);
-    expectFocusPayload(sendFocus, "Folder/Current.md");
+    expect(requestFocus).toHaveBeenCalledTimes(1);
+    expectFocusPath(requestFocus, "Folder/Current.md");
 
     currentTime += 251;
     controller.onMarkdownFocus("Folder/Current.md");
 
-    expect(sendFocus).toHaveBeenCalledTimes(2);
-    expectFocusPayload(sendFocus, "Folder/Current.md");
+    expect(requestFocus).toHaveBeenCalledTimes(2);
+    expectFocusPath(requestFocus, "Folder/Current.md");
+  });
+
+  it("does not gate focus when the session rejects the request", () => {
+    const requestFocus = vi.fn()
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true) as RequestFocusMock;
+    const { controller } = createController({ requestFocus });
+
+    controller.onMarkdownFocus("Folder/Current.md");
+    controller.onMarkdownFocus("Folder/Current.md");
+
+    expect(requestFocus).toHaveBeenCalledTimes(2);
+    expectFocusPath(requestFocus, "Folder/Current.md");
   });
 
   it("consumes the expected focus echo after a Unity note open", () => {
     let currentTime = 1000;
-    const { controller, sendFocus } = createController({
+    const { controller, requestFocus } = createController({
       now: () => currentTime
     });
 
     controller.expectFocusEchoForPath("Folder/Current.md");
     controller.onMarkdownFocus("Folder/Current.md");
 
-    expect(sendFocus).not.toHaveBeenCalled();
+    expect(requestFocus).not.toHaveBeenCalled();
 
     controller.onMarkdownFocus("Folder/Current.md");
 
-    expect(sendFocus).not.toHaveBeenCalled();
+    expect(requestFocus).not.toHaveBeenCalled();
 
     currentTime += 251;
     controller.onMarkdownFocus("Folder/Current.md");
 
-    expect(sendFocus).toHaveBeenCalledTimes(1);
-    expectFocusPayload(sendFocus, "Folder/Current.md");
+    expect(requestFocus).toHaveBeenCalledTimes(1);
+    expectFocusPath(requestFocus, "Folder/Current.md");
   });
 
   it("extends the focus gate while consuming duplicate focus", () => {
     let currentTime = 1000;
-    const { controller, sendFocus } = createController({
+    const { controller, requestFocus } = createController({
       now: () => currentTime
     });
 
@@ -193,18 +199,18 @@ describe("MapFocusController", () => {
     currentTime += 200;
     controller.onMarkdownFocus("Folder/Current.md");
 
-    expect(sendFocus).not.toHaveBeenCalled();
+    expect(requestFocus).not.toHaveBeenCalled();
 
     currentTime += 251;
     controller.onMarkdownFocus("Folder/Current.md");
 
-    expect(sendFocus).toHaveBeenCalledTimes(1);
-    expectFocusPayload(sendFocus, "Folder/Current.md");
+    expect(requestFocus).toHaveBeenCalledTimes(1);
+    expectFocusPath(requestFocus, "Folder/Current.md");
   });
 
   it("does not consume a stale expected focus echo", () => {
     let currentTime = 1000;
-    const { controller, sendFocus } = createController({
+    const { controller, requestFocus } = createController({
       now: () => currentTime
     });
 
@@ -212,23 +218,23 @@ describe("MapFocusController", () => {
     currentTime += 251;
     controller.onMarkdownFocus("Folder/Current.md");
 
-    expect(sendFocus).toHaveBeenCalledTimes(1);
-    expectFocusPayload(sendFocus, "Folder/Current.md");
+    expect(requestFocus).toHaveBeenCalledTimes(1);
+    expectFocusPath(requestFocus, "Folder/Current.md");
   });
 
   it("clears expected focus echo when another note receives focus", () => {
-    const { controller, sendFocus } = createController();
+    const { controller, requestFocus } = createController();
 
     controller.expectFocusEchoForPath("Folder/Opened.md");
     controller.onMarkdownFocus("Folder/Other.md");
 
-    expect(sendFocus).toHaveBeenCalledTimes(1);
-    expectFocusPayload(sendFocus, "Folder/Other.md");
+    expect(requestFocus).toHaveBeenCalledTimes(1);
+    expectFocusPath(requestFocus, "Folder/Other.md");
   });
 
-  it("sends rename focus only when the renamed markdown note is active", () => {
+  it("requests rename focus without checking the current graph when the renamed markdown note is active", () => {
     const renamedLeaf = makeMarkdownLeaf("Folder/New.md");
-    const { controller, sendFocus } = createController({
+    const { controller, requestFocus } = createController({
       workspace: {
         getActiveViewOfType: vi.fn().mockReturnValue({ leaf: renamedLeaf }),
         getLeavesOfType: vi.fn().mockReturnValue([renamedLeaf]),
@@ -239,8 +245,8 @@ describe("MapFocusController", () => {
 
     controller.onRename("Folder/Old.md", "Folder/New.md");
 
-    expect(sendFocus).toHaveBeenCalledTimes(1);
-    expectFocusPayload(sendFocus, "Folder/New.md");
+    expect(requestFocus).toHaveBeenCalledTimes(1);
+    expect(requestFocus).toHaveBeenLastCalledWith("Folder/New.md", { skipGraphCheck: true });
   });
 
   it("resolves open-link source from current workspace without cached history", () => {

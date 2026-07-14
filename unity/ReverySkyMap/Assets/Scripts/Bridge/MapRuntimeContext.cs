@@ -20,6 +20,11 @@ public static class MapRuntimeContext
   private static Dictionary<int, string> tagNamesById = new();
   public static int NotesVersion { get; private set; } = 0;
 
+  /// <summary>
+  /// One-shot focus request that already reached Unity but cannot be applied
+  /// until the accepted graph exposes its star in GraphIndex.
+  /// Unlike <see cref="FocusNode.FocusRestoreNoteId"/>, this is cleared after one graph-focus reconciliation.
+  /// </summary>
   public static string PendingFocusNoteId { get; set; } = string.Empty;
 
   public static MapLayoutMode MapLayoutPreference { get; set; } = MapLayoutMode.Auto;
