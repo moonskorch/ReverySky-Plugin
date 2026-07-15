@@ -1,8 +1,14 @@
 # ReverySky Map
 
-![ReverySky Map header](docs/assets/reverysky-map-header.png)
+![ReverySky Map header](docs/assets/reverysky-map-header.jpg)
 
 ReverySky Map embeds a 3D Unity WebGL map view in Obsidian for inspecting vault structure. It builds the view from Markdown notes, resolved links, tags, note dates, and file metadata, then keeps the runtime in sync with the active filter and focused note.
+
+## Requirements
+
+- Obsidian 1.12.7 or later
+- Desktop only
+- WebGL-compatible graphics hardware and drivers
 
 ## Installation
 
@@ -29,7 +35,7 @@ You can also install the plugin via [BRAT](https://github.com/TfTHacker/obsidian
 
 ## Opening the map
 
-After enabling the plugin, you can open the map in either way:
+After enabling the plugin, you can open the map in either of two ways:
 
 - Click the left ribbon button **Toggle ReverySky Map**.
 - Run **ReverySky Map: Open map** from the command palette.
@@ -50,7 +56,7 @@ Map note titles support Latin text with accents, Cyrillic text, common symbols, 
 - Zoom: use the vertical slider on the left side of the map, or use the mouse wheel for quick zooming.
 - Rotate: use the on-screen rotate controls, or hold the right mouse button and drag horizontally.
 - Display mode: use the round view button to switch between the standard detailed rendering and a simplified rendering. In link layouts, the standard mode shows tag nodes and link lines; the simplified mode keeps note nodes visible and hides those extra details.
-- Open a note: click a note node in the runtime. The map focuses that node and asks Obsidian to open the matching Markdown file.
+- Open a note: click a note node in the runtime. The map focuses that node and opens the matching Markdown note in Obsidian.
 - Follow the active note: when Obsidian focuses a Markdown note, the runtime can focus the matching node in the map.
 - Date navigation: in the `Dates` layout, use the date slider to move along the time axis while keeping pan, zoom, and rotation available.
 
@@ -62,10 +68,11 @@ Open the settings panel from the map view to limit which notes are sent to the r
 - `tag:` to match notes by tag. Tag suggestions use tags collected from Markdown metadata and frontmatter.
 - `date:` to match note dates from `date`, `created`, or `created_at` frontmatter, with file creation time as a fallback. Supported forms include exact dates and comparisons such as `date:>=2026-01-01`.
 - A leading `-` to exclude matches, such as `-path:Archive`.
+- Filters can be combined, for example: `path:Projects tag:research -path:Archive date:>=2026-01-01`
 
 Use `Escape` in the filter box to clear the query. Use the Tags switch to hide tag-derived map structure without changing the current path, date, or tag filter.
 
-## Map Layout
+## Map layout
 
 The Map layout control changes how the same vault data is arranged:
 
@@ -74,29 +81,69 @@ The Map layout control changes how the same vault data is arranged:
 - `Dates`: a chronological layout that arranges notes by date and enables the date slider.
 - `Auto`: chooses `Dynamic links` for smaller datasets and switches to `Scalable links` above 500 notes.
 
-## Runtime and source availability
+## Privacy, network, and local files
 
-The current release candidate build uses the `embedded-archive` package mode. Other package modes and release shapes are documented in [Packaging Modes](docs/PACKAGING_MODES.md).
+ReverySky Map processes vault structure locally on your device.
 
-The [Obsidian plugin source code](src/) and the [Unity project source code](unity/ReverySkyMap/) are available in this repository. 
+### Vault data
 
-Release assets are built and attested by GitHub Actions from tracked repository contents. To make that reproducible without running Unity Editor in GitHub Actions, the compact Unity WebGL runtime input under `unity-webgl/Build/runtime-*` is intentionally tracked after the local Unity export/import workflow.
+The plugin uses Obsidian's vault and metadata APIs to collect the information required to build the map:
+
+- Markdown file paths and note titles
+- Tags from note metadata and frontmatter
+- Dates from the `date`, `created`, or `created_at` frontmatter properties, with file creation time as a fallback
+- File sizes
+- Resolved links between notes
+
+The map payload does not include the full Markdown contents of your notes.
+
+Vault data is passed from the Obsidian plugin to the embedded Unity runtime through local bridge messaging within Obsidian. It is not sent to external servers.
+
+ReverySky Map does not include telemetry, analytics, advertising, user accounts, subscriptions, or payments.
+
+### Local runtime files
+
+The Unity WebGL runtime is bundled with the plugin release and is not downloaded from an external server.
+
+When the map is opened for the first time, the plugin extracts the bundled runtime into a versioned cache inside the installed plugin directory:
+
+`<vault-config-dir>/plugins/reverysky-map/.reverysky-runtime/<version>/`
+
+Later map launches reuse the validated cache.
+
+Runtime file access is limited to the installed plugin directory. It is not used to scan, read, or write vault notes, unrelated user files, or system files outside the plugin directory.
+
+### Local WebGL server
+
+Unity WebGL requires its runtime files to be loaded through HTTP. ReverySky Map therefore starts a local loopback server when the map runtime is needed.
+
+The server:
+
+- Binds exclusively to `127.0.0.1` on a randomly selected port
+- Is accessible only from the same device
+- Accepts only `GET` and `HEAD` requests
+- Serves files only from the prepared Unity runtime directory
+- Stops when the map view is closed or when the plugin is unloaded
+
+The local server only delivers Unity WebGL runtime files to the embedded map iframe. It does not process or serve vault notes.
+
+## Runtime packaging and source availability
+
+The release build uses the `embedded-archive` package mode. Other package modes and release shapes are documented in [Packaging Modes](docs/PACKAGING_MODES.md).
+
+The [Obsidian plugin source code](src/) and the [Unity project source code](unity/ReverySkyMap/) are available in this repository.
+
+Release assets are built and attested by GitHub Actions from tracked repository contents. To make the build reproducible without running Unity Editor in GitHub Actions, the compact Unity WebGL runtime input under `unity-webgl/Build/runtime-*` is intentionally tracked after the local Unity export/import workflow.
+
+The standard Obsidian community plugin release shape consists of a small set of root release assets: `manifest.json`, `main.js`, and optionally `styles.css`.
+
+ReverySky Map also requires a Unity WebGL runtime, including Unity-generated JavaScript, WebAssembly, data files, and visual and runtime assets. To keep the release self-contained in the standard Obsidian plugin shape, the `embedded-archive` package mode stores the generated Unity WebGL build archive inside the released `main.js`.
 
 The ReverySky Map WebGL view was built with Unity® software and includes Unity-generated WebGL runtime files. ReverySky Map is not sponsored by or affiliated with Unity Technologies or its affiliates. Unity and related Unity marks are trademarks or registered trademarks of Unity Technologies or its affiliates in the U.S. and elsewhere.
 
-The standard Obsidian community plugin release shape is a small set of root release assets: `manifest.json`, `main.js`, and optionally `styles.css`. ReverySky Map also needs a Unity WebGL runtime, including Unity-generated JavaScript, WebAssembly, data files, and visual/runtime assets. To keep the release self-contained in that shape, the `embedded-archive` package mode stores the generated Unity WebGL build archive inside the released `main.js`.
+Because the bundled runtime is large, plugin files may not be transferred by sync services with per-file size limits. Install the plugin separately on each device when necessary.
 
-The plugin does not download the Unity runtime from the network. On first map open, it extracts the embedded Unity WebGL archive into a versioned local cache inside the installed plugin folder:
-
-`.obsidian/plugins/reverysky-map/.reverysky-runtime/<version>/`
-
-Later launches reuse that cache. A local WebGL host reads the cached runtime files so the iframe can load Unity WebGL from `127.0.0.1`.
-
-Vault notes are handled separately. The graph builder enumerates Markdown files through Obsidian's vault APIs and uses vault-relative paths plus metadata to build the map payload; the local runtime file access is not used to scan, read, or write vault notes, other user files, or system files outside the installed plugin folder.
-
-If you rely on Obsidian Sync Standard to sync installed plugins, install or update ReverySky Map from the release assets on each device; that plan does not sync files over 5 MB.
-
-See the third-party notices for bundled visual assets and runtime dependencies.
+See the [third-party notices](unity/ReverySkyMap/Assets/ThirdPartyNotices.txt) for bundled visual assets and runtime dependencies.
 
 ## License
 
@@ -114,8 +161,17 @@ development.
 See [third-party notices](unity/ReverySkyMap/Assets/ThirdPartyNotices.txt) and
 [Unity setup instructions](unity/ReverySkyMap/Assets/README.txt).
 
-## Contact
+## Feedback and support
 
-- Bug reports and technical problems: use GitHub Issues.
-- Feedback, ideas, questions, feature suggestions, and general discussion: use GitHub Discussions.
-- For anything else, or if you prefer to contact me directly, email `reverysky.journal@proton.me`.
+- Bug reports and technical problems: [GitHub Issues](https://github.com/moonskorch/ReverySky-Plugin/issues)
+- Feedback, ideas, questions, feature suggestions, and general discussion: [GitHub Discussions](https://github.com/moonskorch/ReverySky-Plugin/discussions)
+
+## Future development
+
+ReverySky is built around the idea that every experience and every piece of information is a world of its own. Through their connections, these worlds form a living universe that can be explored, expanded, and shaped.
+
+I want to continue developing ReverySky in this direction through richer visualizations, deeper ways to navigate connected information, and new mechanics.
+
+I’m open to sponsorship, funding, and publishing or marketing partnerships that can help move this work forward.
+
+Contact: [reverysky.journal@proton.me](mailto:reverysky.journal@proton.me)
