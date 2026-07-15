@@ -24,6 +24,7 @@ export type MapViewDependencies = {
   now?: () => number;
   initialState?: Record<string, unknown> | null;
   onStateChanged?: (state: Record<string, unknown>, options?: { persist?: boolean }) => void;
+  onLifecycleClose?: () => Promise<void> | void;
 };
 
 /**
@@ -41,6 +42,7 @@ export class MapView extends ItemView {
   private iframeLoadAbortController: AbortController | null = null;
   private lifecycleGeneration = 0;
   private readonly initialState: Record<string, unknown> | null;
+  private readonly onLifecycleClose?: () => Promise<void> | void;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -53,6 +55,7 @@ export class MapView extends ItemView {
     this.notify = deps.notify ?? ((message: string) => new Notice(message));
     this.now = deps.now ?? Date.now;
     this.initialState = deps.initialState ? { ...deps.initialState } : null;
+    this.onLifecycleClose = deps.onLifecycleClose;
     this.session = new MapSession({
       app: this.app,
       buildGraph,
@@ -160,20 +163,25 @@ export class MapView extends ItemView {
 
   async onClose(): Promise<void> {
     const closeGeneration = ++this.lifecycleGeneration;
-    this.session.stop();
-    this.filterPanelController?.dispose();
-    this.filterPanelController = null;
-    this.iframeLoadAbortController?.abort();
-    this.iframeLoadAbortController = null;
+    const lifecycleClosePromise = this.notifyLifecycleClose();
+    try {
+      this.session.stop();
+      this.filterPanelController?.dispose();
+      this.filterPanelController = null;
+      this.iframeLoadAbortController?.abort();
+      this.iframeLoadAbortController = null;
 
-    await this.bridge.shutdown(300);
+      await this.bridge.shutdown(300);
 
-    if (closeGeneration !== this.lifecycleGeneration) {
-      return;
+      if (closeGeneration !== this.lifecycleGeneration) {
+        return;
+      }
+
+      this.bridge.detach();
+      emptyElement(this.contentEl);
+    } finally {
+      await lifecycleClosePromise;
     }
-
-    this.bridge.detach();
-    emptyElement(this.contentEl);
   }
 
   private createRuntimeIframeSrc(iframeSrc: string, cacheBust: number): string {
@@ -181,6 +189,18 @@ export class MapView extends ItemView {
     url.searchParams.set("t", String(cacheBust));
     url.searchParams.set("renderScale", String(this.session.getRenderScale()));
     return url.toString();
+  }
+
+  private notifyLifecycleClose(): Promise<void> {
+    if (!this.onLifecycleClose) {
+      return Promise.resolve();
+    }
+
+    try {
+      return Promise.resolve(this.onLifecycleClose());
+    } catch (error) {
+      return Promise.reject(error);
+    }
   }
 }
 
