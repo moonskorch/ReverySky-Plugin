@@ -42,6 +42,10 @@ export class MapFilterPanelController {
     const root = createChild(container as ObsidianHTMLElement, "div") as ObsidianHTMLElement;
     root.className = "reverysky-map-root";
 
+    const iframeFallback = createChild(root, "div");
+    iframeFallback.className = "reverysky-map-iframe-fallback";
+    iframeFallback.textContent = "Loading map runtime...";
+
     const iframeHost = createChild(root, "div") as ObsidianHTMLElement;
     iframeHost.className = "reverysky-map-iframe-host";
 

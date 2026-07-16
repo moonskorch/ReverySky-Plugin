@@ -120,6 +120,50 @@ Mitigation:
 * Treat observed duplicate map leaves as a bug or recovery case, not as a supported multi-view feature.
 * Before adding supported multi-map behavior, define ownership for runtime server reuse, per-view persisted state, bridge lifecycle, and shutdown ordering.
 
+## 10. Iframe Navigation Failure During Obsidian Window Migration
+
+Risk:
+
+* Moving the map view between the main window and an Obsidian popout can put iframe navigation into an Electron-owned transition state.
+* The iframe may stay on an empty `about:blank` document, and DevTools may report `index.html:1 Uncaught illegal access`.
+* The failure happens before the Unity wrapper has built its normal runtime DOM.
+
+Mitigation:
+
+* Handle Obsidian window migration as a runtime iframe restart point.
+* Defer the fresh iframe navigation until after the migration callback returns.
+* Keep the parent-side `Loading map runtime...` fallback visible behind the iframe so a failed or delayed runtime page is not a silent black screen.
+* Treat remaining reports as Electron/Obsidian iframe lifecycle edge cases first.
+* Do not change graph emission, Unity layout, or bridge payload contracts solely for this symptom.
+
+## 11. WebGL Context Loss During Resize or Window Movement
+
+Risk:
+
+* Obsidian resize, popout movement, or GPU pressure can cause the Unity canvas to lose its WebGL context.
+* A lost WebGL context is terminal for the current iframe runtime; the plugin should not assume Unity can continue rendering after this event.
+
+Mitigation:
+
+* Keep the iframe wrapper's `webglcontextlost` handling explicit.
+* Show the runtime status `WebGL context lost. Reload the map view.` when context loss is detected.
+* Prefer user-visible reload guidance over complex automatic recovery unless repeated user reports show that a controlled restart is necessary.
+
+## 12. Runtime Startup May Never Reach `bridge:ready`
+
+Risk:
+
+* The iframe may load partially, or the Unity runtime may fail before sending `bridge:ready`.
+* When `bridge:ready` never arrives, the plugin must not send `graph:set`; the latest graph payload can remain pending while the runtime is not ready.
+* The visible result depends on how far startup progressed: the parent-side loading fallback, the iframe wrapper's startup status, or the iframe wrapper's runtime failure status.
+
+Mitigation:
+
+* Keep `bridge:ready` as the gate before sending `graph:set`.
+* Keep startup and failure statuses visible in the iframe wrapper when the wrapper starts successfully.
+* Keep the parent-side loading fallback visible for cases where the runtime page does not build its own status UI.
+* If users report persistent startup stalls, diagnose runtime startup separately from window migration and bridge payload handling.
+
 ## Architecture Risks and Hardening Plan
 
 The core architecture is intentional: ReverySky Map embeds a Unity WebGL runtime inside an Obsidian plugin and sends live graph data across several runtime boundaries.

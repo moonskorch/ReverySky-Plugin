@@ -40,6 +40,8 @@ export class MapView extends ItemView {
   private readonly noteOpenRouter: MapNoteOpenRouter;
   private filterPanelController: MapFilterPanelController | null = null;
   private iframeLoadAbortController: AbortController | null = null;
+  private windowMigrationCleanup: (() => void) | null = null;
+  private deferredIframeRenderCleanup: (() => void) | null = null;
   private lifecycleGeneration = 0;
   private readonly initialState: Record<string, unknown> | null;
   private readonly onLifecycleClose?: () => Promise<void> | void;
@@ -97,6 +99,56 @@ export class MapView extends ItemView {
     this.session.start(this.registerEvent.bind(this));
 
     const container = this.contentEl as ObsidianHTMLElement;
+    this.registerWindowMigrationHandler(container);
+    await this.renderRuntimeIframe(container, lifecycleGeneration);
+  }
+
+  async onClose(): Promise<void> {
+    const closeGeneration = ++this.lifecycleGeneration;
+    const lifecycleClosePromise = this.notifyLifecycleClose();
+    const windowMigrationCleanup = this.windowMigrationCleanup;
+    this.windowMigrationCleanup = null;
+    windowMigrationCleanup?.();
+
+    try {
+      this.session.stop();
+      this.cancelDeferredIframeRender();
+      this.disposeRuntimeShell();
+
+      await this.bridge.shutdown(300);
+
+      if (closeGeneration !== this.lifecycleGeneration) {
+        return;
+      }
+
+      this.bridge.detach();
+      emptyElement(this.contentEl);
+    } finally {
+      await lifecycleClosePromise;
+    }
+  }
+
+  private restartRuntimeAfterWindowMigration(win: Window): void {
+    const lifecycleGeneration = ++this.lifecycleGeneration;
+    const container = this.contentEl as ObsidianHTMLElement;
+    this.session.setBridgeReady(false);
+    this.cancelDeferredIframeRender();
+    // Exit Obsidian's migration callback before navigating a fresh iframe.
+    this.deferredIframeRenderCleanup = this.deferIframeRender(win, () => {
+      this.deferredIframeRenderCleanup = null;
+      if (lifecycleGeneration !== this.lifecycleGeneration) {
+        return;
+      }
+      this.disposeRuntimeShell();
+      this.bridge.detach();
+      void this.renderRuntimeIframe(container, lifecycleGeneration);
+    });
+  }
+
+  private async renderRuntimeIframe(
+    container: ObsidianHTMLElement,
+    lifecycleGeneration: number
+  ): Promise<void> {
     emptyElement(container);
     this.filterPanelController = new MapFilterPanelController(this.session);
     const iframeHost = this.filterPanelController.render(container);
@@ -161,34 +213,47 @@ export class MapView extends ItemView {
     }, { signal: iframeLoadAbortController.signal });
   }
 
-  async onClose(): Promise<void> {
-    const closeGeneration = ++this.lifecycleGeneration;
-    const lifecycleClosePromise = this.notifyLifecycleClose();
-    try {
-      this.session.stop();
-      this.filterPanelController?.dispose();
-      this.filterPanelController = null;
-      this.iframeLoadAbortController?.abort();
-      this.iframeLoadAbortController = null;
-
-      await this.bridge.shutdown(300);
-
-      if (closeGeneration !== this.lifecycleGeneration) {
-        return;
-      }
-
-      this.bridge.detach();
-      emptyElement(this.contentEl);
-    } finally {
-      await lifecycleClosePromise;
-    }
-  }
-
   private createRuntimeIframeSrc(iframeSrc: string, cacheBust: number): string {
     const url = new URL(iframeSrc);
     url.searchParams.set("t", String(cacheBust));
     url.searchParams.set("renderScale", String(this.session.getRenderScale()));
     return url.toString();
+  }
+
+  private registerWindowMigrationHandler(container: ObsidianHTMLElement): void {
+    this.windowMigrationCleanup?.();
+    this.windowMigrationCleanup = null;
+
+    this.windowMigrationCleanup = container.onWindowMigrated((win) => {
+      this.restartRuntimeAfterWindowMigration(win);
+    });
+  }
+
+  private deferIframeRender(win: Window, callback: () => void): () => void {
+    let cancelled = false;
+    const timeoutId = win.setTimeout(() => {
+      if (cancelled) {
+        return;
+      }
+      callback();
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      win.clearTimeout(timeoutId);
+    };
+  }
+
+  private cancelDeferredIframeRender(): void {
+    this.deferredIframeRenderCleanup?.();
+    this.deferredIframeRenderCleanup = null;
+  }
+
+  private disposeRuntimeShell(): void {
+    this.filterPanelController?.dispose();
+    this.filterPanelController = null;
+    this.iframeLoadAbortController?.abort();
+    this.iframeLoadAbortController = null;
   }
 
   private notifyLifecycleClose(): Promise<void> {
