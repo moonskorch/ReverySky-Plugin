@@ -105,6 +105,21 @@ Mitigation:
 * Do not force `workspace.setActiveLeaf(...)` solely to steer main-window versus popout routing unless user reports show the native behavior is worse than the focus-state risk.
 * Keep active-note tracking global so markdown navigation inside popout windows can still update map focus.
 
+## 9. Unexpected Multiple Map Leaves
+
+Risk:
+
+* The plugin command intentionally opens and owns a single ReverySky map leaf: repeated open actions reveal the existing leaf instead of creating another one.
+* Obsidian workspace state, saved layouts, plugin reload timing, or manual workspace manipulation may still create more than one ReverySky map leaf.
+* Multiple map leaves are not a supported lifecycle mode. Some plugin paths iterate all map leaves defensively, but iframe startup, runtime shutdown, persisted view state, and bridge lifecycle ordering are not guaranteed to behave correctly when two map runtimes exist at the same time.
+
+Mitigation:
+
+* Keep `activateMapView()` single-leaf behavior intact.
+* Keep cleanup and focus broadcast paths defensive where Obsidian exposes array-based leaf APIs.
+* Treat observed duplicate map leaves as a bug or recovery case, not as a supported multi-view feature.
+* Before adding supported multi-map behavior, define ownership for runtime server reuse, per-view persisted state, bridge lifecycle, and shutdown ordering.
+
 ## Architecture Risks and Hardening Plan
 
 The core architecture is intentional: ReverySky Map embeds a Unity WebGL runtime inside an Obsidian plugin and sends live graph data across several runtime boundaries.

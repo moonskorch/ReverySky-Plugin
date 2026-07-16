@@ -67,4 +67,24 @@ describe("UnityWebglLocalServer", () => {
       }
     );
   });
+
+  it("can stop a server immediately after startup and start again cleanly", async () => {
+    const html = "<!doctype html><html>restart</html>";
+    const server = new UnityWebglLocalServer({ kind: "embedded-index", indexHtml: html });
+    const firstBaseUrlPromise = server.getBaseUrl();
+    const stopPromise = server.stop();
+    const firstBaseUrl = await firstBaseUrlPromise;
+    await stopPromise;
+
+    await expect(fetch(`${firstBaseUrl}/index.html`)).rejects.toThrow();
+
+    const secondBaseUrl = await server.getBaseUrl();
+    try {
+      const response = await fetch(`${secondBaseUrl}/index.html`);
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe(html);
+    } finally {
+      await server.stop();
+    }
+  });
 });

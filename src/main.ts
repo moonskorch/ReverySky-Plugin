@@ -37,6 +37,9 @@ export default class ReverySkyMapPlugin extends Plugin {
         initialState: this.mapViewState ? { ...this.mapViewState } : null,
         onStateChanged: (state, options) => {
           this.updateMapViewState(state, options?.persist ?? true);
+        },
+        onLifecycleClose: async () => {
+          await this.stopUnityRuntimeServer();
         }
       })
     );
@@ -141,7 +144,6 @@ export default class ReverySkyMapPlugin extends Plugin {
     if (leaves.length > 0) {
       await this.flushPersistedMapViewState();
       workspace.detachLeavesOfType(MAP_VIEW_TYPE);
-      await this.stopUnityRuntimeServer();
       return;
     }
 
@@ -149,12 +151,13 @@ export default class ReverySkyMapPlugin extends Plugin {
   }
 
   private async stopUnityRuntimeServer(): Promise<void> {
-    if (!this.unityWebglServer) {
+    const unityWebglServer = this.unityWebglServer;
+    if (!unityWebglServer) {
       return;
     }
 
-    await this.unityWebglServer.stop();
     this.unityWebglServer = null;
+    await unityWebglServer.stop();
   }
 
   private requestEditorFocus(path: string): void {

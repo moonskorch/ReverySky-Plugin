@@ -113,6 +113,15 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
       }
     });
     expect(harness.detachLeavesOfType).toHaveBeenCalledWith(MAP_VIEW_TYPE);
+    expect(runtimeServer.stop).not.toHaveBeenCalled();
+
+    const createMapView = harness.registerView.mock.calls[0]?.[1] as
+      | ((leaf: { app?: unknown }) => { onClose: () => Promise<void> })
+      | undefined;
+    expect(createMapView).toBeDefined();
+    const closedView = createMapView?.({ app: harness.plugin.app });
+    await closedView?.onClose();
+
     expect(runtimeServer.stop).toHaveBeenCalledTimes(1);
     expect((harness.plugin as unknown as { unityWebglServer: unknown }).unityWebglServer).toBeNull();
 
@@ -252,6 +261,27 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
       type: MAP_VIEW_TYPE,
       active: true
     });
+  });
+
+  it("reveals the existing map leaf instead of creating another one", async () => {
+    const existingLeaf: MockLeaf = {
+      setViewState: vi.fn()
+    };
+    const unusedRightLeaf: MockLeaf = {
+      setViewState: vi.fn().mockResolvedValue(undefined)
+    };
+    const harness = createPluginHarness({
+      existingLeaves: [existingLeaf],
+      rightLeaf: unusedRightLeaf
+    });
+
+    await harness.plugin.onload();
+    await (harness.addCommand.mock.calls[0]?.[0]?.callback as () => Promise<void>)();
+
+    expect(harness.getRightLeaf).not.toHaveBeenCalled();
+    expect(existingLeaf.setViewState).not.toHaveBeenCalled();
+    expect(unusedRightLeaf.setViewState).not.toHaveBeenCalled();
+    expect(harness.revealLeaf).toHaveBeenCalledWith(existingLeaf);
   });
 
   it("routes editor focus requests to open map views", async () => {

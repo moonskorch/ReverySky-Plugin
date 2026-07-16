@@ -160,6 +160,8 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
    Loads plugin data `mapViewState`, registers `MAP_VIEW_TYPE`, and registers the `open-map` command.
 2. `src/main.ts` -> command callback -> `activateMapView()`
    Finds an existing map leaf or creates one with `workspace.getRightLeaf(false)` and `leaf.setViewState(...)`.
+   The plugin intentionally opens and owns a single map leaf: repeated open actions reveal the existing leaf instead of creating another one.
+   Some cleanup and focus paths use Obsidian's array-based leaf APIs defensively, but multiple ReverySky map leaves are treated as an unexpected workspace state rather than a supported lifecycle mode.
 3. Obsidian opens the custom view and calls `src/view/MapView.ts` -> `onOpen()`.
 4. `MapView.onOpen()` starts `MapSession`, creates `MapFilterPanelController`, and calls `plugin.getUnityRuntimeUrl()`.
 5. `src/main.ts` -> `getUnityRuntimeUrl()` chooses the runtime source:

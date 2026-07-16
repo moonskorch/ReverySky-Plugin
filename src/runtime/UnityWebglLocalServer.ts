@@ -31,6 +31,7 @@ export class UnityWebglLocalServer {
   private server: Server | null = null;
   private baseUrl: string | null = null;
   private startPromise: Promise<string> | null = null;
+  private stopRequested = false;
   private readonly source: UnityWebglRuntimeSource;
 
   constructor(source: UnityWebglRuntimeSource) {
@@ -53,17 +54,35 @@ export class UnityWebglLocalServer {
       return this.startPromise;
     }
 
-    this.startPromise = this.startServer();
+    this.stopRequested = false;
+    const startPromise = this.startServer();
+    this.startPromise = startPromise;
     try {
-      this.baseUrl = await this.startPromise;
-      return this.baseUrl;
+      const baseUrl = await startPromise;
+      if (!this.stopRequested) {
+        this.baseUrl = baseUrl;
+      }
+      return baseUrl;
     } finally {
-      this.startPromise = null;
+      if (this.startPromise === startPromise) {
+        this.startPromise = null;
+      }
     }
   }
 
   async stop(): Promise<void> {
+    this.stopRequested = true;
+    if (this.startPromise) {
+      try {
+        await this.startPromise;
+      } catch {
+        // A failed start leaves no listener to close.
+      }
+    }
+
     if (!this.server) {
+      this.baseUrl = null;
+      this.stopRequested = false;
       return;
     }
 
@@ -74,6 +93,7 @@ export class UnityWebglLocalServer {
     await new Promise<void>((resolve) => {
       activeServer.close(() => resolve());
     });
+    this.stopRequested = false;
   }
 
   /**

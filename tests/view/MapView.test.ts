@@ -112,12 +112,14 @@ describe("MapView bridge integration", () => {
     const payload = makePayload();
     const buildGraph = vi.fn().mockReturnValue(payload);
     const notify = vi.fn();
+    const onLifecycleClose = vi.fn().mockResolvedValue(undefined);
 
     const deps: MapViewDependencies = {
       createBridge: () => bridge,
       buildGraph: buildGraph as BuildGraphForTest,
       notify,
-      now: () => 1700000000000
+      now: () => 1700000000000,
+      onLifecycleClose
     };
 
     const view = new MapView({ app } as never, plugin as never, deps);
@@ -149,6 +151,7 @@ describe("MapView bridge integration", () => {
     await view.onClose();
 
     expect(bridge.shutdown).toHaveBeenCalledWith(300);
+    expect(onLifecycleClose).toHaveBeenCalledTimes(1);
     expect(bridge.detach).toHaveBeenCalledTimes(1);
     expect(bridge.shutdown.mock.invocationCallOrder[0]).toBeLessThan(bridge.detach.mock.invocationCallOrder[0]);
     expect(view.contentEl.childElementCount).toBe(0);
