@@ -47,6 +47,10 @@ Mitigation:
 - the first map open extracts the runtime into `.reverysky-runtime/<version>/`;
 - later opens and later Obsidian restarts reuse the cache without network download;
 - archive validation and cache replacement must stay strict to avoid partial installs;
+- normal map-view startup is serialized by the plugin runtime URL owner, so multiple map leaves do not independently extract the same cache;
+- accepted residual risk: plugin lifecycle interruption during the first extraction could leave a transient missing or invalid cache if a second plugin instance starts preparing the same version before the first one finishes;
+- impact is limited to Unity runtime startup for that version; vault data and user notes are not affected, and a later startup can rebuild the cache;
+- do not add file-locking or claim-file complexity unless user reports show this recovery path fails in normal use;
 - `embedded-archive` is the current release-shaped candidate, while dashboard submission and scan status are tracked separately.
 
 ## 5. Vault Graph Scale
@@ -111,14 +115,19 @@ Risk:
 
 * The plugin command intentionally opens and owns a single ReverySky map leaf: repeated open actions reveal the existing leaf instead of creating another one.
 * Obsidian workspace state, saved layouts, plugin reload timing, or manual workspace manipulation may still create more than one ReverySky map leaf.
-* Multiple map leaves are not a supported lifecycle mode. Some plugin paths iterate all map leaves defensively, but iframe startup, runtime shutdown, persisted view state, and bridge lifecycle ordering are not guaranteed to behave correctly when two map runtimes exist at the same time.
+* Multiple map leaves are tolerated as a recovery case, but they are not the primary workflow.
+* Runtime server startup and shutdown are owned by the plugin and shared across open map leaves.
+* Each open map leaf owns an independent `MapSession`, graph snapshot, filter state, bridge lifecycle, focus gate, refresh timer, and Obsidian event listeners.
+* Accepted cost: if several map leaves are open, graph-relevant vault or metadata events can trigger one refresh path per leaf.
+* Open map leaves keep their own in-memory filter/session state, but persistence restores only the most recently reported state on later opens.
 
 Mitigation:
 
 * Keep `activateMapView()` single-leaf behavior intact.
+* Keep plugin-level runtime server ownership serialized and lease-based so one map leaf cannot stop the server while another leaf is active.
 * Keep cleanup and focus broadcast paths defensive where Obsidian exposes array-based leaf APIs.
-* Treat observed duplicate map leaves as a bug or recovery case, not as a supported multi-view feature.
-* Before adding supported multi-map behavior, define ownership for runtime server reuse, per-view persisted state, bridge lifecycle, and shutdown ordering.
+* Keep independent per-leaf sessions unless real performance reports justify a shared source-graph cache.
+* Before making multi-map behavior a first-class feature, define per-view persisted state ownership and whether graph refresh should remain per-leaf or move to a plugin-level cache.
 
 ## 10. Iframe Navigation Failure During Obsidian Window Migration
 

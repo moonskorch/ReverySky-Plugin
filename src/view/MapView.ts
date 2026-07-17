@@ -24,7 +24,8 @@ export type MapViewDependencies = {
   now?: () => number;
   initialState?: Record<string, unknown> | null;
   onStateChanged?: (state: Record<string, unknown>, options?: { persist?: boolean }) => void;
-  onLifecycleClose?: () => Promise<void> | void;
+  onLifecycleOpen?: () => symbol;
+  onLifecycleClose?: (lease: symbol) => Promise<void> | void;
 };
 
 /**
@@ -44,7 +45,12 @@ export class MapView extends ItemView {
   private deferredIframeRenderCleanup: (() => void) | null = null;
   private lifecycleGeneration = 0;
   private readonly initialState: Record<string, unknown> | null;
-  private readonly onLifecycleClose?: () => Promise<void> | void;
+  private readonly onLifecycleOpen?: () => symbol;
+  private readonly onLifecycleClose?: (lease: symbol) => Promise<void> | void;
+  /**
+   * Lease held while this view is one of the active users of the plugin-owned runtime server.
+   */
+  private runtimeLease: symbol | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -57,6 +63,7 @@ export class MapView extends ItemView {
     this.notify = deps.notify ?? ((message: string) => new Notice(message));
     this.now = deps.now ?? Date.now;
     this.initialState = deps.initialState ? { ...deps.initialState } : null;
+    this.onLifecycleOpen = deps.onLifecycleOpen;
     this.onLifecycleClose = deps.onLifecycleClose;
     this.session = new MapSession({
       app: this.app,
@@ -93,6 +100,7 @@ export class MapView extends ItemView {
 
   async onOpen(): Promise<void> {
     const lifecycleGeneration = ++this.lifecycleGeneration;
+    this.acquireRuntimeLease();
     if (this.initialState) {
       await this.session.setState(this.initialState);
     }
@@ -105,7 +113,7 @@ export class MapView extends ItemView {
 
   async onClose(): Promise<void> {
     const closeGeneration = ++this.lifecycleGeneration;
-    const lifecycleClosePromise = this.notifyLifecycleClose();
+    let shouldNotifyLifecycleClose = true;
     const windowMigrationCleanup = this.windowMigrationCleanup;
     this.windowMigrationCleanup = null;
     windowMigrationCleanup?.();
@@ -118,13 +126,16 @@ export class MapView extends ItemView {
       await this.bridge.shutdown(300);
 
       if (closeGeneration !== this.lifecycleGeneration) {
+        shouldNotifyLifecycleClose = false;
         return;
       }
 
       this.bridge.detach();
       emptyElement(this.contentEl);
     } finally {
-      await lifecycleClosePromise;
+      if (shouldNotifyLifecycleClose) {
+        await this.notifyLifecycleClose();
+      }
     }
   }
 
@@ -261,11 +272,25 @@ export class MapView extends ItemView {
       return Promise.resolve();
     }
 
+    const lease = this.runtimeLease;
+    if (!lease) {
+      return Promise.resolve();
+    }
+
+    this.runtimeLease = null;
     try {
-      return Promise.resolve(this.onLifecycleClose());
+      return Promise.resolve(this.onLifecycleClose(lease));
     } catch (error) {
       return Promise.reject(error);
     }
+  }
+
+  private acquireRuntimeLease(): void {
+    if (this.runtimeLease || !this.onLifecycleOpen) {
+      return;
+    }
+
+    this.runtimeLease = this.onLifecycleOpen();
   }
 }
 

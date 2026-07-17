@@ -118,6 +118,8 @@ describe("MapView bridge integration", () => {
     const payload = makePayload();
     const buildGraph = vi.fn().mockReturnValue(payload);
     const notify = vi.fn();
+    const runtimeLease = Symbol("test-runtime-lease");
+    const onLifecycleOpen = vi.fn(() => runtimeLease);
     const onLifecycleClose = vi.fn().mockResolvedValue(undefined);
 
     const deps: MapViewDependencies = {
@@ -125,11 +127,13 @@ describe("MapView bridge integration", () => {
       buildGraph: buildGraph as BuildGraphForTest,
       notify,
       now: () => 1700000000000,
+      onLifecycleOpen,
       onLifecycleClose
     };
 
     const view = new MapView({ app } as never, plugin as never, deps);
     await view.onOpen();
+    expect(onLifecycleOpen).toHaveBeenCalledTimes(1);
 
     const iframe = view.contentEl.querySelector("iframe");
     expect(iframe).not.toBeNull();
@@ -164,6 +168,7 @@ describe("MapView bridge integration", () => {
 
     expect(bridge.shutdown).toHaveBeenCalledWith(300);
     expect(onLifecycleClose).toHaveBeenCalledTimes(1);
+    expect(onLifecycleClose).toHaveBeenCalledWith(runtimeLease);
     expect(bridge.detach).toHaveBeenCalledTimes(1);
     expect(bridge.shutdown.mock.invocationCallOrder[0]).toBeLessThan(bridge.detach.mock.invocationCallOrder[0]);
     expect(view.contentEl.childElementCount).toBe(0);
@@ -227,6 +232,9 @@ describe("MapView bridge integration", () => {
       getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
     };
     let resolveShutdown: ((result: "complete") => void) | null = null;
+    const runtimeLease = Symbol("stale-close-runtime-lease");
+    const onLifecycleOpen = vi.fn(() => runtimeLease);
+    const onLifecycleClose = vi.fn().mockResolvedValue(undefined);
     const bridge = {
       attach: vi.fn(),
       detach: vi.fn(),
@@ -244,11 +252,14 @@ describe("MapView bridge integration", () => {
         createBridge: () => bridge,
         buildGraph: vi.fn().mockReturnValue(makePayload()) as BuildGraphForTest,
         notify: vi.fn(),
-        now: () => 1700000000000
+        now: () => 1700000000000,
+        onLifecycleOpen,
+        onLifecycleClose
       }
     );
 
     await view.onOpen();
+    expect(onLifecycleOpen).toHaveBeenCalledTimes(1);
     const closePromise = view.onClose();
     await Promise.resolve();
     expect(bridge.shutdown).toHaveBeenCalledTimes(1);
@@ -259,6 +270,8 @@ describe("MapView bridge integration", () => {
     await closePromise;
 
     expect(bridge.detach).not.toHaveBeenCalled();
+    expect(onLifecycleOpen).toHaveBeenCalledTimes(1);
+    expect(onLifecycleClose).not.toHaveBeenCalled();
     expect(view.contentEl.querySelector("iframe")).not.toBeNull();
   });
 

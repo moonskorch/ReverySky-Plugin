@@ -75,6 +75,8 @@ function validateArchiveEntryPath(entryPath: string): void {
   }
 
   const normalizedPath = path.posix.normalize(entryPath);
+  // The embedded archive must behave like a packaged unity-webgl/ folder, not
+  // like an arbitrary tarball that can write beside the plugin directory.
   if (
     normalizedPath === ".." ||
     normalizedPath.startsWith("../") ||
@@ -152,6 +154,10 @@ async function validateRuntimeDirectory(runtimeDir: string): Promise<void> {
   await findUniqueMatchingFile(buildDir, "runtime-code.");
 }
 
+/**
+ * The ready marker is written only after extraction and shape validation.
+ * A cache without a valid marker is treated as incomplete and rebuilt.
+ */
 async function readRuntimeReadyMarker(markerPath: string): Promise<{
   schemaVersion?: unknown;
   pluginVersion?: unknown;
@@ -170,7 +176,13 @@ async function readRuntimeReadyMarker(markerPath: string): Promise<{
 }
 
 /**
- * Resolve the embedded Unity WebGL runtime, extracting it into a versioned cache when needed.
+ * Reads and prepares the Unity WebGL runtime used by `embedded-archive` builds.
+ *
+ * Release packages carry a compressed runtime archive inside `main.js`; this
+ * installer verifies that payload and extracts it once into
+ * `.reverysky-runtime/<plugin-version>/unity-webgl`. Development and
+ * folder-runtime installs bypass extraction and validate the adjacent
+ * `unity-webgl/` directory instead.
  */
 export class EmbeddedUnityRuntimeInstaller {
   private readonly archiveBase64: string | null;
@@ -181,6 +193,13 @@ export class EmbeddedUnityRuntimeInstaller {
     this.archiveSha256 = normalizeSha256(options.archiveSha256 ?? getEmbeddedUnityRuntimeArchiveSha256());
   }
 
+  /**
+   * Return a directory that `UnityWebglLocalServer` can serve as a normal WebGL export.
+   *
+   * Embedded-archive builds extract into a versioned cache. Dev and folder-runtime
+   * builds do not have an archive payload, so they validate and return the local
+   * `unity-webgl/` folder beside the plugin bundle.
+   */
   async resolveRuntimeDirectory(pluginDir: string, pluginVersion: string): Promise<string> {
     const pluginDirResolved = path.resolve(pluginDir);
     const runtimeRoot = path.join(pluginDirResolved, RUNTIME_VERSION_ROOT_NAME);

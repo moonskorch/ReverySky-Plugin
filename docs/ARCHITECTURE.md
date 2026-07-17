@@ -11,6 +11,8 @@ Current in-scope behavior:
 - host the local WebGL runtime on `127.0.0.1`;
 - round-trip note selection between Obsidian and the Unity runtime.
 
+The primary workflow is one map leaf opened by the plugin command. Duplicate map leaves can exist through Obsidian workspace restore, popouts, or manual workspace manipulation; they should remain operable, but they are treated as a recovery case rather than the main interaction model.
+
 ## System Overview
 The system has three runtime boundaries:
 1. Obsidian plugin code in TypeScript.
@@ -20,7 +22,7 @@ The system has three runtime boundaries:
 Main system parts:
 
 - Obsidian plugin shell
-  Registers the custom view and the `Open map` command, and lazily creates the local WebGL server.
+  Registers the custom view and the `Open map` command, lazily creates the shared local WebGL server, and owns the latest plugin-level map settings snapshot.
   Main code: `src/main.ts`
   Depends on: Obsidian `Plugin`, `WorkspaceLeaf`, `UnityWebglLocalServer`
 
@@ -30,7 +32,7 @@ Main system parts:
   Depends on: `MapSession`, `MapFilterPanelController`, `MapNoteOpenRouter`, `UnityIframeBridge`
 
 - Map session and filter UI
-  Owns persisted map state, graph refresh timing, Obsidian metadata-resolution gating, filter derivation, render-scale preference, and the transient filter-panel interaction state.
+  Owns per-view live map state, graph refresh timing, Obsidian metadata-resolution gating, filter derivation, render-scale preference, and the transient filter-panel interaction state.
   Main code: `src/view/MapSession.ts`, `src/view/MapFilterPanelController.ts`
   Depends on: `VaultGraphBuilder`, `GraphPathFilter`, Obsidian workspace APIs, browser DOM events
 
@@ -91,6 +93,8 @@ ReverySky Map uses two separate communication paths. They should not be treated 
 ### 1. Local HTTP hosting
 
 `UnityWebglLocalServer` only serves the selected Unity runtime source to the iframe. That source can be the local `unity-webgl/` folder for `folder-runtime`, an in-memory embedded `index.html` for `embedded-html`, or an extracted `.reverysky-runtime/<version>/unity-webgl` cache for `embedded-archive`.
+
+The plugin owns one shared local server per plugin instance. `getUnityRuntimeUrl()` serializes cold startup so concurrent map leaves join the same runtime URL resolution, and map-view leases keep the server alive until the last open map leaf closes.
 
 It exposes a loopback URL such as:
 
@@ -161,7 +165,7 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 2. `src/main.ts` -> command callback -> `activateMapView()`
    Finds an existing map leaf or creates one with `workspace.getRightLeaf(false)` and `leaf.setViewState(...)`.
    The plugin intentionally opens and owns a single map leaf: repeated open actions reveal the existing leaf instead of creating another one.
-   Some cleanup and focus paths use Obsidian's array-based leaf APIs defensively, but multiple ReverySky map leaves are treated as an unexpected workspace state rather than a supported lifecycle mode.
+   Some cleanup and focus paths use Obsidian's array-based leaf APIs defensively. Duplicate ReverySky map leaves are expected to keep working through the shared runtime server, but they are a recovery case rather than the primary workflow.
 3. Obsidian opens the custom view and calls `src/view/MapView.ts` -> `onOpen()`.
 4. `MapView.onOpen()` starts `MapSession`, creates `MapFilterPanelController`, and calls `plugin.getUnityRuntimeUrl()`.
 5. `src/main.ts` -> `getUnityRuntimeUrl()` chooses the runtime source:
@@ -369,16 +373,18 @@ For rename, `MapFocusController.onRename(...)` preserves focus only when the ren
 8. `toggleMapView()` close, `onunload()`, and workspace `quit` flush the latest in-memory snapshot before shutdown paths continue.
 9. Obsidian workspace view state is intentionally not used as a persistence source for `pathFilterQuery`, `showTags`, `mapLayout`, or `renderScale`.
 
+Open map leaves do not share live filter state. Each leaf's `MapSession` owns its own current filter, effective graph, bridge readiness, and refresh timers. Persistence remains one plugin-level snapshot, so later opens restore the most recently reported settings rather than per-window settings.
+
 ### Key plugin-side control points
 
 - `src/main.ts` -> `ReverySkyMapPlugin`
-  Owns plugin startup, command registration, view activation, persistence of the last map-view state, and lazy runtime-server creation.
+  Owns plugin startup, command registration, view activation, persistence of the last map-view state, shared runtime-server startup, and map-view runtime leases.
 
 - `src/view/MapView.ts` -> `MapView`
   Owns the shell execution paths after the view exists: iframe startup, bridge wiring, and collaborator orchestration.
 
 - `src/view/MapSession.ts` -> `MapSession`
-  Owns persisted map state, graph refresh timing, metadata-resolution waiting, graph emission, render-scale restart tracking, and the bridge-facing focus membership gate.
+  Owns per-view live map state, graph refresh timing, metadata-resolution waiting, graph emission, render-scale restart tracking, and the bridge-facing focus membership gate.
 
 - `src/view/MapFocusController.ts` -> `MapFocusController`
   Owns plugin-side focus event routing for workspace `file-open`, markdown editor focus, active-note rename, and short-lived suppression of Unity-open focus echo. It emits focus intents to `MapSession` instead of sending bridge payloads directly.
@@ -417,9 +423,11 @@ For rename, `MapFocusController.onRename(...)` preserves focus only when the ren
 
 - The effective graph after filters is owned by `MapSession`.
   The session emits the filtered payload that Unity receives through the shell view.
+  If more than one map leaf is open, each leaf has its own effective graph and can rebuild or re-emit independently.
 
 - `pathFilterQuery`, `showTags`, `mapLayout`, and `renderScale` are owned by `MapSession`.
-  They are reported to `ReverySkyMapPlugin`, persisted in plugin data under `mapViewState`, and re-applied on open.
+  They are live per-view state while the leaf is open.
+  They are reported to `ReverySkyMapPlugin`, which keeps one latest snapshot in plugin data under `mapViewState` and re-applies that snapshot on later opens.
 
 - Markdown focus events are routed by `MapFocusController`.
   The controller does not store focus history or a focus queue. It keeps only a short-lived path gate to collapse duplicate Obsidian focus signals and consume Unity-open echo, then emits a focus intent to `MapSession`.
@@ -437,6 +445,7 @@ For rename, `MapFocusController.onRename(...)` preserves focus only when the ren
 
 - The latest map settings snapshot is owned by `ReverySkyMapPlugin`.
   It is stored as plugin data under `mapViewState`, then passed to a newly created `MapView` as `initialState` on the next open.
+  It is not per-window persisted state.
 
 - Filter panel visibility, active suggestion pane, and hide-delay timers are owned by `MapFilterPanelController`.
   They are UI-only transient state and are intentionally not persisted in plugin data.
@@ -446,6 +455,7 @@ For rename, `MapFocusController.onRename(...)` preserves focus only when the ren
 
 - WebGL runtime serving is owned by `UnityWebglLocalServer`.
   The runtime is hosted locally from the selected runtime source, not from an external site.
+  Server lifecycle is owned by the plugin so multiple map leaves share one server instead of creating or stopping independent servers.
 
 ### Bridge contract
 The canonical plugin-side contract lives in:

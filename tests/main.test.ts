@@ -1,4 +1,63 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const runtimeServerMock = vi.hoisted(() => {
+  type RuntimeServerInstance = {
+    baseUrl: string;
+    getBaseUrl: ReturnType<typeof vi.fn>;
+    stop: ReturnType<typeof vi.fn>;
+  };
+  const pendingBaseUrlResolvers: Array<() => void> = [];
+
+  return {
+    delayBaseUrl: false,
+    instances: [] as RuntimeServerInstance[],
+    reset() {
+      this.delayBaseUrl = false;
+      this.instances.length = 0;
+      pendingBaseUrlResolvers.length = 0;
+    },
+    resolvePendingBaseUrls() {
+      while (pendingBaseUrlResolvers.length > 0) {
+        pendingBaseUrlResolvers.shift()?.();
+      }
+    },
+    createInstance() {
+      const instance: RuntimeServerInstance = {
+        baseUrl: `http://127.0.0.1:${7000 + this.instances.length}`,
+        getBaseUrl: vi.fn(),
+        stop: vi.fn().mockResolvedValue(undefined)
+      };
+      instance.getBaseUrl.mockImplementation(() => {
+        if (!this.delayBaseUrl) {
+          return Promise.resolve(instance.baseUrl);
+        }
+
+        return new Promise<string>((resolve) => {
+          pendingBaseUrlResolvers.push(() => resolve(instance.baseUrl));
+        });
+      });
+      this.instances.push(instance);
+      return instance;
+    }
+  };
+});
+
+vi.mock("../src/runtime/UnityWebglLocalServer", () => ({
+  UnityWebglLocalServer: vi.fn().mockImplementation(function MockUnityWebglLocalServer() {
+    return runtimeServerMock.createInstance();
+  })
+}));
+
+vi.mock("../src/runtime/EmbeddedUnityRuntimeArchive", () => ({
+  getEmbeddedUnityRuntimeArchiveBase64: () => null,
+  getEmbeddedUnityRuntimeArchiveSha256: () => null,
+  hasEmbeddedUnityRuntimeArchive: () => false
+}));
+
+vi.mock("../src/runtime/EmbeddedUnityIndexHtml", () => ({
+  getEmbeddedUnityIndexHtml: () => null
+}));
+
 import ReverySkyMapPlugin from "../src/main";
 import { MAP_VIEW_TYPE } from "../src/view/MapView";
 
@@ -77,8 +136,13 @@ function createPluginHarness(options?: {
 }
 
 describe("ReverySkyMapPlugin map view state persistence", () => {
+  beforeEach(() => {
+    runtimeServerMock.reset();
+  });
+
   it("captures map state before toggle close and restores it on next open", async () => {
     const runtimeServer = {
+      getBaseUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7000"),
       stop: vi.fn().mockResolvedValue(undefined)
     };
     const closingLeaf: MockLeaf = {
@@ -116,11 +180,19 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
     expect(runtimeServer.stop).not.toHaveBeenCalled();
 
     const createMapView = harness.registerView.mock.calls[0]?.[1] as
-      | ((leaf: { app?: unknown }) => { onClose: () => Promise<void> })
+      | ((leaf: { app?: unknown }) => { onOpen: () => Promise<void>; onClose: () => Promise<void> })
       | undefined;
     expect(createMapView).toBeDefined();
-    const closedView = createMapView?.({ app: harness.plugin.app });
-    await closedView?.onClose();
+    const closedView = createMapView?.({ app: harness.plugin.app }) as
+      | ({ contentEl: HTMLElement & { onWindowMigrated?: (listener: (win: Window) => void) => () => void } } & {
+          onOpen: () => Promise<void>;
+          onClose: () => Promise<void>;
+        })
+      | undefined;
+    expect(closedView).toBeDefined();
+    closedView!.contentEl.onWindowMigrated = vi.fn(() => () => undefined);
+    await closedView!.onOpen();
+    await closedView!.onClose();
 
     expect(runtimeServer.stop).toHaveBeenCalledTimes(1);
     expect((harness.plugin as unknown as { unityWebglServer: unknown }).unityWebglServer).toBeNull();
@@ -302,5 +374,59 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
 
     expect(focusA).toHaveBeenCalledWith("Folder/Note.md");
     expect(focusB).toHaveBeenCalledWith("Folder/Note.md");
+  });
+
+  it("shares one runtime server during concurrent cold starts", async () => {
+    const harness = createPluginHarness();
+    runtimeServerMock.delayBaseUrl = true;
+
+    const firstRuntimeUrl = harness.plugin.getUnityRuntimeUrl();
+    const secondRuntimeUrl = harness.plugin.getUnityRuntimeUrl();
+
+    expect(runtimeServerMock.instances).toHaveLength(1);
+    expect(runtimeServerMock.instances[0]?.getBaseUrl).toHaveBeenCalledTimes(1);
+
+    runtimeServerMock.resolvePendingBaseUrls();
+
+    await expect(Promise.all([firstRuntimeUrl, secondRuntimeUrl])).resolves.toEqual([
+      "http://127.0.0.1:7000/index.html",
+      "http://127.0.0.1:7000/index.html"
+    ]);
+  });
+
+  it("keeps the runtime server alive until the last map view lease is released", async () => {
+    const harness = createPluginHarness();
+    await harness.plugin.getUnityRuntimeUrl();
+    const runtimeServer = runtimeServerMock.instances[0];
+    const firstLease = harness.plugin.acquireMapViewRuntimeLease();
+    const secondLease = harness.plugin.acquireMapViewRuntimeLease();
+
+    await harness.plugin.releaseMapViewRuntimeLease(firstLease);
+
+    expect(runtimeServer?.stop).not.toHaveBeenCalled();
+
+    await harness.plugin.releaseMapViewRuntimeLease(secondLease);
+
+    expect(runtimeServer?.stop).toHaveBeenCalledTimes(1);
+    expect((harness.plugin as unknown as { unityWebglServer: unknown }).unityWebglServer).toBeNull();
+  });
+
+  it("stops a runtime server after in-flight startup when the last lease closes", async () => {
+    const harness = createPluginHarness();
+    runtimeServerMock.delayBaseUrl = true;
+    const lease = harness.plugin.acquireMapViewRuntimeLease();
+
+    const runtimeUrlPromise = harness.plugin.getUnityRuntimeUrl();
+    const releasePromise = harness.plugin.releaseMapViewRuntimeLease(lease);
+
+    expect(runtimeServerMock.instances).toHaveLength(1);
+    expect(runtimeServerMock.instances[0]?.stop).not.toHaveBeenCalled();
+
+    runtimeServerMock.resolvePendingBaseUrls();
+    await runtimeUrlPromise;
+    await releasePromise;
+
+    expect(runtimeServerMock.instances[0]?.stop).toHaveBeenCalledTimes(1);
+    expect((harness.plugin as unknown as { unityWebglServer: unknown }).unityWebglServer).toBeNull();
   });
 });

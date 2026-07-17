@@ -1,3 +1,11 @@
+/**
+ * Accessors for the `embedded-archive` release package mode.
+ *
+ * `scripts/package-embedded-archive.mjs` injects two window functions into
+ * root `main.js`: one returns the compressed Unity WebGL archive as base64,
+ * and the other returns the expected SHA-256. The installer reads both values
+ * here before extracting the runtime into a versioned local cache.
+ */
 const EMBEDDED_RUNTIME_ARCHIVE_BASE64_KEY =
   "__REVERYSKY_GET_EMBEDDED_RUNTIME_ARCHIVE_BASE64__";
 const EMBEDDED_RUNTIME_ARCHIVE_SHA256_KEY =
