@@ -2,6 +2,8 @@
 
 ReverySky currently supports three first-class package modes. Each mode writes the active generated plugin bundle to root `main.js`.
 
+This file explains package mode behavior and release shapes. The step-by-step export, import, build, install, and smoke workflow lives in `docs/WEBGL_INTEGRATION_RUNBOOK.md`.
+
 Before uploading release assets, open root `main.js` and verify its first line:
 
 ```js

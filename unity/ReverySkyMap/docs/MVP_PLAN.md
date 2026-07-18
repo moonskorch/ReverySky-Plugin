@@ -18,7 +18,6 @@ Current checkpoint:
 - Last completed step: `Step 8 (DONE)`.
 - Current runtime state: Unity WebGL runtime is integrated with the parent plugin flow (`bridge:ready` -> `graph:set`) and runs in Editor Play mode.
 - Current implementation step: `MVP complete (Unity scope)`.
-- Next execution track: `../../docs/BUGS_AND_FEATURES.md` (post-MVP bugs/features backlog).
 - Execution priority: use Unity MCP as default interface for Unity project access, verification, and Unity-state manipulations.
 
 ## Step 1 (DONE) - Create Unity runtime shell from legacy source

@@ -42,7 +42,7 @@ Main system parts:
   Depends on: CodeMirror `ViewUpdate`, Obsidian `editorInfoField`
 
 - Graph extraction and normalization
-  Converts vault files and resolved links into a stable graph payload with normalized paths, tags, dates, and note ids.
+  Converts vault files and resolved links into a stable graph payload with normalized paths, tags, dates, byte sizes, and note ids.
   Main code: `src/graph/VaultGraphBuilder.ts`, `src/graph/GraphNormalizer.ts`
   Depends on: Obsidian `vault` and `metadataCache`
 
@@ -185,7 +185,7 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 4. `src/view/MapSession.ts` -> `refreshGraphNow()` -> `emitGraphFromSource()`
    Rebuilds the source graph, applies the active filter, applies `showTags`, and includes `mapLayout`.
 5. `src/graph/VaultGraphBuilder.ts` -> `build(app)`
-   Reads markdown files from the vault, derives stable note ids, normalizes tags and paths, and builds links from `metadataCache.resolvedLinks`.
+   Reads markdown files from the vault, derives stable note ids, normalizes tags and paths, adds canonical date and byte-size fields, and builds links from `metadataCache.resolvedLinks`.
 6. `src/view/MapView.ts` -> `bridge.sendGraphSet(outgoingPayload)`
 7. `src/bridge/UnityIframeBridge.ts` -> `sendGraphSet()`
    Validates the payload with `MessageValidator`, builds a `graph:set` envelope, and calls `iframeWindow.postMessage(...)`.
@@ -298,6 +298,7 @@ For rename, `MapFocusController.onRename(...)` preserves focus only when the ren
   `buildGraphRelevantSignature(cache)` derives tags and outgoing links only ->
   unchanged signature returns before `markSemanticRefreshPending()` ->
   no `graph:set` or `note:focus`.
+  Size-only and date-only changes follow the same rule: they are included the next time a graph payload is rebuilt for another reason, but they do not independently trigger a live `graph:set`.
   Known limitation: an outstanding startup correction can still send one `graph:set` on the next global `metadataCache.resolved`; this is kept as a simple one-shot startup repair instead of adding graph equality comparison.
 
 - Graph-relevant metadata or link change:
@@ -375,6 +376,19 @@ For rename, `MapFocusController.onRename(...)` preserves focus only when the ren
 
 Open map leaves do not share live filter state. Each leaf's `MapSession` owns its own current filter, effective graph, bridge readiness, and refresh timers. Persistence remains one plugin-level snapshot, so later opens restore the most recently reported settings rather than per-window settings.
 
+### Path 7. View close -> bridge shutdown -> runtime lease release
+1. `src/view/MapView.ts` -> `MapView.onClose()`
+   Stops the `MapSession`, cancels deferred iframe rendering, disposes the runtime shell, and calls `bridge.shutdown(300)`.
+2. `src/bridge/UnityIframeBridge.ts` -> `shutdown(...)`
+   Sends `runtime:shutdown` with a generated `requestId` to the attached iframe and waits for a matching `runtime:shutdown-complete` or timeout.
+3. `unity-webgl/index.template.html` and `unity-webgl/index.disk-runtime.template.html`
+   The iframe wrapper enters shutdown mode, removes wrapper-owned bridge listeners, sends `runtime:shutdown` to Unity as a guard, and replies to the parent with `runtime:shutdown-complete`.
+4. `unity/ReverySkyMap/Assets/Scripts/Bridge/ObsidianBridge.cs`
+   Treats shutdown as a bridge guard so later `graph:set`, `note:focus`, and note-open sends are ignored by that runtime bridge instance.
+5. `MapView.onClose()` detaches the bridge and clears the view content if no newer open lifecycle replaced the closing iframe.
+6. `src/main.ts` -> map lifecycle close callback -> `releaseUnityRuntimeLease(...)`
+   Releases the view lease; `stopUnityRuntimeServer()` stops the shared loopback server only after the last open map leaf releases its lease.
+
 ### Key plugin-side control points
 
 - `src/main.ts` -> `ReverySkyMapPlugin`
@@ -418,7 +432,7 @@ Open map leaves do not share live filter state. Each leaf's `MapSession` owns it
   `MapSession` waits for `metadataCache.resolved` after graph-relevant `metadataCache.changed` events before treating `resolvedLinks` as ready for a live rebuild.
   On view startup, it also allows one correction refresh after the first `metadataCache.resolved` event so an early restored view does not keep an incomplete initial snapshot.
 
-- Stable note ids, normalized paths, normalized tags, and canonical note date are owned by the TypeScript graph layer.
+- Stable note ids, normalized paths, normalized tags, canonical note date, and byte-size value are owned by the TypeScript graph layer.
   They are built in `VaultGraphBuilder` and `GraphNormalizer`.
 
 - The effective graph after filters is owned by `MapSession`.
@@ -450,8 +464,8 @@ Open map leaves do not share live filter state. Each leaf's `MapSession` owns it
 - Filter panel visibility, active suggestion pane, and hide-delay timers are owned by `MapFilterPanelController`.
   They are UI-only transient state and are intentionally not persisted in plugin data.
 
-- Runtime notes, links, tag names, runtime mode, pending focus note id, and layout preference are owned by the Unity runtime.
-  They are stored in `MapRuntimeContext` and consumed by `Cartographer`. `PendingFocusNoteId` is a one-shot runtime delivery/materialization buffer; `FocusNode.FocusRestoreNoteId` is the map-continuity fallback across graph rebuilds.
+- Runtime notes, links, tag names, runtime mode, pending focus note id, layout preference, and note-length-derived visual scale are owned by the Unity runtime.
+  They are stored in `MapRuntimeContext` and consumed by `Cartographer`. `ObsidianBridge` maps bridge `size` to `NoteData.Length`, and `StarSO` uses the current runtime note set to derive relative star scale. `PendingFocusNoteId` is a one-shot runtime delivery/materialization buffer; `FocusNode.FocusRestoreNoteId` is the map-continuity fallback across graph rebuilds.
 
 - WebGL runtime serving is owned by `UnityWebglLocalServer`.
   The runtime is hosted locally from the selected runtime source, not from an external site.
@@ -470,6 +484,7 @@ Important current contract facts:
 - runtime-to-plugin messages are `bridge:ready`, `graph:ready`, `note:open`, and `runtime:shutdown-complete`;
 - plugin-to-runtime messages are `graph:set`, `runtime:status`, `note:focus`, and `runtime:shutdown`;
 - `path` values must stay vault-relative and use `/` separators;
+- `notes[].size` is a non-negative byte count produced from Obsidian file metadata and mapped to Unity `NoteData.Length`;
 - `graph:set` carries the effective filtered graph; focus changes are sent separately via `note:focus`, which must include both `id` and `path`;
 - ordinary `note:focus` dispatch is gated by the latest effective graph on the TypeScript side; active-note rename can bypass this gate to cover bridge ordering around path-derived ids;
 - `graph:ready` must echo the latest `graph:set` `requestId` before the iframe clears the loading status;
@@ -536,7 +551,7 @@ Detailed commands live in `docs/VERIFICATION.md`. This section only maps the mai
   Manual checks: verify `bridge:ready` -> `graph:set` flow in the map view
 
 - View execution paths, filter state, editor-focus routing, and note-open flow
-  Automated checks: `npm run test`, especially `tests/view/MapView.test.ts`, `tests/view/MapFilterPanelController.test.ts`, `tests/view/MarkdownEditorFocus.test.ts`, `tests/view/MapSession.test.ts`, and `tests/view/MapNoteOpenRouter.test.ts`
+  Automated checks: `npm run test`, especially `tests/view/MapView.test.ts`, `tests/view/MapFilterPanelController.test.ts`, `tests/view/MarkdownEditorFocus.test.ts`, `tests/view/MapSession.test.ts`, `tests/view/MapNoteOpenRouter.test.ts`, and `tests/bridge/UnityIframeBridge.test.ts`
   Manual checks: open the map, click into a markdown note, change filters, reopen the map, and open a note from the runtime
 
 - Map state persistence across close and reopen
@@ -556,3 +571,4 @@ Detailed commands live in `docs/VERIFICATION.md`. This section only maps the mai
 - TypeScript tests cover the plugin side well enough to show intent, but they do not prove the packaged Unity WebGL build is fresh.
 - Unity runtime quality depends on a new export plus a correct `scripts/import-unity-webgl.ps1` import step after Unity-side changes.
 - The repository contains source-of-truth docs, generated runtime assets, and tracked generated runtime inputs for `embedded-archive`; future work must keep those boundaries explicit to avoid editing the wrong surface.
+- Live metadata refresh currently keys off tags and outgoing links. Size-only or date-only changes can leave Unity visual scale or date layout stale until another graph refresh occurs.

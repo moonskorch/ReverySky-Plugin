@@ -27,7 +27,7 @@ General staged rules:
 - Do not apply destructive edits before explicit approval.
 - Keep one micro-batch per subsystem.
 - Stop on first regression and enter repair flow.
-- Treat batch completion as `verification + commit + ledger row`.
+- Treat batch completion as `verification + ledger row`; include a commit only when explicitly approved for that batch.
 
 ## MCP-First Operating Rule
 - Use Unity MCP as the primary interface for Unity project state access and Unity-side manipulations.
@@ -46,12 +46,14 @@ If mode is unclear, use the safer one.
 
 ## Task Definition Checklist
 Define before edits:
-- goal,
-- in-scope and out-of-scope,
-- likely affected Unity areas,
-- acceptance criteria,
-- verification plan,
-- rollback checkpoint source (for example editor local history/checkpoint).
+- Mode
+- Goal
+- Scope
+- Out of scope
+- Verification
+- Stop condition
+
+For risky cleanup or serialized Unity changes, also record the rollback checkpoint source, such as editor local history/checkpoint.
 
 ## Repair Loop
 If any check fails:

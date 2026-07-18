@@ -101,29 +101,21 @@ The full staging output remains local generated state. For attested `embedded-ar
 This lets GitHub Actions rebuild `main.js` from repository contents and attach artifact attestations to the release assets. The Unity WebGL runtime itself remains a prebuilt input produced by the local Unity export/import workflow.
 
 ### 4) Choose and build one package mode
-Use exactly one build command:
+Use exactly one build command. Detailed mode behavior lives in `docs/PACKAGING_MODES.md`.
 
 - `folder-runtime`
-  - Use for: local/manual Obsidian install.
-  - Build command: `npm.cmd run package:folder-runtime`
-  - Install files: `main.js`, `manifest.json`, `styles.css`, `unity-webgl\`
+  - Local/manual Obsidian install: `npm.cmd run package:folder-runtime`
 
 - `embedded-html`
-  - Use for: release-shaped HTML embedding check.
-  - Build command: `npm.cmd run package:embedded-html`
-  - Release assets: `main.js`, `manifest.json`, `styles.css`
+  - Release-shaped HTML embedding check: `npm.cmd run package:embedded-html`
 
 - `embedded-archive`
-  - Use for: current default release candidate.
-  - Build command: `npm.cmd run build`
+  - Current default release candidate: `npm.cmd run build`
   - Direct mode command: `npm.cmd run package:embedded-archive`
-  - Release assets: `main.js`, `manifest.json`, `styles.css`
 
 Notes:
 - `npm.cmd run build` currently calls `package:release-candidate`, which currently calls `package:embedded-archive`.
-- `folder-runtime` keeps `unity-webgl/` as a folder beside `main.js`.
-- Embedded modes package the prepared `unity-webgl/` runtime into `main.js`; do not upload `unity-webgl/` for embedded releases.
-- `manifest.json` and `styles.css` are static root release files. The generated output is `main.js`.
+- Package contents and mode-specific behavior are canonical in `docs/PACKAGING_MODES.md`.
 
 ### 5) Verify the chosen package
 Use the matching check command:

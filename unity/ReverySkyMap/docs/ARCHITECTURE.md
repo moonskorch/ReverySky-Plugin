@@ -25,7 +25,7 @@ Obsidian plugin
   - Main code location: `Assets/Scenes/StarScapeScene.unity`
   - Important dependencies: `GameInput`, `CameraOrbitalController`, `FocusNode`, `Cartographer`, `CartographerForcesEngine`, `Cartographer25DEngine`, `CartographerEngineRecursiveHubsEngine`, `ScapeCameraWarper`, `LineBuilder`, `CullingManager`, `FocusHighlighter`, `ChangeViewControl`, `RotateCameraUI`, `RotateHoldButton`, `Notification`
 - Bridge and runtime state
-  - Responsibility: validates inbound bridge envelopes, converts payloads into runtime models, stores the normalized source graph, and raises outbound events for parent bridge messages.
+  - Responsibility: validates inbound bridge envelopes, converts payloads into runtime models, stores the normalized source graph, derives direct note-neighbor counts, and raises outbound events for parent bridge messages.
   - Main code location: `Assets/Scripts/Bridge/ObsidianBridge.cs`, `Assets/Scripts/Bridge/MapRuntimeContext.cs`, `Assets/Scripts/Models/NoteData.cs`
   - Important dependencies: `Cartographer`, `MapRuntimeContext.OnNotesChanged`, `MapRuntimeContext.OnOpenNoteRequested`, `MapRuntimeContext.OnGraphReady`
 - Graph orchestration
@@ -49,8 +49,8 @@ Obsidian plugin
   - Main code location: `Assets/Scripts/GameInput/GameInput.cs`, `Assets/Scripts/StarScape/FocusNode.cs`, `Assets/Scripts/StarScape/FocusHighlighter.cs`, `Assets/Scripts/Camera/CameraOrbitalController.cs`, `Assets/Scripts/UI/ChangeViewControl.cs`, `Assets/Scripts/UI/RotateCameraUI.cs`, `Assets/Scripts/UI/RotateHoldButton.cs`
   - Important dependencies: `EventSystem`, `Camera.main`, `MapRuntimeContext`, `Cartographer.I`, `GameSettings`
 - Visual support objects
-  - Responsibility: provide prefabs, scale calibration, labels, shared culling consumers, notifications, and optional sample graph injection.
-  - Main code location: `Assets/Scripts/ScriptableObjects/StarSO.cs`, `Assets/Scripts/ScriptableObjects/TagNodeSO.cs`, `Assets/Scripts/StarScape/LabelPresenter.cs`, `Assets/Scripts/StarScape/BehaviourCullingTarget.cs`, `Assets/Scripts/Notification/Notification.cs`, `Assets/Scripts/StarScape/SampleDataGenerator.cs`
+  - Responsibility: provide prefabs, note-length scale calibration, direct-link crystal buckets, labels, shared culling consumers, notifications, and optional sample graph injection.
+  - Main code location: `Assets/Scripts/ScriptableObjects/StarSO.cs`, `Assets/Scripts/ScriptableObjects/TagNodeSO.cs`, `Assets/Scripts/StarScape/StarVisual.cs`, `Assets/Scripts/StarScape/LabelPresenter.cs`, `Assets/Scripts/StarScape/BehaviourCullingTarget.cs`, `Assets/Scripts/Notification/Notification.cs`, `Assets/Scripts/StarScape/SampleDataGenerator.cs`
   - Important dependencies: `MapRuntimeContext.NotesVersion`, `MapRuntimeContext.HasRuntimeNotes`, prefab assets in `Assets/Prefabs`
 - Automated checks
   - Responsibility: guard bridge parsing, layout rules, focus and highlight behavior, and PlayMode bootstrap and visual stability.
@@ -71,17 +71,18 @@ Obsidian plugin
 
 1. `ObsidianBridge.OnGraphSet(string json)` exits early during shutdown, rejects empty JSON, and parses the envelope with `JsonUtility.FromJson`.
 2. The bridge rejects payloads with a wrong `protocolVersion` or `type`, stores the envelope `requestId` in `MapRuntimeContext.GraphRequestId`, then normalizes the payload into `NoteData` and `MapRuntimeContext.RuntimeNoteLink` objects.
-3. Tags are de-duplicated by name, blank titles become `GameSettings.DefaultTitle`, invalid dates become `DateTime.MinValue`, and non-positive link weights are normalized to `1`.
-4. `MapRuntimeContext.SetTagNames`, `SetLinks`, and `SetNotes` store the runtime source of truth and raise `OnNotesChanged`.
-5. `Cartographer.HandleRuntimeNotesChanged()` calls `RebuildGraph(MapRuntimeContext.MapLayoutPreference)`.
-6. `Cartographer.ResolveModeByNotesCount()` uses `defaultEngine` first. Without an override, explicit `Dates` and `ScalableLinks` stay fixed, while `Auto` and `DynamicLinks` resolve by note count: small graphs use `DynamicLinks`, large graphs use `ScalableLinks`.
-7. The chosen engine runs `BuildGraph(notes)` and emits `OnNodesChanged` with the instantiated `Star` and `TagNode` scene objects.
-8. `Cartographer.HandleEngineNodesChanged(...)` builds `GraphIndex = MapGraphIndex.Build(stars, tagNodes, MapRuntimeContext.Links)`.
-9. `Cartographer` passes the same `GraphIndex` to `LineBuilder.Rebuild(...)` and `CullingManager.Rebuild(...)`; `OnGraphVisualsChanged` remains the raw-node notification surface.
-10. `BuildGraph(...)` applies `CurrentView`, rebinds the active `ScapeCameraWarper`, and logs build timing.
-11. After each non-transient index publication, `Cartographer.ApplyGraphFocus()` tries `MapRuntimeContext.PendingFocusNoteId` once, then tries `FocusNode.FocusRestoreNoteId`, then calls `ResetFocus()`.
-12. Transient empty publications from engine cleanup are ignored for focus reconciliation while runtime notes still exist, so a rebuild clear step does not erase pending or restored focus.
-13. When the active engine reaches its ready point, it calls `MapRuntimeContext.RequestGraphReady()`. `ObsidianBridge` forwards the matching `requestId` to JavaScript as `graph:ready`, unless the id is empty.
+3. Tags are trimmed and mapped by case-insensitive name to shared runtime tag ids, blank titles become `GameSettings.DefaultTitle`, invalid dates become `DateTime.MinValue`, and note size is clamped to `0` or greater.
+4. Links with empty endpoints or self-links are dropped, and non-positive link weights are normalized to `1`.
+5. `MapRuntimeContext.SetTagNames`, `SetLinks`, and `SetNotes` store the runtime source of truth. `SetNotes` derives each note's unique direct note-neighbor count from the current links, increments `NotesVersion`, and raises `OnNotesChanged`.
+6. `Cartographer.HandleRuntimeNotesChanged()` calls `RebuildGraph(MapRuntimeContext.MapLayoutPreference)`.
+7. `Cartographer.ResolveModeByNotesCount()` uses `defaultEngine` first. Without an override, explicit `Dates` and `ScalableLinks` stay fixed, while `Auto` and `DynamicLinks` resolve by note count: small graphs use `DynamicLinks`, large graphs use `ScalableLinks`.
+8. The chosen engine runs `BuildGraph(notes)` and emits `OnNodesChanged` with the instantiated `Star` and `TagNode` scene objects.
+9. `Cartographer.HandleEngineNodesChanged(...)` builds `GraphIndex = MapGraphIndex.Build(stars, tagNodes, MapRuntimeContext.Links)`.
+10. `Cartographer` passes the same `GraphIndex` to `LineBuilder.Rebuild(...)` and `CullingManager.Rebuild(...)`; `OnGraphVisualsChanged` remains the raw-node notification surface.
+11. `BuildGraph(...)` applies `CurrentView`, rebinds the active `ScapeCameraWarper`, and logs build timing.
+12. After each non-transient index publication, `Cartographer.ApplyGraphFocus()` tries `MapRuntimeContext.PendingFocusNoteId` once, then tries `FocusNode.FocusRestoreNoteId`, then calls `ResetFocus()`.
+13. Transient empty publications from engine cleanup are ignored for focus reconciliation while runtime notes still exist, so a rebuild clear step does not erase pending or restored focus.
+14. When the active engine reaches its ready point, it calls `MapRuntimeContext.RequestGraphReady()`. `ObsidianBridge` forwards the matching `requestId` to JavaScript as `graph:ready`, unless the id is empty.
 
 ### 3. Note focus, label emphasis, and open-note callback
 
@@ -183,6 +184,11 @@ Obsidian plugin
   - Code anchor: `Assets/Scripts/ScriptableObjects/StarSO.cs::Instantiate`
   - Entry point: called by the active layout engines while building stars
   - Calls / sends to: `MapRuntimeContext.NotesVersion`, `NoteData`, `Star`
+- `StarVisual`
+  - Responsibility: selects stable sphere material from note path and maps direct note-neighbor count into crystal visual buckets.
+  - Code anchor: `Assets/Scripts/StarScape/StarVisual.cs::ShowSphere`, `ShowCrystal`, `ResolveCrystalTypeByDirectLinkCount`
+  - Entry point: star prefab visual update
+  - Calls / sends to: `NoteData.Path`, `NoteData.DirectLinkCount`, `SphereMaterialCatalogSO`, `CrystalTypeScaleMapperSO`
 - `TagNodeSO`
   - Responsibility: supplies the tag-node prefab used by the layout engines that instantiate tags.
   - Code anchor: `Assets/Scripts/ScriptableObjects/TagNodeSO.cs`
@@ -257,7 +263,8 @@ Obsidian plugin
 
 ## State Ownership and Contracts
 
-- `MapRuntimeContext` is the source of truth for live runtime notes, links, tag names, runtime mode, pending focus note id, layout preference, and the `NotesVersion` counter. `PendingFocusNoteId` is a one-shot focus delivery/materialization buffer, not a durable remembered selection.
+- `MapRuntimeContext` is the source of truth for live runtime notes, links, tag names, pending focus note id, layout preference, graph request id, and the `NotesVersion` counter. `PendingFocusNoteId` is a one-shot focus delivery/materialization buffer, not a durable remembered selection.
+- `MapRuntimeContext.SetNotes()` derives `NoteData.DirectLinkCount` from unique direct note-note neighbors in `MapRuntimeContext.Links`. `StarVisual` reads that value to choose crystal buckets; layout engines do not own this visual metric.
 - `ObsidianBridge` owns bridge validation and all conversion from the JSON envelope into runtime models.
 - `Cartographer` owns engine selection, rebuild timing, current view, `GraphIndex` creation, and focus reconciliation after the index changes. The focus order is pending once, restore, then reset.
 - Unity does not decide whether a focused note belongs to the active Obsidian filter. The parent plugin gates ordinary focus by the effective graph; Unity pending only bridges the delay between a valid focus message and an indexed star.
@@ -282,6 +289,7 @@ Obsidian plugin
   - `path` values are treated as vault-relative and normalized with `/` separators when path lookup is needed.
   - Empty titles fall back to `GameSettings.DefaultTitle`.
   - Negative note sizes clamp to `0`.
+  - Empty link endpoints and self-links are dropped.
   - Non-positive link weights normalize to `1`.
   - Unknown bridge fields are ignored.
 - `Cartographer.ResolveModeByNotesCount()` uses `defaultEngine` first, then preserves explicit `Dates` and `ScalableLinks`, then resolves `Auto` and `DynamicLinks` by the note-count threshold.

@@ -18,7 +18,7 @@ Current checkpoint:
 - Last completed step: `Step 18 (DONE)`.
 - Current renderer in Obsidian view: Unity WebGL runtime loaded from `unity-webgl/`.
 - Unity runtime project shell is created and scene starts in Unity Editor.
-- Current implementation step: `Post-MVP stabilization and iterative delivery from bugs/features backlog`.
+- Current implementation step: `Post-MVP stabilization and iterative delivery`.
 
 ## Step 1 (DONE) - Plugin skeleton with custom map view
 
@@ -575,15 +575,15 @@ Likely risks:
 - Event storms, rebuild churn, and missing release assets.
 
 Post-step note:
-- Length-driven node-size recalculation on text typing is intentionally deferred and tracked in `docs/BUGS_AND_FEATURES.md`.
+- Length-driven node-size recalculation on text typing is intentionally deferred beyond the completed MVP scope.
 
 ## Post-MVP operating mode
 
 Goal:
-- Treat MVP as delivered and continue with backlog-driven iteration.
+- Treat MVP as delivered and continue with incremental owner-directed iteration.
 
 Execution policy:
-1. Use `docs/BUGS_AND_FEATURES.md` as the working backlog for bugfixes and feature slices.
-2. Keep changes incremental: one focused behavior slice per task with explicit verification.
-3. Preserve current bridge/runtime stability gates (`npm run test`, `npm run build`, Unity checks when Unity runtime code changes).
-4. Revisit architecture-level changes only when backlog evidence shows a concrete need.
+1. Keep changes incremental: one focused behavior slice per task with explicit verification.
+2. Preserve current bridge/runtime stability gates (`npm run test`, `npm run build`, Unity checks when Unity runtime code changes).
+3. Revisit architecture-level changes only when concrete implementation evidence shows a need.
+4. Do not append new active work items to this completed MVP plan.

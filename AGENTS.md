@@ -3,10 +3,6 @@
 ## Project Overview
 - This repository contains an Obsidian desktop plugin (`reverysky-map`).
 - It renders vault relationships in a Unity WebGL runtime inside a custom Obsidian view.
-- Source docs:
-  - `docs/ARCHITECTURE.md` for architecture
-  - `docs/MVP_PLAN.md` for delivery
-  - `docs/BUGS_AND_FEATURES.md` for the post-MVP backlog
 
 ## Tech Stack
 - TypeScript plugin code in `src/` bundled with `esbuild`.
@@ -23,21 +19,19 @@
 - `src/graph/`: vault graph extraction and normalization.
 - `src/runtime/`: local HTTP server for Unity WebGL assets.
 - `unity/ReverySkyMap/`: Unity project source used to build WebGL export.
-- `unity-webgl/index.template.html`, `unity-webgl/index.disk-runtime.template.html`: tracked runtime host templates.
+- `unity-webgl/index.template.html` and `unity-webgl/index.disk-runtime.template.html`: tracked runtime host templates.
 - `unity-webgl/Build/build-config.json`, `runtime-entry.js`, `runtime-core.js`, `runtime-data.*`, `runtime-code.*`: tracked compact runtime input for `embedded-archive`.
-- `unity-webgl/index.html`, other `unity-webgl/Build/*`, `unity-webgl/TemplateData/*`: generated local artifacts.
-- `docs/`: architecture, data contract, risks, MVP plan, verification, and runbooks.
-- `docs/BUGS_AND_FEATURES.md`: post-MVP backlog for confirmed bugs and feature slices.
-- `.local-notes/`: local private notes; may be checked during task execution.
+- `unity-webgl/index.html`, other `unity-webgl/Build/*`, and `unity-webgl/TemplateData/*`: generated local artifacts.
+- `docs/`: architecture, data contract, risks, plans, verification, and runbooks.
+- `.local-notes/`: local private notes; may be checked for relevant task context.
 - `reference/ReverySky`: reference-only workspace; never a restore baseline.
 
 ## Development Commands
 - Install deps: `npm install`
-- Common plugin commands: `npm run dev`, `npm run build`, `npm run check`, `npm run test`
-- Full verification command matrix: `docs/VERIFICATION.md`
-- UI visual regression commands: `docs/VERIFICATION.md`
+- Common plugin commands: `npm run dev`, `npm run build`, `npm run check`, `npm run test`.
+- Verification command matrix and UI visual regression commands: `docs/VERIFICATION.md`
 - Unity export import: `powershell -ExecutionPolicy Bypass -File .\scripts\import-unity-webgl.ps1 -ExportRoot "<UnityWebGLExportRoot>"`
-- Full workflow for clean setup and manual validation: `docs/WEBGL_INTEGRATION_RUNBOOK.md`
+- Clean setup, WebGL import, packaging, and local smoke workflow: `docs/WEBGL_INTEGRATION_RUNBOOK.md`
 
 ## Core Rules
 - Bridge protocol version and payload contract live in `docs/DATA_CONTRACT.md`.
@@ -46,11 +40,18 @@
 - Unity runtime is served from a local loopback HTTP server (`127.0.0.1`), not external hosting.
 - Do not modify `*.unity`, `*.prefab`, `*.asset`, or `*.meta` unless the task explicitly requires it.
 - If such files must change, say which ones and why before editing.
+- `reference/ReverySky` may be used only for targeted comparison or selective fragment adaptation, not rollback, reset, or bulk-copy.
 
 ## Workflow And Verification
-- Before edits, define a compact task contract with `Mode`, `Goal`, `Scope`, `Out of scope`, `Verification`, and `Stop condition`.
-- For substantial MVP work, use `docs/MVP_PLAN.md`; after MVP, use `docs/BUGS_AND_FEATURES.md`.
-- Use `docs/AGENT_WORKFLOW.md` for task modes, repair loop, and final report shape.
+- Before edits, define a compact task contract with:
+  - `Mode`
+  - `Goal`
+  - `Scope`
+  - `Out of scope`
+  - `Verification`
+  - `Stop condition`
+- For substantial MVP work, use `docs/MVP_PLAN.md`; after MVP, use the owner request and current docs as the task source.
+- Use `docs/AGENT_WORKFLOW.md` for task modes, scope control, repair loop, and final report shape.
 - Use `docs/VERIFICATION.md` as the canonical verification policy and command matrix.
 - For non-documentation tasks, run automated checks before manual checks.
 - For bridge/runtime changes, verify the end-to-end `bridge:ready` -> `graph:set` flow.
@@ -74,6 +75,7 @@
 - Use `apply_patch` for source/doc edits.
 - Avoid shell rewrite commands.
 - Avoid destructive git history operations.
+- Use `apply_patch` for source/doc edits; avoid shell rewrite commands.
 - Keep edits small and targeted.
 - Optionally check `.local-notes/` for relevant local documentation before making implementation decisions.
 
@@ -87,17 +89,11 @@
 - Treat large generated binaries and embedded payload files as noise by default.
 
 ## Known Giant Blob Denylist
+- Avoid loading or pasting generated artifacts or large binaries unless necessary.
 - Never read fully unless explicitly requested:
   - `unity-webgl/index.html`
-  - `unity/ReverySkyMap/Assets/_Visuals/Nebula Skyboxes/Nebula_01_Cubemap.exr`
-  - `unity/ReverySkyMap/Assets/_Visuals/Nebula Skyboxes/Nebula_02_Cubemap.exr`
-  - `unity/ReverySkyMap/Assets/_Visuals/Nebula Skyboxes/Nebula_03_Cubemap.exr`
-  - `unity/ReverySkyMap/Assets/_Visuals/Nebula Skyboxes/Nebula_04_Cubemap.exr`
-  - `reference/ReverySky/Assets/_Visuals/Nebula Skyboxes/Nebula_01_Cubemap.exr`
-  - `reference/ReverySky/Assets/_Visuals/Nebula Skyboxes/Nebula_02_Cubemap.exr`
-  - `reference/ReverySky/Assets/_Visuals/Nebula Skyboxes/Nebula_03_Cubemap.exr`
-  - `reference/ReverySky/Assets/_Visuals/Nebula Skyboxes/Nebula_04_Cubemap.exr`
   - WebGL `GameAssembly.a` artifacts
+  - Unity/`reference` nebula cubemap `.exr` files
   - `unity/ReverySkyMap/Library/PackageCache/com.unity.burst@973857688024/.Runtime/libburst-llvm-19.dylib`
 - For these files, use metadata-only inspection by default.
 - If new files larger than 100 MB are discovered, add them to this denylist.
@@ -112,8 +108,7 @@
 - If an edit cannot be represented as a visible patch, stop and ask before editing.
 - For risky or multi-file edits, confirm a fresh rollback point exists in VS Code Timeline/Checkpoints before editing.
 - After edits, report only actually changed files.
-- Git read-only commands are allowed by default for inspection only.
-- Any git command that changes working tree, index, commits, refs, or remotes requires explicit user approval.
+- Git read-only commands are allowed for inspection only; any command that changes the working tree, index, commits, refs, or remotes requires explicit approval.
 - Commits and history rewrite are forbidden by default.
 - Rejected or reverted attempts must be reported as `no persistent file change`.
 
@@ -123,7 +118,6 @@
 - Task workflow, repair loop, and final report policy: `docs/AGENT_WORKFLOW.md`
 - Delivery sequence and manual acceptance checks: `docs/MVP_PLAN.md`
 - Verification policy and command matrix: `docs/VERIFICATION.md`
-- Post-MVP bug and feature backlog: `docs/BUGS_AND_FEATURES.md`
 - Risk register and mitigations: `docs/RISKS.md`
 - Build/import/install operations: `docs/WEBGL_INTEGRATION_RUNBOOK.md`
 
@@ -136,7 +130,7 @@
 ## UI Changes
 - For plugin-side UI implementation, screenshot matching, visual polish, and visual regressions, use the `ui-polish` skill.
 
-### Preserve non-obvious decisions
-During implementation, add a short inline comment or JSDoc only when the code contains a non-obvious constraint, invariant, or deliberate trade-off that cannot be made clear through naming or structure.
-Do not add comments that restate the code.
+## Code Comments
+- Add a short inline comment or JSDoc only for a non-obvious constraint, invariant, or trade-off that cannot be made clear through naming or structure.
+- Do not add comments that restate the code.
 
