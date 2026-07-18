@@ -65,6 +65,18 @@ function createSession() {
 
 const SUGGESTIONS_HIDDEN_CLASS = "reverysky-map-filter-suggestions--hidden";
 
+type ObsidianTestHTMLElement = HTMLElement & {
+  createEl: <K extends keyof HTMLElementTagNameMap>(tagName: K) => HTMLElementTagNameMap[K];
+};
+
+function createObsidianTestContainer(): ObsidianTestHTMLElement {
+  const container = document.createElement("div") as ObsidianTestHTMLElement;
+  if (typeof container.createEl !== "function") {
+    throw new Error("Obsidian createEl mock is not installed.");
+  }
+  return container;
+}
+
 describe("MapFilterPanelController", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -79,7 +91,7 @@ describe("MapFilterPanelController", () => {
 
     const session = createSession();
     const controller = new MapFilterPanelController(session);
-    const container = document.createElement("div");
+    const container = createObsidianTestContainer();
     controller.render(container);
 
     const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
@@ -100,7 +112,7 @@ describe("MapFilterPanelController", () => {
     const session = createSession();
     await session.setState({ pathFilterQuery: "tag:#project" });
     const controller = new MapFilterPanelController(session);
-    const container = document.createElement("div");
+    const container = createObsidianTestContainer();
     controller.render(container);
 
     const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
@@ -118,7 +130,7 @@ describe("MapFilterPanelController", () => {
   it("applies operator and value suggestions to the active query", () => {
     const session = createSession();
     const controller = new MapFilterPanelController(session);
-    const container = document.createElement("div");
+    const container = createObsidianTestContainer();
     controller.render(container);
 
     const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
@@ -146,7 +158,7 @@ describe("MapFilterPanelController", () => {
     session.start(() => undefined);
 
     const controller = new MapFilterPanelController(session);
-    const container = document.createElement("div");
+    const container = createObsidianTestContainer();
     controller.render(container);
 
     const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
@@ -175,7 +187,7 @@ describe("MapFilterPanelController", () => {
     const persistRenderScale = vi.spyOn(session, "persistRenderScale");
     session.start(() => undefined);
     const controller = new MapFilterPanelController(session);
-    const container = document.createElement("div");
+    const container = createObsidianTestContainer();
     controller.render(container);
 
     const renderScaleInput = container.querySelector(".reverysky-map-render-scale-input") as HTMLInputElement;

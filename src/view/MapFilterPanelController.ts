@@ -10,7 +10,7 @@ import {
 const FILTER_SUGGESTIONS_HIDE_DELAY_MS = 120;
 
 type ObsidianHTMLElement = HTMLElement & {
-  createEl?: <K extends keyof HTMLElementTagNameMap>(tagName: K) => HTMLElementTagNameMap[K];
+  createEl: <K extends keyof HTMLElementTagNameMap>(tagName: K) => HTMLElementTagNameMap[K];
   setAttr?: (name: string, value: string) => void;
 };
 
@@ -38,8 +38,8 @@ export class MapFilterPanelController {
 
   constructor(private readonly session: MapSession) {}
 
-  render(container: HTMLElement): HTMLElement {
-    const root = createChild(container as ObsidianHTMLElement, "div") as ObsidianHTMLElement;
+  render(container: ObsidianHTMLElement): ObsidianHTMLElement {
+    const root = createChild(container, "div") as ObsidianHTMLElement;
     root.className = "reverysky-map-root";
 
     const iframeFallback = createChild(root, "div");
@@ -728,11 +728,5 @@ function createChild<K extends keyof HTMLElementTagNameMap>(
   element: ObsidianHTMLElement,
   tagName: K
 ): HTMLElementTagNameMap[K] {
-  if (typeof element.createEl === "function") {
-    return element.createEl(tagName);
-  }
-
-  const child = element.ownerDocument.createElement(tagName);
-  element.appendChild(child);
-  return child;
+  return element.createEl(tagName);
 }

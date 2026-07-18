@@ -13,6 +13,7 @@ export const MAP_VIEW_TYPE = "reverysky-map-view";
 type BridgePort = Pick<UnityIframeBridge, "attach" | "detach" | "shutdown" | "sendGraphSet" | "sendNoteFocus"> &
   Partial<Pick<UnityIframeBridge, "sendStatus">>;
 type ObsidianHTMLElement = HTMLElement & {
+  createEl: <K extends keyof HTMLElementTagNameMap>(tagName: K) => HTMLElementTagNameMap[K];
   empty?: () => void;
   setAttr?: (name: string, value: string) => void;
 };
@@ -178,7 +179,7 @@ export class MapView extends ItemView {
       return;
     }
 
-    const iframe = container.ownerDocument.createElement("iframe");
+    const iframe = iframeHost.createEl("iframe");
     iframe.src = this.createRuntimeIframeSrc(iframeSrc, this.now());
     iframe.className = "reverysky-map-iframe";
     if (typeof iframe.setAttr === "function") {
@@ -186,7 +187,6 @@ export class MapView extends ItemView {
     } else {
       iframe.setAttribute("title", "ReverySky Map");
     }
-    iframeHost.appendChild(iframe);
 
     const iframeLoadAbortController = new AbortController();
     this.iframeLoadAbortController = iframeLoadAbortController;

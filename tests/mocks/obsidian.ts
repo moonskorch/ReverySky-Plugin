@@ -1,3 +1,13 @@
+if (typeof HTMLElement !== "undefined" && typeof HTMLElement.prototype.createEl !== "function") {
+  HTMLElement.prototype.createEl = function <K extends keyof HTMLElementTagNameMap>(
+    tagName: K
+  ): HTMLElementTagNameMap[K] {
+    const child = document.createElement(tagName);
+    this.appendChild(child);
+    return child;
+  };
+}
+
 export class Plugin {
   public app: unknown;
   public manifest: { id: string };
