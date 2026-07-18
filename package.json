@@ -1,6 +1,6 @@
 {
   "name": "reverysky-obsidian-plugin",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "private": true,
   "description": "ReverySky Map Obsidian plugin",
   "engines": {
