@@ -281,7 +281,7 @@ export class MapView extends ItemView {
     try {
       return Promise.resolve(this.onLifecycleClose(lease));
     } catch (error) {
-      return Promise.reject(error);
+      return Promise.reject(error instanceof Error ? error : new Error("Failed to close the map runtime lifecycle."));
     }
   }
 
