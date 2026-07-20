@@ -125,7 +125,7 @@ The ReverySky Map WebGL view was built with Unity® software and includes Unity-
 
 Because the bundled runtime is large, plugin files may not be transferred by sync services with per-file size limits. Install the plugin separately on each device when necessary.
 
-See the [third-party notices](unity/ReverySkyMap/Assets/ThirdPartyNotices.txt) for bundled visual assets and runtime dependencies.
+See the [Third-Party Notices](unity/ReverySkyMap/Assets/ThirdPartyNotices.txt) for bundled visual assets and runtime dependencies.
 
 ### WebAssembly module
 
@@ -144,8 +144,7 @@ The built plugin uses several third-party visual assets. Their raw source files
 are intentionally excluded from Git and must be added manually for local Unity
 development.
 
-See [third-party notices](unity/ReverySkyMap/Assets/ThirdPartyNotices.txt) and
-[Unity setup instructions](unity/ReverySkyMap/Assets/README.txt).
+See [Third-Party Notices](unity/ReverySkyMap/Assets/ThirdPartyNotices.txt) and [Unity setup instructions](unity/ReverySkyMap/Assets/README.txt).
 
 ## Feedback and support
 
