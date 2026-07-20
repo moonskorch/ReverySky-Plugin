@@ -12,26 +12,8 @@ ReverySky Map embeds a 3D Unity WebGL map view in Obsidian for inspecting vault 
 
 ## Installation
 
-You can install ReverySky Map in one of two ways:
+Install [ReverySky Map](https://community.obsidian.md/plugins/reverysky-map) from Obsidian Community plugins.
 
-### Official release
-
-Once ReverySky Map is available in Obsidian Community plugins, install it from Obsidian:
-
-1. Open **Settings → Community plugins → Browse**.
-2. Search for **ReverySky Map**.
-3. Install and enable the plugin.
-
-### Beta release via BRAT
-
-You can also install the plugin via [BRAT](https://github.com/TfTHacker/obsidian42-brat):
-
-1. Install and enable **BRAT** in Obsidian.
-2. Add this beta plugin repository:
-
-   `https://github.com/moonskorch/ReverySky-Plugin`
-
-3. Enable **ReverySky Map** in Obsidian’s Community plugins settings.
 
 ## Opening the map
 
