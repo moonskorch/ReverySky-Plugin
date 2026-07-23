@@ -1,6 +1,6 @@
 # ReverySky Map
 
-![ReverySky Map header](docs/assets/reverysky-map-header.jpg)
+![header](docs/assets/reverysky-map-header.jpg)
 
 ReverySky Map embeds a 3D Unity WebGL map view in Obsidian for inspecting vault structure. It builds the view from Markdown notes, resolved links, tags, note dates, and file metadata, then keeps the runtime in sync with the active filter and focused note.
 
@@ -21,6 +21,8 @@ After enabling the plugin, you can open the map in either of two ways:
 
 - Click the left ribbon button **Toggle ReverySky Map**.
 - Run **ReverySky Map: Open map** from the command palette.
+
+![demo](docs/assets/reverysky-map-demo.webp)
 
 ## Visual quality
 
