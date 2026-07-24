@@ -1,19 +1,27 @@
-# ReverySky Map
-
 ![header](docs/assets/reverysky-map-header.jpg)
 
-ReverySky Map embeds a 3D Unity WebGL map view in Obsidian for inspecting vault structure. It builds the view from Markdown notes, resolved links, tags, note dates, and file metadata, then keeps the runtime in sync with the active filter and focused note.
+**ReverySky Map** is an interactive 3D graph that lets you explore your vault as a connected universe. It runs on a bundled Unity WebGL runtime with live graph updates and integrated note navigation.
 
-## Requirements
+## Features
 
-- Obsidian 1.12.7 or later
-- Desktop only
-- WebGL-compatible graphics hardware and drivers
+* A dynamic force-directed layout for smaller graphs
+* A wide panoramic starfield for larger, denser graphs
+* A chronological layout that arranges notes by date
+* Combined filters by path, tag, and date
+* Opening notes from the graph and highlighting the active note
+* Pan, zoom, rotation, and timeline navigation
+* Detailed and simplified display modes
+* Graphs with or without tag nodes
+* Longer notes appear as larger nodes; more connected nodes glow brighter
+* Stress-tested with graphs of up to 10,000 notes
+
+![demo](docs/assets/reverysky-map-demo.webp)
 
 ## Installation
 
 Install [ReverySky Map](https://community.obsidian.md/plugins/reverysky-map) from Obsidian Community plugins.
 
+**Requirements:** Obsidian 1.12.7 or later, desktop only, and WebGL-compatible graphics hardware.
 
 ## Opening the map
 
@@ -21,8 +29,6 @@ After enabling the plugin, you can open the map in either of two ways:
 
 - Click the left ribbon button **Toggle ReverySky Map**.
 - Run **ReverySky Map: Open map** from the command palette.
-
-![demo](docs/assets/reverysky-map-demo.webp)
 
 ## Visual quality
 
