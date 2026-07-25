@@ -13,7 +13,7 @@ describe("Unity WebGL runtime templates", () => {
     const html = readFileSync(path.join(repoRoot, templatePath), "utf8");
 
     expect(html).toContain('const runtimeBootFailureStatus = "Unity runtime failed. Try restarting Obsidian.";');
-    expect(html).toContain('const webglContextLostStatus = "WebGL context lost. Reload the map view.";');
+    expect(html).toContain('const webglContextLostStatus = "WebGL context lost. Reload the graph view.";');
     expect(html).toContain("const resizeDebounceMs = 200;");
     expect(html).toContain("const maxCanvasSidePixels = 8192;");
     expect(html).toContain("const maxCanvasPixels = maxCanvasSidePixels * maxCanvasSidePixels;");

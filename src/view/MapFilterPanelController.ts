@@ -44,7 +44,7 @@ export class MapFilterPanelController {
 
     const iframeFallback = createChild(root, "div");
     iframeFallback.className = "reverysky-map-iframe-fallback";
-    iframeFallback.textContent = "Loading map runtime...";
+    iframeFallback.textContent = "Loading graph runtime...";
 
     const iframeHost = createChild(root, "div") as ObsidianHTMLElement;
     iframeHost.className = "reverysky-map-iframe-host";
@@ -184,7 +184,7 @@ export class MapFilterPanelController {
 
     const layoutSectionTitle = createChild(layoutSection as ObsidianHTMLElement, "div");
     layoutSectionTitle.className = "reverysky-map-filter-field-label";
-    layoutSectionTitle.textContent = "Map layout";
+    layoutSectionTitle.textContent = "Layout";
 
     const layoutSelectHost = createChild(layoutSection as ObsidianHTMLElement, "div");
     layoutSelectHost.className = "reverysky-map-engine-select-host";
@@ -196,7 +196,7 @@ export class MapFilterPanelController {
       optionEl.textContent = option.label;
     }
     layoutDropdown.classList.add("reverysky-map-engine-select");
-    layoutDropdown.setAttribute("aria-label", "Select map layout");
+    layoutDropdown.setAttribute("aria-label", "Select layout");
     layoutDropdown.addEventListener("change", () => {
       this.session.setMapLayoutPreference(layoutDropdown.value);
       this.refreshLayoutDropdownUi();
@@ -692,7 +692,7 @@ export class MapFilterPanelController {
     this.renderScaleValueEl.textContent = `${formattedValue}x`;
 
     const restartRequired = uiState.renderScaleRestartRequired;
-    this.renderScaleMessageEl.textContent = restartRequired ? "Reopen the map view to apply." : "";
+    this.renderScaleMessageEl.textContent = restartRequired ? "Reopen the graph view to apply." : "";
     this.renderScaleMessageEl.classList.toggle(
       "reverysky-map-render-scale-message--hidden",
       !restartRequired

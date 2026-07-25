@@ -21,7 +21,7 @@ import { MapFocusController } from "./MapFocusController";
 
 const GRAPH_REFRESH_DEBOUNCE_MS = 250;
 const FILTER_INPUT_DEBOUNCE_MS = 500;
-const METADATA_RESOLVE_STATUS = "Updating map data...";
+const METADATA_RESOLVE_STATUS = "Updating graph data...";
 const MAX_FOLDER_SUGGESTIONS = 80;
 const MAX_TAG_SUGGESTIONS = 200;
 export const DEFAULT_RENDER_SCALE = 1;
@@ -75,7 +75,7 @@ export type MapSessionDependencies = {
 };
 
 /**
- * Coordinates the non-DOM map session state that must survive view re-renders:
+ * Coordinates the non-DOM graph session state that must survive view re-renders:
  * graph refresh timing, persisted filters, and bridge-facing focus coordination.
  */
 export class MapSession {
@@ -94,7 +94,7 @@ export class MapSession {
   private semanticRefreshPending = false;
   private startupRefreshPending = false;
   private noteSignatureByPath = new Map<string, string>();
-  // Plugin-side map focus, updated from both TS focus dispatch and Unity note-open.
+  // Plugin-side graph focus, updated from both TS focus dispatch and Unity note-open.
   private focusPath = "";
   private bridgeReady = false;
   private refreshTimer: number | null = null;

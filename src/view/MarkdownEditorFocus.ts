@@ -12,7 +12,7 @@ export function handleMarkdownEditorFocusUpdate(
   update: MarkdownEditorFocusUpdate,
   onMarkdownFocus: (path: string) => void
 ): void {
-  // Only a real focus gain should move map focus; selection and content updates are ignored.
+  // Only a real focus gain should move graph focus; selection and content updates are ignored.
   if (!update.focusChanged || !update.view.hasFocus) {
     return;
   }

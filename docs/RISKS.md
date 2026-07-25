@@ -37,17 +37,17 @@ Mitigation:
 
 ## Embedded HTML main.js size
 - `embedded-html` embeds the self-contained Unity WebGL HTML into root `main.js`;
-- runtime starts lazily when the map view opens;
+- runtime starts lazily when the graph view opens;
 - packaged `main.js` size and Obsidian startup behavior must be measured;
 - dashboard submission and scan status are tracked separately from package-mode behavior;
 - generated package output stays outside Git.
 
 ## Embedded archive cache extraction
 - `embedded-archive` embeds a compressed Unity runtime archive in root `main.js`;
-- the first map open extracts the runtime into `.reverysky-runtime/<version>/`;
+- the first graph open extracts the runtime into `.reverysky-runtime/<version>/`;
 - later opens and later Obsidian restarts reuse the cache without network download;
 - archive validation and cache replacement must stay strict to avoid partial installs;
-- normal map-view startup is serialized by the plugin runtime URL owner, so multiple map leaves do not independently extract the same cache;
+- normal graph-view startup is serialized by the plugin runtime URL owner, so multiple graph leaves do not independently extract the same cache;
 - accepted residual risk: plugin lifecycle interruption during the first extraction could leave a transient missing or invalid cache if a second plugin instance starts preparing the same version before the first one finishes;
 - impact is limited to Unity runtime startup for that version; vault data and user notes are not affected, and a later startup can rebuild the cache;
 - do not add file-locking or claim-file complexity unless user reports show this recovery path fails in normal use;
@@ -92,48 +92,48 @@ Mitigation:
 * Do not treat this as a ReverySky WebGL shutdown or iframe cleanup bug.
 * Do not change Unity runtime shutdown, iframe teardown, or note-opening layout behavior solely to work around this external issue.
 * If users report Obsidian becoming sluggish after closing complex popout layouts, recommend reloading Obsidian.
-* Reconsider a ReverySky-specific workaround only if there are user reports that map popouts commonly trigger this issue in normal use.
+* Reconsider a ReverySky-specific workaround only if there are user reports that graph popouts commonly trigger this issue in normal use.
 
 ## 8. Native Note Open Routing with Popout Windows
 
 Risk:
 
-* Note clicks from the Unity WebGL map are delivered through an iframe bridge, so Obsidian may not treat the map view as the active workspace leaf before `app.workspace.openLinkText(...)` runs.
+* Note clicks from the Unity WebGL graph are delivered through an iframe bridge, so Obsidian may not treat the graph view as the active workspace leaf before `app.workspace.openLinkText(...)` runs.
 * When popout windows are present, Obsidian may route the native open action to whichever workspace context it currently considers active.
-* This can make map node clicks open notes in either the main workspace or a popout window, depending on Obsidian's active workspace state.
+* This can make graph node clicks open notes in either the main workspace or a popout window, depending on Obsidian's active workspace state.
 
 Mitigation:
 
 * Keep note opening delegated to Obsidian with `app.workspace.openLinkText(...)`.
 * Do not use `OpenViewState.group` for note opening; that field is tied to workspace grouping behavior and can create linked-pane side effects.
 * Do not force `workspace.setActiveLeaf(...)` solely to steer main-window versus popout routing unless user reports show the native behavior is worse than the focus-state risk.
-* Keep active-note tracking global so markdown navigation inside popout windows can still update map focus.
+* Keep active-note tracking global so markdown navigation inside popout windows can still update graph focus.
 
-## 9. Unexpected Multiple Map Leaves
+## 9. Unexpected Multiple Graph Leaves
 
 Risk:
 
-* The plugin command intentionally opens and owns a single ReverySky map leaf: repeated open actions reveal the existing leaf instead of creating another one.
-* Obsidian workspace state, saved layouts, plugin reload timing, or manual workspace manipulation may still create more than one ReverySky map leaf.
-* Multiple map leaves are tolerated as a recovery case, but they are not the primary workflow.
-* Runtime server startup and shutdown are owned by the plugin and shared across open map leaves.
-* Each open map leaf owns an independent `MapSession`, graph snapshot, filter state, bridge lifecycle, focus gate, refresh timer, and Obsidian event listeners.
-* Accepted cost: if several map leaves are open, graph-relevant vault or metadata events can trigger one refresh path per leaf.
-* Open map leaves keep their own in-memory filter/session state, but persistence restores only the most recently reported state on later opens.
+* The plugin command intentionally opens and owns a single ReverySky 3D Graph leaf: repeated open actions reveal the existing leaf instead of creating another one.
+* Obsidian workspace state, saved layouts, plugin reload timing, or manual workspace manipulation may still create more than one ReverySky 3D Graph leaf.
+* Multiple graph leaves are tolerated as a recovery case, but they are not the primary workflow.
+* Runtime server startup and shutdown are owned by the plugin and shared across open graph leaves.
+* Each open graph leaf owns an independent `MapSession`, graph snapshot, filter state, bridge lifecycle, focus gate, refresh timer, and Obsidian event listeners.
+* Accepted cost: if several graph leaves are open, graph-relevant vault or metadata events can trigger one refresh path per leaf.
+* Open graph leaves keep their own in-memory filter/session state, but persistence restores only the most recently reported state on later opens.
 
 Mitigation:
 
 * Keep `activateMapView()` single-leaf behavior intact.
-* Keep plugin-level runtime server ownership serialized and lease-based so one map leaf cannot stop the server while another leaf is active.
+* Keep plugin-level runtime server ownership serialized and lease-based so one graph leaf cannot stop the server while another leaf is active.
 * Keep cleanup and focus broadcast paths defensive where Obsidian exposes array-based leaf APIs.
 * Keep independent per-leaf sessions unless real performance reports justify a shared source-graph cache.
-* Before making multi-map behavior a first-class feature, define per-view persisted state ownership and whether graph refresh should remain per-leaf or move to a plugin-level cache.
+* Before making multi-graph behavior a first-class feature, define per-view persisted state ownership and whether graph refresh should remain per-leaf or move to a plugin-level cache.
 
 ## 10. Iframe Navigation Failure During Obsidian Window Migration
 
 Risk:
 
-* Moving the map view between the main window and an Obsidian popout can put iframe navigation into an Electron-owned transition state.
+* Moving the graph view between the main window and an Obsidian popout can put iframe navigation into an Electron-owned transition state.
 * The iframe may stay on an empty `about:blank` document, and DevTools may report `index.html:1 Uncaught illegal access`.
 * The failure happens before the Unity wrapper has built its normal runtime DOM.
 
@@ -141,7 +141,7 @@ Mitigation:
 
 * Handle Obsidian window migration as a runtime iframe restart point.
 * Defer the fresh iframe navigation until after the migration callback returns.
-* Keep the parent-side `Loading map runtime...` fallback visible behind the iframe so a failed or delayed runtime page is not a silent black screen.
+* Keep the parent-side `Loading graph runtime...` fallback visible behind the iframe so a failed or delayed runtime page is not a silent black screen.
 * Treat remaining reports as Electron/Obsidian iframe lifecycle edge cases first.
 * Do not change graph emission, Unity layout, or bridge payload contracts solely for this symptom.
 
@@ -155,7 +155,7 @@ Risk:
 Mitigation:
 
 * Keep the iframe wrapper's `webglcontextlost` handling explicit.
-* Show the runtime status `WebGL context lost. Reload the map view.` when context loss is detected.
+* Show the runtime status `WebGL context lost. Reload the graph view.` when context loss is detected.
 * Prefer user-visible reload guidance over complex automatic recovery unless repeated user reports show that a controlled restart is necessary.
 
 ## 12. Runtime Startup May Never Reach `bridge:ready`
@@ -175,7 +175,7 @@ Mitigation:
 
 ## Architecture Risks and Hardening Plan
 
-The core architecture is intentional: ReverySky Map embeds a Unity WebGL runtime inside an Obsidian plugin and sends live graph data across several runtime boundaries.
+The core architecture is intentional: ReverySky 3D Graph embeds a Unity WebGL runtime inside an Obsidian plugin and sends live graph data across several runtime boundaries.
 
 The documentation now explicitly separates local WebGL hosting from bridge messaging. The remaining risks are not about understanding the architecture, but about keeping the cross-runtime bridge stable as the project evolves.
 

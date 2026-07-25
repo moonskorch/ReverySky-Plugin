@@ -131,14 +131,14 @@ describe("UnityIframeBridge", () => {
     const iframeWindow = { postMessage } as unknown as Window;
 
     bridge.attach(iframeWindow, {});
-    bridge.sendStatus(" Updating map data... ");
+    bridge.sendStatus(" Updating graph data... ");
 
     expect(postMessage).toHaveBeenCalledTimes(1);
     const [message, targetOrigin] = postMessage.mock.calls[0] as [Record<string, unknown>, string];
     expect(targetOrigin).toBe("*");
     expect(message.type).toBe("runtime:status");
     expect(message.protocolVersion).toBe(BRIDGE_PROTOCOL_VERSION);
-    expect(message.payload).toEqual({ text: "Updating map data..." });
+    expect(message.payload).toEqual({ text: "Updating graph data..." });
     bridge.detach();
   });
 

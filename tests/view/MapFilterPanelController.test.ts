@@ -178,7 +178,7 @@ describe("MapFilterPanelController", () => {
     expect(renderScaleInput.value).toBe("1.2");
     expect(renderScaleValue.textContent).toBe("1.2x");
     expect(renderScaleMessage.textContent).toBe("");
-    expect(container.textContent).toContain("Map layout");
+    expect(container.textContent).toContain("Layout");
     expect(message.textContent).toBe("");
   });
 
@@ -200,7 +200,7 @@ describe("MapFilterPanelController", () => {
     expect(session.getState()).toMatchObject({ renderScale: 1.3 });
     expect(persistRenderScale).not.toHaveBeenCalled();
     expect(renderScaleValue.textContent).toBe("1.3x");
-    expect(renderScaleMessage.textContent).toBe("Reopen the map view to apply.");
+    expect(renderScaleMessage.textContent).toBe("Reopen the graph view to apply.");
     expect(renderScaleMessage.classList.contains("reverysky-map-render-scale-message--hidden")).toBe(false);
 
     renderScaleInput.dispatchEvent(new Event("change"));

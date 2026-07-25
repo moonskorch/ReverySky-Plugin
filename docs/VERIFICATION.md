@@ -41,7 +41,7 @@ Core commands:
 
 Current TS baseline test suites:
 - `tests/main.test.ts`
-  - validates plugin lifecycle, map view activation, toggle behavior, persisted map-view state, and runtime URL resolution.
+  - validates plugin lifecycle, graph view activation, toggle behavior, persisted graph-view state, and runtime URL resolution.
 - `tests/bridge/MessageValidator.test.ts`
   - validates valid payload path;
   - validates invalid payload path (date, noteCount mismatch, invalid weight, empty required fields);
@@ -75,13 +75,13 @@ Current TS baseline test suites:
 - `tests/view/MapSession.test.ts`
   - validates session state normalization, graph refresh timing, filtering, focus precedence, and render-scale reopen state.
 - `tests/view/MapFilterPanelController.test.ts`
-  - validates settings panel controls, suggestions, map layout selection, tags toggle, and render-scale slider UI state.
+  - validates settings panel controls, suggestions, layout selection, tags toggle, and render-scale slider UI state.
 - `tests/view/MapNoteOpenRouter.test.ts`
   - validates note-open payload resolution and Obsidian workspace routing handoff.
 
 Current visual regression suites:
 - `tests/visual/engine-dropdown.spec.ts`
-  - validates the map layout dropdown focused state in the preview harness.
+  - validates the layout dropdown focused state in the preview harness.
 - `tests/visual/tags-toggle-off.spec.ts`
   - validates the tags toggle off state in the preview harness.
 
@@ -106,7 +106,7 @@ Additional automated checks when available:
 
 Manual checks:
 - Load plugin in Obsidian dev vault.
-- Open the map view.
+- Open the graph view.
 - Check developer console.
 
 ## Graph/data changes
@@ -149,7 +149,7 @@ Required checks when relevant:
 
 Manual smoke check:
 1. Open test vault.
-2. Open the map view.
+2. Open the graph view.
 3. Confirm Unity/WebGL runtime loads.
 4. Confirm bridge:ready.
 5. Confirm graph:set reaches runtime.

@@ -25,10 +25,19 @@ async function readJson(relativePath) {
 async function main() {
   const manifest = await readJson("manifest.json");
   const packageJson = await readJson("package.json");
+  const packageLock = await readJson("package-lock.json");
   const versionsJson = await readJson("versions.json");
 
   if (packageJson.version !== manifest.version) {
     fail(`Version mismatch: manifest.json=${manifest.version}, package.json=${packageJson.version}.`);
+  }
+  if (packageLock.version !== manifest.version) {
+    fail(`Version mismatch: manifest.json=${manifest.version}, package-lock.json=${packageLock.version}.`);
+  }
+  if (packageLock.packages?.[""]?.version !== manifest.version) {
+    fail(
+      `Version mismatch: manifest.json=${manifest.version}, package-lock.json packages[""]=${packageLock.packages?.[""]?.version}.`
+    );
   }
   if (versionsJson[manifest.version] !== manifest.minAppVersion) {
     fail(

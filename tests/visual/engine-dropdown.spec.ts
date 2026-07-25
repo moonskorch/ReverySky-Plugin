@@ -11,7 +11,7 @@ test.use({
   }
 });
 
-test.describe("map layout dropdown", () => {
+test.describe("layout dropdown", () => {
   test("map-layout-dropdown-focused", async ({ page }) => {
     const previewPath = path.resolve(process.cwd(), "tests/visual/engine-dropdown.preview.html");
     await page.goto(pathToFileURL(previewPath).href);

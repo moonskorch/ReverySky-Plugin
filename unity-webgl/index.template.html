@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ReverySky Map Runtime</title>
+    <title>ReverySky 3D Graph Runtime</title>
     <style>
       html,
       body {
@@ -101,7 +101,7 @@
     <main class="wrap">
       <section class="card">
         <div id="canvas-viewport" class="canvas-stack">
-          <canvas id="unity-canvas" aria-label="ReverySky map runtime"></canvas>
+          <canvas id="unity-canvas" aria-label="ReverySky 3D Graph runtime"></canvas>
           <div id="map-status" role="status" aria-live="polite" aria-atomic="true">
             <div class="map-status-content">
               <div class="map-status-line">
@@ -129,7 +129,7 @@
         const buildConfigPath = buildPath + "build-config.json";
         const renderScale = getRenderScale();
         const runtimeBootFailureStatus = "Unity runtime failed. Try restarting Obsidian.";
-        const webglContextLostStatus = "WebGL context lost. Reload the map view.";
+        const webglContextLostStatus = "WebGL context lost. Reload the graph view.";
         const resizeDebounceMs = 200;
         const maxCanvasSidePixels = 8192;
         const maxCanvasPixels = maxCanvasSidePixels * maxCanvasSidePixels;

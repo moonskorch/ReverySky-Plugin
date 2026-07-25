@@ -1,4 +1,4 @@
-﻿# ReverySky Map Bridge Data Contract
+﻿# ReverySky 3D Graph Bridge Data Contract
 
 ## Protocol Version
 - `protocolVersion`: `2.0.0`
@@ -65,7 +65,7 @@ Parent -> runtime wrapper:
   "protocolVersion": "2.0.0",
   "type": "runtime:status",
   "payload": {
-    "text": "Updating map data..."
+    "text": "Updating graph data..."
   }
 }
 ```
@@ -157,7 +157,7 @@ type GraphLink = {
 - Invalid envelopes are rejected with explicit, non-fatal error reporting.
 - Unity runtime ingest is fail-soft: it treats `vault.noteCount` as informational (uses `notes` as source of truth).
 - Unity runtime ingest is fail-soft for unresolved links: missing endpoints are tolerated at ingest and dropped later during edge resolution.
-- `mapLayout` is optional and controls the preferred runtime map layout selection when the consumer supports it.
+- `mapLayout` is optional and controls the preferred runtime layout selection when the consumer supports it.
 
 ## Unity Runtime Usage Reference
 - Unity-side field-to-behavior mapping, runtime defaults, and ingestion-specific fallbacks are documented in `unity/ReverySkyMap/docs/DATA_CONTRACT.md` under `Runtime Field Usage (Unity)`.

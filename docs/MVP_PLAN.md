@@ -1,4 +1,4 @@
-# ReverySky Map MVP Plan
+# ReverySky 3D Graph MVP Plan
 
 This plan is implementation-focused and split into minimal, testable steps.
 All steps are desktop-first and keep `reference/` untouched.
@@ -20,10 +20,10 @@ Current checkpoint:
 - Unity runtime project shell is created and scene starts in Unity Editor.
 - Current implementation step: `Post-MVP stabilization and iterative delivery`.
 
-## Step 1 (DONE) - Plugin skeleton with custom map view
+## Step 1 (DONE) - Plugin skeleton with custom graph view
 
 Goal:
-- Create minimal Obsidian plugin scaffold and register a dedicated map view.
+- Create minimal Obsidian plugin scaffold and register a dedicated graph view.
 
 Files likely affected:
 - `manifest.json`
@@ -34,11 +34,11 @@ Files likely affected:
 
 Acceptance criteria:
 - Plugin loads in Obsidian desktop without errors.
-- Command `Open map` opens an empty custom view pane.
+- Command `Open` opens an empty custom view pane.
 
 Manual test steps:
 1. Load plugin in a dev vault.
-2. Run command `Open map`.
+2. Run command `Open`.
 3. Confirm custom view opens and survives app reload.
 
 Likely risks:
@@ -54,11 +54,11 @@ Files likely affected:
 - `src/view/MapView.ts`
 
 Acceptance criteria:
-- Map view shows embedded placeholder page inside Obsidian.
+- Graph view shows embedded placeholder page inside Obsidian.
 - No external web server required in runtime.
 
 Manual test steps:
-1. Open map view.
+1. Open graph view.
 2. Confirm placeholder page appears.
 3. Reload plugin and verify page still loads.
 
@@ -81,7 +81,7 @@ Acceptance criteria:
 - Plugin can send `graph:set` envelope without runtime error.
 
 Manual test steps:
-1. Open map view with dev console visible.
+1. Open graph view with dev console visible.
 2. Verify ready message is logged.
 3. Trigger reload and confirm no duplicate listeners.
 
@@ -104,7 +104,7 @@ Acceptance criteria:
 
 Manual test steps:
 1. Prepare vault with 3-5 notes.
-2. Open map view and inspect generated payload in debug log.
+2. Open graph view and inspect generated payload in debug log.
 3. Confirm each note has path/title/date fields.
 
 Likely risks:
@@ -125,7 +125,7 @@ Acceptance criteria:
 
 Manual test steps:
 1. Create notes with wiki-links and markdown links.
-2. Reopen map and inspect edge list.
+2. Reopen graph and inspect edge list.
 3. Verify links resolve to existing note IDs when possible.
 
 Likely risks:
@@ -153,10 +153,10 @@ Manual test steps:
 Likely risks:
 - Contract drift between TS and Unity models.
 
-## Step 7 (DONE) - HTML fallback graph render in map view
+## Step 7 (DONE) - HTML fallback graph render in graph view
 
 Goal:
-- Render first working graph (nodes/edges) in embedded map page via existing bridge and payload.
+- Render first working graph (nodes/edges) in embedded graph page via existing bridge and payload.
 
 Files likely affected:
 - `unity-webgl/index.html`
@@ -168,7 +168,7 @@ Acceptance criteria:
 - Graph updates after bridge refresh.
 
 Manual test steps:
-1. Open map view.
+1. Open graph view.
 2. Confirm nodes and links are visible.
 3. Edit links in vault and confirm counts update after refresh cycle.
 
@@ -307,12 +307,12 @@ Files likely affected:
 - `src/view/MapView.ts`
 
 Acceptance criteria:
-- Obsidian map view loads Unity runtime locally.
+- Obsidian graph view loads Unity runtime locally.
 - `bridge:ready` + `graph:set` work end-to-end.
 
 Manual test steps:
 1. Build WebGL and copy output into `unity-webgl/`.
-2. Open map view in Obsidian.
+2. Open graph view in Obsidian.
 3. Verify Unity initializes and renders graph payload.
 
 Likely risks:

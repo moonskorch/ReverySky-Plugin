@@ -65,4 +65,4 @@ jobs:
             --verify-tag \
             --draft \
             --title "$TAG" \
-            --notes "Attested ReverySky Map release assets."
+            --notes "Release assets were built, verified, and attested by GitHub Actions."

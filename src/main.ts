@@ -24,7 +24,7 @@ type PersistedPluginData = {
  */
 export default class ReverySkyMapPlugin extends Plugin {
   /**
-   * Single loopback WebGL host shared by every open map view in this plugin instance.
+   * Single loopback WebGL host shared by every open graph view in this plugin instance.
    */
   private unityWebglServer: UnityWebglLocalServer | null = null;
 
@@ -33,7 +33,7 @@ export default class ReverySkyMapPlugin extends Plugin {
    *
    * This is deliberately not a permanent URL cache: it exists only while the
    * server source is being prepared or the local server is binding to a port.
-   * Concurrent map views await the same promise so a cold start cannot create
+   * Concurrent graph views await the same promise so a cold start cannot create
    * more than one local server.
    */
   private unityRuntimeUrlPromise: Promise<string> | null = null;
@@ -47,7 +47,7 @@ export default class ReverySkyMapPlugin extends Plugin {
   private readonly unityRuntimeInstaller = new EmbeddedUnityRuntimeInstaller();
 
   /**
-   * Active map-view holds on the shared runtime server.
+   * Active graph view holds on the shared runtime server.
    *
    * These are not Obsidian leaves. Each Symbol is a short-lived lease returned
    * to one MapView on open and released on close. The server stays alive while
@@ -56,10 +56,10 @@ export default class ReverySkyMapPlugin extends Plugin {
   private readonly serverLeases = new Set<symbol>();
 
   /**
-   * Last plugin-level map view state loaded from or written to Obsidian plugin data.
+   * Last plugin-level graph view state loaded from or written to Obsidian plugin data.
    *
    * This intentionally remains a single shared snapshot rather than per-window
-   * state: duplicate map views are tolerated as a recovery edge case, but the
+   * state: duplicate graph views are tolerated as a recovery edge case, but the
    * supported reopen path restores the most recently persisted filter/layout
    * settings.
    */
@@ -83,13 +83,13 @@ export default class ReverySkyMapPlugin extends Plugin {
       })
     );
 
-    this.addRibbonIcon("sparkles", "Toggle ReverySky Map", async () => {
+    this.addRibbonIcon("sparkles", "Toggle ReverySky 3D Graph", async () => {
       await this.toggleMapView();
     });
 
     this.addCommand({
       id: "open-map",
-      name: "Open map",
+      name: "Open",
       callback: async () => {
         await this.activateMapView();
       }
@@ -110,7 +110,7 @@ export default class ReverySkyMapPlugin extends Plugin {
 
   onunload(): void {
     void this.cleanupOnUnload().catch((error: unknown) => {
-      console.error("Failed to unload ReverySky Map plugin.", error);
+      console.error("Failed to unload ReverySky 3D Graph plugin.", error);
     });
   }
 
@@ -129,7 +129,7 @@ export default class ReverySkyMapPlugin extends Plugin {
   /**
    * Start the WebGL host lazily and reuse it for every iframe load.
    *
-   * If two Obsidian windows restore map views at the same time, both calls must
+   * If two Obsidian windows restore graph views at the same time, both calls must
    * join the same startup work instead of racing to create separate servers.
    */
   async getUnityRuntimeUrl(): Promise<string> {
@@ -285,7 +285,7 @@ export default class ReverySkyMapPlugin extends Plugin {
     }
 
     void this.persistMapViewState().catch((error: unknown) => {
-      console.error("Failed to persist ReverySky Map state.", error);
+      console.error("Failed to persist ReverySky 3D Graph state.", error);
     });
   }
 

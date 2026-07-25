@@ -15,7 +15,6 @@ type BridgePort = Pick<UnityIframeBridge, "attach" | "detach" | "shutdown" | "se
 type ObsidianHTMLElement = HTMLElement & {
   createEl: <K extends keyof HTMLElementTagNameMap>(tagName: K) => HTMLElementTagNameMap[K];
   empty?: () => void;
-  setAttr?: (name: string, value: string) => void;
 };
 
 export type MapViewDependencies = {
@@ -30,7 +29,7 @@ export type MapViewDependencies = {
 };
 
 /**
- * Own the Obsidian view shell and iframe bridge lifecycle around the Unity map.
+ * Own the Obsidian view shell and iframe bridge lifecycle around the Unity graph.
  * Filter-panel interactions and note-open routing live in dedicated collaborators.
  */
 export class MapView extends ItemView {
@@ -92,7 +91,7 @@ export class MapView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "ReverySky Map";
+    return "ReverySky 3D Graph";
   }
 
   requestEditorFocus(path: string): void {
@@ -182,11 +181,7 @@ export class MapView extends ItemView {
     const iframe = iframeHost.createEl("iframe");
     iframe.src = this.createRuntimeIframeSrc(iframeSrc, this.now());
     iframe.className = "reverysky-map-iframe";
-    if (typeof iframe.setAttr === "function") {
-      iframe.setAttr("title", "ReverySky Map");
-    } else {
-      iframe.setAttribute("title", "ReverySky Map");
-    }
+    iframe.setAttribute("title", "ReverySky 3D Graph");
 
     const iframeLoadAbortController = new AbortController();
     this.iframeLoadAbortController = iframeLoadAbortController;
@@ -281,7 +276,7 @@ export class MapView extends ItemView {
     try {
       return Promise.resolve(this.onLifecycleClose(lease));
     } catch (error) {
-      return Promise.reject(error instanceof Error ? error : new Error("Failed to close the map runtime lifecycle."));
+      return Promise.reject(error instanceof Error ? error : new Error("Failed to close the graph runtime lifecycle."));
     }
   }
 

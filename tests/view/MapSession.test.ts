@@ -391,7 +391,7 @@ describe("MapSession", () => {
       { links: [{ link: "RefA" }], tags: [{ tag: "#tag-a" }] }
     );
 
-    expect(sendStatus).toHaveBeenCalledWith("Updating map data...");
+    expect(sendStatus).toHaveBeenCalledWith("Updating graph data...");
     vi.advanceTimersByTime(5000);
     expect(buildGraph).toHaveBeenCalledTimes(1);
     expect(sendGraph).toHaveBeenCalledTimes(1);

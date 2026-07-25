@@ -1,14 +1,15 @@
 {
   "name": "reverysky-obsidian-plugin",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "private": true,
-  "description": "ReverySky Map Obsidian plugin",
+  "description": "ReverySky 3D Graph Obsidian plugin",
   "engines": {
     "node": "22.18.0",
     "npm": "10.9.3"
   },
   "scripts": {
     "dev": "node esbuild.config.mjs",
+    "bump-version": "node scripts/bump-version.mjs",
     "build": "npm run package:release-candidate",
     "check": "npm run check:package:release-candidate && npm run test",
     "check:unity-webgl": "node scripts/check-unity-webgl-artifacts.mjs",

@@ -191,10 +191,10 @@ function createPlaceholderIndexHtml() {
     "<head>",
     '  <meta charset="utf-8" />',
     '  <meta name="viewport" content="width=device-width, initial-scale=1" />',
-    "  <title>ReverySky Map</title>",
+    "  <title>ReverySky 3D Graph</title>",
     "</head>",
     "<body>",
-    "  <div>ReverySky Map</div>",
+    "  <div>ReverySky 3D Graph</div>",
     "</body>",
     "</html>"
   ].join("\n") + "\n";

@@ -139,10 +139,11 @@ describe("MapView bridge integration", () => {
     expect(iframe).not.toBeNull();
     const fallback = view.contentEl.querySelector(".reverysky-map-iframe-fallback");
     const iframeHost = view.contentEl.querySelector(".reverysky-map-iframe-host");
-    expect(fallback?.textContent).toBe("Loading map runtime...");
+    expect(fallback?.textContent).toBe("Loading graph runtime...");
     expect(fallback?.nextElementSibling).toBe(iframeHost);
     expect(iframeHost?.childElementCount).toBe(1);
     expect(iframeHost?.firstElementChild).toBe(iframe);
+    expect(iframe?.getAttribute("title")).toBe("ReverySky 3D Graph");
     expect(iframe?.getAttribute("src")).toBe(
       "http://127.0.0.1:7777/index.html?t=1700000000000&renderScale=1"
     );

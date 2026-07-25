@@ -165,7 +165,7 @@ Folder-runtime install files:
 
 Local Obsidian smoke check:
 1. Reload community plugins.
-2. Run command: `Open map`.
+2. Run command: `Open`.
 3. Confirm the view opens and runtime initializes.
 
 Detailed package mode reference lives in `docs/PACKAGING_MODES.md`.
