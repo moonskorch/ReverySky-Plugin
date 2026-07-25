@@ -21,6 +21,8 @@
 
 Install [ReverySky 3D Graph](https://community.obsidian.md/plugins/reverysky-map) from Obsidian Community plugins.
 
+Download and installation may take some time because the plugin includes a bundled Unity WebGL runtime.
+
 **Requirements:** Obsidian 1.12.7 or later, desktop only, and WebGL-compatible graphics hardware.
 
 ## Opening the graph
