@@ -10,10 +10,14 @@ public class ObsidianBridgeEditModeTests
   private GameObject bridgeObject;
   private ObsidianBridge bridge;
   private GameObject cartographerObject;
+  private int originalTargetFrameRate;
+  private int originalVSyncCount;
 
   [SetUp]
   public void SetUp()
   {
+    originalTargetFrameRate = Application.targetFrameRate;
+    originalVSyncCount = QualitySettings.vSyncCount;
     ResetRuntimeContext();
     SetCartographerSingleton(null);
     bridgeObject = new GameObject("ObsidianBridgeEditModeTests");
@@ -29,6 +33,9 @@ public class ObsidianBridgeEditModeTests
 
     if (bridgeObject != null)
       Object.DestroyImmediate(bridgeObject);
+
+    Application.targetFrameRate = originalTargetFrameRate;
+    QualitySettings.vSyncCount = originalVSyncCount;
   }
 
   [Test]
@@ -508,6 +515,38 @@ public class ObsidianBridgeEditModeTests
     Assert.That(MapRuntimeContext.PendingFocusNoteId, Is.EqualTo("a1"));
   }
 
+  [Test]
+  public void OnRuntimeSettings_AppliesFrameRateModes()
+  {
+    bridge.OnRuntimeSettings(TestPayloads.RuntimeSettingsAutoPayload);
+    Assert.That(QualitySettings.vSyncCount, Is.EqualTo(1));
+    Assert.That(Application.targetFrameRate, Is.EqualTo(-1));
+
+    bridge.OnRuntimeSettings(TestPayloads.RuntimeSettingsFps60Payload);
+    Assert.That(QualitySettings.vSyncCount, Is.EqualTo(0));
+    Assert.That(Application.targetFrameRate, Is.EqualTo(60));
+
+    bridge.OnRuntimeSettings(TestPayloads.RuntimeSettingsFps30Payload);
+    Assert.That(QualitySettings.vSyncCount, Is.EqualTo(0));
+    Assert.That(Application.targetFrameRate, Is.EqualTo(30));
+
+    bridge.OnRuntimeSettings(TestPayloads.RuntimeSettingsFps24Payload);
+    Assert.That(QualitySettings.vSyncCount, Is.EqualTo(0));
+    Assert.That(Application.targetFrameRate, Is.EqualTo(24));
+  }
+
+  [Test]
+  public void OnRuntimeSettings_InvalidEnvelope_IsRejectedWithoutMutation()
+  {
+    QualitySettings.vSyncCount = 2;
+    Application.targetFrameRate = -1;
+
+    LogAssert.Expect(LogType.Warning, new Regex("\\[ObsidianBridge\\] Ignoring runtime:settings due to protocolVersion mismatch\\."));
+    bridge.OnRuntimeSettings(TestPayloads.RuntimeSettingsProtocolMismatchPayload);
+    Assert.That(QualitySettings.vSyncCount, Is.EqualTo(2));
+    Assert.That(Application.targetFrameRate, Is.EqualTo(-1));
+  }
+
   private static void ResetRuntimeContext()
   {
     MapRuntimeContext.MapLayoutPreference = MapLayoutMode.Auto;
@@ -685,6 +724,21 @@ public class ObsidianBridgeEditModeTests
 
     public const string NoteFocusTypeMismatchPayload =
       "{\"protocolVersion\":\"2.0.0\",\"type\":\"note:open\",\"payload\":{\"id\":\"a2\"}}";
+
+    public const string RuntimeSettingsAutoPayload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"runtime:settings\",\"payload\":{\"frameRateMode\":\"auto\"}}";
+
+    public const string RuntimeSettingsFps60Payload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"runtime:settings\",\"payload\":{\"frameRateMode\":\"fps60\"}}";
+
+    public const string RuntimeSettingsFps30Payload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"runtime:settings\",\"payload\":{\"frameRateMode\":\"fps30\"}}";
+
+    public const string RuntimeSettingsFps24Payload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"runtime:settings\",\"payload\":{\"frameRateMode\":\"fps24\"}}";
+
+    public const string RuntimeSettingsProtocolMismatchPayload =
+      "{\"protocolVersion\":\"9.9.9\",\"type\":\"runtime:settings\",\"payload\":{\"frameRateMode\":\"fps30\"}}";
 
     public const string ProtocolMismatchPayload =
       "{\"protocolVersion\":\"9.9.9\",\"type\":\"graph:set\",\"payload\":{\"notes\":[" +

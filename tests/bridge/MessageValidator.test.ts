@@ -56,6 +56,22 @@ describe("MessageValidator", () => {
     expect(errors).toContain("payload.mapLayout must be one of: auto, dynamicLinks, dates, scalableLinks");
   });
 
+  it("accepts runtime settings payload with a valid frame-rate mode", () => {
+    const errors = MessageValidator.validateRuntimeSettingsPayload({
+      frameRateMode: "fps60"
+    });
+
+    expect(errors).toEqual([]);
+  });
+
+  it("rejects runtime settings payload with an invalid frame-rate mode", () => {
+    const errors = MessageValidator.validateRuntimeSettingsPayload({
+      frameRateMode: "turbo"
+    });
+
+    expect(errors).toContain("payload.frameRateMode must be one of: auto, fps60, fps30, fps24");
+  });
+
   it("rejects incoming bridge:ready message with protocol mismatch", () => {
     const errors = MessageValidator.validateIncomingReadyMessage({
       type: "bridge:ready",

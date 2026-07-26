@@ -11,6 +11,7 @@ If this file conflicts with canonical contract, canonical contract wins.
 - `protocolVersion` must match expected version exactly.
 - Runtime-ready signal is `bridge:ready`.
 - Runtime ingestion message is `graph:set`.
+- Runtime settings message is `runtime:settings`.
 - Runtime graph completion signal is `graph:ready`.
 - Runtime shutdown message is `runtime:shutdown`.
 
@@ -33,6 +34,30 @@ Required fields for Unity ingestion:
 
 Optional field:
 - `requestId` (string; parent builds now provide this for `graph:set` so Unity can echo it in `graph:ready`)
+
+## Runtime Settings Handling
+`runtime:settings` applies Unity runtime settings without rebuilding graph data.
+
+Parent -> runtime:
+
+```json
+{
+  "protocolVersion": "2.0.0",
+  "type": "runtime:settings",
+  "payload": {
+    "frameRateMode": "auto"
+  }
+}
+```
+
+Unity-side behavior:
+- The iframe JavaScript wrapper forwards `runtime:settings` to `ObsidianBridge.OnRuntimeSettings(string json)` after Unity is ready.
+- `ObsidianBridge.OnRuntimeSettings` rejects wrong `protocolVersion` and wrong `type`.
+- `payload.frameRateMode` accepts `auto`, `fps60`, `fps30`, or `fps24`.
+- `auto` sets `Application.targetFrameRate = -1` and `QualitySettings.vSyncCount = 1`.
+- Fixed modes set `QualitySettings.vSyncCount = 0` and `Application.targetFrameRate` to `60`, `30`, or `24`.
+- Unknown runtime-side mode values fall back to `auto` with a warning; the parent TypeScript bridge validates and should not send them.
+- Applying `runtime:settings` must not call `MapRuntimeContext.SetNotes`, rebuild graph data, reset focus, or recreate the iframe.
 
 ## Graph Ready Handling
 `graph:ready` is Unity's completion acknowledgement for one parent `graph:set`.
@@ -75,6 +100,7 @@ Unity-side behavior:
 - The iframe JS wrapper forwards shutdown to `ObsidianBridge.OnRuntimeShutdown(string json)` when the Unity instance can receive messages.
 - `ObsidianBridge.OnRuntimeShutdown` marks the bridge as shutting down and unsubscribes from `MapRuntimeContext.OnOpenNoteRequested` and `MapRuntimeContext.OnGraphReady`.
 - After shutdown, `ObsidianBridge.OnGraphSet` and `ObsidianBridge.OnNoteFocus` return without processing.
+- After shutdown, `ObsidianBridge.OnRuntimeSettings` returns without changing frame-rate state.
 - After shutdown, `HandleOpenNoteRequested` and `HandleGraphReadyRequested` return without sending outbound bridge events.
 
 Non-goals:
@@ -98,6 +124,12 @@ type GraphPayload = {
 };
 
 type MapLayoutPreference = "auto" | "dynamicLinks" | "dates" | "scalableLinks";
+
+type RuntimeSettingsPayload = {
+  frameRateMode: FrameRateMode;
+};
+
+type FrameRateMode = "auto" | "fps60" | "fps30" | "fps24";
 
 type GraphNoteNode = {
   id: string;
@@ -123,6 +155,7 @@ type GraphLink = {
 - `path` is vault-relative with `/` separators.
 - Links with missing note ids are tolerated at ingest and dropped later during Forces edge resolution.
 - `mapLayout`, when provided, must be one of: `auto`, `dynamicLinks`, `dates`, `scalableLinks`.
+- `runtime:settings.payload.frameRateMode` must be one of: `auto`, `fps60`, `fps30`, `fps24`.
 - Unknown fields are ignored, not fatal.
 
 ## Runtime Field Usage (Unity)
@@ -143,6 +176,8 @@ Current runtime behavior snapshot for Unity ingestion and map interaction:
   - fallback: negative size maps to `0`.
 - `mapLayout` -> preferred runtime map layout for the next graph build.
   - expected mapping: `auto` = threshold-based selection (`DynamicLinks` for small graphs, `ScalableLinks` for large graphs), `dynamicLinks` = links map preference with the same large-graph fallback to `ScalableLinks`, `dates` = explicit dates map preference, `scalableLinks` = explicit scalable links map preference.
+- `runtime:settings.payload.frameRateMode` -> live Unity frame-rate mode.
+  - expected mapping: `auto` = vSync on and platform/browser cadence, `fps60` = software cap at 60 FPS, `fps30` = software cap at 30 FPS, `fps24` = software cap at 24 FPS.
 - envelope `requestId` -> copied to `MapRuntimeContext.GraphRequestId` and echoed through `graph:ready` after the active engine reaches its ready point.
 - `links[].sourceId` and `links[].targetId` -> note-note edges in Forces engine.
   - gate: empty ids and self-links are dropped during bridge mapping; missing runtime node ids are dropped by Forces edge resolution.
@@ -170,6 +205,7 @@ Current runtime behavior snapshot for Unity ingestion and map interaction:
 ## Error Handling Expectations
 - Invalid envelope or protocol mismatch must be rejected gracefully.
 - Repeated `graph:set` calls must rebuild or update runtime state without stale leftovers.
+- Repeated `runtime:settings` calls must update frame-rate state live without graph rebuild side effects.
 - `runtime:shutdown` must stop bridge input/output without requiring a Unity engine quit.
 - Errors must be explicit and non-crashing.
 

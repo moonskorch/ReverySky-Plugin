@@ -6,6 +6,9 @@ import {
   GraphSetMessage,
   IncomingBridgeMessage,
   NoteOpenPayload,
+  OutgoingBridgeMessage,
+  RuntimeSettingsMessage,
+  RuntimeSettingsPayload,
   RuntimeShutdownMessage,
   RuntimeStatusMessage,
   ShutdownResult
@@ -106,14 +109,13 @@ export class UnityIframeBridge {
   }
 
   sendGraphSet(payload: GraphPayload): void {
-    if (!this.iframeWindow) {
-      this.callbacks.onError?.("Bridge is not attached to iframe window.");
+    const iframeWindow = this.getIframeWindowForSend();
+    if (!iframeWindow) {
       return;
     }
 
     const payloadErrors = MessageValidator.validateGraphPayload(payload);
-    if (payloadErrors.length > 0) {
-      this.callbacks.onError?.(`Invalid graph payload: ${payloadErrors.join("; ")}`);
+    if (this.reportValidationErrors("Invalid graph payload", payloadErrors)) {
       return;
     }
 
@@ -124,11 +126,12 @@ export class UnityIframeBridge {
       payload
     };
 
-    this.iframeWindow.postMessage(message, "*");
+    this.postOutgoingMessage(iframeWindow, message);
   }
 
   sendStatus(text: string): void {
-    if (!this.iframeWindow) {
+    const iframeWindow = this.getIframeWindowForSend({ reportError: false });
+    if (!iframeWindow) {
       return;
     }
 
@@ -145,19 +148,37 @@ export class UnityIframeBridge {
       }
     };
 
-    this.iframeWindow.postMessage(message, "*");
+    this.postOutgoingMessage(iframeWindow, message);
   }
 
-  sendNoteFocus(payload: NoteFocusPayload): void {
-    if (!this.iframeWindow) {
-      this.callbacks.onError?.("Bridge is not attached to iframe window.");
+  sendRuntimeSettings(payload: RuntimeSettingsPayload): void {
+    const iframeWindow = this.getIframeWindowForSend();
+    if (!iframeWindow) {
       return;
     }
 
-    const noteId = typeof payload.id === "string" ? payload.id.trim() : "";
-    const notePath = typeof payload.path === "string" ? payload.path.trim() : "";
-    if (!noteId || !notePath) {
-      this.callbacks.onError?.("Invalid note focus payload: id and path are required.");
+    const payloadErrors = MessageValidator.validateRuntimeSettingsPayload(payload);
+    if (this.reportValidationErrors("Invalid runtime settings payload", payloadErrors)) {
+      return;
+    }
+
+    const message: RuntimeSettingsMessage = {
+      protocolVersion: BRIDGE_PROTOCOL_VERSION,
+      type: "runtime:settings",
+      payload
+    };
+
+    this.postOutgoingMessage(iframeWindow, message);
+  }
+
+  sendNoteFocus(payload: NoteFocusPayload): void {
+    const iframeWindow = this.getIframeWindowForSend();
+    if (!iframeWindow) {
+      return;
+    }
+
+    const payloadErrors = MessageValidator.validateNoteFocusPayload(payload);
+    if (this.reportValidationErrors("Invalid note focus payload", payloadErrors)) {
       return;
     }
 
@@ -165,13 +186,10 @@ export class UnityIframeBridge {
       protocolVersion: BRIDGE_PROTOCOL_VERSION,
       type: "note:focus",
       requestId: `req_${Date.now()}`,
-      payload: {
-        id: noteId,
-        path: notePath
-      }
+      payload
     };
 
-    this.iframeWindow.postMessage(message, "*");
+    this.postOutgoingMessage(iframeWindow, message);
   }
 
   /**
@@ -243,5 +261,29 @@ export class UnityIframeBridge {
   private createRequestId(): string {
     this.requestSequence += 1;
     return `req_${Date.now()}_${this.requestSequence}`;
+  }
+
+  private getIframeWindowForSend(options: { reportError?: boolean } = {}): Window | null {
+    if (this.iframeWindow) {
+      return this.iframeWindow;
+    }
+
+    if (options.reportError !== false) {
+      this.callbacks.onError?.("Bridge is not attached to iframe window.");
+    }
+    return null;
+  }
+
+  private reportValidationErrors(prefix: string, errors: string[]): boolean {
+    if (errors.length === 0) {
+      return false;
+    }
+
+    this.callbacks.onError?.(`${prefix}: ${errors.join("; ")}`);
+    return true;
+  }
+
+  private postOutgoingMessage(iframeWindow: Window, message: OutgoingBridgeMessage): void {
+    iframeWindow.postMessage(message, "*");
   }
 }

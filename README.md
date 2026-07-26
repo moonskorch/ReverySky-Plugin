@@ -36,7 +36,10 @@ After enabling the plugin, you can open the graph in either of two ways:
 
 Visual quality depends on your display resolution, screen scaling, graphics driver, and the GPU used by Obsidian. For the clearest image, keep your graphics driver up to date and let Obsidian use a high-performance GPU when your device offers one. On dual-GPU laptops, this is usually set in your system graphics settings.
 
-You can also adjust Render Scale in the plugin settings: higher values sharpen the graph but use more GPU power.
+The graph settings panel includes two visual controls:
+
+- `Render Scale`: higher values sharpen the graph but use more GPU power.
+- `Frame rate`: controls how often the Unity runtime renders frames: `Auto`, `60 FPS`, `30 FPS`, or `24 FPS`. `Auto` lets Unity synchronize rendering to the display, which may still be capped by the Obsidian/Electron host.
 
 ### Character support
 

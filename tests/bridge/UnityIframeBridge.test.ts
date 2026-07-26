@@ -142,6 +142,38 @@ describe("UnityIframeBridge", () => {
     bridge.detach();
   });
 
+  it("sends runtime:settings for a valid frame-rate mode", () => {
+    const bridge = new UnityIframeBridge();
+    const postMessage = vi.fn();
+    const iframeWindow = { postMessage } as unknown as Window;
+
+    bridge.attach(iframeWindow, {});
+    bridge.sendRuntimeSettings({ frameRateMode: "fps60" });
+
+    expect(postMessage).toHaveBeenCalledTimes(1);
+    const [message, targetOrigin] = postMessage.mock.calls[0] as [Record<string, unknown>, string];
+    expect(targetOrigin).toBe("*");
+    expect(message.type).toBe("runtime:settings");
+    expect(message.protocolVersion).toBe(BRIDGE_PROTOCOL_VERSION);
+    expect(message.payload).toEqual({ frameRateMode: "fps60" });
+    bridge.detach();
+  });
+
+  it("reports error and does not send runtime:settings for an invalid frame-rate mode", () => {
+    const bridge = new UnityIframeBridge();
+    const postMessage = vi.fn();
+    const onError = vi.fn();
+    const iframeWindow = { postMessage } as unknown as Window;
+
+    bridge.attach(iframeWindow, { onError });
+    bridge.sendRuntimeSettings({ frameRateMode: "turbo" } as never);
+
+    expect(postMessage).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError.mock.calls[0]?.[0]).toContain("Invalid runtime settings payload");
+    bridge.detach();
+  });
+
   it("reports error and does not send note:focus when payload is incomplete", () => {
     const bridge = new UnityIframeBridge();
     const postMessage = vi.fn();

@@ -153,7 +153,8 @@ describe("MapFilterPanelController", () => {
       pathFilterQuery: "tag:#project",
       showTags: false,
       mapLayout: "dates",
-      renderScale: 1.2
+      renderScale: 1.2,
+      frameRateMode: "fps60"
     });
     session.start(() => undefined);
 
@@ -164,6 +165,8 @@ describe("MapFilterPanelController", () => {
     const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
     const tagsToggle = container.querySelector(".reverysky-map-tags-toggle") as HTMLButtonElement;
     const engineSelect = container.querySelector(".reverysky-map-engine-select") as HTMLSelectElement;
+    const frameRateModeSelect =
+      container.querySelector(".reverysky-map-frame-rate-mode-select") as HTMLSelectElement;
     const renderScaleInput = container.querySelector(".reverysky-map-render-scale-input") as HTMLInputElement;
     const renderScaleValue = container.querySelector(".reverysky-map-render-scale-value") as HTMLElement;
     const renderScaleMessage = container.querySelector(".reverysky-map-render-scale-message") as HTMLElement;
@@ -172,6 +175,7 @@ describe("MapFilterPanelController", () => {
     expect(searchInput.value).toBe("tag:#project");
     expect(tagsToggle.getAttribute("aria-checked")).toBe("false");
     expect(engineSelect.value).toBe("dates");
+    expect(frameRateModeSelect.value).toBe("fps60");
     expect(renderScaleInput.min).toBe("0.5");
     expect(renderScaleInput.max).toBe("1.5");
     expect(renderScaleInput.step).toBe("0.1");
@@ -179,7 +183,32 @@ describe("MapFilterPanelController", () => {
     expect(renderScaleValue.textContent).toBe("1.2x");
     expect(renderScaleMessage.textContent).toBe("");
     expect(container.textContent).toContain("Layout");
+    expect(container.textContent).toContain("Frame rate");
     expect(message.textContent).toBe("");
+  });
+
+  it("updates frame-rate mode from the dropdown", () => {
+    const session = createSession();
+    session.start(() => undefined);
+    const controller = new MapFilterPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const frameRateModeSelect =
+      container.querySelector(".reverysky-map-frame-rate-mode-select") as HTMLSelectElement;
+
+    expect(frameRateModeSelect.value).toBe("auto");
+    expect(frameRateModeSelect.textContent).toContain("Auto");
+    expect(frameRateModeSelect.textContent).toContain("60 FPS");
+    expect(frameRateModeSelect.textContent).toContain("30 FPS");
+    expect(frameRateModeSelect.textContent).toContain("24 FPS");
+    expect(frameRateModeSelect.textContent).not.toContain("fps60");
+
+    frameRateModeSelect.value = "fps24";
+    frameRateModeSelect.dispatchEvent(new Event("change"));
+
+    expect(session.getState()).toMatchObject({ frameRateMode: "fps24" });
+    expect(frameRateModeSelect.value).toBe("fps24");
   });
 
   it("updates render scale from the slider and shows reopen guidance", () => {

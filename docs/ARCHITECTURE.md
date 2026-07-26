@@ -224,6 +224,10 @@ When the plugin is opened after Obsidian has already settled, the next global `r
 
 Render-scale changes are intentionally different from graph-significant changes. `MapFilterPanelController` calls `MapSession.setRenderScale()` on slider input, which updates session state, the plugin's in-memory snapshot, and UI restart guidance without re-emitting `graph:set`. The controller requests persistence on slider commit through `MapSession.persistRenderScale()`, and the new scale is applied the next time the iframe is created.
 
+Frame-rate changes are runtime settings, not graph data. `MapFilterPanelController` calls `MapSession.setFrameRateMode()`, which updates persisted state and sends `runtime:settings` after bridge readiness. The iframe wrapper forwards the message to Unity `ObsidianBridge.OnRuntimeSettings(...)`, where Unity updates `QualitySettings.vSyncCount` and `Application.targetFrameRate` without rebuilding the graph, resetting focus, or recreating the iframe.
+
+The `Auto` frame-rate mode sets `QualitySettings.vSyncCount = 1` and `Application.targetFrameRate = -1`, so Unity attempts to follow the host display cadence. In Obsidian desktop testing, the iframe `requestAnimationFrame` cadence was observed near 60 FPS even on a 120 Hz display, so WebGL rendering can still be capped by the Obsidian/Electron/Chromium host before Unity reaches the physical monitor refresh rate. Fixed modes use Unity's software frame cap and should be treated as frame-rate caps, not guaranteed proportional power-saving modes.
+
 ### Path 4. Markdown editor focus -> graph focus
 1. `src/main.ts` -> `ReverySkyMapPlugin.onload()` -> `registerEditorExtension(...)`
    Registers `createMarkdownEditorFocusExtension(...)` once at plugin scope so the plugin can hear focus changes from any open markdown editor.
@@ -482,13 +486,14 @@ Important current contract facts:
 - successful startup order is `bridge:ready` first, then `graph:set`;
 - Unity WebGL boot failure is terminal inside the iframe wrapper and does not emit `bridge:ready`;
 - runtime-to-plugin messages are `bridge:ready`, `graph:ready`, `note:open`, and `runtime:shutdown-complete`;
-- plugin-to-runtime messages are `graph:set`, `runtime:status`, `note:focus`, and `runtime:shutdown`;
+- plugin-to-runtime messages are `graph:set`, `runtime:settings`, `runtime:status`, `note:focus`, and `runtime:shutdown`;
 - `path` values must stay vault-relative and use `/` separators;
 - `notes[].size` is a non-negative byte count produced from Obsidian file metadata and mapped to Unity `NoteData.Length`;
 - `graph:set` carries the effective filtered graph; focus changes are sent separately via `note:focus`, which must include both `id` and `path`;
 - ordinary `note:focus` dispatch is gated by the latest effective graph on the TypeScript side; active-note rename can bypass this gate to cover bridge ordering around path-derived ids;
 - `graph:ready` must echo the latest `graph:set` `requestId` before the iframe clears the loading status;
 - `runtime:status` updates iframe wrapper status text only and is not forwarded into Unity;
+- `runtime:settings` applies Unity runtime frame-rate mode live and does not rebuild graph state;
 - `runtime:shutdown` is a bridge/runtime-wrapper lifecycle handshake, not a full Unity engine shutdown;
 - `mapLayout` is an optional plugin-owned runtime hint;
 - `renderScale` is a plugin-owned iframe startup hint and does not belong to the bridge payload contract;

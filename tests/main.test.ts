@@ -164,7 +164,8 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
     (harness.plugin as unknown as { updateMapViewState: (state: Record<string, unknown>) => void }).updateMapViewState({
       pathFilterQuery: "tag:#project",
       showTags: false,
-      mapLayout: "dates"
+      mapLayout: "dates",
+      frameRateMode: "fps60"
     });
     expect(harness.registerEditorExtension).toHaveBeenCalledTimes(1);
     await (harness.addRibbonIcon.mock.calls[0]?.[2] as () => Promise<void>)();
@@ -173,7 +174,8 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
       mapViewState: {
         pathFilterQuery: "tag:#project",
         showTags: false,
-        mapLayout: "dates"
+        mapLayout: "dates",
+        frameRateMode: "fps60"
       }
     });
     expect(harness.detachLeavesOfType).toHaveBeenCalledWith(MAP_VIEW_TYPE);
@@ -223,7 +225,8 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
     (harness.plugin as unknown as { updateMapViewState: (state: Record<string, unknown>) => void }).updateMapViewState({
       pathFilterQuery: "path:Projects",
       showTags: true,
-      mapLayout: "chronological"
+      mapLayout: "chronological",
+      frameRateMode: "fps24"
     });
     await (harness.plugin as unknown as { cleanupOnUnload: () => Promise<void> }).cleanupOnUnload();
 
@@ -231,7 +234,8 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
       mapViewState: {
         pathFilterQuery: "path:Projects",
         showTags: true,
-        mapLayout: "chronological"
+        mapLayout: "chronological",
+        frameRateMode: "fps24"
       }
     });
     expect(harness.detachLeavesOfType).toHaveBeenCalledWith(MAP_VIEW_TYPE);
@@ -256,7 +260,8 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
     (harness.plugin as unknown as { updateMapViewState: (state: Record<string, unknown>) => void }).updateMapViewState({
       pathFilterQuery: "tag:#daily",
       showTags: false,
-      mapLayout: "dates"
+      mapLayout: "dates",
+      frameRateMode: "fps60"
     });
 
     const quitHandler = harness.workspaceOn.mock.calls.find((call) => call[0] === "quit")?.[1] as
@@ -272,7 +277,8 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
       mapViewState: {
         pathFilterQuery: "tag:#daily",
         showTags: false,
-        mapLayout: "dates"
+        mapLayout: "dates",
+        frameRateMode: "fps60"
       }
     });
     expect(harness.detachLeavesOfType).not.toHaveBeenCalled();

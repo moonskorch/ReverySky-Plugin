@@ -26,6 +26,7 @@ Plugin -> runtime:
 - `graph:set`: effective filtered graph payload.
 - `note:focus`: current-note focus hint with required `id` and `path`.
 - `runtime:status`: iframe-wrapper status text update that does not change Unity graph state.
+- `runtime:settings`: Unity runtime frame-rate settings that apply without rebuilding graph state.
 - `runtime:shutdown`: lifecycle message requesting the iframe runtime wrapper to stop bridge activity before the parent view detaches.
 
 Runtime -> plugin:
@@ -75,6 +76,27 @@ Rules:
 - `payload.text` must be non-empty after trimming.
 - The iframe wrapper applies the text to the status UI only; it must not call Unity `SendMessage`.
 - Runtime failure and shutdown states keep precedence over status updates.
+
+## Runtime Settings Messages
+`runtime:settings` applies Unity runtime frame-rate settings without sending graph data or rebuilding the map.
+
+Parent -> runtime:
+
+```json
+{
+  "protocolVersion": "2.0.0",
+  "type": "runtime:settings",
+  "payload": {
+    "frameRateMode": "auto"
+  }
+}
+```
+
+Rules:
+- `runtime:settings` has no `requestId`.
+- `payload.frameRateMode` must be one of: `auto`, `fps60`, `fps30`, `fps24`.
+- The iframe wrapper forwards valid settings to Unity `ObsidianBridge.OnRuntimeSettings(...)`.
+- The Unity runtime applies the selected frame-rate mode live; it must not rebuild graph data, reset focus, or recreate the iframe.
 
 ## Runtime Shutdown Messages
 `runtime:shutdown` is a bridge/runtime-wrapper lifecycle handshake, not a full Unity engine teardown.
@@ -150,6 +172,7 @@ type GraphLink = {
 ## Validation Requirements
 - Outgoing `graph:set` payloads are validated before postMessage dispatch.
 - Outgoing `runtime:status` messages are skipped when the status text is empty after trimming.
+- Outgoing `runtime:settings` payloads are validated before postMessage dispatch.
 - Incoming `bridge:ready` is accepted only when `protocolVersion` matches exactly.
 - Incoming `graph:ready` is accepted only when `protocolVersion` matches and `requestId` is a non-empty string.
 - Incoming `note:open` is accepted only when `protocolVersion` matches and the payload includes non-empty `id` and `path`.
@@ -173,4 +196,5 @@ type GraphLink = {
 - `notes[].size` is emitted as file size in bytes.
 - `mapLayout`, when present, is a plugin-owned runtime hint and travels with the effective graph payload.
 - `note:focus` carries the current note identity separately; `graph:set` stays focused on the graph payload itself.
+- `runtime:settings` carries frame-rate mode separately; `graph:set` stays focused on graph payload data.
 - `vault.noteCount` reflects the emitted `notes.length` for the filtered payload.

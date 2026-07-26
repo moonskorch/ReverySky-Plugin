@@ -25,8 +25,8 @@ Obsidian plugin
   - Main code location: `Assets/Scenes/StarScapeScene.unity`
   - Important dependencies: `GameInput`, `CameraOrbitalController`, `FocusNode`, `Cartographer`, `CartographerForcesEngine`, `Cartographer25DEngine`, `CartographerEngineRecursiveHubsEngine`, `ScapeCameraWarper`, `LineBuilder`, `CullingManager`, `FocusHighlighter`, `ChangeViewControl`, `RotateCameraUI`, `RotateHoldButton`, `Notification`
 - Bridge and runtime state
-  - Responsibility: validates inbound bridge envelopes, converts payloads into runtime models, stores the normalized source graph, derives direct note-neighbor counts, and raises outbound events for parent bridge messages.
-  - Main code location: `Assets/Scripts/Bridge/ObsidianBridge.cs`, `Assets/Scripts/Bridge/MapRuntimeContext.cs`, `Assets/Scripts/Models/NoteData.cs`
+  - Responsibility: validates inbound bridge envelopes, converts graph payloads into runtime models, applies runtime settings, stores the normalized source graph, derives direct note-neighbor counts, and raises outbound events for parent bridge messages.
+  - Main code location: `Assets/Scripts/Bridge/ObsidianBridge.cs`, `Assets/Scripts/Bridge/MapRuntimeContext.cs`, `Assets/Scripts/Models/BridgeEnvelopeModels.cs`, `Assets/Scripts/Models/BridgePayloadModels.cs`, `Assets/Scripts/Models/MapFrameRateMode.cs`, `Assets/Scripts/Models/NoteData.cs`
   - Important dependencies: `Cartographer`, `MapRuntimeContext.OnNotesChanged`, `MapRuntimeContext.OnOpenNoteRequested`, `MapRuntimeContext.OnGraphReady`
 - Graph orchestration
   - Responsibility: chooses the active layout engine, rebuilds the graph when runtime notes change, creates the shared visual graph index, forwards that index to consumers, and reconciles pending or restored focus after real index publications.
@@ -95,15 +95,25 @@ Obsidian plugin
 7. The next non-transient `HandleEngineNodesChanged(...)` call rebuilds `GraphIndex` and lets `ApplyGraphFocus()` consume pending focus before falling back to restore focus.
 8. `FocusHighlighter.SetFocus(...)` reads `MapGraphIndex.GetNeighborIds(...)`, marks the focused node as `Focused`, marks adjacent nodes as `Linked`, and calls `LineBuilder.ApplyHighlight(...)` so incident edges restyle together with the labels.
 
-### 4. Runtime shutdown guard
+### 4. Runtime frame-rate settings
+
+1. The parent plugin persists `frameRateMode` as map view state and sends it after the iframe reports `bridge:ready`.
+2. The iframe JavaScript wrapper receives `runtime:settings` and forwards it to `ObsidianBridge.OnRuntimeSettings(string json)` only after `runtimeMode` is `unity`.
+3. `ObsidianBridge.OnRuntimeSettings` exits during shutdown, rejects empty JSON, parses `BridgeRuntimeSettingsEnvelope`, and rejects wrong `protocolVersion` or `type`.
+4. `ApplyFrameRateMode(...)` maps `auto` to `Application.targetFrameRate = -1` and `QualitySettings.vSyncCount = 1`.
+5. `fps60`, `fps30`, and `fps24` disable vSync with `QualitySettings.vSyncCount = 0` and set `Application.targetFrameRate` to `60`, `30`, or `24`.
+6. Unknown runtime-side mode values log a warning and fall back to `Auto`; the parent TypeScript bridge should reject them before delivery.
+7. This path does not call `MapRuntimeContext.SetNotes`, does not rebuild graph data, does not reset focus, and does not recreate the iframe.
+
+### 5. Runtime shutdown guard
 
 1. Before the parent plugin detaches the iframe, the WebGL wrapper receives `runtime:shutdown` and forwards it to `ObsidianBridge.OnRuntimeShutdown(string json)` when the Unity instance can receive messages.
 2. `ObsidianBridge` marks the bridge as shutting down and unsubscribes from `MapRuntimeContext.OnOpenNoteRequested` and `MapRuntimeContext.OnGraphReady`.
-3. After shutdown starts, `OnGraphSet`, `OnNoteFocus`, and `HandleOpenNoteRequested` return without processing so the closing runtime cannot ingest new graph state, focus notes, or send late `note:open` callbacks.
+3. After shutdown starts, `OnGraphSet`, `OnNoteFocus`, `OnRuntimeSettings`, and `HandleOpenNoteRequested` return without processing so the closing runtime cannot ingest new graph state, focus notes, apply late frame-rate changes, or send late `note:open` callbacks.
 4. `HandleGraphReadyRequested` also returns during shutdown so late engine completion cannot send `graph:ready`.
 5. This is a bridge lifecycle guard only; parent hosting, iframe detachment, and full Unity engine teardown remain outside the Unity project boundary.
 
-### 5. Camera, view, and rotation controls
+### 6. Camera, view, and rotation controls
 
 1. `GameInput` translates raw pointer and touch input into semantic events such as select, pan, pinch zoom, scroll zoom, and orbit drag.
 2. `CameraOrbitalController` listens to those events and keeps the camera orbiting around the current pivot.
@@ -112,7 +122,7 @@ Obsidian plugin
 5. `RotateHoldButton` feeds `RotateCameraUI`, and `RotateCameraUI` emits the clockwise and pressed state consumed by `CameraOrbitalController`.
 6. `ScapeCameraWarper.OnWarpApplied` refreshes culling targets after 2.5D warp movement, and the date slider only appears when the active engine is `Dates`.
 
-### 6. Line rendering and node distance culling
+### 7. Line rendering and node distance culling
 
 1. `Cartographer.HandleEngineNodesChanged(...)` receives rebuilt `Star` and `TagNode` scene objects, builds `GraphIndex`, and forwards it with the active engine's line budgets.
 2. `LineBuilder.Rebuild(MapGraphIndex, ...)` stores the new limits, clears active line renderers and cached state, resizes its `ObjectPool<LineRenderer>`, registers indexed graph nodes, and creates line candidates directly from `MapGraphIndex.Edges`.
@@ -127,8 +137,8 @@ Obsidian plugin
 ### Bridge and runtime state
 
 - `ObsidianBridge`
-  - Responsibility: owns bridge validation, payload normalization, the shutdown guard, and WebGL callbacks back into the parent plugin.
-  - Code anchor: `Assets/Scripts/Bridge/ObsidianBridge.cs::OnGraphSet`, `OnNoteFocus`, `OnRuntimeShutdown`, `HandleOpenNoteRequested`, `HandleGraphReadyRequested`
+  - Responsibility: owns bridge validation, graph payload normalization, runtime settings application, the shutdown guard, and WebGL callbacks back into the parent plugin.
+  - Code anchor: `Assets/Scripts/Bridge/ObsidianBridge.cs::OnGraphSet`, `OnNoteFocus`, `OnRuntimeSettings`, `OnRuntimeShutdown`, `HandleOpenNoteRequested`, `HandleGraphReadyRequested`
   - Entry point: bridge messages from the parent runtime
   - Calls / sends to: `MapRuntimeContext`, `Cartographer`, `ReverySkyBridgePostNoteOpen`, `ReverySkyBridgePostGraphReady`
 - `MapRuntimeContext`
@@ -281,10 +291,12 @@ Obsidian plugin
 - `GameInput` treats UI hits as blocked input and only forwards gestures that originate on the map.
 - Bridge contract rules that matter locally:
   - `protocolVersion` must match `2.0.0`.
-  - Accepted parent-to-Unity message types are `graph:set`, `note:focus`, and `runtime:shutdown`.
+  - Accepted parent-to-Unity message types are `graph:set`, `note:focus`, `runtime:settings`, and `runtime:shutdown`.
   - `graph:set` payloads are already filtered by the parent plugin; Unity does not own vault query logic.
-  - `graph:set` carries only the filtered graph payload; focus is handled separately through `note:focus`.
+  - `graph:set` carries only the filtered graph payload; focus is handled separately through `note:focus`, and frame-rate settings are handled separately through `runtime:settings`.
   - `graph:set.requestId` is echoed in `graph:ready` after active engine readiness; empty ids suppress outbound `graph:ready`.
+  - `runtime:settings.payload.frameRateMode` applies live frame-rate mode: `auto` enables vSync and uses `Application.targetFrameRate = -1`, while `fps60`, `fps30`, and `fps24` disable vSync and set Unity's software frame cap.
+  - `runtime:settings` must not mutate `MapRuntimeContext` graph data or trigger a graph rebuild.
   - `runtime:shutdown` is a lifecycle guard that stops bridge input and output without calling Unity quit APIs.
   - `path` values are treated as vault-relative and normalized with `/` separators when path lookup is needed.
   - Empty titles fall back to `GameSettings.DefaultTitle`.
@@ -309,7 +321,7 @@ Obsidian plugin
 
 - Bridge parsing and runtime mapping
   - Automated checks: `Assets/Tests/EditMode/ObsidianBridgeEditModeTests.cs`
-  - Manual checks when needed: load the scene and confirm `graph:set` populates notes, links, tags, request id, and focus state without errors; in the parent plugin, close and quickly reopen the map view and confirm there are no delayed `note:open`, stale `graph:ready`, or bridge errors
+  - Manual checks when needed: load the scene and confirm `graph:set` populates notes, links, tags, request id, and focus state without errors; change the parent plugin frame-rate setting and confirm Unity logs/applies the selected mode without rebuilding the graph; in the parent plugin, close and quickly reopen the map view and confirm there are no delayed `note:open`, stale `graph:ready`, or bridge errors
 - Engine selection and layout
   - Automated checks: `Assets/Tests/EditMode/CartographerForcesEngineRadiusEditModeTests.cs`, `Assets/Tests/EditMode/CartographerScalableLinksEngineEditModeTests.cs`, PlayMode engine-preference checks in `Assets/Tests/PlayMode/StarScapeRuntimePlayModeTests.cs`
   - Manual checks when needed: inspect `DynamicLinks`, `ScalableLinks`, and `Dates`, RecursiveHubs node spacing on hub-heavy maps, and the `Dates` camera slider

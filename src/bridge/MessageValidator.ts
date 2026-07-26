@@ -3,6 +3,7 @@ import {
   GraphReadyMessage,
   GraphPayload,
   IncomingBridgeMessage,
+  NoteFocusPayload,
   NoteOpenMessage,
   RuntimeShutdownCompleteMessage
 } from "./BridgeTypes";
@@ -10,6 +11,10 @@ import {
   formatMapLayoutPreferenceValues,
   isMapLayoutPreference
 } from "./LayoutPreference";
+import {
+  formatFrameRateModeValues,
+  isFrameRateMode
+} from "./FrameRateMode";
 
 /**
  * Validate bridge messages at the boundary so malformed payloads fail fast.
@@ -80,6 +85,38 @@ export class MessageValidator {
       !isMapLayoutPreference(payload.mapLayout)
     ) {
       errors.push(`payload.mapLayout must be one of: ${formatMapLayoutPreferenceValues()}`);
+    }
+
+    return errors;
+  }
+
+  static validateRuntimeSettingsPayload(payload: unknown): string[] {
+    const errors: string[] = [];
+
+    if (!payload || typeof payload !== "object") {
+      return ["payload must be an object"];
+    }
+
+    const frameRateMode = (payload as { frameRateMode?: unknown }).frameRateMode;
+    if (!isFrameRateMode(frameRateMode)) {
+      errors.push(`payload.frameRateMode must be one of: ${formatFrameRateModeValues()}`);
+    }
+
+    return errors;
+  }
+
+  static validateNoteFocusPayload(payload: NoteFocusPayload): string[] {
+    const errors: string[] = [];
+
+    if (!payload || typeof payload !== "object") {
+      return ["payload must be an object"];
+    }
+
+    if (!this.isNonEmptyString(payload.id)) {
+      errors.push("payload.id must be a non-empty string");
+    }
+    if (!this.isNonEmptyString(payload.path)) {
+      errors.push("payload.path must be a non-empty string");
     }
 
     return errors;

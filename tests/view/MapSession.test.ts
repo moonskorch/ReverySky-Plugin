@@ -63,6 +63,7 @@ function makePathPayload(): GraphPayload {
 
 function createSessionForStateTests(options?: {
   sendGraph?: (payload: GraphPayload) => void;
+  sendRuntimeSettings?: (payload: { frameRateMode: "auto" | "fps60" | "fps30" | "fps24" }) => void;
   onStateChanged?: (state: Record<string, unknown>) => void;
 }) {
   return new MapSession({
@@ -84,6 +85,7 @@ function createSessionForStateTests(options?: {
     now: () => 1700000000000,
     sendGraph: options?.sendGraph ?? makeVoidCallback<[GraphPayload]>(),
     sendFocus: makeVoidCallback<[NoteFocusPayload]>(),
+    sendRuntimeSettings: options?.sendRuntimeSettings,
     onStateChanged: options?.onStateChanged
   });
 }
@@ -97,12 +99,13 @@ describe("MapSession", () => {
     vi.useRealTimers();
   });
 
-  it("normalizes and restores render scale state", async () => {
+  it("normalizes and restores render scale and frame-rate mode state", async () => {
     const session = createSessionForStateTests();
-    expect(session.getState()).toMatchObject({ renderScale: 1 });
+    expect(session.getState()).toMatchObject({ renderScale: 1, frameRateMode: "auto" });
     expect(session.getFilterUiState()).toMatchObject({
       renderScale: 1,
-      renderScaleRestartRequired: false
+      renderScaleRestartRequired: false,
+      frameRateMode: "auto"
     });
 
     await session.setState({ renderScale: 1.24 });
@@ -119,6 +122,12 @@ describe("MapSession", () => {
 
     await session.setState({ renderScale: "sharp" });
     expect(session.getState()).toMatchObject({ renderScale: 1 });
+
+    await session.setState({ frameRateMode: "fps60" });
+    expect(session.getState()).toMatchObject({ frameRateMode: "fps60" });
+
+    await session.setState({ frameRateMode: "turbo" });
+    expect(session.getState()).toMatchObject({ frameRateMode: "auto" });
   });
 
   it("tracks render scale restart state without re-emitting graph data", async () => {
@@ -162,7 +171,8 @@ describe("MapSession", () => {
       pathFilterQuery: "tag:#project",
       showTags: false,
       mapLayout: "dates",
-      renderScale: 1.2
+      renderScale: 1.2,
+      frameRateMode: "auto"
     }, { persist: false });
 
     vi.runOnlyPendingTimers();
@@ -171,8 +181,33 @@ describe("MapSession", () => {
       pathFilterQuery: "tag:#project",
       showTags: false,
       mapLayout: "dates",
-      renderScale: 1.2
+      renderScale: 1.2,
+      frameRateMode: "auto"
     }, undefined);
+  });
+
+  it("sends frame-rate mode settings without re-emitting graph data", () => {
+    const sendGraph = vi.fn();
+    const sendRuntimeSettings = vi.fn();
+    const session = createSessionForStateTests({ sendGraph, sendRuntimeSettings });
+    session.start(() => undefined);
+
+    session.setFrameRateMode("fps60");
+
+    expect(session.getState()).toMatchObject({ frameRateMode: "fps60" });
+    expect(sendRuntimeSettings).not.toHaveBeenCalled();
+    expect(sendGraph).not.toHaveBeenCalled();
+
+    session.setBridgeReady(true);
+    session.sendCurrentRuntimeSettings();
+
+    expect(sendRuntimeSettings).toHaveBeenCalledWith({ frameRateMode: "fps60" });
+
+    sendRuntimeSettings.mockClear();
+    session.setFrameRateMode("fps24");
+
+    expect(sendRuntimeSettings).toHaveBeenCalledWith({ frameRateMode: "fps24" });
+    expect(sendGraph).not.toHaveBeenCalled();
   });
 
   it("persists render scale only after the slider commits", () => {
@@ -187,7 +222,8 @@ describe("MapSession", () => {
       pathFilterQuery: "",
       showTags: true,
       mapLayout: "auto",
-      renderScale: 1.2
+      renderScale: 1.2,
+      frameRateMode: "auto"
     }, { persist: false });
 
     session.persistRenderScale();
@@ -196,7 +232,8 @@ describe("MapSession", () => {
       pathFilterQuery: "",
       showTags: true,
       mapLayout: "auto",
-      renderScale: 1.2
+      renderScale: 1.2,
+      frameRateMode: "auto"
     }, undefined);
   });
 

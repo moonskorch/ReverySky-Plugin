@@ -394,6 +394,20 @@
           }
         }
 
+        function tryDispatchRuntimeSettingsToUnity(message) {
+          if (!unityInstance || typeof unityInstance.SendMessage !== "function") {
+            return false;
+          }
+
+          try {
+            unityInstance.SendMessage("ObsidianBridge", "OnRuntimeSettings", JSON.stringify(message));
+            return true;
+          } catch (e) {
+            console.warn("[ReverySky] Failed to dispatch runtime:settings to Unity:", e);
+            return false;
+          }
+        }
+
         function scheduleGraphSetDispatch(message) {
           const dispatchToken = ++graphSetDispatchToken;
           const dispatch = () => {
@@ -483,6 +497,14 @@
           if (runtimeMode === "unity" && tryDispatchNoteFocusToUnity(message)) {
             return;
           }
+        }
+
+        function applyRuntimeSettings(message) {
+          if (isShuttingDown || runtimeMode !== "unity") {
+            return;
+          }
+
+          tryDispatchRuntimeSettingsToUnity(message);
         }
 
         function setRuntimeFailed(statusText) {
@@ -594,6 +616,11 @@
 
           if (data.type === "runtime:status") {
             applyRuntimeStatus(data);
+            return;
+          }
+
+          if (data.type === "runtime:settings") {
+            applyRuntimeSettings(data);
           }
         }
 

@@ -1,4 +1,5 @@
 import { SearchComponent, setIcon } from "obsidian";
+import { FRAME_RATE_MODE_OPTIONS } from "../bridge/FrameRateMode";
 import { MAP_LAYOUT_PREFERENCE_OPTIONS } from "../bridge/LayoutPreference";
 import {
   MAX_RENDER_SCALE,
@@ -29,6 +30,7 @@ export class MapFilterPanelController {
   private filterToggleButtonEl: HTMLButtonElement | null = null;
   private tagsToggleButtonEl: HTMLButtonElement | null = null;
   private layoutDropdownEl: HTMLSelectElement | null = null;
+  private frameRateModeDropdownEl: HTMLSelectElement | null = null;
   private renderScaleInputEl: HTMLInputElement | null = null;
   private renderScaleValueEl: HTMLElement | null = null;
   private renderScaleMessageEl: HTMLElement | null = null;
@@ -236,6 +238,29 @@ export class MapFilterPanelController {
     this.renderScaleMessageEl.className =
       "reverysky-map-render-scale-message reverysky-map-render-scale-message--hidden";
 
+    const frameRateModeSection = createChild(filterContainer as ObsidianHTMLElement, "div");
+    frameRateModeSection.className = "reverysky-map-filter-section reverysky-map-filter-control-group";
+
+    const frameRateModeTitle = createChild(frameRateModeSection as ObsidianHTMLElement, "div");
+    frameRateModeTitle.className = "reverysky-map-filter-field-label";
+    frameRateModeTitle.textContent = "Frame rate";
+
+    const frameRateModeSelectHost = createChild(frameRateModeSection as ObsidianHTMLElement, "div");
+    frameRateModeSelectHost.className = "reverysky-map-engine-select-host";
+    const frameRateModeDropdown = createChild(frameRateModeSelectHost as ObsidianHTMLElement, "select");
+    this.frameRateModeDropdownEl = frameRateModeDropdown;
+    for (const option of FRAME_RATE_MODE_OPTIONS) {
+      const optionEl = createChild(frameRateModeDropdown as ObsidianHTMLElement, "option");
+      optionEl.value = option.value;
+      optionEl.textContent = option.label;
+    }
+    frameRateModeDropdown.classList.add("reverysky-map-engine-select", "reverysky-map-frame-rate-mode-select");
+    frameRateModeDropdown.setAttribute("aria-label", "Select frame rate");
+    frameRateModeDropdown.addEventListener("change", () => {
+      this.session.setFrameRateMode(frameRateModeDropdown.value);
+      this.refreshFrameRateModeDropdownUi();
+    });
+
     this.setFilterPanelOpen(false);
     this.syncFromSession();
     return iframeHost;
@@ -247,6 +272,7 @@ export class MapFilterPanelController {
     this.refreshTagsToggleUi();
     this.refreshLayoutDropdownUi();
     this.refreshRenderScaleUi();
+    this.refreshFrameRateModeDropdownUi();
   }
 
   refreshSuggestions(): void {
@@ -285,6 +311,7 @@ export class MapFilterPanelController {
     this.filterToggleButtonEl = null;
     this.tagsToggleButtonEl = null;
     this.layoutDropdownEl = null;
+    this.frameRateModeDropdownEl = null;
     this.renderScaleInputEl = null;
     this.renderScaleValueEl = null;
     this.renderScaleMessageEl = null;
@@ -697,6 +724,19 @@ export class MapFilterPanelController {
       "reverysky-map-render-scale-message--hidden",
       !restartRequired
     );
+  }
+
+  private refreshFrameRateModeDropdownUi(): void {
+    if (!this.frameRateModeDropdownEl) {
+      return;
+    }
+
+    const uiState = this.session.getFilterUiState();
+    if (this.frameRateModeDropdownEl.value === uiState.frameRateMode) {
+      return;
+    }
+
+    this.frameRateModeDropdownEl.value = uiState.frameRateMode;
   }
 
   private formatRenderScale(value: number): string {

@@ -9,12 +9,18 @@ import type {
   MapLayoutPreference,
   GraphPayload,
   NoteFocusPayload,
-  NoteOpenPayload
+  NoteOpenPayload,
+  RuntimeSettingsPayload
 } from "../bridge/BridgeTypes";
 import {
   DEFAULT_MAP_LAYOUT_PREFERENCE,
   normalizeMapLayoutPreference
 } from "../bridge/LayoutPreference";
+import {
+  DEFAULT_FRAME_RATE_MODE,
+  normalizeFrameRateMode,
+  type FrameRateMode
+} from "../bridge/FrameRateMode";
 import { GraphPathFilter, type ParsedPathFilter, type PathFilterParseResult } from "../graph/GraphPathFilter";
 import { makeStableNoteId } from "../graph/VaultGraphBuilder";
 import { MapFocusController } from "./MapFocusController";
@@ -33,6 +39,7 @@ export type MapViewState = {
   showTags?: unknown;
   mapLayout?: unknown;
   renderScale?: unknown;
+  frameRateMode?: unknown;
 };
 
 export type MapFilterUiState = {
@@ -41,6 +48,7 @@ export type MapFilterUiState = {
   mapLayout: MapLayoutPreference;
   renderScale: number;
   renderScaleRestartRequired: boolean;
+  frameRateMode: FrameRateMode;
   pathFilterParseValid: boolean;
   pathFilterMessage: string;
 };
@@ -71,6 +79,7 @@ export type MapSessionDependencies = {
   sendGraph: (payload: GraphPayload) => void;
   sendStatus?: (message: string) => void;
   sendFocus: (payload: NoteFocusPayload) => void;
+  sendRuntimeSettings?: (payload: RuntimeSettingsPayload) => void;
   onStateChanged?: (state: Record<string, unknown>, options?: { persist?: boolean }) => void;
 };
 
@@ -85,6 +94,7 @@ export class MapSession {
   private readonly sendGraph: (payload: GraphPayload) => void;
   private readonly sendStatus?: (message: string) => void;
   private readonly sendFocus: (payload: NoteFocusPayload) => void;
+  private readonly sendRuntimeSettings?: (payload: RuntimeSettingsPayload) => void;
   private readonly onStateChanged?: (state: Record<string, unknown>, options?: { persist?: boolean }) => void;
   private readonly focus: MapFocusController;
 
@@ -106,6 +116,7 @@ export class MapSession {
   private mapLayout: MapLayoutPreference = DEFAULT_MAP_LAYOUT_PREFERENCE;
   private renderScale = DEFAULT_RENDER_SCALE;
   private appliedRenderScale = DEFAULT_RENDER_SCALE;
+  private frameRateMode: FrameRateMode = DEFAULT_FRAME_RATE_MODE;
   private activePathFilter: ParsedPathFilter | null = null;
   private pathFilterParseValid = true;
   private pathFilterMessage = "";
@@ -120,6 +131,7 @@ export class MapSession {
     this.now = deps.now;
     this.sendGraph = deps.sendGraph;
     this.sendStatus = deps.sendStatus;
+    this.sendRuntimeSettings = deps.sendRuntimeSettings;
     this.onStateChanged = deps.onStateChanged;
     this.focus = new MapFocusController({
       app: this.app,
@@ -135,7 +147,8 @@ export class MapSession {
       pathFilterQuery: this.pathFilterQuery,
       showTags: this.showTags,
       mapLayout: this.mapLayout,
-      renderScale: this.renderScale
+      renderScale: this.renderScale,
+      frameRateMode: this.frameRateMode
     };
   }
 
@@ -149,6 +162,7 @@ export class MapSession {
     this.showTags = nextShowTags;
     this.mapLayout = nextLayoutPreference;
     this.renderScale = normalizeRenderScale(nextState.renderScale);
+    this.frameRateMode = normalizeFrameRateMode(nextState.frameRateMode);
     this.applyParsedFilterResult(GraphPathFilter.parsePathQuery(nextQuery));
   }
 
@@ -205,6 +219,12 @@ export class MapSession {
     this.emitGraphFromSource();
   }
 
+  setFrameRateMode(frameRateMode: unknown): void {
+    this.frameRateMode = normalizeFrameRateMode(frameRateMode);
+    this.notifyStateChanged();
+    this.sendCurrentRuntimeSettings();
+  }
+
   setRenderScale(renderScale: unknown): void {
     this.renderScale = normalizeRenderScale(renderScale);
     this.notifyStateChanged({ persist: false });
@@ -218,6 +238,16 @@ export class MapSession {
     return this.renderScale;
   }
 
+  sendCurrentRuntimeSettings(): void {
+    if (!this.bridgeReady) {
+      return;
+    }
+
+    this.sendRuntimeSettings?.({
+      frameRateMode: this.frameRateMode
+    });
+  }
+
   getFilterUiState(): MapFilterUiState {
     return {
       pathFilterQuery: this.pathFilterQuery,
@@ -225,6 +255,7 @@ export class MapSession {
       mapLayout: this.mapLayout,
       renderScale: this.renderScale,
       renderScaleRestartRequired: this.renderScale !== this.appliedRenderScale,
+      frameRateMode: this.frameRateMode,
       pathFilterParseValid: this.pathFilterParseValid,
       pathFilterMessage: this.pathFilterMessage
     };

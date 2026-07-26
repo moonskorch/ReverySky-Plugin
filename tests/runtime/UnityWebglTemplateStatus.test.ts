@@ -7,7 +7,6 @@ const templatePaths = [
   "unity-webgl/index.template.html",
   "unity-webgl/index.disk-runtime.template.html"
 ];
-
 describe("Unity WebGL runtime templates", () => {
   it.each(templatePaths)("keeps Unity boot failures visible in %s", (templatePath) => {
     const html = readFileSync(path.join(repoRoot, templatePath), "utf8");
@@ -22,6 +21,10 @@ describe("Unity WebGL runtime templates", () => {
     expect(html).toContain("let resizePendingDuringBoot = false;");
     expect(html).toContain("function setStatusText(text)");
     expect(html).toContain("function scheduleResizeCanvas()");
+    expect(html).toContain("function tryDispatchRuntimeSettingsToUnity(message)");
+    expect(html).toContain("function applyRuntimeSettings(message)");
+    expect(html).toContain('data.type === "runtime:settings"');
+    expect(html).toContain('unityInstance.SendMessage("ObsidianBridge", "OnRuntimeSettings", JSON.stringify(message));');
     expect(html).toContain('if (runtimeMode === "failed")');
     expect(html).toContain("function setRuntimeFailed(statusText)");
     expect(html).toContain("graphSetDispatchToken++;");

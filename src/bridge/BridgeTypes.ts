@@ -1,5 +1,7 @@
 import type { MapLayoutPreference } from "./LayoutPreference";
+import type { FrameRateMode } from "./FrameRateMode";
 export type { MapLayoutPreference } from "./LayoutPreference";
+export type { FrameRateMode } from "./FrameRateMode";
 
 export const BRIDGE_PROTOCOL_VERSION = "2.0.0";
 
@@ -63,6 +65,16 @@ export type RuntimeStatusMessage = {
   };
 };
 
+export type RuntimeSettingsPayload = {
+  frameRateMode: FrameRateMode;
+};
+
+export type RuntimeSettingsMessage = {
+  protocolVersion: string;
+  type: "runtime:settings";
+  payload: RuntimeSettingsPayload;
+};
+
 export type ShutdownResult = "complete" | "timeout" | "not-attached" | "superseded";
 
 export type GraphNoteNode = {
@@ -108,4 +120,5 @@ export type OutgoingBridgeMessage =
   | GraphSetMessage
   | NoteFocusMessage
   | RuntimeShutdownMessage
-  | RuntimeStatusMessage;
+  | RuntimeStatusMessage
+  | RuntimeSettingsMessage;

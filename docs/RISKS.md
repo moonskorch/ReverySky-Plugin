@@ -176,6 +176,21 @@ Mitigation:
 * Document that higher Render Scale values sharpen the graph but use more GPU power.
 * If users report instability, advise lowering plugin Render Scale first, then investigate whether a targeted safe mode or clearer in-UI warning is needed.
 
+## Host Frame Cadence Limits
+
+Risk:
+
+* Obsidian desktop runs the Unity WebGL map inside an Electron/Chromium iframe, so the browser host controls the `requestAnimationFrame` cadence seen by WebGL.
+* Local diagnostics observed iframe `requestAnimationFrame` near 60 FPS on a 120 Hz display.
+* `Auto` frame-rate mode uses Unity vSync (`QualitySettings.vSyncCount = 1`, `Application.targetFrameRate = -1`), but the effective cadence may still be capped by Obsidian/Electron before Unity reaches the physical monitor refresh rate.
+* Lower fixed caps (`60 FPS`, `30 FPS`, `24 FPS`) can reduce Unity frame work in some cases, but Task Manager GPU readings and perceived device load may not drop proportionally.
+
+Mitigation:
+
+* Present the setting as `Frame rate`, not as a guaranteed power-saving mode.
+* Keep `Auto` as the default because it follows the host cadence and avoids forcing a lower software cap.
+* Treat fixed modes as user-controlled caps for systems where lower Unity frame frequency helps stability or comfort.
+
 ## 13. Runtime Startup May Never Reach `bridge:ready`
 
 Risk:

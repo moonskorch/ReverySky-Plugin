@@ -8,6 +8,7 @@ public class ObsidianBridge : MonoBehaviour
   private const string ExpectedProtocolVersion = "2.0.0";
   private const string GraphSetMessageType = "graph:set";
   private const string NoteFocusMessageType = "note:focus";
+  private const string RuntimeSettingsMessageType = "runtime:settings";
   private static bool IsRuntimeShuttingDown;
 
 #if UNITY_WEBGL && !UNITY_EDITOR
@@ -21,13 +22,8 @@ public class ObsidianBridge : MonoBehaviour
   [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
   private static void EnsureInstance()
   {
-#if UNITY_2023_1_OR_NEWER
     if (FindFirstObjectByType<ObsidianBridge>() != null)
       return;
-#else
-    if (FindObjectOfType<ObsidianBridge>() != null)
-      return;
-#endif
 
     var go = new GameObject("ObsidianBridge");
     DontDestroyOnLoad(go);
@@ -54,10 +50,10 @@ public class ObsidianBridge : MonoBehaviour
     if (string.IsNullOrWhiteSpace(json))
       return;
 
-    GraphSetEnvelope envelope;
+    BridgeGraphSetEnvelope envelope;
     try
     {
-      envelope = JsonUtility.FromJson<GraphSetEnvelope>(json);
+      envelope = JsonUtility.FromJson<BridgeGraphSetEnvelope>(json);
     }
     catch (Exception ex)
     {
@@ -85,8 +81,8 @@ public class ObsidianBridge : MonoBehaviour
     MapRuntimeContext.MapLayoutPreference = ParseMapLayoutPreference(envelope.payload.mapLayout);
     MapRuntimeContext.SetGraphRequestId(envelope.requestId);
 
-    var notes = envelope.payload.notes ?? Array.Empty<GraphNote>();
-    var links = envelope.payload.links ?? Array.Empty<GraphLink>();
+    var notes = envelope.payload.notes ?? Array.Empty<BridgeGraphNote>();
+    var links = envelope.payload.links ?? Array.Empty<BridgeGraphLink>();
 
     var tagIdByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
     var tagNameById = new Dictionary<int, string>();
@@ -174,10 +170,10 @@ public class ObsidianBridge : MonoBehaviour
     if (string.IsNullOrWhiteSpace(json))
       return;
 
-    NoteFocusEnvelope envelope;
+    BridgeNoteFocusEnvelope envelope;
     try
     {
-      envelope = JsonUtility.FromJson<NoteFocusEnvelope>(json);
+      envelope = JsonUtility.FromJson<BridgeNoteFocusEnvelope>(json);
     }
     catch (Exception ex)
     {
@@ -210,6 +206,46 @@ public class ObsidianBridge : MonoBehaviour
       return;
 
     cartographer.FocusRuntimeNote(noteId);
+  }
+
+  public void OnRuntimeSettings(string json)
+  {
+    if (IsRuntimeShuttingDown)
+      return;
+
+    if (string.IsNullOrWhiteSpace(json))
+      return;
+
+    BridgeRuntimeSettingsEnvelope envelope;
+    try
+    {
+      envelope = JsonUtility.FromJson<BridgeRuntimeSettingsEnvelope>(json);
+    }
+    catch (Exception ex)
+    {
+      Debug.LogWarning($"[ObsidianBridge] Invalid runtime:settings payload: {ex.Message}");
+      return;
+    }
+
+    if (envelope?.payload == null)
+      return;
+
+    if (!string.Equals(envelope.protocolVersion, ExpectedProtocolVersion, StringComparison.Ordinal))
+    {
+      Debug.LogWarning(
+        $"[ObsidianBridge] Ignoring runtime:settings due to protocolVersion mismatch. expected={ExpectedProtocolVersion}, got={envelope?.protocolVersion ?? "<null>"}");
+      return;
+    }
+
+    if (!string.Equals(envelope.type, RuntimeSettingsMessageType, StringComparison.Ordinal))
+    {
+      Debug.LogWarning(
+        $"[ObsidianBridge] Ignoring runtime:settings due to message type mismatch. expected={RuntimeSettingsMessageType}, got={envelope?.type ?? "<null>"}");
+      return;
+    }
+
+    var appliedMode = ApplyFrameRateMode(envelope.payload.frameRateMode);
+    LogFrameRateModeApplied(envelope.payload.frameRateMode, appliedMode);
   }
 
   private static void HandleOpenNoteRequested(string noteId, string notePath)
@@ -273,6 +309,55 @@ public class ObsidianBridge : MonoBehaviour
     return MapLayoutMode.Auto;
   }
 
+  private static MapFrameRateMode ApplyFrameRateMode(string frameRateMode)
+  {
+    switch (ParseFrameRateMode(frameRateMode))
+    {
+      case MapFrameRateMode.Fps60:
+        QualitySettings.vSyncCount = 0;
+        Application.targetFrameRate = 60;
+        return MapFrameRateMode.Fps60;
+
+      case MapFrameRateMode.Fps30:
+        QualitySettings.vSyncCount = 0;
+        Application.targetFrameRate = 30;
+        return MapFrameRateMode.Fps30;
+
+      case MapFrameRateMode.Fps24:
+        QualitySettings.vSyncCount = 0;
+        Application.targetFrameRate = 24;
+        return MapFrameRateMode.Fps24;
+
+      default:
+        Application.targetFrameRate = -1;
+        QualitySettings.vSyncCount = 1;
+        return MapFrameRateMode.Auto;
+    }
+  }
+
+  private static void LogFrameRateModeApplied(string receivedFrameRateMode, MapFrameRateMode appliedMode)
+  {
+    Debug.Log(
+      $"[ObsidianBridge] runtime:settings applied. received={receivedFrameRateMode ?? "<null>"}, applied={appliedMode}, vSyncCount={QualitySettings.vSyncCount}, targetFrameRate={Application.targetFrameRate}");
+  }
+
+  private static MapFrameRateMode ParseFrameRateMode(string value)
+  {
+    if (string.Equals(value, "fps60", StringComparison.OrdinalIgnoreCase))
+      return MapFrameRateMode.Fps60;
+
+    if (string.Equals(value, "fps30", StringComparison.OrdinalIgnoreCase))
+      return MapFrameRateMode.Fps30;
+
+    if (string.Equals(value, "fps24", StringComparison.OrdinalIgnoreCase))
+      return MapFrameRateMode.Fps24;
+
+    if (!string.IsNullOrWhiteSpace(value) && !string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase))
+      Debug.LogWarning($"[ObsidianBridge] Unknown frame-rate mode: {value}");
+
+    return MapFrameRateMode.Auto;
+  }
+
   private static bool TryParseIso(string value, out DateTime dt)
   {
     dt = DateTime.MinValue;
@@ -286,54 +371,4 @@ public class ObsidianBridge : MonoBehaviour
       out dt);
   }
 
-  [Serializable]
-  private class GraphSetEnvelope
-  {
-    public string protocolVersion;
-    public string type;
-    public string requestId;
-    public GraphPayload payload;
-  }
-
-  [Serializable]
-  private class NoteFocusEnvelope
-  {
-    public string protocolVersion;
-    public string type;
-    public NoteIdentityPayload payload;
-  }
-
-  [Serializable]
-  private class NoteIdentityPayload
-  {
-    public string id;
-    public string path;
-  }
-
-  [Serializable]
-  private class GraphPayload
-  {
-    public GraphNote[] notes;
-    public GraphLink[] links;
-    public string mapLayout;
-  }
-
-  [Serializable]
-  private class GraphNote
-  {
-    public string id;
-    public string path;
-    public string title;
-    public string[] tags;
-    public string date;
-    public int size;
-  }
-
-  [Serializable]
-  private class GraphLink
-  {
-    public string sourceId;
-    public string targetId;
-    public float weight;
-  }
 }
