@@ -24,5 +24,9 @@ test.describe("render scale slider", () => {
     await expect(stage).toHaveScreenshot("render-scale-slider.png", {
       animations: "disabled"
     });
+
+    await renderScaleInput.focus();
+    await expect(renderScaleInput).toBeFocused();
+    await expect(renderScaleInput).toHaveCSS("outline-style", "solid");
   });
 });

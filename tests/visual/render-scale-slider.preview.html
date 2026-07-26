@@ -7,14 +7,14 @@
     <link rel="stylesheet" href="../../styles.css" />
     <style>
       :root {
-        color-scheme: light;
-        --background-primary: #f8f8f8;
-        --background-secondary: #f8f8f8;
-        --background-modifier-border: #dddddd;
-        --background-modifier-border-hover: #c7c7c7;
-        --background-modifier-hover: #ececec;
-        --text-normal: #222222;
-        --text-muted: #555555;
+        color-scheme: dark;
+        --background-primary: #1f1f1f;
+        --background-secondary: #262626;
+        --background-modifier-border: #393939;
+        --background-modifier-border-hover: #505050;
+        --background-modifier-hover: #303030;
+        --text-normal: #d7d7d7;
+        --text-muted: #a6a6a6;
         --font-ui-small: 21px;
         --font-ui-smaller: 13px;
         --font-ui-medium: 21px;
@@ -33,22 +33,23 @@
       body {
         padding: 0;
         box-sizing: border-box;
-        background: #f8f8f8;
+        background: #111111;
         font-family: Arial, sans-serif;
-        color: #222222;
+        color: var(--text-normal);
       }
 
       .visual-stage {
         position: relative;
-        width: 584px;
-        height: 80px;
+        width: 656px;
+        height: 120px;
         overflow: visible;
-        background: #f8f8f8;
+        background: #111111;
       }
 
       .visual-panel-shell {
-        width: 100%;
-        height: 100%;
+        width: 584px;
+        height: 80px;
+        margin: 20px 24px;
       }
 
       .visual-panel-shell .reverysky-map-filter-panel {
@@ -57,7 +58,7 @@
         max-height: none;
         overflow: visible;
         box-sizing: border-box;
-        background: #f8f8f8;
+        background: #262626;
         border: 0;
         border-radius: 0;
         box-shadow: none;
@@ -84,7 +85,7 @@
 
       .visual-panel-shell input[type="range"]::-webkit-slider-runnable-track {
         height: 6px;
-        background: #e8e8e8;
+        background: #333333;
         border-radius: 999px;
       }
 

@@ -182,8 +182,14 @@ describe("MapFilterPanelController", () => {
     expect(renderScaleInput.value).toBe("1.2");
     expect(renderScaleValue.textContent).toBe("1.2x");
     expect(renderScaleMessage.textContent).toBe("");
+    expect(container.textContent).toContain("Selection");
+    expect(container.textContent).not.toContain("Settings");
     expect(container.textContent).toContain("Layout");
+    expect(container.textContent).toContain("Graphics");
     expect(container.textContent).toContain("Frame rate");
+    const graphicsSection = container.querySelector(".reverysky-map-graphics-section") as HTMLElement;
+    expect(graphicsSection.textContent).toContain("Render scale");
+    expect(graphicsSection.textContent).toContain("Frame rate");
     expect(message.textContent).toBe("");
   });
 
@@ -209,6 +215,51 @@ describe("MapFilterPanelController", () => {
 
     expect(session.getState()).toMatchObject({ frameRateMode: "fps24" });
     expect(frameRateModeSelect.value).toBe("fps24");
+  });
+
+  it("collapses sections from the header toggle without treating close as a section toggle", () => {
+    const session = createSession();
+    const controller = new MapFilterPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const filterToggle = container.querySelector(".reverysky-map-filter-toggle") as HTMLButtonElement;
+    const panel = container.querySelector(".reverysky-map-filter-panel") as HTMLElement;
+    const settingsToggle = container.querySelector(
+      '.reverysky-map-settings-section .reverysky-map-filter-section-toggle'
+    ) as HTMLButtonElement;
+    const graphicsToggle = container.querySelector(
+      '.reverysky-map-graphics-section .reverysky-map-filter-section-toggle'
+    ) as HTMLButtonElement;
+    const settingsContent = container.querySelector(
+      ".reverysky-map-settings-section .reverysky-map-filter-section-content"
+    ) as HTMLElement;
+    const graphicsContent = container.querySelector(
+      ".reverysky-map-graphics-section .reverysky-map-filter-section-content"
+    ) as HTMLElement;
+    const closeButton = container.querySelector(".reverysky-map-filter-close") as HTMLButtonElement;
+
+    filterToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+    settingsToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    graphicsToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+    expect(settingsToggle.tabIndex).toBe(-1);
+    expect(graphicsToggle.tabIndex).toBe(-1);
+    expect(settingsToggle.getAttribute("aria-expanded")).toBe("false");
+    expect(graphicsToggle.getAttribute("aria-expanded")).toBe("false");
+    expect(settingsContent.classList.contains("reverysky-map-filter-section-content--collapsed")).toBe(true);
+    expect(graphicsContent.classList.contains("reverysky-map-filter-section-content--collapsed")).toBe(true);
+
+    closeButton.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+    expect(panel.classList.contains("reverysky-map-filter-panel--closed")).toBe(true);
+    expect(settingsToggle.getAttribute("aria-expanded")).toBe("false");
+
+    settingsToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+    expect(settingsToggle.getAttribute("aria-expanded")).toBe("true");
+    expect(settingsContent.classList.contains("reverysky-map-filter-section-content--collapsed")).toBe(false);
   });
 
   it("updates render scale from the slider and shows reopen guidance", () => {

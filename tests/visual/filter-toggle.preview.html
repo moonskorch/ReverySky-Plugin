@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Filter Toggle Preview</title>
+    <link rel="stylesheet" href="../../styles.css" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --background-primary: #1f1f1f;
+        --background-secondary: #262626;
+        --background-modifier-border: #393939;
+        --background-modifier-border-hover: #505050;
+        --background-modifier-hover: #303030;
+        --text-normal: #d7d7d7;
+        --text-muted: #a6a6a6;
+        --font-ui-small: 0.875rem;
+        --font-ui-medium: 1rem;
+        --size-2-3: 0.5rem;
+        --size-4-3: 0.875rem;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      body {
+        display: grid;
+        place-items: start;
+        padding: 24px;
+        box-sizing: border-box;
+        background: #111111;
+        font-family: system-ui, sans-serif;
+        color: var(--text-normal);
+      }
+
+      .visual-stage {
+        position: relative;
+        width: 96px;
+        height: 96px;
+        overflow: visible;
+        background:
+          radial-gradient(circle at 22% 28%, rgba(255, 255, 255, 0.12) 0 1px, transparent 2px),
+          radial-gradient(circle at 72% 58%, rgba(255, 255, 255, 0.1) 0 1px, transparent 2px),
+          #101010;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="visual-stage reverysky-map-root" data-visual-stage>
+      <div class="reverysky-map-overlay-controls">
+        <button class="reverysky-map-filter-toggle" type="button" aria-label="Open filters">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.72l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"
+              fill="none"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </body>
+</html>
