@@ -158,7 +158,25 @@ Mitigation:
 * Show the runtime status `WebGL context lost. Reload the graph view.` when context loss is detected.
 * Prefer user-visible reload guidance over complex automatic recovery unless repeated user reports show that a controlled restart is necessary.
 
-## 12. Runtime Startup May Never Reach `bridge:ready`
+## 12. High WebGL Render Resolution
+
+Risk:
+
+* The WebGL canvas backing size is derived from the graph view panel size, the browser `devicePixelRatio`, and the user-controlled plugin Render Scale.
+* The iframe wrapper keeps a high-end hard ceiling of `8192` pixels per canvas side, which can allow a very large backing buffer on large or high-DPI displays.
+* The Unity URP asset intentionally uses Render Scale `1.2` as the ReverySky visual baseline, so the internal game render target can be larger than the WebGL canvas backing resolution.
+* HDR, MSAA, Opaque Texture, Bloom, and URP intermediate render targets can multiply peak GPU memory pressure beyond a single color buffer.
+* On systems with limited GPU memory, integrated graphics, or fragile Electron/ANGLE WebGL behavior, aggressive user Render Scale values can increase the chance of slow rendering or WebGL context loss.
+
+Mitigation:
+
+* Treat the current high-quality visual baseline as intentional: keep Unity URP Render Scale `1.2` unless real user reports show that the default is broadly unstable.
+* Keep the `8192` canvas-side ceiling as a high-end guardrail rather than reducing image quality for capable systems.
+* Leave the plugin Render Scale under user control so users can choose the quality/performance trade-off that fits their hardware and visual preference.
+* Document that higher Render Scale values sharpen the graph but use more GPU power.
+* If users report instability, advise lowering plugin Render Scale first, then investigate whether a targeted safe mode or clearer in-UI warning is needed.
+
+## 13. Runtime Startup May Never Reach `bridge:ready`
 
 Risk:
 
