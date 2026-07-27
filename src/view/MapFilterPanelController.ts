@@ -43,8 +43,8 @@ export class MapFilterPanelController {
   private filterSuggestionMode: FilterSuggestionMode = 0;
   private searchComponent: SearchComponent | null = null;
   private filterPanelOpen = false;
-  private settingsSectionCollapsed = false;
-  private graphicsSectionCollapsed = false;
+  private settingsSectionCollapsed = true;
+  private graphicsSectionCollapsed = true;
 
   constructor(private readonly session: MapSession) {}
 
@@ -378,8 +378,8 @@ export class MapFilterPanelController {
     this.renderScaleMessageEl = null;
     this.filterSuggestionMode = 0;
     this.filterPanelOpen = false;
-    this.settingsSectionCollapsed = false;
-    this.graphicsSectionCollapsed = false;
+    this.settingsSectionCollapsed = true;
+    this.graphicsSectionCollapsed = true;
   }
 
   private setFilterPanelOpen(isOpen: boolean): void {

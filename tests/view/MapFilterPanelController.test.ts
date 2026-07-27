@@ -217,7 +217,7 @@ describe("MapFilterPanelController", () => {
     expect(frameRateModeSelect.value).toBe("fps24");
   });
 
-  it("collapses sections from the header toggle without treating close as a section toggle", () => {
+  it("opens with collapsed sections and preserves section state across panel reopen", () => {
     const session = createSession();
     const controller = new MapFilterPanelController(session);
     const container = createObsidianTestContainer();
@@ -241,9 +241,6 @@ describe("MapFilterPanelController", () => {
 
     filterToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
-    settingsToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-    graphicsToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-
     expect(settingsToggle.tabIndex).toBe(-1);
     expect(graphicsToggle.tabIndex).toBe(-1);
     expect(settingsToggle.getAttribute("aria-expanded")).toBe("false");
@@ -251,15 +248,25 @@ describe("MapFilterPanelController", () => {
     expect(settingsContent.classList.contains("reverysky-map-filter-section-content--collapsed")).toBe(true);
     expect(graphicsContent.classList.contains("reverysky-map-filter-section-content--collapsed")).toBe(true);
 
+    settingsToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    graphicsToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+    expect(settingsToggle.getAttribute("aria-expanded")).toBe("true");
+    expect(graphicsToggle.getAttribute("aria-expanded")).toBe("true");
+    expect(settingsContent.classList.contains("reverysky-map-filter-section-content--collapsed")).toBe(false);
+    expect(graphicsContent.classList.contains("reverysky-map-filter-section-content--collapsed")).toBe(false);
+
     closeButton.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
     expect(panel.classList.contains("reverysky-map-filter-panel--closed")).toBe(true);
-    expect(settingsToggle.getAttribute("aria-expanded")).toBe("false");
+    expect(settingsToggle.getAttribute("aria-expanded")).toBe("true");
 
-    settingsToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    filterToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
     expect(settingsToggle.getAttribute("aria-expanded")).toBe("true");
+    expect(graphicsToggle.getAttribute("aria-expanded")).toBe("true");
     expect(settingsContent.classList.contains("reverysky-map-filter-section-content--collapsed")).toBe(false);
+    expect(graphicsContent.classList.contains("reverysky-map-filter-section-content--collapsed")).toBe(false);
   });
 
   it("updates render scale from the slider and shows reopen guidance", () => {

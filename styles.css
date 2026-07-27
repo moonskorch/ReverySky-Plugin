@@ -11,14 +11,20 @@
   --reverysky-panel-border: 1px solid var(--background-modifier-border);
   --reverysky-panel-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.14);
   --reverysky-filter-panel-width: 18rem;
-  --reverysky-filter-panel-viewport-margin: 1.25rem;
+  --reverysky-filter-panel-max-height: 32rem;
   --reverysky-overlay-offset-x: 0.875rem;
   --reverysky-overlay-offset-y: 0.875rem;
+  --reverysky-filter-section-gap: 0.5rem;
+  --reverysky-filter-control-gap: 0.25rem;
   --reverysky-filter-section-padding-y: 0.625rem;
   --reverysky-filter-section-collapsed-padding-y: 0.75rem;
   --reverysky-filter-toggle-size: 2.5rem;
+  --reverysky-filter-toggle-radius: var(--reverysky-panel-radius);
   --reverysky-filter-close-size: 1.75rem;
   --reverysky-filter-action-icon-size: 1.25rem;
+  --reverysky-filter-icon-size: 1rem;
+  --reverysky-filter-icon-stroke-width: 2.25;
+  --reverysky-filter-chevron-color: var(--nav-collapse-icon-color, var(--text-faint, var(--text-muted)));
   --reverysky-filter-header-padding-edge: calc(
     (var(--reverysky-filter-toggle-size) - var(--reverysky-filter-close-size)) / 2
   );
@@ -31,20 +37,26 @@
   --reverysky-control-border: 1px solid var(--background-modifier-border);
   --reverysky-control-border-hover: var(--background-modifier-border-hover);
   --reverysky-control-shadow-focus: 0 0 0 0.15625rem var(--background-modifier-border-hover);
+  --reverysky-control-padding-x: 0.875rem;
+  --reverysky-control-padding-y: 0.375rem;
+  --reverysky-select-arrow-offset-x: var(--reverysky-control-padding-x);
+  --reverysky-select-arrow-half-width: 0.3125rem;
+  --reverysky-select-arrow-height: 0.375rem;
+  --reverysky-select-padding-right: 2.25rem;
   --reverysky-transition-fast: 120ms ease;
-  --reverysky-toggle-track-off: color-mix(
-    in srgb,
-    var(--background-modifier-border) 78%,
-    var(--text-muted) 22%
-  );
-  --reverysky-toggle-thumb-off: var(--background-primary);
-  --reverysky-toggle-thumb-off-border: color-mix(
-    in srgb,
-    var(--background-modifier-border) 72%,
-    var(--text-muted) 28%
-  );
+  --reverysky-transition-transform: 160ms ease;
+  --reverysky-toggle-width: 2.5rem;
+  --reverysky-toggle-height: 1.5rem;
+  --reverysky-toggle-padding: 0.125rem;
+  --reverysky-toggle-radius: 999px;
+  --reverysky-toggle-thumb-size: 1.125rem;
+  --reverysky-toggle-track-off: linear-gradient(180deg, #dedede 0%, #d0d0d0 100%);
+  --reverysky-toggle-thumb-off: linear-gradient(180deg, #ffffff 0%, #f8f8f8 100%);
 
   /* Suggestions tokens */
+  --reverysky-suggestion-panel-radius: var(--reverysky-panel-radius);
+  --reverysky-suggestion-panel-padding: 0.5rem;
+  --reverysky-suggestion-panel-max-height: 44vh;
   --reverysky-suggestion-padding: 0.375rem 0.5rem;
   --reverysky-suggestion-font-size: var(--font-ui-small, 0.8125rem);
 }
@@ -89,7 +101,7 @@
   width: var(--reverysky-filter-toggle-size);
   height: var(--reverysky-filter-toggle-size);
   border: var(--reverysky-panel-border);
-  border-radius: 0.75rem;
+  border-radius: var(--reverysky-filter-toggle-radius);
   background: var(--background-secondary);
   color: var(--text-muted);
   padding: 0;
@@ -116,7 +128,7 @@
 .reverysky-map-filter-toggle svg {
   width: var(--reverysky-filter-action-icon-size);
   height: var(--reverysky-filter-action-icon-size);
-  stroke-width: 2.25;
+  stroke-width: var(--reverysky-filter-icon-stroke-width);
 }
 
 /* Filter Panel */
@@ -124,17 +136,29 @@
   position: absolute;
   top: var(--reverysky-overlay-offset-y);
   right: var(--reverysky-overlay-offset-x);
-  width: min(var(--reverysky-filter-panel-width), calc(100% - var(--reverysky-filter-panel-viewport-margin)));
-  max-height: min(32rem, calc(100% - 1rem));
-  overflow: visible;
+  width: min(
+    var(--reverysky-filter-panel-width),
+    calc(100% - var(--reverysky-overlay-offset-x) - var(--reverysky-overlay-offset-x))
+  );
+  max-height: min(
+    var(--reverysky-filter-panel-max-height),
+    calc(100% - var(--reverysky-overlay-offset-y) - var(--reverysky-overlay-offset-y))
+  );
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
   background: var(--background-secondary);
   border: var(--reverysky-panel-border);
-  border-radius: 0.625rem;
+  border-radius: var(--reverysky-panel-radius);
   box-shadow: var(--reverysky-panel-shadow);
   padding: 0;
   display: grid;
   gap: 0;
   z-index: 120;
+}
+
+.reverysky-map-filter-panel::-webkit-scrollbar {
+  display: none;
 }
 
 .reverysky-map-filter-panel--closed {
@@ -146,7 +170,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--reverysky-filter-header-side);
   align-items: center;
-  gap: 0.25rem;
+  gap: var(--reverysky-filter-control-gap);
   min-height: var(--reverysky-filter-header-row-height);
   padding: var(--reverysky-filter-header-padding-edge) var(--reverysky-filter-header-padding-edge) 0
     var(--size-4-3);
@@ -154,12 +178,12 @@
 
 .reverysky-map-filter-section {
   display: grid;
-  gap: 0.5rem;
+  gap: var(--reverysky-filter-section-gap);
 }
 
 .reverysky-map-filter-section-content {
   display: grid;
-  gap: 0.5rem;
+  gap: var(--reverysky-filter-section-gap);
 }
 
 .reverysky-map-filter-section-content--collapsed {
@@ -174,7 +198,7 @@
 .reverysky-map-settings-section,
 .reverysky-map-graphics-section {
   box-sizing: border-box;
-  gap: 0.5rem;
+  gap: var(--reverysky-filter-section-gap);
 }
 
 .reverysky-map-settings-section.reverysky-map-filter-section--collapsed,
@@ -187,17 +211,17 @@
 }
 
 .reverysky-map-graphics-section:not(.reverysky-map-filter-section--collapsed) {
-  padding-bottom: 0.75rem;
+  padding-bottom: var(--reverysky-filter-section-collapsed-padding-y);
 }
 
 .reverysky-map-filter-search-area {
   position: relative;
   display: grid;
-  gap: 0.25rem;
+  gap: var(--reverysky-filter-control-gap);
 }
 
 .reverysky-map-filter-control-group {
-  gap: 0.25rem;
+  gap: var(--reverysky-filter-control-gap);
 }
 
 .reverysky-map-filter-field-label {
@@ -222,7 +246,7 @@ button.reverysky-map-filter-section-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 0.5rem;
+  gap: var(--reverysky-filter-section-gap);
   margin: 0;
   padding: 0;
   border: 0;
@@ -250,15 +274,15 @@ button.reverysky-map-filter-section-toggle:active {
 }
 
 .reverysky-map-filter-section-chevron {
-  width: 1rem;
-  height: 1rem;
-  color: var(--text-muted);
+  width: var(--reverysky-filter-icon-size);
+  height: var(--reverysky-filter-icon-size);
+  color: var(--reverysky-filter-chevron-color);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
   transform: rotate(90deg);
-  transition: transform 160ms ease;
+  transition: transform var(--reverysky-transition-transform);
 }
 
 .reverysky-map-filter-section--collapsed .reverysky-map-filter-section-chevron {
@@ -266,9 +290,9 @@ button.reverysky-map-filter-section-toggle:active {
 }
 
 .reverysky-map-filter-section-chevron svg {
-  width: 1rem;
-  height: 1rem;
-  stroke-width: 2.25;
+  width: var(--reverysky-filter-icon-size);
+  height: var(--reverysky-filter-icon-size);
+  stroke-width: var(--reverysky-filter-icon-stroke-width);
 }
 
 button.reverysky-map-filter-close {
@@ -309,7 +333,7 @@ button.reverysky-map-filter-close:active {
 button.reverysky-map-filter-close svg {
   width: var(--reverysky-filter-action-icon-size);
   height: var(--reverysky-filter-action-icon-size);
-  stroke-width: 2.25;
+  stroke-width: var(--reverysky-filter-icon-stroke-width);
 }
 
 /* Filter Controls */
@@ -343,12 +367,12 @@ button.reverysky-map-filter-close svg {
   content: "";
   position: absolute;
   top: 50%;
-  right: 0.875rem;
+  right: var(--reverysky-select-arrow-offset-x);
   width: 0;
   height: 0;
-  border-left: 0.3125rem solid transparent;
-  border-right: 0.3125rem solid transparent;
-  border-top: 0.375rem solid var(--text-muted);
+  border-left: var(--reverysky-select-arrow-half-width) solid transparent;
+  border-right: var(--reverysky-select-arrow-half-width) solid transparent;
+  border-top: var(--reverysky-select-arrow-height) solid var(--text-muted);
   pointer-events: none;
   transform: translateY(-35%);
 }
@@ -359,7 +383,8 @@ button.reverysky-map-filter-close svg {
   min-height: var(--input-height, 2rem);
   font-size: var(--font-ui-small, 0.875rem);
   line-height: 1.25;
-  padding: 0.375rem 2.25rem 0.375rem 0.875rem;
+  padding: var(--reverysky-control-padding-y) var(--reverysky-select-padding-right)
+    var(--reverysky-control-padding-y) var(--reverysky-control-padding-x);
   border: 0;
   border-radius: var(--reverysky-control-radius);
   background-color: var(--background-primary);
@@ -395,7 +420,7 @@ button.reverysky-map-filter-close svg {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: var(--reverysky-filter-section-gap);
 }
 
 .reverysky-map-render-scale-value {
@@ -432,11 +457,11 @@ button.reverysky-map-filter-close svg {
 }
 
 button.reverysky-map-tags-toggle {
-  width: 2.5rem;
-  height: 1.5rem;
-  border-radius: 999px;
+  width: var(--reverysky-toggle-width);
+  height: var(--reverysky-toggle-height);
+  border-radius: var(--reverysky-toggle-radius);
   border: 0;
-  padding: 0.125rem;
+  padding: var(--reverysky-toggle-padding);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -444,7 +469,7 @@ button.reverysky-map-tags-toggle {
   transition: background-color var(--reverysky-transition-fast);
   box-shadow: none;
   appearance: none;
-  background: linear-gradient(180deg, #dedede 0%, #d0d0d0 100%);
+  background: var(--reverysky-toggle-track-off);
   flex-shrink: 0;
   outline: none;
 }
@@ -479,10 +504,10 @@ button.reverysky-map-tags-toggle[aria-checked]:focus-visible {
 
 button.reverysky-map-tags-toggle .reverysky-map-tags-toggle-thumb {
   display: block;
-  width: 1.125rem;
-  height: 1.125rem;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8f8f8 100%);
+  width: var(--reverysky-toggle-thumb-size);
+  height: var(--reverysky-toggle-thumb-size);
+  border-radius: var(--reverysky-toggle-radius);
+  background: var(--reverysky-toggle-thumb-off);
   box-shadow: none;
 }
 
@@ -494,11 +519,11 @@ button.reverysky-map-tags-toggle .reverysky-map-tags-toggle-thumb {
   top: calc(100% + 0.25rem);
   background: var(--background-primary);
   border: var(--reverysky-panel-border);
-  border-radius: 0.625rem;
-  padding: 0.5rem;
+  border-radius: var(--reverysky-suggestion-panel-radius);
+  padding: var(--reverysky-suggestion-panel-padding);
   box-shadow: none;
   z-index: 140;
-  max-height: 44vh;
+  max-height: var(--reverysky-suggestion-panel-max-height);
   overflow-y: auto;
 }
 

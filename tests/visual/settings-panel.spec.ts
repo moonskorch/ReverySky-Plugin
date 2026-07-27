@@ -88,4 +88,39 @@ test.describe("settings panel", () => {
       animations: "disabled"
     });
   });
+
+  test("settings-panel-overflow-scrolls-without-visible-scrollbar", async ({ page }) => {
+    const previewPath = path.resolve(process.cwd(), "tests/visual/settings-panel.preview.html");
+    await page.goto(pathToFileURL(previewPath).href);
+
+    const stage = page.locator("[data-visual-stage]");
+    const panel = page.locator(".reverysky-map-filter-panel");
+    await stage.evaluate((element) => {
+      element.classList.add("visual-stage--compact-overflow");
+    });
+
+    await expect(panel).toHaveCSS("overflow-y", "auto");
+
+    const beforeWheel = await panel.evaluate((element) => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      scrollTop: element.scrollTop,
+      scrollbarGutter:
+        element.offsetWidth -
+        element.clientWidth -
+        parseFloat(getComputedStyle(element).borderLeftWidth) -
+        parseFloat(getComputedStyle(element).borderRightWidth)
+    }));
+    expect(beforeWheel.scrollHeight).toBeGreaterThan(beforeWheel.clientHeight);
+    expect(beforeWheel.scrollbarGutter).toBeLessThanOrEqual(1);
+
+    const panelBox = await panel.boundingBox();
+    expect(panelBox).not.toBeNull();
+    await page.mouse.move(panelBox!.x + 12, panelBox!.y + panelBox!.height - 12);
+    await page.mouse.wheel(0, 480);
+
+    await expect.poll(() => panel.evaluate((element) => element.scrollTop)).toBeGreaterThan(beforeWheel.scrollTop);
+    const afterWheel = await panel.evaluate((element) => element.scrollTop);
+    expect(afterWheel).toBeGreaterThan(beforeWheel.scrollTop);
+  });
 });
