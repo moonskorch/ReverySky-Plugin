@@ -158,7 +158,25 @@ Mitigation:
 * Show the runtime status `WebGL context lost. Reload the graph view.` when context loss is detected.
 * Prefer user-visible reload guidance over complex automatic recovery unless repeated user reports show that a controlled restart is necessary.
 
-## 12. High WebGL Render Resolution
+## 12. Explicit Unity WebGL Quit During View Teardown
+
+Risk:
+
+* Unity WebGL exposes `unityInstance.Quit()` as the canonical runtime shutdown API, but the plugin parent cannot call it directly because the Unity instance lives inside the iframe wrapper.
+* A reliable explicit quit path would require an asynchronous shutdown handshake across `MapView`, the iframe bridge, the iframe HTML wrapper, Unity boot timing, Obsidian tab close, plugin unload, and window migration.
+* Local implementation analysis showed that this handshake quickly adds lifecycle state, timeouts, late-boot handling, duplicate template logic, and stale async continuation risks.
+* Existing repeated graph open and close behavior works through browser-level iframe teardown, where Electron/Chromium eventually releases the iframe JavaScript, WebGL, and GPU resources.
+* No reproducible resource-retention bug has confirmed that missing `unityInstance.Quit()` is the root cause.
+
+Mitigation:
+
+* Do not add explicit `unityInstance.Quit()` to production shutdown paths without a reproducible memory, GPU resource, WebGL runtime, or plugin deletion failure that points to live Unity runtime retention.
+* Treat `unityInstance.Quit()` as a deferred architecture option, not a missing required cleanup step.
+* Keep the current parent-owned cleanup simple: stop view/session work, detach bridge listeners, remove iframe content, and stop the local runtime server when no graph leaves remain.
+* Investigate plugin uninstall or delete hangs as a separate file-handle and unload-order problem before attributing them to Unity runtime quit behavior.
+* If this direction is reopened, first capture a baseline without explicit quit, define the exact failure being fixed, and keep any proposed quit path bounded and measurable.
+
+## 13. High WebGL Render Resolution
 
 Risk:
 
