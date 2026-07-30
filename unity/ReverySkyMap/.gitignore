@@ -1,2 +1,30 @@
+# Optional large skybox textures are intentionally excluded
+Assets/_Visuals/Nebula Skyboxes/*.exr
+Assets/_Visuals/Nebula Skyboxes/Nebula_03_Cubemap.exr.meta
+Assets/_Visuals/Textures/electric_texture_bw_big_contrast.jpg
+Assets/_Visuals/Textures/electric_texture_bw_big_contrast.jpg.meta
+
+# Unity generated/cache/output (keep source assets and settings)
+[Ll]ibrary/
+[Tt]emp/
+[Ll]ogs/
+[Oo]bj/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Pp]rofilerCaptures/
+[Rr]ecordings/
+[Bb]uild/
+[Bb]uilds/
+artifacts/
+
+# Unity IDE/project generated files
+*.csproj
+*.sln
+.vsconfig
+.vs/
+
+# Local cleanup tracking
+docs/CLEANUP_BATCH_LEDGER.md
+
 # Unity tests may create an empty Resources folder; this project does not use Resources.Load.
 Assets/Resources.meta
