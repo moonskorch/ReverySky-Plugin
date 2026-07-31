@@ -8,6 +8,24 @@ if (typeof HTMLElement !== "undefined" && typeof HTMLElement.prototype.createEl 
   };
 }
 
+if (typeof Node !== "undefined" && !Object.getOwnPropertyDescriptor(Node.prototype, "win")) {
+  Object.defineProperty(Node.prototype, "win", {
+    configurable: true,
+    get(this: Node): Window {
+      return this.ownerDocument?.defaultView ?? window;
+    }
+  });
+}
+
+if (typeof Node !== "undefined" && !Object.getOwnPropertyDescriptor(Node.prototype, "doc")) {
+  Object.defineProperty(Node.prototype, "doc", {
+    configurable: true,
+    get(this: Node): Document {
+      return this.ownerDocument ?? document;
+    }
+  });
+}
+
 export class Plugin {
   public app: unknown;
   public manifest: { id: string };

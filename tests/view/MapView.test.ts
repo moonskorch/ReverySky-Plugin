@@ -345,6 +345,7 @@ describe("MapView bridge integration", () => {
   });
 
   it("restarts the runtime iframe when Obsidian migrates the view to another window", async () => {
+    vi.useFakeTimers();
     const app = {
       marker: "app",
       workspace: {
@@ -374,14 +375,12 @@ describe("MapView bridge integration", () => {
     const buildGraph = vi.fn().mockReturnValue(payload);
     let onWindowMigrated: ((win: Window) => void) | null = null;
     const cleanupWindowMigration = vi.fn();
-    const timeoutCallbacks: (() => void)[] = [];
-    const migratedWindow = {
-      setTimeout: vi.fn((callback: () => void) => {
-        timeoutCallbacks.push(callback);
-        return timeoutCallbacks.length;
-      }),
-      clearTimeout: vi.fn()
-    } as unknown as Window;
+    const popoutHost = document.createElement("iframe");
+    document.body.appendChild(popoutHost);
+    const migratedWindow = popoutHost.contentWindow;
+    if (!migratedWindow) {
+      throw new Error("Expected jsdom iframe to expose a content window.");
+    }
 
     const view = new MapView(
       { app } as never,
@@ -393,6 +392,8 @@ describe("MapView bridge integration", () => {
         now: () => 1700000000000
       }
     );
+    migratedWindow.document.body.appendChild(view.contentEl);
+    expect((view.contentEl as HTMLElement & { win: Window }).win).toBe(migratedWindow);
     (
       view.contentEl as HTMLElement & {
         onWindowMigrated?: (listener: (win: Window) => void) => () => void;
@@ -419,19 +420,17 @@ describe("MapView bridge integration", () => {
     callMaybe(onWindowMigrated, migratedWindow);
     await Promise.resolve();
 
-    expect(bridge.detach).not.toHaveBeenCalled();
+    expect(bridge.detach).toHaveBeenCalledTimes(1);
     expect(bridge.shutdown).not.toHaveBeenCalled();
     expect(plugin.getUnityRuntimeUrl).toHaveBeenCalledTimes(1);
-    expect(view.contentEl.querySelector("iframe")).toBe(firstIframe);
+    expect(view.contentEl.querySelector("iframe")).toBeNull();
 
     firstIframe!.dispatchEvent(new Event("load"));
     callbacks[0]?.onReady?.();
     expect(bridge.attach).toHaveBeenCalledTimes(1);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
 
-    timeoutCallbacks.shift()?.();
-    await Promise.resolve();
-    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(0);
     expect(bridge.detach).toHaveBeenCalledTimes(1);
     expect(plugin.getUnityRuntimeUrl).toHaveBeenCalledTimes(2);
 
@@ -455,6 +454,7 @@ describe("MapView bridge integration", () => {
   });
 
   it("ignores a stale deferred iframe restart when a newer window migration arrives first", async () => {
+    vi.useFakeTimers();
     const app = {
       marker: "app",
       workspace: {
@@ -477,22 +477,7 @@ describe("MapView bridge integration", () => {
       shutdown: vi.fn().mockResolvedValue("complete")
     };
     let onWindowMigrated: ((win: Window) => void) | null = null;
-    const timeoutCallbacksA: (() => void)[] = [];
-    const timeoutCallbacksB: (() => void)[] = [];
-    const migratedWindowA = {
-      setTimeout: vi.fn((callback: () => void) => {
-        timeoutCallbacksA.push(callback);
-        return timeoutCallbacksA.length;
-      }),
-      clearTimeout: vi.fn()
-    } as unknown as Window;
-    const migratedWindowB = {
-      setTimeout: vi.fn((callback: () => void) => {
-        timeoutCallbacksB.push(callback);
-        return timeoutCallbacksB.length;
-      }),
-      clearTimeout: vi.fn()
-    } as unknown as Window;
+    const migratedWindow = window;
 
     const view = new MapView(
       { app } as never,
@@ -504,6 +489,7 @@ describe("MapView bridge integration", () => {
         now: () => 1700000000000
       }
     );
+    document.body.appendChild(view.contentEl);
     (
       view.contentEl as HTMLElement & {
         onWindowMigrated?: (listener: (win: Window) => void) => () => void;
@@ -518,28 +504,85 @@ describe("MapView bridge integration", () => {
     expect(firstIframe).not.toBeNull();
     expect(plugin.getUnityRuntimeUrl).toHaveBeenCalledTimes(1);
 
-    callMaybe(onWindowMigrated, migratedWindowA);
-    callMaybe(onWindowMigrated, migratedWindowB);
+    callMaybe(onWindowMigrated, migratedWindow);
+    callMaybe(onWindowMigrated, migratedWindow);
 
-    expect(migratedWindowA.clearTimeout).toHaveBeenCalledWith(1);
-    expect(bridge.detach).not.toHaveBeenCalled();
-    expect(view.contentEl.querySelector("iframe")).toBe(firstIframe);
+    expect(bridge.detach).toHaveBeenCalledTimes(2);
+    expect(view.contentEl.querySelector("iframe")).toBeNull();
 
-    timeoutCallbacksA.shift()?.();
-    await Promise.resolve();
-    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(0);
 
-    expect(plugin.getUnityRuntimeUrl).toHaveBeenCalledTimes(1);
-    expect(bridge.detach).not.toHaveBeenCalled();
-    expect(view.contentEl.querySelector("iframe")).toBe(firstIframe);
-
-    timeoutCallbacksB.shift()?.();
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(bridge.detach).toHaveBeenCalledTimes(1);
     expect(plugin.getUnityRuntimeUrl).toHaveBeenCalledTimes(2);
     expect(view.contentEl.querySelector("iframe")).not.toBe(firstIframe);
+
+    await view.onClose();
+  });
+
+  it("restarts after migration using the connected container window even when callback window differs", async () => {
+    vi.useFakeTimers();
+    const app = {
+      marker: "app",
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+    const bridge = {
+      attach: vi.fn(),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn(),
+      sendRuntimeSettings: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
+    };
+    let onWindowMigrated: ((win: Window) => void) | null = null;
+    const popoutHost = document.createElement("iframe");
+    document.body.appendChild(popoutHost);
+    const callbackWindow = popoutHost.contentWindow;
+    if (!callbackWindow) {
+      throw new Error("Expected jsdom iframe to expose a content window.");
+    }
+
+    const view = new MapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => makeBridgeForTest(bridge),
+        buildGraph: vi.fn().mockReturnValue(makePayload()) as BuildGraphForTest,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+    document.body.appendChild(view.contentEl);
+    expect((view.contentEl as HTMLElement & { win: Window }).win).toBe(window);
+    expect((view.contentEl as HTMLElement & { win: Window }).win).not.toBe(callbackWindow);
+    (
+      view.contentEl as HTMLElement & {
+        onWindowMigrated?: (listener: (win: Window) => void) => () => void;
+      }
+    ).onWindowMigrated = vi.fn((listener) => {
+      onWindowMigrated = listener;
+      return vi.fn();
+    });
+
+    await view.onOpen();
+    const firstIframe = view.contentEl.querySelector("iframe");
+    expect(firstIframe).not.toBeNull();
+
+    callMaybe(onWindowMigrated, callbackWindow);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(plugin.getUnityRuntimeUrl).toHaveBeenCalledTimes(2);
+    expect(view.contentEl.querySelector("iframe")).not.toBe(firstIframe);
+    expect(view.contentEl.textContent).toContain("Loading graph runtime...");
+
+    await view.onClose();
   });
 
   it("does not emit graph when stale bridge ready fires after close", async () => {

@@ -17,6 +17,11 @@ type BridgePort = Pick<
 type ObsidianHTMLElement = HTMLElement & {
   createEl: <K extends keyof HTMLElementTagNameMap>(tagName: K) => HTMLElementTagNameMap[K];
   empty?: () => void;
+  doc: Document;
+  win: Window;
+};
+type RuntimeWindow = Window & {
+  AbortController: typeof AbortController;
 };
 
 export type MapViewDependencies = {
@@ -149,14 +154,19 @@ export class MapView extends ItemView {
     const container = this.contentEl as ObsidianHTMLElement;
     this.session.setBridgeReady(false);
     this.cancelDeferredIframeRender();
+    this.disposeRuntimeFrame();
+    this.bridge.detach();
+    this.removeRuntimeIframe(container);
+
     // Exit Obsidian's migration callback before navigating a fresh iframe.
     this.deferredIframeRenderCleanup = this.deferIframeRender(win, () => {
       this.deferredIframeRenderCleanup = null;
       if (lifecycleGeneration !== this.lifecycleGeneration) {
         return;
       }
-      this.disposeRuntimeShell();
-      this.bridge.detach();
+      if (!container.isConnected) {
+        return;
+      }
       void this.renderRuntimeIframe(container, lifecycleGeneration);
     });
   }
@@ -165,6 +175,8 @@ export class MapView extends ItemView {
     container: ObsidianHTMLElement,
     lifecycleGeneration: number
   ): Promise<void> {
+    this.filterPanelController?.dispose();
+    this.filterPanelController = null;
     emptyElement(container);
     this.filterPanelController = new MapFilterPanelController(this.session);
     const iframeHost = this.filterPanelController.render(container);
@@ -183,12 +195,12 @@ export class MapView extends ItemView {
       return;
     }
 
-    const iframe = iframeHost.createEl("iframe");
-    iframe.src = this.createRuntimeIframeSrc(iframeSrc, this.now());
+    const iframe = iframeHost.doc.createElement("iframe");
     iframe.className = "reverysky-map-iframe";
     iframe.setAttribute("title", "ReverySky 3D Graph");
 
-    const iframeLoadAbortController = new AbortController();
+    const iframeWindow = iframeHost.win as RuntimeWindow;
+    const iframeLoadAbortController = new iframeWindow.AbortController();
     this.iframeLoadAbortController = iframeLoadAbortController;
     iframe.addEventListener("load", () => {
       if (lifecycleGeneration !== this.lifecycleGeneration) {
@@ -199,7 +211,7 @@ export class MapView extends ItemView {
         return;
       }
 
-      const messageWindow = container.ownerDocument.defaultView ?? window;
+      const messageWindow = container.win;
       this.bridge.attach(iframe.contentWindow, {
         onReady: () => {
           if (lifecycleGeneration !== this.lifecycleGeneration) {
@@ -223,6 +235,9 @@ export class MapView extends ItemView {
         }
       }, messageWindow);
     }, { signal: iframeLoadAbortController.signal });
+
+    iframe.src = this.createRuntimeIframeSrc(iframeSrc, this.now());
+    iframeHost.appendChild(iframe);
   }
 
   private createRuntimeIframeSrc(iframeSrc: string, cacheBust: number): string {
@@ -262,10 +277,18 @@ export class MapView extends ItemView {
   }
 
   private disposeRuntimeShell(): void {
+    this.disposeRuntimeFrame();
     this.filterPanelController?.dispose();
     this.filterPanelController = null;
+  }
+
+  private disposeRuntimeFrame(): void {
     this.iframeLoadAbortController?.abort();
     this.iframeLoadAbortController = null;
+  }
+
+  private removeRuntimeIframe(container: ObsidianHTMLElement): void {
+    container.querySelector("iframe.reverysky-map-iframe")?.remove();
   }
 
   private notifyLifecycleClose(): Promise<void> {
