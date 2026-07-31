@@ -7,7 +7,7 @@
 ## Tech Stack
 - TypeScript plugin code in `src/` bundled with `esbuild`.
 - Obsidian plugin manifest in `manifest.json`, generated entry output `main.js`.
-- Unity source project in `unity/ReverySkyMap` (Unity `6000.3.8f1`).
+- Unity source project in `unity/ReverySkyMap` (Unity `6000.3.12f1`).
 - Local runtime artifacts and templates in `unity-webgl/`.
 - Compact Unity WebGL runtime input for `embedded-archive` release builds is generated/imported, but tracked intentionally.
 - PowerShell automation for WebGL import in `scripts/import-unity-webgl.ps1`.

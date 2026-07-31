@@ -518,7 +518,7 @@ describe("MapView bridge integration", () => {
     await view.onClose();
   });
 
-  it("restarts after migration using the connected container window even when callback window differs", async () => {
+  it("schedules replacement iframe from the connected container window when callback window differs", async () => {
     vi.useFakeTimers();
     const app = {
       marker: "app",
@@ -562,6 +562,9 @@ describe("MapView bridge integration", () => {
     document.body.appendChild(view.contentEl);
     expect((view.contentEl as HTMLElement & { win: Window }).win).toBe(window);
     expect((view.contentEl as HTMLElement & { win: Window }).win).not.toBe(callbackWindow);
+    const callbackSetTimeout = vi.spyOn(callbackWindow, "setTimeout").mockImplementation(() => {
+      throw new Error("Expected migration restart to schedule from the connected container window.");
+    });
     (
       view.contentEl as HTMLElement & {
         onWindowMigrated?: (listener: (win: Window) => void) => () => void;
@@ -581,7 +584,9 @@ describe("MapView bridge integration", () => {
     expect(plugin.getUnityRuntimeUrl).toHaveBeenCalledTimes(2);
     expect(view.contentEl.querySelector("iframe")).not.toBe(firstIframe);
     expect(view.contentEl.textContent).toContain("Loading graph runtime...");
+    expect(callbackSetTimeout).not.toHaveBeenCalled();
 
+    callbackSetTimeout.mockRestore();
     await view.onClose();
   });
 

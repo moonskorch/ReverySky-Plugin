@@ -149,9 +149,10 @@ export class MapView extends ItemView {
     }
   }
 
-  private restartRuntimeAfterWindowMigration(win: Window): void {
+  private restartRuntimeAfterWindowMigration(): void {
     const lifecycleGeneration = ++this.lifecycleGeneration;
     const container = this.contentEl as ObsidianHTMLElement;
+    const renderWindow = container.win;
     this.session.setBridgeReady(false);
     this.cancelDeferredIframeRender();
     this.disposeRuntimeFrame();
@@ -159,7 +160,7 @@ export class MapView extends ItemView {
     this.removeRuntimeIframe(container);
 
     // Exit Obsidian's migration callback before navigating a fresh iframe.
-    this.deferredIframeRenderCleanup = this.deferIframeRender(win, () => {
+    this.deferredIframeRenderCleanup = this.deferIframeRender(renderWindow, () => {
       this.deferredIframeRenderCleanup = null;
       if (lifecycleGeneration !== this.lifecycleGeneration) {
         return;
@@ -234,7 +235,7 @@ export class MapView extends ItemView {
           this.notify(message);
         }
       }, messageWindow);
-    }, { signal: iframeLoadAbortController.signal });
+    }, { signal: iframeLoadAbortController.signal, once: true });
 
     iframe.src = this.createRuntimeIframeSrc(iframeSrc, this.now());
     iframeHost.appendChild(iframe);
@@ -251,8 +252,8 @@ export class MapView extends ItemView {
     this.windowMigrationCleanup?.();
     this.windowMigrationCleanup = null;
 
-    this.windowMigrationCleanup = container.onWindowMigrated((win) => {
-      this.restartRuntimeAfterWindowMigration(win);
+    this.windowMigrationCleanup = container.onWindowMigrated(() => {
+      this.restartRuntimeAfterWindowMigration();
     });
   }
 

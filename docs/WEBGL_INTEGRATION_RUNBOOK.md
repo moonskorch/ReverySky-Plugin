@@ -34,7 +34,7 @@ Generated local artifacts that remain untracked:
 - Windows environment with PowerShell.
 - Node.js and npm available on PATH.
 - Unity Editor matching project version:
-  - `6000.3.8f1` (from `unity/ReverySkyMap/ProjectSettings/ProjectVersion.txt`).
+  - `6000.3.12f1` (from `unity/ReverySkyMap/ProjectSettings/ProjectVersion.txt`).
 - Obsidian desktop.
 
 ## Build Algorithm

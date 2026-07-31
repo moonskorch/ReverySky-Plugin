@@ -2,7 +2,7 @@
 
 ## Project Overview
 - This folder is the ReverySky Map Unity runtime subproject for the ReverySky 3D Graph Obsidian plugin.
-- Unity version: `6000.3.8f1`.
+- Unity version: `6000.3.12f1`.
 - Primary scene: `Assets/Scenes/StarScapeScene.unity`.
 - Main runtime areas:
   - `Assets/Scripts/*`
