@@ -19,7 +19,14 @@ public interface ICartographerEngine
   IReadOnlyList<Star> Stars { get; }
   IReadOnlyList<TagNode> TagNodes { get; }
 
+  /// <summary>
+  /// Builds into a state already cleared by Cartographer.
+  /// </summary>
   void BuildGraph(List<NoteData> notes);
+
+  /// <summary>
+  /// Clears engine-owned visuals/state without publishing OnNodesChanged.
+  /// </summary>
   void ClearGraph();
 
   void ApplyView(ScapeView view);

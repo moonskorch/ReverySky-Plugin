@@ -78,19 +78,11 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
   private void Awake()
   {
     _rng = new System.Random(STABLE_SEED);
-    CalculateLayoutRadii(
-      totalNodeCount: 0,
-      nodeSpacingFactor,
-      minimumBoundRadius,
-      spawnFillRatio,
-      out _boundRadius,
-      out _);
+    ResetBoundRadius();
   }
 
   public void BuildGraph(List<NoteData> notes)
   {
-    ClearGraph();
-
     _rng = new System.Random(STABLE_SEED);
 
     int noteCount = notes?.Count ?? 0;
@@ -215,7 +207,7 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
     _noteLinks.Clear();
     _stars.Clear();
     _tagNodes.Clear();
-    PublishVisualNodesChanged();
+    ResetBoundRadius();
   }
 
   public void Tick(float dt)
@@ -328,6 +320,17 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
       if (_nodes[i].star != null)
         _nodes[i].star.SetView(view);
     }
+  }
+
+  private void ResetBoundRadius()
+  {
+    CalculateLayoutRadii(
+      totalNodeCount: 0,
+      nodeSpacingFactor,
+      minimumBoundRadius,
+      spawnFillRatio,
+      out _boundRadius,
+      out _);
   }
 
   public static void CalculateLayoutRadii(

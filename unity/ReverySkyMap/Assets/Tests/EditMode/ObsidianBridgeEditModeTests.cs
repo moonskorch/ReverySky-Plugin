@@ -183,6 +183,7 @@ public class ObsidianBridgeEditModeTests
     var cartographerObject = new GameObject("CartographerEmptyGraphIndexTests");
     var focusObject = new GameObject("CartographerEmptyGraphIndexTests_Focus");
     var cameraObject = new GameObject("CartographerEmptyGraphIndexTests_Camera");
+    var startObject = new GameObject("CartographerEmptyGraphIndexTests_CameraStart");
     var staleStarObject = new GameObject("CartographerEmptyGraphIndexTests_StaleStar");
     try
     {
@@ -201,23 +202,141 @@ public class ObsidianBridgeEditModeTests
       SetPrivateField(focusNode, "cameraController", cameraController);
       SetPrivateField(cartographer, "_dynamicLinksEngine", new TestCartographerEngine(MapLayoutMode.DynamicLinks));
       SetPrivateField(cartographer, "<GraphIndex>k__BackingField", staleIndex);
+      var resetCameraTarget = new Vector3(8f, 0f, 9f);
+      SetPrivateField(cameraController, "targetPos", new Vector3(4f, 5f, 6f));
+      startObject.transform.position = new Vector3(resetCameraTarget.x, 3f, resetCameraTarget.z);
+      SetPrivateField(cameraController, "startPosition", startObject.transform);
 
       Assert.That(cartographer.GraphIndex.TryGetStar("stale", out _), Is.True);
 
-      MethodInfo buildGraph = typeof(Cartographer).GetMethod("BuildGraph", BindingFlags.Instance | BindingFlags.NonPublic);
-      Assert.That(buildGraph, Is.Not.Null);
-
-      buildGraph.Invoke(cartographer, new object[] { new List<NoteData>(), MapLayoutMode.DynamicLinks });
+      InvokeCartographerBuildGraph(
+        cartographer,
+        new List<NoteData>(),
+        MapLayoutMode.DynamicLinks);
 
       Assert.That(cartographer.GraphIndex.Nodes, Is.Empty);
       Assert.That(cartographer.GraphIndex.TryGetStar("stale", out _), Is.False);
+      Assert.That(GetPrivateField<Vector3>(cameraController, "targetPos"), Is.EqualTo(resetCameraTarget));
     }
     finally
     {
       Object.DestroyImmediate(cartographerObject);
       Object.DestroyImmediate(focusObject);
       Object.DestroyImmediate(cameraObject);
+      Object.DestroyImmediate(startObject);
       Object.DestroyImmediate(staleStarObject);
+    }
+  }
+
+  [Test]
+  public void BuildGraph_NonEmptyNotes_ClearsStaleGraphIndexWithoutResettingFocus()
+  {
+    var cartographerObject = new GameObject("CartographerNonEmptyClearedStateTests");
+    var focusObject = new GameObject("CartographerNonEmptyClearedStateTests_Focus");
+    var cameraObject = new GameObject("CartographerNonEmptyClearedStateTests_Camera");
+    var startObject = new GameObject("CartographerNonEmptyClearedStateTests_CameraStart");
+    var staleStarObject = new GameObject("CartographerNonEmptyClearedStateTests_StaleStar");
+    try
+    {
+      var cartographer = cartographerObject.AddComponent<Cartographer>();
+      var focusNode = focusObject.AddComponent<FocusNode>();
+      var cameraController = cameraObject.AddComponent<CameraOrbitalController>();
+      var engine = new TestCartographerEngine(MapLayoutMode.DynamicLinks);
+      var staleStar = staleStarObject.AddComponent<Star>();
+      staleStar.SetData(new NoteData { Id = "stale", Path = "notes/stale.md" });
+      MapGraphIndex staleIndex = MapGraphIndex.Build(
+        new List<Star> { staleStar },
+        new List<TagNode>(),
+        new List<MapRuntimeContext.RuntimeNoteLink>());
+      var unchangedCameraTarget = new Vector3(4f, 5f, 6f);
+
+      SetCartographerSingleton(cartographer);
+      SetPrivateField(cartographer, "focusNode", focusNode);
+      SetPrivateField(focusNode, "cameraController", cameraController);
+      SetPrivateField(cartographer, "_dynamicLinksEngine", engine);
+      SetPrivateField(cartographer, "<GraphIndex>k__BackingField", staleIndex);
+      SetPrivateField(cameraController, "targetPos", unchangedCameraTarget);
+      startObject.transform.position = new Vector3(8f, 3f, 9f);
+      SetPrivateField(cameraController, "startPosition", startObject.transform);
+
+      Assert.That(cartographer.GraphIndex.TryGetStar("stale", out _), Is.True);
+
+      InvokeCartographerBuildGraph(
+        cartographer,
+        new List<NoteData> { new NoteData { Id = "next", Path = "notes/next.md" } },
+        MapLayoutMode.DynamicLinks);
+
+      Assert.That(cartographer.GraphIndex.Nodes, Is.Empty);
+      Assert.That(cartographer.GraphIndex.TryGetStar("stale", out _), Is.False);
+      Assert.That(GetPrivateField<Vector3>(cameraController, "targetPos"), Is.EqualTo(unchangedCameraTarget));
+      Assert.That(engine.BuildGraphCallCount, Is.EqualTo(1));
+    }
+    finally
+    {
+      Object.DestroyImmediate(cartographerObject);
+      Object.DestroyImmediate(focusObject);
+      Object.DestroyImmediate(cameraObject);
+      Object.DestroyImmediate(startObject);
+      Object.DestroyImmediate(staleStarObject);
+    }
+  }
+
+  [Test]
+  public void BuildGraph_SameEngine_ClearsCurrentEngineBeforeBuild()
+  {
+    var cartographerObject = new GameObject("CartographerSameEngineRebuildTests");
+    try
+    {
+      var cartographer = cartographerObject.AddComponent<Cartographer>();
+      var engine = new TestCartographerEngine(MapLayoutMode.DynamicLinks);
+
+      SetCartographerSingleton(cartographer);
+      SetPrivateField(cartographer, "_dynamicLinksEngine", engine);
+      SetPrivateField(cartographer, "_activeEngine", engine);
+
+      InvokeCartographerBuildGraph(
+        cartographer,
+        new List<NoteData> { new NoteData { Id = "next", Path = "notes/next.md" } },
+        MapLayoutMode.DynamicLinks);
+
+      Assert.That(engine.ClearGraphCallCount, Is.EqualTo(1));
+      Assert.That(engine.BuildGraphCallCount, Is.EqualTo(1));
+      Assert.That(cartographer.ActiveEngine, Is.SameAs(engine));
+    }
+    finally
+    {
+      Object.DestroyImmediate(cartographerObject);
+    }
+  }
+
+  [Test]
+  public void BuildGraph_SwitchEngine_ClearsPreviousEngineOnly()
+  {
+    var cartographerObject = new GameObject("CartographerSwitchEngineRebuildTests");
+    try
+    {
+      var cartographer = cartographerObject.AddComponent<Cartographer>();
+      var previousEngine = new TestCartographerEngine(MapLayoutMode.DynamicLinks);
+      var nextEngine = new TestCartographerEngine(MapLayoutMode.Dates);
+
+      SetCartographerSingleton(cartographer);
+      SetPrivateField(cartographer, "_activeEngine", previousEngine);
+      SetPrivateField(cartographer, "_datesEngine", nextEngine);
+
+      InvokeCartographerBuildGraph(
+        cartographer,
+        new List<NoteData> { new NoteData { Id = "next", Path = "notes/next.md" } },
+        MapLayoutMode.Dates);
+
+      Assert.That(previousEngine.ClearGraphCallCount, Is.EqualTo(1));
+      Assert.That(previousEngine.BuildGraphCallCount, Is.EqualTo(0));
+      Assert.That(nextEngine.ClearGraphCallCount, Is.EqualTo(0));
+      Assert.That(nextEngine.BuildGraphCallCount, Is.EqualTo(1));
+      Assert.That(cartographer.ActiveEngine, Is.SameAs(nextEngine));
+    }
+    finally
+    {
+      Object.DestroyImmediate(cartographerObject);
     }
   }
 
@@ -577,6 +696,23 @@ public class ObsidianBridgeEditModeTests
     field.SetValue(target, value);
   }
 
+  private static void InvokeCartographerBuildGraph(
+    Cartographer cartographer,
+    List<NoteData> notes,
+    MapLayoutMode layoutPreference)
+  {
+    MethodInfo buildGraph = typeof(Cartographer).GetMethod("BuildGraph", BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(buildGraph, Is.Not.Null);
+    try
+    {
+      buildGraph.Invoke(cartographer, new object[] { notes, layoutPreference });
+    }
+    catch (TargetInvocationException ex) when (ex.InnerException != null)
+    {
+      throw ex.InnerException;
+    }
+  }
+
   private static T GetPrivateField<T>(object target, string fieldName)
   {
     FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
@@ -608,6 +744,8 @@ public class ObsidianBridgeEditModeTests
     public float BoundRadius => 1f;
     public Vector3 Pivot => pivot;
     public MapLayoutMode EngineType { get; }
+    public int BuildGraphCallCount { get; private set; }
+    public int ClearGraphCallCount { get; private set; }
     public int MaxActiveLines => 0;
     public int MaxActiveLongLines => 0;
     public ScapeCameraWarper ScapeWarper => null;
@@ -620,8 +758,16 @@ public class ObsidianBridgeEditModeTests
     }
 
     public void Tick(float dt) { }
-    public void BuildGraph(List<NoteData> notes) { }
-    public void ClearGraph() { }
+    public void BuildGraph(List<NoteData> notes)
+    {
+      BuildGraphCallCount++;
+    }
+
+    public void ClearGraph()
+    {
+      ClearGraphCallCount++;
+    }
+
     public void ApplyView(ScapeView view) { }
 
     public bool TryGetNavigationWorld(Transform tr, out Vector3 pos)

@@ -52,7 +52,6 @@ public class Cartographer : MonoBehaviour
   public MapGraphIndex GraphIndex { get; private set; } = MapGraphIndex.Empty;
 
   public event Action<MapLayoutMode> OnEngineChanged;
-  public event Action<IReadOnlyList<Star>, IReadOnlyList<TagNode>> OnGraphVisualsChanged;
 
   private void Awake()
   {
@@ -125,13 +124,7 @@ public class Cartographer : MonoBehaviour
     var engine = ResolveModeByNotesCount(notes.Count, layoutPreference);
     SwitchEngine(engine);
 
-    if (_activeEngine == null) 
-    {
-      Debug.LogError("No active engine");
-      return;
-    }
-
-    RebuildGraphConsumers(MapGraphIndex.Empty);
+    ApplyGraphIndex(MapGraphIndex.Empty, updateFocus: notes.Count == 0);
 
     var stopwatch = System.Diagnostics.Stopwatch.StartNew();
     _activeEngine.BuildGraph(notes);
@@ -160,6 +153,10 @@ public class Cartographer : MonoBehaviour
       : MapLayoutMode.DynamicLinks;
   }
 
+  /// <summary>
+  /// Switches to the requested engine and clears only the engine that currently owns stale graph visuals.
+  /// </summary>
+  /// <param name="resolvedMode"></param>
   private void SwitchEngine(MapLayoutMode resolvedMode)
   {
     var next = resolvedMode switch
@@ -168,11 +165,14 @@ public class Cartographer : MonoBehaviour
       MapLayoutMode.ScalableLinks => _scalableLinksEngine,
       _ => _dynamicLinksEngine
     };
-    if (next == null) return;
 
-    if (_activeEngine == next) return;
+    if (_activeEngine == next)
+    {
+      _activeEngine.ClearGraph();
+      return;
+    }
 
-    if (_activeEngine != null && _activeEngine != next) 
+    if (_activeEngine != null) 
     {
       _activeEngine.OnNodesChanged -= HandleEngineNodesChanged;
       BindActiveWarper(null);
@@ -273,11 +273,9 @@ public class Cartographer : MonoBehaviour
 
   private void HandleEngineNodesChanged(IReadOnlyList<Star> stars, IReadOnlyList<TagNode> tagNodes)
   {
-    RebuildGraphConsumers(MapGraphIndex.Build(stars, tagNodes, MapRuntimeContext.Links));
-    if (!IsTransientEmptyGraph(stars))
-      ApplyGraphFocus();
-
-    OnGraphVisualsChanged?.Invoke(stars, tagNodes);
+    ApplyGraphIndex(
+      MapGraphIndex.Build(stars, tagNodes, MapRuntimeContext.Links),
+      updateFocus: !IsTransientEmptyGraph(stars));
   }
 
   private static bool IsTransientEmptyGraph(IReadOnlyList<Star> stars)
@@ -304,12 +302,15 @@ public class Cartographer : MonoBehaviour
     focusNode.ResetFocus();
   }
 
-  private void RebuildGraphConsumers(MapGraphIndex graphIndex)
+  private void ApplyGraphIndex(MapGraphIndex graphIndex, bool updateFocus)
   {
     GraphIndex = graphIndex;
     int activeLineLimit = _activeEngine?.MaxActiveLines ?? 0;
     int activeLongLineLimit = _activeEngine?.MaxActiveLongLines ?? 0;
     lineBuilder?.Rebuild(GraphIndex, activeLineLimit, activeLongLineLimit);
     cullingManager?.Rebuild(GraphIndex, lineBuilder);
+
+    if (updateFocus)
+      ApplyGraphFocus();
   }
 }

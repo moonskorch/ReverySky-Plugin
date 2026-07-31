@@ -470,6 +470,7 @@ public class CartographerScalableLinksEngineEditModeTests
     var scope = new EngineScope(CreateStarTemplatePrefab());
     scope.ConfigureForDeterministicEditMode();
     configureBeforeBuild?.Invoke(scope);
+    scope.Engine.ClearGraph();
     scope.Engine.BuildGraph(runtimeNotes);
     return scope;
   }

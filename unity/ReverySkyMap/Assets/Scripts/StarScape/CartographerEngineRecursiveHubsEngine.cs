@@ -467,8 +467,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
   {
     var totalStopwatch = Stopwatch.StartNew();
 
-    ClearGraph();
-
     var logicalStopwatch = Stopwatch.StartNew();
     BuildLogicalGraph(notes);
     BuildAdjacencyAndScores();
@@ -658,7 +656,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     _visualSmoothingActive = false;
     _nextPlacementSequence = 0;
     _navigationRadius = Mathf.Max(0.1f, minimumNavigationRadius);
-    PublishVisualNodesChanged();
   }
 
   public void ApplyView(ScapeView view)

@@ -1,7 +1,36 @@
+using System.Reflection;
 using NUnit.Framework;
+using UnityEngine;
 
 public class CartographerForcesEngineRadiusEditModeTests
 {
+  [Test]
+  public void ClearGraph_ResetsBoundRadiusToEmptyLayoutRadius()
+  {
+    var engineObject = new GameObject("CartographerForcesEngineRadiusEditModeTests");
+    try
+    {
+      var engine = engineObject.AddComponent<CartographerForcesEngine>();
+      SetPrivateField(engine, "_boundRadius", 42f);
+
+      engine.ClearGraph();
+
+      CartographerForcesEngine.CalculateLayoutRadii(
+        0,
+        3.8f,
+        6f,
+        0.65f,
+        out float expectedBoundRadius,
+        out _);
+
+      Assert.That(engine.BoundRadius, Is.EqualTo(expectedBoundRadius));
+    }
+    finally
+    {
+      Object.DestroyImmediate(engineObject);
+    }
+  }
+
   [TestCase(-10, 4f)]
   [TestCase(0, 4f)]
   [TestCase(250, 6f)]
@@ -191,5 +220,42 @@ public class CartographerForcesEngineRadiusEditModeTests
     Assert.That(float.IsInfinity(boundRadius), Is.False);
     Assert.That(float.IsNaN(spawnRadius), Is.False);
     Assert.That(float.IsInfinity(spawnRadius), Is.False);
+  }
+
+  private static void SetPrivateField(object target, string fieldName, object value)
+  {
+    FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(field, Is.Not.Null, $"Missing field {fieldName}.");
+    field.SetValue(target, value);
+  }
+}
+
+public class Cartographer25DEngineEditModeTests
+{
+  [Test]
+  public void ClearGraph_ResetsDateAxisRange()
+  {
+    var engineObject = new GameObject("Cartographer25DEngineEditModeTests");
+    try
+    {
+      var engine = engineObject.AddComponent<Cartographer25DEngine>();
+      SetPrivateField(engine, "dateDepthRange", 120f);
+
+      engine.ClearGraph();
+
+      Assert.That(engine.ZMin, Is.EqualTo(-0.005f).Within(0.0001f));
+      Assert.That(engine.ZMax, Is.EqualTo(0.005f).Within(0.0001f));
+    }
+    finally
+    {
+      Object.DestroyImmediate(engineObject);
+    }
+  }
+
+  private static void SetPrivateField(object target, string fieldName, object value)
+  {
+    FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(field, Is.Not.Null, $"Missing field {fieldName}.");
+    field.SetValue(target, value);
   }
 }

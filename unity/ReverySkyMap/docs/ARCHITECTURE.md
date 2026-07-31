@@ -78,10 +78,10 @@ Obsidian plugin
 7. `Cartographer.ResolveModeByNotesCount()` uses `defaultEngine` first. Without an override, explicit `Dates` and `ScalableLinks` stay fixed, while `Auto` and `DynamicLinks` resolve by note count: small graphs use `DynamicLinks`, large graphs use `ScalableLinks`.
 8. The chosen engine runs `BuildGraph(notes)` and emits `OnNodesChanged` with the instantiated `Star` and `TagNode` scene objects.
 9. `Cartographer.HandleEngineNodesChanged(...)` builds `GraphIndex = MapGraphIndex.Build(stars, tagNodes, MapRuntimeContext.Links)`.
-10. `Cartographer` passes the same `GraphIndex` to `LineBuilder.Rebuild(...)` and `CullingManager.Rebuild(...)`; `OnGraphVisualsChanged` remains the raw-node notification surface.
+10. `Cartographer` passes the same `GraphIndex` to `LineBuilder.Rebuild(...)` and `CullingManager.Rebuild(...)`.
 11. `BuildGraph(...)` applies `CurrentView`, rebinds the active `ScapeCameraWarper`, and logs build timing.
 12. After each non-transient index publication, `Cartographer.ApplyGraphFocus()` tries `MapRuntimeContext.PendingFocusNoteId` once, then tries `FocusNode.FocusRestoreNoteId`, then calls `ResetFocus()`.
-13. Transient empty publications from engine cleanup are ignored for focus reconciliation while runtime notes still exist, so a rebuild clear step does not erase pending or restored focus.
+13. `Cartographer.SwitchEngine(...)` clears the engine that owns stale visuals/state, then `Cartographer.ApplyGraphIndex(...)` applies `MapGraphIndex.Empty` before rebuild. Engine cleanup is silent; empty payloads reset focus during this empty-index application, while non-empty rebuilds leave focus untouched until the engine publishes rebuilt nodes.
 14. When the active engine reaches its ready point, it calls `MapRuntimeContext.RequestGraphReady()`. `ObsidianBridge` forwards the matching `requestId` to JavaScript as `graph:ready`, unless the id is empty.
 
 ### 3. Note focus, label emphasis, and open-note callback

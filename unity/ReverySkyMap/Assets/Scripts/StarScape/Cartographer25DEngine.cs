@@ -43,6 +43,7 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
   [SerializeField, Min(0)] private int maxActiveLongLines = 10;
 
   private const int STABLE_SEED = 12345;
+  private const float DefaultDateDepthRange = 0.01f;
 
   private readonly List<Node> _nodes = new();
   private readonly List<Star> _stars = new();
@@ -80,7 +81,6 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
 
   public void BuildGraph(List<NoteData> notes)
   {
-    ClearGraph();
     if (notes == null || notes.Count == 0)
     {
       MapRuntimeContext.RequestGraphReady();
@@ -127,7 +127,7 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
 
     float dateRangeDays = Mathf.Max(0f, (float)(maxDate - minDate).TotalDays);
     float totalVirtualDays = dateRangeDays + extraVirtualDays;
-    dateDepthRange = Mathf.Max(0.01f, depthPerDay * totalVirtualDays);
+    dateDepthRange = Mathf.Max(DefaultDateDepthRange, depthPerDay * totalVirtualDays);
     OnDateAxisRangeChanged?.Invoke(ZMin, ZMax);
 
     var rng = new System.Random(STABLE_SEED);
@@ -246,7 +246,7 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
 
     _nodes.Clear();
     _stars.Clear();
-    PublishVisualNodesChanged();
+    dateDepthRange = DefaultDateDepthRange;
   }
 
   public void ApplyView(ScapeView view)
