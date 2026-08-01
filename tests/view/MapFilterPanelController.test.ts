@@ -147,7 +147,7 @@ describe("MapFilterPanelController", () => {
     expect(suggestions.style.getPropertyValue("--reverysky-filter-suggestions-anchor-width")).toBe("280px");
   });
 
-  it("keeps every suggestion mode in the shared overlay outside the scrollable panel", () => {
+  it("keeps every suggestion mode in the shared overlay while typing operator prefixes", () => {
     const session = createSession();
     const controller = new MapFilterPanelController(session);
     const container = createObsidianTestContainer();
@@ -169,15 +169,15 @@ describe("MapFilterPanelController", () => {
     expectSharedOverlay("Search settings");
 
     searchInput.value = "path:";
-    searchInput.dispatchEvent(new Event("click"));
+    searchInput.dispatchEvent(new Event("input"));
     expectSharedOverlay("Folders");
 
     searchInput.value = "date:";
-    searchInput.dispatchEvent(new Event("click"));
+    searchInput.dispatchEvent(new Event("input"));
     expectSharedOverlay("Date presets");
 
     searchInput.value = "tag:";
-    searchInput.dispatchEvent(new Event("click"));
+    searchInput.dispatchEvent(new Event("input"));
     expectSharedOverlay("Tags");
   });
 

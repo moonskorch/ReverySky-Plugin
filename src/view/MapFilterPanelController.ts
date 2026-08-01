@@ -465,7 +465,20 @@ export class MapFilterPanelController {
   private onPathFilterInputChanged(nextQuery: string): void {
     this.session.setFilterQuery(nextQuery);
     this.refreshFilterMessage();
-    this.refreshSuggestions();
+
+    const autoSuggestionMode = this.resolveAutoSuggestionMode();
+    if (autoSuggestionMode !== 0) {
+      this.showFilterSuggestions(autoSuggestionMode);
+      return;
+    }
+
+    if (
+      this.filterSuggestionsEl &&
+      !this.filterSuggestionsEl.classList.contains("reverysky-map-filter-suggestions--hidden")
+    ) {
+      this.filterSuggestionMode = 0;
+      this.refreshSuggestions();
+    }
   }
 
   private showFilterSuggestions(mode: FilterSuggestionMode): void {
