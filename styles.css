@@ -513,6 +513,7 @@ button.reverysky-map-tags-toggle .reverysky-map-tags-toggle-thumb {
 
 /* Suggestions */
 .reverysky-map-filter-suggestions {
+  box-sizing: border-box;
   position: absolute;
   left: 0;
   right: 0;
@@ -523,8 +524,13 @@ button.reverysky-map-tags-toggle .reverysky-map-tags-toggle-thumb {
   padding: var(--reverysky-suggestion-panel-padding);
   box-shadow: none;
   z-index: 140;
+  width: var(--reverysky-filter-suggestions-anchor-width, 100%);
   max-height: var(--reverysky-suggestion-panel-max-height);
   overflow-y: auto;
+}
+
+.reverysky-map-filter-suggestions--overlay {
+  right: auto;
 }
 
 .reverysky-map-filter-suggestions--hidden {
@@ -557,6 +563,7 @@ button.reverysky-map-tags-toggle .reverysky-map-tags-toggle-thumb {
 .reverysky-map-date-suggestion-option,
 .reverysky-map-folder-suggestion-option,
 .reverysky-map-tag-suggestion-option {
+  box-sizing: border-box;
   display: block;
   width: 100%;
   border: 0.0625rem solid transparent;

@@ -101,16 +101,20 @@ test.describe("settings panel", () => {
 
     await expect(panel).toHaveCSS("overflow-y", "auto");
 
-    const beforeWheel = await panel.evaluate((element) => ({
-      clientHeight: element.clientHeight,
-      scrollHeight: element.scrollHeight,
-      scrollTop: element.scrollTop,
-      scrollbarGutter:
-        element.offsetWidth -
-        element.clientWidth -
-        parseFloat(getComputedStyle(element).borderLeftWidth) -
-        parseFloat(getComputedStyle(element).borderRightWidth)
-    }));
+    const beforeWheel = await panel.evaluate((element) => {
+      const htmlElement = element as HTMLElement;
+
+      return {
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+        scrollTop: element.scrollTop,
+        scrollbarGutter:
+          htmlElement.offsetWidth -
+          htmlElement.clientWidth -
+          parseFloat(getComputedStyle(htmlElement).borderLeftWidth) -
+          parseFloat(getComputedStyle(htmlElement).borderRightWidth)
+      };
+    });
     expect(beforeWheel.scrollHeight).toBeGreaterThan(beforeWheel.clientHeight);
     expect(beforeWheel.scrollbarGutter).toBeLessThanOrEqual(1);
 

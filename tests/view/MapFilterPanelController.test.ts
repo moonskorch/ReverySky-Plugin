@@ -77,6 +77,20 @@ function createObsidianTestContainer(): ObsidianTestHTMLElement {
   return container;
 }
 
+function makeRect(left: number, top: number, width: number, height: number): DOMRect {
+  return {
+    x: left,
+    y: top,
+    left,
+    top,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+    toJSON: () => ({})
+  } as DOMRect;
+}
+
 describe("MapFilterPanelController", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -104,6 +118,67 @@ describe("MapFilterPanelController", () => {
     searchInput.dispatchEvent(new Event("blur"));
     vi.advanceTimersByTime(120);
     expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
+  });
+
+  it("renders suggestions outside the scrollable panel and positions them from the search area", () => {
+    const session = createSession();
+    const controller = new MapFilterPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const root = container.querySelector(".reverysky-map-root") as HTMLElement;
+    const panel = container.querySelector(".reverysky-map-filter-panel") as HTMLElement;
+    const searchArea = container.querySelector(".reverysky-map-filter-search-area") as HTMLElement;
+    const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
+    const suggestions = container.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
+
+    searchArea.getBoundingClientRect = () => makeRect(24, 44, 280, 40);
+    root.getBoundingClientRect = () => makeRect(14, 20, 320, 440);
+
+    searchInput.dispatchEvent(new Event("focus"));
+
+    expect(panel.contains(suggestions)).toBe(false);
+    expect(root.contains(suggestions)).toBe(true);
+    expect(suggestions.classList.contains("reverysky-map-filter-suggestions--overlay")).toBe(true);
+    expect(suggestions.style.left).toBe("auto");
+    expect(suggestions.style.right).toBe("30px");
+    expect(suggestions.style.top).toBe("68px");
+    expect(suggestions.style.width).toBe("");
+    expect(suggestions.style.getPropertyValue("--reverysky-filter-suggestions-anchor-width")).toBe("280px");
+  });
+
+  it("keeps every suggestion mode in the shared overlay outside the scrollable panel", () => {
+    const session = createSession();
+    const controller = new MapFilterPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const root = container.querySelector(".reverysky-map-root") as HTMLElement;
+    const panel = container.querySelector(".reverysky-map-filter-panel") as HTMLElement;
+    const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
+    const suggestions = container.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
+
+    const expectSharedOverlay = (expectedText: string) => {
+      expect(container.querySelectorAll(".reverysky-map-filter-suggestions")).toHaveLength(1);
+      expect(panel.contains(suggestions)).toBe(false);
+      expect(root.contains(suggestions)).toBe(true);
+      expect(suggestions.textContent).toContain(expectedText);
+    };
+
+    searchInput.dispatchEvent(new Event("focus"));
+    expectSharedOverlay("Search settings");
+
+    searchInput.value = "path:";
+    searchInput.dispatchEvent(new Event("click"));
+    expectSharedOverlay("Folders");
+
+    searchInput.value = "date:";
+    searchInput.dispatchEvent(new Event("click"));
+    expectSharedOverlay("Date presets");
+
+    searchInput.value = "tag:";
+    searchInput.dispatchEvent(new Event("click"));
+    expectSharedOverlay("Tags");
   });
 
   it("clears query and hides suggestions on Escape", async () => {

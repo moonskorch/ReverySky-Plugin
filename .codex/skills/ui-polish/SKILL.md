@@ -116,6 +116,8 @@ The scenario must:
 
 * reproduce the requested state deterministically;
 
+* test the production UI surface, not handmade substitute controls, decorative stand-ins, or invented helper elements.
+
 * use a standard Playwright screenshot assertion:
 
   `await expect(locator).toHaveScreenshot("<state>.png")`
@@ -123,6 +125,8 @@ The scenario must:
 * remain isolated from production behavior.
 
 A small faithful markup mirror is acceptable when extracting shared production code would create a broad refactor.
+
+Do not add fake visual details to make a preview look closer to the live app. Do not hand-draw browser, Obsidian, library, or production-owned controls such as clear buttons, search icons, scrollbars, dropdown arrows, focus rings, or other widget chrome unless the owner explicitly asks for a custom mock or illustration. If a real production detail cannot be reproduced faithfully in the harness, either omit that detail and narrow the test's stated contract, or stop and report that the visual state needs a real renderer/host-specific test.
 
 Do not add broad UI infrastructure for a local visual task.
 

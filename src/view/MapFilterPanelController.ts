@@ -9,7 +9,6 @@ import {
 } from "./MapSession";
 
 const FILTER_SUGGESTIONS_HIDE_DELAY_MS = 120;
-
 type ObsidianHTMLElement = HTMLElement & {
   createEl: <K extends keyof HTMLElementTagNameMap>(tagName: K) => HTMLElementTagNameMap[K];
   setAttr?: (name: string, value: string) => void;
@@ -26,6 +25,8 @@ export class MapFilterPanelController {
   private filterSuggestionsHideTimerWindow: Window | null = null;
   private filterMessageEl: HTMLElement | null = null;
   private filterSuggestionsEl: HTMLElement | null = null;
+  private filterSuggestionsAnchorEl: HTMLElement | null = null;
+  private filterSuggestionsRootEl: HTMLElement | null = null;
   private filterPanelEl: HTMLElement | null = null;
   private filterToggleButtonEl: HTMLButtonElement | null = null;
   private settingsSectionEl: HTMLElement | null = null;
@@ -91,6 +92,9 @@ export class MapFilterPanelController {
     const filterContainer = createChild(root, "div");
     filterContainer.className = "reverysky-map-filter-panel";
     this.filterPanelEl = filterContainer;
+    filterContainer.addEventListener("scroll", () => {
+      this.positionFilterSuggestions();
+    });
 
     const filterSection = createChild(filterContainer as ObsidianHTMLElement, "div");
     filterSection.className = "reverysky-map-filter-section reverysky-map-settings-section";
@@ -138,6 +142,7 @@ export class MapFilterPanelController {
 
     const filterSearchArea = createChild(filterSectionContent as ObsidianHTMLElement, "div");
     filterSearchArea.className = "reverysky-map-filter-search-area";
+    this.filterSuggestionsAnchorEl = filterSearchArea;
 
     const filterSearchLabel = createChild(filterSearchArea as ObsidianHTMLElement, "div");
     filterSearchLabel.className = "reverysky-map-filter-field-label";
@@ -170,8 +175,10 @@ export class MapFilterPanelController {
       }
     });
 
-    this.filterSuggestionsEl = createChild(filterSearchArea as ObsidianHTMLElement, "div");
-    this.filterSuggestionsEl.className = "reverysky-map-filter-suggestions";
+    this.filterSuggestionsRootEl = root;
+    this.filterSuggestionsEl = createChild(root, "div");
+    this.filterSuggestionsEl.className =
+      "reverysky-map-filter-suggestions reverysky-map-filter-suggestions--overlay";
     this.filterSuggestionsEl.classList.add("reverysky-map-filter-suggestions--hidden");
 
     this.filterMessageEl = createChild(filterSectionContent as ObsidianHTMLElement, "div");
@@ -362,6 +369,8 @@ export class MapFilterPanelController {
     this.searchComponent = null;
     this.filterMessageEl = null;
     this.filterSuggestionsEl = null;
+    this.filterSuggestionsAnchorEl = null;
+    this.filterSuggestionsRootEl = null;
     this.filterPanelEl = null;
     this.filterToggleButtonEl = null;
     this.settingsSectionEl = null;
@@ -468,6 +477,7 @@ export class MapFilterPanelController {
     this.setFilterPanelOpen(true);
     this.refreshSuggestions();
     this.clearFilterSuggestionsHideTimer();
+    this.positionFilterSuggestions();
     this.filterSuggestionsEl.classList.remove("reverysky-map-filter-suggestions--hidden");
   }
 
@@ -508,6 +518,23 @@ export class MapFilterPanelController {
 
     this.filterSuggestionMode = 0;
     this.filterSuggestionsEl.classList.add("reverysky-map-filter-suggestions--hidden");
+  }
+
+  private positionFilterSuggestions(): void {
+    if (!this.filterSuggestionsEl || !this.filterSuggestionsAnchorEl || !this.filterSuggestionsRootEl) {
+      return;
+    }
+
+    const anchorRect = this.filterSuggestionsAnchorEl.getBoundingClientRect();
+    const rootRect = this.filterSuggestionsRootEl.getBoundingClientRect();
+    const gapPx = 4;
+    this.filterSuggestionsEl.style.left = "auto";
+    this.filterSuggestionsEl.style.right = `${rootRect.right - anchorRect.right}px`;
+    this.filterSuggestionsEl.style.top = `${anchorRect.bottom - rootRect.top + gapPx}px`;
+    this.filterSuggestionsEl.style.setProperty(
+      "--reverysky-filter-suggestions-anchor-width",
+      `${anchorRect.width}px`
+    );
   }
 
   private applyPathSuggestionOperator(): void {
