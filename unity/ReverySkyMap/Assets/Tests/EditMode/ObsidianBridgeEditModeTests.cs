@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -45,6 +46,7 @@ public class ObsidianBridgeEditModeTests
 
     Assert.That(MapRuntimeContext.Notes, Has.Count.EqualTo(2));
     Assert.That(MapRuntimeContext.Links, Has.Count.EqualTo(1));
+    Assert.That(MapRuntimeContext.LatestGraphRequestId, Is.EqualTo("req-minimal"));
     Assert.That(MapRuntimeContext.Links[0].SourceId, Is.EqualTo("n1"));
     Assert.That(MapRuntimeContext.Links[0].TargetId, Is.EqualTo("n2"));
     Assert.That(MapRuntimeContext.Links[0].Weight, Is.EqualTo(1f));
@@ -178,7 +180,7 @@ public class ObsidianBridgeEditModeTests
   }
 
   [Test]
-  public void BuildGraph_EmptyNotes_ClearsStaleGraphIndex()
+  public void RebuildGraphAfterClear_EmptyNotes_ClearsStaleGraphIndex()
   {
     var cartographerObject = new GameObject("CartographerEmptyGraphIndexTests");
     var focusObject = new GameObject("CartographerEmptyGraphIndexTests_Focus");
@@ -206,17 +208,20 @@ public class ObsidianBridgeEditModeTests
       SetPrivateField(cameraController, "targetPos", new Vector3(4f, 5f, 6f));
       startObject.transform.position = new Vector3(resetCameraTarget.x, 3f, resetCameraTarget.z);
       SetPrivateField(cameraController, "startPosition", startObject.transform);
+      MapRuntimeContext.SetNotes(new List<NoteData>(), string.Empty);
 
       Assert.That(cartographer.GraphIndex.TryGetStar("stale", out _), Is.True);
 
-      InvokeCartographerBuildGraph(
+      IEnumerator rebuildGraph = InvokeCartographerRebuildGraphAfterClear(
         cartographer,
-        new List<NoteData>(),
         MapLayoutMode.DynamicLinks);
 
+      Assert.That(rebuildGraph.MoveNext(), Is.True);
       Assert.That(cartographer.GraphIndex.Nodes, Is.Empty);
       Assert.That(cartographer.GraphIndex.TryGetStar("stale", out _), Is.False);
       Assert.That(GetPrivateField<Vector3>(cameraController, "targetPos"), Is.EqualTo(resetCameraTarget));
+
+      Assert.That(rebuildGraph.MoveNext(), Is.False);
     }
     finally
     {
@@ -229,7 +234,7 @@ public class ObsidianBridgeEditModeTests
   }
 
   [Test]
-  public void BuildGraph_NonEmptyNotes_ClearsStaleGraphIndexWithoutResettingFocus()
+  public void RebuildGraphAfterClear_NonEmptyNotes_ClearsStaleGraphIndexWithoutResettingFocus()
   {
     var cartographerObject = new GameObject("CartographerNonEmptyClearedStateTests");
     var focusObject = new GameObject("CartographerNonEmptyClearedStateTests_Focus");
@@ -258,17 +263,21 @@ public class ObsidianBridgeEditModeTests
       SetPrivateField(cameraController, "targetPos", unchangedCameraTarget);
       startObject.transform.position = new Vector3(8f, 3f, 9f);
       SetPrivateField(cameraController, "startPosition", startObject.transform);
+      MapRuntimeContext.SetNotes(new List<NoteData> { new NoteData { Id = "next", Path = "notes/next.md" } }, string.Empty);
 
       Assert.That(cartographer.GraphIndex.TryGetStar("stale", out _), Is.True);
 
-      InvokeCartographerBuildGraph(
+      IEnumerator rebuildGraph = InvokeCartographerRebuildGraphAfterClear(
         cartographer,
-        new List<NoteData> { new NoteData { Id = "next", Path = "notes/next.md" } },
         MapLayoutMode.DynamicLinks);
 
+      Assert.That(rebuildGraph.MoveNext(), Is.True);
       Assert.That(cartographer.GraphIndex.Nodes, Is.Empty);
       Assert.That(cartographer.GraphIndex.TryGetStar("stale", out _), Is.False);
       Assert.That(GetPrivateField<Vector3>(cameraController, "targetPos"), Is.EqualTo(unchangedCameraTarget));
+      Assert.That(engine.BuildGraphCallCount, Is.EqualTo(0));
+
+      Assert.That(rebuildGraph.MoveNext(), Is.False);
       Assert.That(engine.BuildGraphCallCount, Is.EqualTo(1));
     }
     finally
@@ -282,7 +291,7 @@ public class ObsidianBridgeEditModeTests
   }
 
   [Test]
-  public void BuildGraph_SameEngine_ClearsCurrentEngineBeforeBuild()
+  public void RebuildGraphAfterClear_SameEngine_ClearsCurrentEngineBeforeBuild()
   {
     var cartographerObject = new GameObject("CartographerSameEngineRebuildTests");
     try
@@ -293,15 +302,19 @@ public class ObsidianBridgeEditModeTests
       SetCartographerSingleton(cartographer);
       SetPrivateField(cartographer, "_dynamicLinksEngine", engine);
       SetPrivateField(cartographer, "_activeEngine", engine);
+      MapRuntimeContext.SetNotes(new List<NoteData> { new NoteData { Id = "next", Path = "notes/next.md" } }, string.Empty);
 
-      InvokeCartographerBuildGraph(
+      IEnumerator rebuildGraph = InvokeCartographerRebuildGraphAfterClear(
         cartographer,
-        new List<NoteData> { new NoteData { Id = "next", Path = "notes/next.md" } },
         MapLayoutMode.DynamicLinks);
 
+      Assert.That(rebuildGraph.MoveNext(), Is.True);
       Assert.That(engine.ClearGraphCallCount, Is.EqualTo(1));
-      Assert.That(engine.BuildGraphCallCount, Is.EqualTo(1));
+      Assert.That(engine.BuildGraphCallCount, Is.EqualTo(0));
       Assert.That(cartographer.ActiveEngine, Is.SameAs(engine));
+
+      Assert.That(rebuildGraph.MoveNext(), Is.False);
+      Assert.That(engine.BuildGraphCallCount, Is.EqualTo(1));
     }
     finally
     {
@@ -310,7 +323,7 @@ public class ObsidianBridgeEditModeTests
   }
 
   [Test]
-  public void BuildGraph_SwitchEngine_ClearsPreviousEngineOnly()
+  public void RebuildGraphAfterClear_SwitchEngine_ClearsPreviousEngineOnly()
   {
     var cartographerObject = new GameObject("CartographerSwitchEngineRebuildTests");
     try
@@ -322,20 +335,194 @@ public class ObsidianBridgeEditModeTests
       SetCartographerSingleton(cartographer);
       SetPrivateField(cartographer, "_activeEngine", previousEngine);
       SetPrivateField(cartographer, "_datesEngine", nextEngine);
+      MapRuntimeContext.SetNotes(new List<NoteData> { new NoteData { Id = "next", Path = "notes/next.md" } }, string.Empty);
 
-      InvokeCartographerBuildGraph(
+      IEnumerator rebuildGraph = InvokeCartographerRebuildGraphAfterClear(
         cartographer,
-        new List<NoteData> { new NoteData { Id = "next", Path = "notes/next.md" } },
         MapLayoutMode.Dates);
 
+      Assert.That(rebuildGraph.MoveNext(), Is.True);
       Assert.That(previousEngine.ClearGraphCallCount, Is.EqualTo(1));
       Assert.That(previousEngine.BuildGraphCallCount, Is.EqualTo(0));
       Assert.That(nextEngine.ClearGraphCallCount, Is.EqualTo(0));
-      Assert.That(nextEngine.BuildGraphCallCount, Is.EqualTo(1));
+      Assert.That(nextEngine.BuildGraphCallCount, Is.EqualTo(0));
       Assert.That(cartographer.ActiveEngine, Is.SameAs(nextEngine));
+
+      Assert.That(rebuildGraph.MoveNext(), Is.False);
+      Assert.That(nextEngine.BuildGraphCallCount, Is.EqualTo(1));
     }
     finally
     {
+      Object.DestroyImmediate(cartographerObject);
+    }
+  }
+
+  [Test]
+  public void RebuildGraphAfterClear_SwitchEngine_EmptyIndexUsesNextEngineLineBudget()
+  {
+    var cartographerObject = new GameObject("CartographerSwitchEngineLineBudgetTests");
+    var lineBuilderObject = new GameObject("CartographerSwitchEngineLineBudgetTests_LineBuilder");
+    var focusObject = new GameObject("CartographerSwitchEngineLineBudgetTests_Focus");
+    var cameraObject = new GameObject("CartographerSwitchEngineLineBudgetTests_Camera");
+    var startObject = new GameObject("CartographerSwitchEngineLineBudgetTests_CameraStart");
+    try
+    {
+      var cartographer = cartographerObject.AddComponent<Cartographer>();
+      var lineBuilder = lineBuilderObject.AddComponent<LineBuilder>();
+      var focusNode = focusObject.AddComponent<FocusNode>();
+      var cameraController = cameraObject.AddComponent<CameraOrbitalController>();
+      var previousEngine = new TestCartographerEngine(MapLayoutMode.DynamicLinks, maxActiveLines: 200);
+      var nextEngine = new TestCartographerEngine(MapLayoutMode.Dates, maxActiveLines: 0);
+
+      SetCartographerSingleton(cartographer);
+      SetPrivateField(cartographer, "_activeEngine", previousEngine);
+      SetPrivateField(cartographer, "_datesEngine", nextEngine);
+      SetPrivateField(cartographer, "lineBuilder", lineBuilder);
+      SetPrivateField(cartographer, "focusNode", focusNode);
+      SetPrivateField(focusNode, "cameraController", cameraController);
+      SetPrivateField(cameraController, "startPosition", startObject.transform);
+      MapRuntimeContext.SetNotes(new List<NoteData>(), string.Empty);
+
+      IEnumerator rebuildGraph = InvokeCartographerRebuildGraphAfterClear(
+        cartographer,
+        MapLayoutMode.Dates);
+
+      Assert.That(rebuildGraph.MoveNext(), Is.True);
+      Assert.That(GetPrivateField<int>(lineBuilder, "activeLineLimit"), Is.EqualTo(0));
+
+      Assert.That(rebuildGraph.MoveNext(), Is.False);
+      Assert.That(nextEngine.BuildGraphCallCount, Is.EqualTo(1));
+    }
+    finally
+    {
+      Object.DestroyImmediate(cartographerObject);
+      Object.DestroyImmediate(lineBuilderObject);
+      Object.DestroyImmediate(focusObject);
+      Object.DestroyImmediate(cameraObject);
+      Object.DestroyImmediate(startObject);
+    }
+  }
+
+  [Test]
+  public void RebuildGraphAfterClear_BuildsCurrentRuntimeNotesAfterClearFrame()
+  {
+    var cartographerObject = new GameObject("CartographerRebuildCurrentRuntimeNotesTests");
+    try
+    {
+      var cartographer = cartographerObject.AddComponent<Cartographer>();
+      var engine = new TestCartographerEngine(MapLayoutMode.DynamicLinks);
+
+      SetCartographerSingleton(cartographer);
+      SetPrivateField(cartographer, "_dynamicLinksEngine", engine);
+
+      MapRuntimeContext.SetNotes(new List<NoteData> { new NoteData { Id = "old", Path = "notes/old.md" } }, string.Empty);
+      IEnumerator rebuildGraph = InvokeCartographerRebuildGraphAfterClear(
+        cartographer,
+        MapLayoutMode.DynamicLinks);
+      Assert.That(rebuildGraph.MoveNext(), Is.True);
+
+      MapRuntimeContext.SetNotes(new List<NoteData> { new NoteData { Id = "latest", Path = "notes/latest.md" } }, string.Empty);
+
+      Assert.That(engine.BuildGraphCallCount, Is.EqualTo(0));
+
+      Assert.That(rebuildGraph.MoveNext(), Is.False);
+      Assert.That(engine.BuildGraphCallCount, Is.EqualTo(1));
+      Assert.That(engine.LastBuiltNotes, Has.Count.EqualTo(1));
+      Assert.That(engine.LastBuiltNotes[0].Id, Is.EqualTo("latest"));
+    }
+    finally
+    {
+      Object.DestroyImmediate(cartographerObject);
+    }
+  }
+
+  [Test]
+  public void RebuildGraphAfterClear_BuildsAfterClearFrame()
+  {
+    var cartographerObject = new GameObject("CartographerRebuildCurrentVersionTests");
+    try
+    {
+      var cartographer = cartographerObject.AddComponent<Cartographer>();
+      var engine = new TestCartographerEngine(MapLayoutMode.DynamicLinks);
+
+      SetCartographerSingleton(cartographer);
+      SetPrivateField(cartographer, "_dynamicLinksEngine", engine);
+
+      MapRuntimeContext.SetNotes(new List<NoteData> { new NoteData { Id = "latest", Path = "notes/latest.md" } }, string.Empty);
+      IEnumerator rebuildGraph = InvokeCartographerRebuildGraphAfterClear(
+        cartographer,
+        MapLayoutMode.DynamicLinks);
+
+      Assert.That(rebuildGraph.MoveNext(), Is.True);
+      Assert.That(engine.BuildGraphCallCount, Is.EqualTo(0));
+
+      Assert.That(rebuildGraph.MoveNext(), Is.False);
+      Assert.That(engine.BuildGraphCallCount, Is.EqualTo(1));
+      Assert.That(engine.LastBuiltNotes, Has.Count.EqualTo(1));
+      Assert.That(engine.LastBuiltNotes[0].Id, Is.EqualTo("latest"));
+    }
+    finally
+    {
+      Object.DestroyImmediate(cartographerObject);
+    }
+  }
+
+  [Test]
+  public void RequestGraphReady_UsesCapturedRequestId()
+  {
+    var readyRequestIds = new List<string>();
+    void HandleReady(string requestId) => readyRequestIds.Add(requestId);
+
+    MapRuntimeContext.OnGraphReady += HandleReady;
+    try
+    {
+      MapRuntimeContext.SetLatestGraphRequestId("req-old");
+      MapRuntimeContext.SetBuildingGraphRequestId(MapRuntimeContext.LatestGraphRequestId);
+      MapRuntimeContext.SetLatestGraphRequestId("req-new");
+
+      MapRuntimeContext.RequestGraphReady();
+
+      Assert.That(readyRequestIds, Is.EqualTo(new List<string> { "req-old" }));
+    }
+    finally
+    {
+      MapRuntimeContext.OnGraphReady -= HandleReady;
+    }
+  }
+
+  [Test]
+  public void RebuildGraphAfterClear_ReadyScopeUsesCoroutineRequestId()
+  {
+    var readyRequestIds = new List<string>();
+    void HandleReady(string requestId) => readyRequestIds.Add(requestId);
+
+    var cartographerObject = new GameObject("CartographerRebuildReadyScopeTests");
+    MapRuntimeContext.OnGraphReady += HandleReady;
+    try
+    {
+      var cartographer = cartographerObject.AddComponent<Cartographer>();
+      var engine = new TestCartographerEngine(MapLayoutMode.DynamicLinks);
+
+      SetCartographerSingleton(cartographer);
+      SetPrivateField(cartographer, "_dynamicLinksEngine", engine);
+
+      MapRuntimeContext.SetNotes(new List<NoteData> { new NoteData { Id = "old", Path = "notes/old.md" } }, "req-old");
+      IEnumerator rebuildGraph = InvokeCartographerRebuildGraphAfterClear(
+        cartographer,
+        MapLayoutMode.DynamicLinks,
+        "req-old");
+
+      Assert.That(rebuildGraph.MoveNext(), Is.True);
+      MapRuntimeContext.SetLatestGraphRequestId("req-new");
+
+      Assert.That(rebuildGraph.MoveNext(), Is.False);
+      MapRuntimeContext.RequestGraphReady();
+
+      Assert.That(readyRequestIds, Is.EqualTo(new List<string> { "req-old" }));
+    }
+    finally
+    {
+      MapRuntimeContext.OnGraphReady -= HandleReady;
       Object.DestroyImmediate(cartographerObject);
     }
   }
@@ -670,9 +857,11 @@ public class ObsidianBridgeEditModeTests
   {
     MapRuntimeContext.MapLayoutPreference = MapLayoutMode.Auto;
     MapRuntimeContext.PendingFocusNoteId = string.Empty;
+    MapRuntimeContext.SetLatestGraphRequestId(string.Empty);
+    MapRuntimeContext.ClearBuildingGraphRequestId();
     MapRuntimeContext.SetTagNames(new Dictionary<int, string>());
     MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>());
-    MapRuntimeContext.SetNotes(new List<NoteData>());
+    MapRuntimeContext.SetNotes(new List<NoteData>(), string.Empty);
   }
 
   private void EnsureCartographerSingleton()
@@ -696,16 +885,16 @@ public class ObsidianBridgeEditModeTests
     field.SetValue(target, value);
   }
 
-  private static void InvokeCartographerBuildGraph(
+  private static IEnumerator InvokeCartographerRebuildGraphAfterClear(
     Cartographer cartographer,
-    List<NoteData> notes,
-    MapLayoutMode layoutPreference)
+    MapLayoutMode layoutPreference,
+    string requestId = "")
   {
-    MethodInfo buildGraph = typeof(Cartographer).GetMethod("BuildGraph", BindingFlags.Instance | BindingFlags.NonPublic);
-    Assert.That(buildGraph, Is.Not.Null);
+    MethodInfo rebuildGraph = typeof(Cartographer).GetMethod("RebuildGraphAfterClear", BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(rebuildGraph, Is.Not.Null);
     try
     {
-      buildGraph.Invoke(cartographer, new object[] { notes, layoutPreference });
+      return (IEnumerator)rebuildGraph.Invoke(cartographer, new object[] { layoutPreference, requestId });
     }
     catch (TargetInvocationException ex) when (ex.InnerException != null)
     {
@@ -735,9 +924,20 @@ public class ObsidianBridgeEditModeTests
     }
 
     public TestCartographerEngine(MapLayoutMode engineType, Vector3 pivot)
+      : this(engineType, pivot, 0)
+    {
+    }
+
+    public TestCartographerEngine(MapLayoutMode engineType, int maxActiveLines)
+      : this(engineType, Vector3.zero, maxActiveLines)
+    {
+    }
+
+    private TestCartographerEngine(MapLayoutMode engineType, Vector3 pivot, int maxActiveLines)
     {
       EngineType = engineType;
       this.pivot = pivot;
+      MaxActiveLines = maxActiveLines;
     }
 
     public bool RequiresTick => false;
@@ -746,7 +946,8 @@ public class ObsidianBridgeEditModeTests
     public MapLayoutMode EngineType { get; }
     public int BuildGraphCallCount { get; private set; }
     public int ClearGraphCallCount { get; private set; }
-    public int MaxActiveLines => 0;
+    public List<NoteData> LastBuiltNotes { get; private set; } = new();
+    public int MaxActiveLines { get; }
     public int MaxActiveLongLines => 0;
     public ScapeCameraWarper ScapeWarper => null;
     public IReadOnlyList<Star> Stars => new List<Star>();
@@ -761,6 +962,7 @@ public class ObsidianBridgeEditModeTests
     public void BuildGraph(List<NoteData> notes)
     {
       BuildGraphCallCount++;
+      LastBuiltNotes = notes;
     }
 
     public void ClearGraph()

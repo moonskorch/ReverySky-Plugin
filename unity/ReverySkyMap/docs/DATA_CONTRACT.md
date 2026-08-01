@@ -73,8 +73,11 @@ Runtime -> parent:
 ```
 
 Unity-side behavior:
-- `ObsidianBridge.OnGraphSet` stores the incoming `requestId` in `MapRuntimeContext.GraphRequestId`.
+- `ObsidianBridge.OnGraphSet` passes the incoming `requestId` to `MapRuntimeContext.SetNotes(...)` after payload normalization succeeds.
+- `MapRuntimeContext.OnNotesChanged(requestId)` carries that id to `Cartographer`.
+- `Cartographer` sets the building graph request id when a graph build starts, using the request id carried by the rebuild coroutine.
 - Engines call `MapRuntimeContext.RequestGraphReady()` when their current graph reaches its user-visible ready point.
+- `MapRuntimeContext.RequestGraphReady()` emits the building graph `requestId`; the iframe wrapper ignores stale `graph:ready` messages whose `requestId` no longer matches the latest accepted `graph:set`.
 - `MapRuntimeContext.OnGraphReady` reaches `ObsidianBridge.HandleGraphReadyRequested`.
 - WebGL builds forward the event to JavaScript via `ReverySkyBridgePostGraphReady(requestId)`.
 - Empty or whitespace `requestId` is not sent out as `graph:ready`; this avoids a startup empty-graph rebuild producing an invalid completion event.
@@ -178,7 +181,7 @@ Current runtime behavior snapshot for Unity ingestion and map interaction:
   - expected mapping: `auto` = threshold-based selection (`DynamicLinks` for small graphs, `ScalableLinks` for large graphs), `dynamicLinks` = links map preference with the same large-graph fallback to `ScalableLinks`, `dates` = explicit dates map preference, `scalableLinks` = explicit scalable links map preference.
 - `runtime:settings.payload.frameRateMode` -> live Unity frame-rate mode.
   - expected mapping: `auto` = vSync on and platform/browser cadence, `fps60` = software cap at 60 FPS, `fps30` = software cap at 30 FPS, `fps24` = software cap at 24 FPS.
-- envelope `requestId` -> copied to `MapRuntimeContext.GraphRequestId` and echoed through `graph:ready` after the active engine reaches its ready point.
+- envelope `requestId` -> stored with the accepted runtime notes, carried through `OnNotesChanged(requestId)` and the active rebuild coroutine, then echoed through `graph:ready` after that build reaches its ready point.
 - `links[].sourceId` and `links[].targetId` -> note-note edges in Forces engine.
   - gate: empty ids and self-links are dropped during bridge mapping; missing runtime node ids are dropped by Forces edge resolution.
 - `links[].weight` -> Forces spring rest length (`idealEdgeLen / sqrt(weight)`).

@@ -126,7 +126,7 @@ public class StarScapeRuntimePlayModeTests
     MapRuntimeContext.MapLayoutPreference = MapLayoutMode.ScalableLinks;
     MapRuntimeContext.SetTagNames(new Dictionary<int, string>());
     MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>());
-    MapRuntimeContext.SetNotes(new List<NoteData>());
+    MapRuntimeContext.SetNotes(new List<NoteData>(), string.Empty);
 
     var bridgeObject = new GameObject("ObsidianBridgePlayModeTest");
     var bridge = bridgeObject.AddComponent<ObsidianBridge>();

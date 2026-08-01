@@ -246,7 +246,7 @@ public class FocusLabelHighlightEditModeTests
   {
     MapRuntimeContext.SetTagNames(new Dictionary<int, string>());
     MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>());
-    MapRuntimeContext.SetNotes(new List<NoteData>());
+    MapRuntimeContext.SetNotes(new List<NoteData>(), string.Empty);
   }
 
   private static MapGraphNode GetNode(MapGraphIndex index, Component component)

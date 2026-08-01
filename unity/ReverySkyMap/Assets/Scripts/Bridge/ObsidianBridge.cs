@@ -79,7 +79,6 @@ public class ObsidianBridge : MonoBehaviour
     }
 
     MapRuntimeContext.MapLayoutPreference = ParseMapLayoutPreference(envelope.payload.mapLayout);
-    MapRuntimeContext.SetGraphRequestId(envelope.requestId);
 
     var notes = envelope.payload.notes ?? Array.Empty<BridgeGraphNote>();
     var links = envelope.payload.links ?? Array.Empty<BridgeGraphLink>();
@@ -157,7 +156,7 @@ public class ObsidianBridge : MonoBehaviour
 
     MapRuntimeContext.SetTagNames(tagNameById);
     MapRuntimeContext.SetLinks(linksRuntime);
-    MapRuntimeContext.SetNotes(runtimeNotes);
+    MapRuntimeContext.SetNotes(runtimeNotes, envelope.requestId);
 
     Debug.Log($"[ObsidianBridge] graph:set applied. notes={notes.Length}, links={links.Length}, runtimeNotes={runtimeNotes.Count}, tags={tagNameById.Count}");
   }

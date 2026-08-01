@@ -465,7 +465,7 @@ public class CartographerScalableLinksEngineEditModeTests
 
     MapRuntimeContext.SetTagNames(new Dictionary<int, string>());
     MapRuntimeContext.SetLinks(runtimeLinks);
-    MapRuntimeContext.SetNotes(runtimeNotes);
+    MapRuntimeContext.SetNotes(runtimeNotes, string.Empty);
 
     var scope = new EngineScope(CreateStarTemplatePrefab());
     scope.ConfigureForDeterministicEditMode();

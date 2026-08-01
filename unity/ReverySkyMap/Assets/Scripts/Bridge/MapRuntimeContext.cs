@@ -28,20 +28,22 @@ public static class MapRuntimeContext
   public static string PendingFocusNoteId { get; set; } = string.Empty;
 
   public static MapLayoutMode MapLayoutPreference { get; set; } = MapLayoutMode.Auto;
-  public static string GraphRequestId { get; private set; } = string.Empty;
+  public static string LatestGraphRequestId { get; private set; } = string.Empty;
+  private static string buildingGraphRequestId = string.Empty;
 
   public static event Action<string, string> OnOpenNoteRequested;
   public static event Action<string> OnGraphReady;
-  public static event Action OnNotesChanged;
+  public static event Action<string> OnNotesChanged;
 
   public static bool HasRuntimeNotes => Notes != null && Notes.Count > 0;
 
-  public static void SetNotes(List<NoteData> notes)
+  public static void SetNotes(List<NoteData> notes, string requestId)
   {
     Notes = notes ?? new List<NoteData>();
+    SetLatestGraphRequestId(requestId);
     ApplyDirectLinkCounts();
     NotesVersion++;
-    OnNotesChanged?.Invoke();
+    OnNotesChanged?.Invoke(LatestGraphRequestId);
   }
 
   public static void SetLinks(List<RuntimeNoteLink> links)
@@ -54,9 +56,19 @@ public static class MapRuntimeContext
     tagNamesById = tagsById ?? new Dictionary<int, string>();
   }
 
-  public static void SetGraphRequestId(string requestId)
+  public static void SetLatestGraphRequestId(string requestId)
   {
-    GraphRequestId = requestId ?? string.Empty;
+    LatestGraphRequestId = requestId ?? string.Empty;
+  }
+
+  public static void SetBuildingGraphRequestId(string requestId)
+  {
+    buildingGraphRequestId = requestId ?? string.Empty;
+  }
+
+  public static void ClearBuildingGraphRequestId()
+  {
+    buildingGraphRequestId = string.Empty;
   }
 
   public static string GetTagName(int tagId)
@@ -90,7 +102,7 @@ public static class MapRuntimeContext
 
   public static void RequestGraphReady()
   {
-    OnGraphReady?.Invoke(GraphRequestId);
+    OnGraphReady?.Invoke(buildingGraphRequestId);
   }
 
   /// <summary>

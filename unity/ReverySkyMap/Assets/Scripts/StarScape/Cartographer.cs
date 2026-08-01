@@ -45,6 +45,7 @@ public class Cartographer : MonoBehaviour
   private ICartographerEngine _scalableLinksEngine;
   private ICartographerEngine _activeEngine;
   private ScapeCameraWarper _activeWarper;
+  private Coroutine rebuildGraphCoroutine;
 
   public ICartographerEngine ActiveEngine => _activeEngine;
   public ICartographerEngine StaticSlotEngine => _scalableLinksEngine;
@@ -69,7 +70,7 @@ public class Cartographer : MonoBehaviour
 #if UNITY_EDITOR
     sampleDataGenerator?.TryInjectSampleDataIfNeeded();
 #endif
-    RebuildGraph(MapRuntimeContext.MapLayoutPreference);
+    RebuildGraph(MapRuntimeContext.MapLayoutPreference, MapRuntimeContext.LatestGraphRequestId);
 
     MapRuntimeContext.OnNotesChanged += HandleRuntimeNotesChanged;
     if (changeViewControl != null)
@@ -89,6 +90,10 @@ public class Cartographer : MonoBehaviour
     if (_activeEngine != null)
       _activeEngine.OnNodesChanged -= HandleEngineNodesChanged;
 
+    if (rebuildGraphCoroutine != null)
+      StopCoroutine(rebuildGraphCoroutine);
+
+    MapRuntimeContext.ClearBuildingGraphRequestId();
     BindActiveWarper(null);
   }
 
@@ -101,31 +106,48 @@ public class Cartographer : MonoBehaviour
     }
   }
 
-  private void RebuildGraph(MapLayoutMode layoutPreference)
+  private void RebuildGraph(MapLayoutMode layoutPreference, string requestId)
   {
-    var noteList = MapRuntimeContext.Notes ?? new List<NoteData>();
+    if (rebuildGraphCoroutine != null)
+      StopCoroutine(rebuildGraphCoroutine);
 
+    rebuildGraphCoroutine = StartCoroutine(RebuildGraphAfterClear(layoutPreference, requestId));
+  }
+
+  private IEnumerator RebuildGraphAfterClear(MapLayoutMode layoutPreference, string requestId)
+  {
+    int noteCount = MapRuntimeContext.Notes?.Count ?? 0;
+
+    PrepareGraphClear(noteCount, layoutPreference);
+    yield return null;
+
+    BuildClearedGraph(MapRuntimeContext.Notes ?? new List<NoteData>(), requestId);
+    rebuildGraphCoroutine = null;
+  }
+
+  private void PrepareGraphClear(int noteCount, MapLayoutMode layoutPreference)
+  {
     var noEntriesMessage = GameSettings.NotificationNoStars;
 
     if (notification != null)
     {
       notification.UpdateNoticeMessage(
-        noteList.Count == 0,
+        noteCount == 0,
         noEntriesMessage);
     }
 
     SetCurrentView(CurrentView);
     ApplyLineVisibility();
-    BuildGraph(noteList, layoutPreference);
+    MapRuntimeContext.ClearBuildingGraphRequestId();
+
+    var engine = ResolveModeByNotesCount(noteCount, layoutPreference);
+    SwitchEngine(engine);
+    ApplyGraphIndex(MapGraphIndex.Empty, updateFocus: noteCount == 0);
   }
 
-  private void BuildGraph(List<NoteData> notes, MapLayoutMode layoutPreference)
+  private void BuildClearedGraph(List<NoteData> notes, string requestId)
   {
-    var engine = ResolveModeByNotesCount(notes.Count, layoutPreference);
-    SwitchEngine(engine);
-
-    ApplyGraphIndex(MapGraphIndex.Empty, updateFocus: notes.Count == 0);
-
+    MapRuntimeContext.SetBuildingGraphRequestId(requestId);
     var stopwatch = System.Diagnostics.Stopwatch.StartNew();
     _activeEngine.BuildGraph(notes);
     _activeEngine.ApplyView(CurrentView);
@@ -247,9 +269,9 @@ public class Cartographer : MonoBehaviour
     lineBuilder?.SetLinesVisible(CurrentView == ScapeView.Planets);
   }
 
-  private void HandleRuntimeNotesChanged()
+  private void HandleRuntimeNotesChanged(string requestId)
   {
-    RebuildGraph(MapRuntimeContext.MapLayoutPreference);
+    RebuildGraph(MapRuntimeContext.MapLayoutPreference, requestId);
   }
 
   private void BindActiveWarper(ScapeCameraWarper warper)

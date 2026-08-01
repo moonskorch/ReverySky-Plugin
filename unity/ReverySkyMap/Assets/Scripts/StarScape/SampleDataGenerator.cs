@@ -87,7 +87,7 @@ public class SampleDataGenerator : MonoBehaviour
     var sampleGraph = GenerateGraph(settings, DateTime.Now.Date);
     MapRuntimeContext.SetTagNames(sampleGraph.TagNames);
     MapRuntimeContext.SetLinks(sampleGraph.Links);
-    MapRuntimeContext.SetNotes(sampleGraph.Notes);
+    MapRuntimeContext.SetNotes(sampleGraph.Notes, string.Empty);
 
     Debug.Log(
       $"[CartographerSampleData] Injected connectionModel={settings.ConnectionModel} islands={settings.Islands} density={settings.LinkDensity} notes={sampleGraph.Notes.Count} tags={sampleGraph.TagNames.Count} links={sampleGraph.Links.Count}");

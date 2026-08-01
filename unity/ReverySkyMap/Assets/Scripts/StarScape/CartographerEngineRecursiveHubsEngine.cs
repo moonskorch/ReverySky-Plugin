@@ -654,6 +654,8 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
     _nodeSpacingPairChecks = 0;
     _constructionActive = false;
     _visualSmoothingActive = false;
+    _continuousLinkRefinement = false;
+    _graphHasNodes = false;
     _nextPlacementSequence = 0;
     _navigationRadius = Mathf.Max(0.1f, minimumNavigationRadius);
   }

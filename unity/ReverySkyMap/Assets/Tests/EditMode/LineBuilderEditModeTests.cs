@@ -1081,7 +1081,7 @@ public class LineBuilderEditModeTests
   {
     MapRuntimeContext.SetTagNames(new Dictionary<int, string>());
     MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>());
-    MapRuntimeContext.SetNotes(new List<NoteData>());
+    MapRuntimeContext.SetNotes(new List<NoteData>(), string.Empty);
   }
 
   private sealed class LineBuilderScope : System.IDisposable

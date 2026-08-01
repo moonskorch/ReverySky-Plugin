@@ -64,25 +64,26 @@ Obsidian plugin
 1. Unity loads `Assets/Scenes/StarScapeScene.unity`.
 2. `ObsidianBridge.EnsureInstance()` in `Assets/Scripts/Bridge/ObsidianBridge.cs` creates a persistent bridge object if the scene does not already contain one.
 3. Scene wiring activates `GameInput`, `CameraOrbitalController`, `FocusNode`, `FocusHighlighter`, `Cartographer`, the engine components, `ScapeCameraWarper`, `ChangeViewControl`, `RotateCameraUI`, `RotateHoldButton`, and `Notification`.
-4. `Cartographer.Start()` calls `SampleDataGenerator.TryInjectSampleDataIfNeeded()` only inside `UNITY_EDITOR`, then calls `RebuildGraph(MapRuntimeContext.MapLayoutPreference)`.
+4. `Cartographer.Start()` calls `SampleDataGenerator.TryInjectSampleDataIfNeeded()` only inside `UNITY_EDITOR`, then calls `RebuildGraph(MapRuntimeContext.MapLayoutPreference, MapRuntimeContext.LatestGraphRequestId)`.
 5. `Cartographer` subscribes to `MapRuntimeContext.OnNotesChanged` and the view toggle so later payloads or button clicks can rebuild or restyle the active graph.
 
 ### 2. `graph:set` ingestion and graph rebuild
 
 1. `ObsidianBridge.OnGraphSet(string json)` exits early during shutdown, rejects empty JSON, and parses the envelope with `JsonUtility.FromJson`.
-2. The bridge rejects payloads with a wrong `protocolVersion` or `type`, stores the envelope `requestId` in `MapRuntimeContext.GraphRequestId`, then normalizes the payload into `NoteData` and `MapRuntimeContext.RuntimeNoteLink` objects.
+2. The bridge rejects payloads with a wrong `protocolVersion` or `type`, then normalizes the payload into `NoteData` and `MapRuntimeContext.RuntimeNoteLink` objects.
 3. Tags are trimmed and mapped by case-insensitive name to shared runtime tag ids, blank titles become `GameSettings.DefaultTitle`, invalid dates become `DateTime.MinValue`, and note size is clamped to `0` or greater.
 4. Links with empty endpoints or self-links are dropped, and non-positive link weights are normalized to `1`.
-5. `MapRuntimeContext.SetTagNames`, `SetLinks`, and `SetNotes` store the runtime source of truth. `SetNotes` derives each note's unique direct note-neighbor count from the current links, increments `NotesVersion`, and raises `OnNotesChanged`.
-6. `Cartographer.HandleRuntimeNotesChanged()` calls `RebuildGraph(MapRuntimeContext.MapLayoutPreference)`.
+5. `MapRuntimeContext.SetTagNames`, `SetLinks`, and `SetNotes` store the runtime source of truth. `SetNotes` stores the envelope `requestId`, derives each note's unique direct note-neighbor count from the current links, increments `NotesVersion`, and raises `OnNotesChanged(requestId)`.
+6. `Cartographer.HandleRuntimeNotesChanged(requestId)` calls `RebuildGraph(MapRuntimeContext.MapLayoutPreference, requestId)`.
 7. `Cartographer.ResolveModeByNotesCount()` uses `defaultEngine` first. Without an override, explicit `Dates` and `ScalableLinks` stay fixed, while `Auto` and `DynamicLinks` resolve by note count: small graphs use `DynamicLinks`, large graphs use `ScalableLinks`.
-8. The chosen engine runs `BuildGraph(notes)` and emits `OnNodesChanged` with the instantiated `Star` and `TagNode` scene objects.
-9. `Cartographer.HandleEngineNodesChanged(...)` builds `GraphIndex = MapGraphIndex.Build(stars, tagNodes, MapRuntimeContext.Links)`.
-10. `Cartographer` passes the same `GraphIndex` to `LineBuilder.Rebuild(...)` and `CullingManager.Rebuild(...)`.
-11. `BuildGraph(...)` applies `CurrentView`, rebinds the active `ScapeCameraWarper`, and logs build timing.
-12. After each non-transient index publication, `Cartographer.ApplyGraphFocus()` tries `MapRuntimeContext.PendingFocusNoteId` once, then tries `FocusNode.FocusRestoreNoteId`, then calls `ResetFocus()`.
-13. `Cartographer.SwitchEngine(...)` clears the engine that owns stale visuals/state, then `Cartographer.ApplyGraphIndex(...)` applies `MapGraphIndex.Empty` before rebuild. Engine cleanup is silent; empty payloads reset focus during this empty-index application, while non-empty rebuilds leave focus untouched until the engine publishes rebuilt nodes.
-14. When the active engine reaches its ready point, it calls `MapRuntimeContext.RequestGraphReady()`. `ObsidianBridge` forwards the matching `requestId` to JavaScript as `graph:ready`, unless the id is empty.
+8. `Cartographer` clears the engine that owns stale visuals/state, applies `MapGraphIndex.Empty` using the selected engine contract, waits one frame so Unity can destroy old objects, then builds the current `MapRuntimeContext.Notes`. New `graph:set` events stop the pending rebuild coroutine before starting a replacement rebuild.
+9. The chosen engine runs `BuildGraph(notes)` and emits `OnNodesChanged` with the instantiated `Star` and `TagNode` scene objects.
+10. `Cartographer.HandleEngineNodesChanged(...)` builds `GraphIndex = MapGraphIndex.Build(stars, tagNodes, MapRuntimeContext.Links)`.
+11. `Cartographer` passes the same `GraphIndex` to `LineBuilder.Rebuild(...)` and `CullingManager.Rebuild(...)`.
+12. `BuildGraph(...)` applies `CurrentView`, rebinds the active `ScapeCameraWarper`, and logs build timing.
+13. After each non-transient index publication, `Cartographer.ApplyGraphFocus()` tries `MapRuntimeContext.PendingFocusNoteId` once, then tries `FocusNode.FocusRestoreNoteId`, then calls `ResetFocus()`.
+14. When a build starts, `Cartographer` sets the building graph request id from the request id carried by the rebuild coroutine.
+15. When the active engine reaches its ready point, it calls `MapRuntimeContext.RequestGraphReady()`. `ObsidianBridge` forwards the building graph `requestId` to JavaScript as `graph:ready`, unless the id is empty; the iframe wrapper ignores stale ready ids when updating loading status.
 
 ### 3. Note focus, label emphasis, and open-note callback
 
@@ -144,7 +145,7 @@ Obsidian plugin
 - `MapRuntimeContext`
   - Responsibility: owns the normalized source graph data from the bridge, current graph request id, and pending focus note id.
   - Code anchor: `Assets/Scripts/Bridge/MapRuntimeContext.cs`
-  - Entry point: `SetNotes`, `SetLinks`, `SetTagNames`, `SetGraphRequestId`, `RequestOpenNote`, `RequestGraphReady`
+  - Entry point: `SetNotes`, `SetLinks`, `SetTagNames`, `SetLatestGraphRequestId`, `RequestOpenNote`, `RequestGraphReady`
   - Calls / sends to: `Cartographer`, `FocusNode`, `ObsidianBridge`
 - `NoteData`
   - Responsibility: represents the normalized runtime note model consumed by engines and visuals.
@@ -274,7 +275,7 @@ Obsidian plugin
 ## State Ownership and Contracts
 
 - `MapRuntimeContext` is the source of truth for live runtime notes, links, tag names, pending focus note id, layout preference, graph request id, and the `NotesVersion` counter. `PendingFocusNoteId` is a one-shot focus delivery/materialization buffer, not a durable remembered selection.
-- `MapRuntimeContext.SetNotes()` derives `NoteData.DirectLinkCount` from unique direct note-note neighbors in `MapRuntimeContext.Links`. `StarVisual` reads that value to choose crystal buckets; layout engines do not own this visual metric.
+- `MapRuntimeContext.SetNotes(notes, requestId)` derives `NoteData.DirectLinkCount` from unique direct note-note neighbors in `MapRuntimeContext.Links`. `StarVisual` reads that value to choose crystal buckets; layout engines do not own this visual metric.
 - `ObsidianBridge` owns bridge validation and all conversion from the JSON envelope into runtime models.
 - `Cartographer` owns engine selection, rebuild timing, current view, `GraphIndex` creation, and focus reconciliation after the index changes. The focus order is pending once, restore, then reset.
 - Unity does not decide whether a focused note belongs to the active Obsidian filter. The parent plugin gates ordinary focus by the effective graph; Unity pending only bridges the delay between a valid focus message and an indexed star.
