@@ -196,10 +196,10 @@ export class MapView extends ItemView {
       return;
     }
 
-    const iframe = iframeHost.doc.createElement("iframe");
+    const iframe = iframeHost.createEl("iframe");
+    iframe.src = this.createRuntimeIframeSrc(iframeSrc, this.now());
     iframe.className = "reverysky-map-iframe";
     iframe.setAttribute("title", "ReverySky 3D Graph");
-
     const iframeWindow = iframeHost.win as RuntimeWindow;
     const iframeLoadAbortController = new iframeWindow.AbortController();
     this.iframeLoadAbortController = iframeLoadAbortController;
@@ -235,10 +235,7 @@ export class MapView extends ItemView {
           this.notify(message);
         }
       }, messageWindow);
-    }, { signal: iframeLoadAbortController.signal, once: true });
-
-    iframe.src = this.createRuntimeIframeSrc(iframeSrc, this.now());
-    iframeHost.appendChild(iframe);
+    }, { signal: iframeLoadAbortController.signal });
   }
 
   private createRuntimeIframeSrc(iframeSrc: string, cacheBust: number): string {
