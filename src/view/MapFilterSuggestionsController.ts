@@ -634,11 +634,30 @@ export class MapFilterSuggestionsController {
       option.setAttribute("aria-selected", isActive ? "true" : "false");
       option.id = `${this.filterSuggestionsListboxEl.id}-option-${index}`;
       if (isActive) {
-        if (typeof option.scrollIntoView === "function") {
-          option.scrollIntoView({ block: "nearest" });
-        }
+        this.scrollActiveSuggestionIntoPane(option);
         this.inputEl.setAttribute("aria-activedescendant", option.id);
       }
+    }
+  }
+
+  private scrollActiveSuggestionIntoPane(option: HTMLElement): void {
+    if (!this.filterSuggestionsEl) {
+      return;
+    }
+
+    const pane = this.filterSuggestionsEl;
+    const paneTop = pane.scrollTop;
+    const paneBottom = paneTop + pane.clientHeight;
+    const optionTop = option.offsetTop;
+    const optionBottom = optionTop + option.offsetHeight;
+
+    if (optionTop < paneTop) {
+      pane.scrollTop = optionTop;
+      return;
+    }
+
+    if (optionBottom > paneBottom) {
+      pane.scrollTop = optionBottom - pane.clientHeight;
     }
   }
 

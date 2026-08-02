@@ -447,7 +447,7 @@ describe("MapFilterPanelController", () => {
     expect(searchInput.value).toContain("Archive");
   });
 
-  it("scrolls the active long-list suggestion into view while navigating with arrows", () => {
+  it("keeps the WebGL host stable while navigating long suggestion lists", () => {
     const session = createSession();
     vi.spyOn(session, "getFolderSuggestions").mockReturnValue(
       Array.from({ length: 14 }, (_value, index) => ({
@@ -458,35 +458,99 @@ describe("MapFilterPanelController", () => {
       }))
     );
 
-    const scrollCalls: string[] = [];
     const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
       configurable: true,
-      value(this: HTMLElement) {
-        scrollCalls.push(this.textContent ?? "");
+      value() {
+        throw new Error("Filter suggestions must not scroll ancestor containers.");
       }
     });
 
     try {
-      const controller = new MapFilterPanelController(session);
       const container = createObsidianTestContainer();
-      controller.render(container);
+      const controller = new MapFilterPanelController(session);
+      const iframeHost = controller.render(container);
 
       const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
       searchInput.dispatchEvent(new Event("focus"));
 
       const operatorOptions = container.querySelectorAll(".reverysky-map-filter-suggestion-option");
       (operatorOptions[0] as HTMLElement).dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-      expect(scrollCalls.at(-1)).toContain("Long/Folder-01");
 
-      scrollCalls.length = 0;
-      searchInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-      searchInput.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
-      expect(scrollCalls.at(-1)).toContain("Long/Folder-14");
+      const root = container.querySelector(".reverysky-map-root") as HTMLElement;
+      const filterPanel = container.querySelector(".reverysky-map-filter-panel") as HTMLElement;
+      const suggestions = container.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
+      const folderOptions = Array.from(
+        container.querySelectorAll<HTMLElement>(".reverysky-map-folder-suggestion-option")
+      );
+      let containerScrollTop = 0;
+      let rootScrollTop = 0;
+      let iframeHostTop = 12;
+      let suggestionsScrollTop = 0;
+      let filterPanelScrollTop = 0;
+      iframeHost.getBoundingClientRect = () => makeRect(0, iframeHostTop, 640, 360);
+      const iframeHostRectBefore = iframeHost.getBoundingClientRect();
 
-      scrollCalls.length = 0;
-      searchInput.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
-      expect(scrollCalls.at(-1)).toContain("Long/Folder-13");
+      Object.defineProperty(suggestions, "clientHeight", {
+        configurable: true,
+        value: 60
+      });
+      Object.defineProperty(container, "scrollTop", {
+        configurable: true,
+        get: () => containerScrollTop,
+        set: (value: number) => {
+          containerScrollTop = value;
+          iframeHostTop -= value;
+        }
+      });
+      Object.defineProperty(root, "scrollTop", {
+        configurable: true,
+        get: () => rootScrollTop,
+        set: (value: number) => {
+          rootScrollTop = value;
+          iframeHostTop -= value;
+        }
+      });
+      Object.defineProperty(suggestions, "scrollTop", {
+        configurable: true,
+        get: () => suggestionsScrollTop,
+        set: (value: number) => {
+          suggestionsScrollTop = value;
+        }
+      });
+      Object.defineProperty(filterPanel, "scrollTop", {
+        configurable: true,
+        get: () => filterPanelScrollTop,
+        set: (value: number) => {
+          filterPanelScrollTop = value;
+        }
+      });
+      folderOptions.forEach((option, index) => {
+        Object.defineProperty(option, "offsetTop", {
+          configurable: true,
+          value: index * 24
+        });
+        Object.defineProperty(option, "offsetHeight", {
+          configurable: true,
+          value: 24
+        });
+      });
+
+      for (let index = 0; index < 3; index += 1) {
+        searchInput.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+      }
+
+      expect(folderOptions[3]?.getAttribute("aria-selected")).toBe("true");
+      expect(suggestionsScrollTop).toBe(36);
+      expect(filterPanelScrollTop).toBe(0);
+      expect(rootScrollTop).toBe(0);
+      expect(containerScrollTop).toBe(0);
+      expect(iframeHost.getBoundingClientRect()).toMatchObject({
+        top: iframeHostRectBefore.top,
+        left: iframeHostRectBefore.left,
+        width: iframeHostRectBefore.width,
+        height: iframeHostRectBefore.height
+      });
     } finally {
       Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
         configurable: true,

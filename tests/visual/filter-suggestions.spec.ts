@@ -119,4 +119,50 @@ test.describe("filter suggestions", () => {
     expect(Math.abs(suggestionsBox!.width - anchorBox!.width)).toBeLessThanOrEqual(1);
     expect(Math.abs(suggestionsBox!.x + suggestionsBox!.width - (anchorBox!.x + anchorBox!.width))).toBeLessThanOrEqual(1);
   });
+
+  test("webgl-host-stays-fixed-while-filter-panel-scrolls", async ({ page }) => {
+    await page.goto(pathToFileURL(previewPath).href);
+
+    const root = page.locator(".reverysky-map-root");
+    const host = page.locator("[data-webgl-host]");
+    const panel = page.locator(".reverysky-map-filter-panel");
+    const suggestions = page.locator("[data-filter-suggestions]");
+    const beforeBox = await host.boundingBox();
+    expect(beforeBox).not.toBeNull();
+
+    await suggestions.evaluate((element) => {
+      const datePresets = Array.from({ length: 18 }, (_value, index) => [
+        `date:>=2026-${String(Math.max(1, 8 - index)).padStart(2, "0")}-01`,
+        `>= overflow preset ${index + 1}`
+      ]);
+
+      for (const [value, label] of datePresets) {
+        const option = document.createElement("div");
+        option.className = "reverysky-map-date-suggestion-option";
+        option.setAttribute("role", "option");
+        const valuePart = document.createElement("span");
+        valuePart.className = "reverysky-map-date-suggestion-value";
+        valuePart.textContent = value;
+        const labelPart = document.createElement("span");
+        labelPart.className = "reverysky-map-date-suggestion-label";
+        labelPart.textContent = label;
+        option.append(valuePart, labelPart);
+        element.appendChild(option);
+      }
+
+      element.scrollTop = element.scrollHeight;
+    });
+
+    await panel.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+
+    const afterBox = await host.boundingBox();
+    expect(afterBox).not.toBeNull();
+    expect(afterBox!.x).toBe(beforeBox!.x);
+    expect(afterBox!.y).toBe(beforeBox!.y);
+    expect(afterBox!.width).toBe(beforeBox!.width);
+    expect(afterBox!.height).toBe(beforeBox!.height);
+    await expect.poll(() => root.evaluate((element) => element.scrollTop)).toBe(0);
+  });
 });
