@@ -172,4 +172,6 @@ I want to continue developing ReverySky in this direction through richer visuali
 
 I’m open to sponsorship, funding, and publishing or marketing partnerships that can help move this work forward.
 
-Contact: [reverysky.journal@proton.me](mailto:reverysky.journal@proton.me)
+Contact:
+* Email: [reverysky.journal@proton.me](mailto:reverysky.journal@proton.me)
+* Reddit: [u/natkorch](https://www.reddit.com/user/natkorch/)
