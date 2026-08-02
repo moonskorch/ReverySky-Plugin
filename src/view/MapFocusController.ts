@@ -80,7 +80,7 @@ export class MapFocusController {
     const focusPath = this.normalizePath(this.deps.getFocusPath());
     if (focusPath === normalizedOldPath) {
       // Rename is the only focus source allowed to outrun the current graph:
-      // the new path-derived id may not exist in MapSession.lastGraphPayload yet.
+      // the new path-derived id may not exist in MapSession.outgoingGraphPayload yet.
       this.deps.requestFocus(normalizedNewPath, { skipGraphCheck: true });
     }
   }

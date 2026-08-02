@@ -98,9 +98,10 @@ export class MapSession {
   private readonly onStateChanged?: (state: Record<string, unknown>, options?: { persist?: boolean }) => void;
   private readonly focus: MapFocusController;
 
+  // Full vault graph snapshot used as the source for filters and suggestions.
   private sourceGraphPayload: GraphPayload | null = null;
-  private lastGraphPayload: GraphPayload | null = null;
-  private pendingGraphPayload: GraphPayload | null = null;
+  // Last effective graph snapshot prepared for Unity, focus checks, and note-open id resolution.
+  private outgoingGraphPayload: GraphPayload | null = null;
   private semanticRefreshPending = false;
   private startupRefreshPending = false;
   private noteSignatureByPath = new Map<string, string>();
@@ -170,7 +171,6 @@ export class MapSession {
     this.refreshActive = true;
     this.bridgeReady = false;
     this.appliedRenderScale = this.renderScale;
-    this.pendingGraphPayload = null;
     this.focus.start(registerEvent);
     this.semanticRefreshPending = false;
     this.startupRefreshPending = false;
@@ -187,11 +187,10 @@ export class MapSession {
     this.sourceGraphPayload = null;
     this.folderPathSuggestions = [];
     this.tagSuggestions = [];
-    this.pendingGraphPayload = null;
     this.focus.reset();
     this.semanticRefreshPending = false;
     this.startupRefreshPending = false;
-    this.lastGraphPayload = null;
+    this.outgoingGraphPayload = null;
     this.focusPath = "";
   }
 
@@ -344,14 +343,11 @@ export class MapSession {
 
   /**
    * Send the current graph after the runtime becomes ready.
-   * Use a queued payload first, then a cached source graph, and rebuild only when neither exists.
+   * Use the cached effective graph first, then a cached source graph, and rebuild only when neither exists.
    */
   flushOrRefresh(): void {
-    if (this.pendingGraphPayload) {
-      const payload = this.pendingGraphPayload;
-      this.pendingGraphPayload = null;
-      this.lastGraphPayload = payload;
-      this.sendGraph(payload);
+    if (this.outgoingGraphPayload) {
+      this.sendGraph(this.outgoingGraphPayload);
     } else if (this.sourceGraphPayload) {
       this.emitGraphFromSource();
     } else {
@@ -365,8 +361,8 @@ export class MapSession {
     const requestedId = typeof payload.id === "string" ? payload.id.trim() : "";
     const requestedPath = typeof payload.path === "string" ? payload.path.trim() : "";
 
-    if (requestedId && this.lastGraphPayload) {
-      const byId = this.lastGraphPayload.notes.find((note) => note.id === requestedId);
+    if (requestedId && this.outgoingGraphPayload) {
+      const byId = this.outgoingGraphPayload.notes.find((note) => note.id === requestedId);
       if (byId?.path?.trim()) {
         return byId.path.replace(/\\/g, "/");
       }
@@ -399,7 +395,7 @@ export class MapSession {
     // renamed graph payload reaches Unity.
     if (!this.bridgeReady ||
         !this.isGraphRelevantPath(path) ||
-        (!options?.skipGraphCheck && !this.isPathInLastGraph(path))) {
+        (!options?.skipGraphCheck && !this.isPathInOutgoingGraph(path))) {
       return false;
     }
 
@@ -411,13 +407,13 @@ export class MapSession {
     return true;
   }
 
-  private isPathInLastGraph(path: string): boolean {
-    if (!this.lastGraphPayload) {
+  private isPathInOutgoingGraph(path: string): boolean {
+    if (!this.outgoingGraphPayload) {
       return false;
     }
 
     const noteId = makeStableNoteId(path);
-    return this.lastGraphPayload.notes.some((note) => {
+    return this.outgoingGraphPayload.notes.some((note) => {
       const notePath = this.normalizeVaultPath(note.path);
       return notePath === path || note.id === noteId;
     });
@@ -575,24 +571,18 @@ export class MapSession {
 
   /**
    * Turn the cached source graph into the effective outgoing payload by applying filters and layout.
-   * The source graph stays untouched here; only the transport-ready snapshot is produced or queued.
+   * The source graph stays untouched here; only the transport-ready snapshot is produced and cached.
    */
   private emitGraphFromSource(): void {
     if (!this.sourceGraphPayload) {
       return;
     }
 
-    const outgoingPayload = this.applyActiveFilters(this.sourceGraphPayload);
-    this.lastGraphPayload = outgoingPayload;
+    this.outgoingGraphPayload = this.applyActiveFilters(this.sourceGraphPayload);
 
-    if (!this.bridgeReady) {
-      // Cache the latest effective graph so the runtime receives the freshest snapshot after handshake.
-      this.pendingGraphPayload = outgoingPayload;
-      return;
+    if (this.bridgeReady) {
+      this.sendGraph(this.outgoingGraphPayload);
     }
-
-    this.pendingGraphPayload = null;
-    this.sendGraph(outgoingPayload);
   }
 
   private applyActiveFilters(payload: GraphPayload): GraphPayload {

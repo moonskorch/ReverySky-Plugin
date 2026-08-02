@@ -1095,6 +1095,51 @@ describe("MapSession", () => {
     expect(updatedPayload.notes.map((note) => note.id)).toEqual(["archive"]);
   });
 
+  it("replays the latest effective graph after the runtime becomes ready again", () => {
+    vi.useFakeTimers();
+
+    const buildGraph = vi.fn().mockReturnValue(makePathPayload());
+    const sendGraph = vi.fn();
+    const session = new MapSession({
+      app: {
+        metadataCache: {
+          on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+        },
+        vault: {
+          on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+        },
+        workspace: {
+          activeLeaf: null,
+          getLeavesOfType: vi.fn().mockReturnValue([]),
+          iterateAllLeaves: vi.fn(),
+          on: vi.fn().mockReturnValue({ id: "event-ref" })
+        }
+      } as never,
+      buildGraph,
+      now: () => 1700000000000,
+      sendGraph,
+      sendFocus: vi.fn()
+    });
+
+    session.start(() => undefined);
+    session.setBridgeReady(true);
+    session.flushOrRefresh();
+
+    session.setFilterQuery("path:archive");
+    vi.advanceTimersByTime(500);
+    session.setMapLayoutPreference("dates");
+
+    session.setBridgeReady(false);
+    session.setBridgeReady(true);
+    session.flushOrRefresh();
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(sendGraph).toHaveBeenCalledTimes(4);
+    const replayedPayload = sendGraph.mock.calls[3]?.[0] as GraphPayload;
+    expect(replayedPayload.notes.map((note) => note.id)).toEqual(["archive"]);
+    expect(replayedPayload.mapLayout).toBe("dates");
+  });
+
   it("registers refresh subscriptions only once across reopen cycles", () => {
     const metadataCacheOn = vi.fn().mockReturnValue({ id: "metadata-event-ref" });
     const vaultOn = vi.fn().mockReturnValue({ id: "vault-event-ref" });
