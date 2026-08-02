@@ -33,8 +33,7 @@ function createSession(app: unknown, payload: GraphPayload) {
     sendFocus: vi.fn()
   });
   session.start(() => undefined);
-  session.setBridgeReady(true);
-  session.flushOrRefresh();
+  session.handleRuntimeReady();
   return session;
 }
 

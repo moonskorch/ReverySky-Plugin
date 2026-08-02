@@ -198,12 +198,13 @@ describe("MapSession", () => {
     expect(sendRuntimeSettings).not.toHaveBeenCalled();
     expect(sendGraph).not.toHaveBeenCalled();
 
-    session.setBridgeReady(true);
-    session.sendCurrentRuntimeSettings();
+    session.handleRuntimeReady();
 
     expect(sendRuntimeSettings).toHaveBeenCalledWith({ frameRateMode: "fps60" });
+    expect(sendGraph).toHaveBeenCalledTimes(1);
 
     sendRuntimeSettings.mockClear();
+    sendGraph.mockClear();
     session.setFrameRateMode("fps24");
 
     expect(sendRuntimeSettings).toHaveBeenCalledWith({ frameRateMode: "fps24" });
@@ -278,8 +279,7 @@ describe("MapSession", () => {
     });
 
     session.start(() => undefined);
-    session.setBridgeReady(true);
-    session.flushOrRefresh();
+    session.handleRuntimeReady();
     expect(buildGraph).toHaveBeenCalledTimes(1);
 
     metadataCallbacks.changed?.(
@@ -311,7 +311,7 @@ describe("MapSession", () => {
     expect(sendGraph).toHaveBeenCalledTimes(2);
   });
 
-  it("queues latest graph before bridge ready and flushes it on ready", () => {
+  it("queues latest graph before bridge ready and sends it on ready", () => {
     vi.useFakeTimers();
 
     const metadataCallbacks: {
@@ -366,8 +366,7 @@ describe("MapSession", () => {
     expect(buildGraph).toHaveBeenCalledTimes(1);
     expect(sendGraph).toHaveBeenCalledTimes(0);
 
-    session.setBridgeReady(true);
-    session.flushOrRefresh();
+    session.handleRuntimeReady();
 
     expect(buildGraph).toHaveBeenCalledTimes(1);
     expect(sendGraph).toHaveBeenCalledTimes(1);
@@ -417,8 +416,7 @@ describe("MapSession", () => {
     });
 
     session.start(() => undefined);
-    session.setBridgeReady(true);
-    session.flushOrRefresh();
+    session.handleRuntimeReady();
     expect(buildGraph).toHaveBeenCalledTimes(1);
     expect(sendGraph).toHaveBeenCalledTimes(1);
 
@@ -565,8 +563,7 @@ describe("MapSession", () => {
     });
 
     session.start(() => undefined);
-    session.setBridgeReady(true);
-    session.flushOrRefresh();
+    session.handleRuntimeReady();
 
     expect(buildGraph).toHaveBeenCalledTimes(1);
     expect(sendGraph).toHaveBeenCalledTimes(1);
@@ -633,8 +630,7 @@ describe("MapSession", () => {
     expect(buildGraph).not.toHaveBeenCalled();
     expect(sendGraph).not.toHaveBeenCalled();
 
-    session.setBridgeReady(true);
-    session.flushOrRefresh();
+    session.handleRuntimeReady();
 
     expect(buildGraph).toHaveBeenCalledTimes(1);
     expect(sendGraph).toHaveBeenCalledTimes(1);
@@ -683,9 +679,8 @@ describe("MapSession", () => {
     });
 
     session.start(() => undefined);
-    session.setBridgeReady(true);
-    session.flushOrRefresh();
-    session.flushOrRefresh();
+    session.handleRuntimeReady();
+    session.handleRuntimeReady();
 
     expect(sendGraph).toHaveBeenCalledTimes(2);
     expect(sendFocus).not.toHaveBeenCalled();
@@ -741,8 +736,7 @@ describe("MapSession", () => {
     });
 
     session.start(() => undefined);
-    session.setBridgeReady(true);
-    session.flushOrRefresh();
+    session.handleRuntimeReady();
 
     app.workspace.activeLeaf = projectLeaf;
     session.requestEditorFocus(projectLeaf.view.file.path);
@@ -791,7 +785,6 @@ describe("MapSession", () => {
     });
 
     session.start(() => undefined);
-    session.flushOrRefresh();
     session.requestEditorFocus("Projects/ReverySky/Spec.md");
 
     expect(sendGraph).not.toHaveBeenCalled();
@@ -829,8 +822,7 @@ describe("MapSession", () => {
     });
 
     session.start(() => undefined);
-    session.setBridgeReady(true);
-    session.flushOrRefresh();
+    session.handleRuntimeReady();
 
     session.setFilterQuery("path:Archive");
     vi.advanceTimersByTime(500);
@@ -891,7 +883,7 @@ describe("MapSession", () => {
     });
 
     session.start(() => undefined);
-    session.setBridgeReady(true);
+    session.handleRuntimeReady();
     session.recordRuntimeFocusPath("Folder/Old.md");
 
     vaultCallbacks.rename?.({ path: "Folder/New.md" }, "Folder/Old.md");
@@ -965,8 +957,7 @@ describe("MapSession", () => {
     });
 
     session.start(() => undefined);
-    session.setBridgeReady(true);
-    session.flushOrRefresh();
+    session.handleRuntimeReady();
     session.requestEditorFocus(oldPath);
     expect(sendFocus).toHaveBeenLastCalledWith({
       id: makeStableNoteId(oldPath),
@@ -1033,13 +1024,13 @@ describe("MapSession", () => {
     });
 
     session.start(() => undefined);
-    session.setBridgeReady(true);
+    session.handleRuntimeReady();
 
     vaultCallbacks.delete?.({ path: "Folder/Deleted.md" });
     activeLeaf.view.file.path = "Folder/Replacement.md";
     vi.advanceTimersByTime(250);
 
-    expect(sendGraph).toHaveBeenCalledTimes(1);
+    expect(sendGraph).toHaveBeenCalledTimes(2);
     expect(sendFocus).not.toHaveBeenCalled();
   });
 
@@ -1076,8 +1067,7 @@ describe("MapSession", () => {
     });
 
     session.start(() => undefined);
-    session.setBridgeReady(true);
-    session.flushOrRefresh();
+    session.handleRuntimeReady();
 
     expect(buildGraph).toHaveBeenCalledTimes(1);
     expect(sendGraph).toHaveBeenCalledTimes(1);
@@ -1122,16 +1112,14 @@ describe("MapSession", () => {
     });
 
     session.start(() => undefined);
-    session.setBridgeReady(true);
-    session.flushOrRefresh();
+    session.handleRuntimeReady();
 
     session.setFilterQuery("path:archive");
     vi.advanceTimersByTime(500);
     session.setMapLayoutPreference("dates");
 
-    session.setBridgeReady(false);
-    session.setBridgeReady(true);
-    session.flushOrRefresh();
+    session.handleRuntimeUnavailable();
+    session.handleRuntimeReady();
 
     expect(buildGraph).toHaveBeenCalledTimes(1);
     expect(sendGraph).toHaveBeenCalledTimes(4);

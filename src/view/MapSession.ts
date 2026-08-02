@@ -194,8 +194,14 @@ export class MapSession {
     this.focusPath = "";
   }
 
-  setBridgeReady(isReady: boolean): void {
-    this.bridgeReady = isReady;
+  handleRuntimeReady(): void {
+    this.bridgeReady = true;
+    this.sendCurrentRuntimeSettings();
+    this.sendInitialRuntimeGraph();
+  }
+
+  handleRuntimeUnavailable(): void {
+    this.bridgeReady = false;
   }
 
   setFilterQuery(query: string): void {
@@ -203,19 +209,19 @@ export class MapSession {
     this.notifyStateChanged({ persist: false });
     const parseResult = GraphPathFilter.parsePathQuery(this.pathFilterQuery);
     this.applyParsedFilterResult(parseResult);
-    this.scheduleFilterRefresh(parseResult.isValid);
+    this.scheduleFilterGraphUpdate(parseResult.isValid);
   }
 
   setShowTags(showTags: boolean): void {
     this.showTags = showTags;
     this.notifyStateChanged();
-    this.emitGraphFromSource();
+    this.sendGraphFromSource();
   }
 
   setMapLayoutPreference(mapLayout: unknown): void {
     this.mapLayout = normalizeMapLayoutPreference(mapLayout);
     this.notifyStateChanged();
-    this.emitGraphFromSource();
+    this.sendGraphFromSource();
   }
 
   setFrameRateMode(frameRateMode: unknown): void {
@@ -237,7 +243,7 @@ export class MapSession {
     return this.renderScale;
   }
 
-  sendCurrentRuntimeSettings(): void {
+  private sendCurrentRuntimeSettings(): void {
     if (!this.bridgeReady) {
       return;
     }
@@ -341,17 +347,14 @@ export class MapSession {
     ];
   }
 
-  /**
-   * Send the current graph after the runtime becomes ready.
-   * Use the cached effective graph first, then a cached source graph, and rebuild only when neither exists.
-   */
-  flushOrRefresh(): void {
+  private sendInitialRuntimeGraph(): void {
     if (this.outgoingGraphPayload) {
       this.sendGraph(this.outgoingGraphPayload);
-    } else if (this.sourceGraphPayload) {
-      this.emitGraphFromSource();
     } else {
-      this.refreshGraphNow();
+      if (!this.sourceGraphPayload) {
+        this.rebuildSourceGraph();
+      }
+      this.sendGraphFromSource();
     }
 
     this.startupRefreshPending = true;
@@ -466,7 +469,7 @@ export class MapSession {
           if (this.semanticRefreshPending) {
             this.semanticRefreshPending = false;
             this.startupRefreshPending = false;
-            this.scheduleGraphRefresh();
+            this.scheduleSourceGraphRebuild();
             return;
           }
 
@@ -475,7 +478,7 @@ export class MapSession {
             // spend it on the next resolved event, but avoiding that would require a graph
             // equality pass for a narrow edge case.
             this.startupRefreshPending = false;
-            this.scheduleGraphRefresh();
+            this.scheduleSourceGraphRebuild();
           }
         })
       );
@@ -487,7 +490,7 @@ export class MapSession {
           if (!this.isGraphRelevantPath(file?.path)) {
             return;
           }
-          this.scheduleGraphRefresh();
+          this.scheduleSourceGraphRebuild();
         })
       );
       registerEvent(
@@ -500,7 +503,7 @@ export class MapSession {
           if (this.focusPath === normalizedPath) {
             this.focusPath = "";
           }
-          this.scheduleGraphRefresh();
+          this.scheduleSourceGraphRebuild();
         })
       );
       registerEvent(
@@ -514,7 +517,7 @@ export class MapSession {
           if (this.isGraphRelevantPath(oldPath)) {
             this.noteSignatureByPath.delete(normalizedOldPath);
           }
-          this.scheduleGraphRefresh();
+          this.scheduleSourceGraphRebuild();
         })
       );
     }
@@ -529,7 +532,7 @@ export class MapSession {
     this.sendStatus?.(METADATA_RESOLVE_STATUS);
   }
 
-  private scheduleGraphRefresh(): void {
+  private scheduleSourceGraphRebuild(): void {
     if (!this.refreshActive) {
       return;
     }
@@ -539,18 +542,22 @@ export class MapSession {
     this.refreshTimer = timerWindow.setTimeout(() => {
       this.refreshTimer = null;
       this.refreshTimerWindow = null;
-      this.refreshGraphNow();
+      this.handleVaultGraphChanged();
     }, GRAPH_REFRESH_DEBOUNCE_MS);
   }
 
-  private refreshGraphNow(): void {
+  private handleVaultGraphChanged(): void {
+    this.rebuildSourceGraph();
+    this.sendGraphFromSource();
+  }
+
+  private rebuildSourceGraph(): void {
     this.sourceGraphPayload = this.buildGraph(this.app);
     this.folderPathSuggestions = this.buildFolderPathSuggestions(this.sourceGraphPayload);
     this.tagSuggestions = this.buildTagSuggestions(this.sourceGraphPayload);
-    this.emitGraphFromSource();
   }
 
-  private scheduleFilterRefresh(shouldEmitGraph: boolean): void {
+  private scheduleFilterGraphUpdate(shouldSendGraph: boolean): void {
     if (!this.refreshActive) {
       this.notifyStateChanged();
       return;
@@ -563,8 +570,8 @@ export class MapSession {
       this.filterInputDebounceTimer = null;
       this.filterInputDebounceTimerWindow = null;
       this.notifyStateChanged();
-      if (shouldEmitGraph) {
-        this.emitGraphFromSource();
+      if (shouldSendGraph) {
+        this.sendGraphFromSource();
       }
     }, FILTER_INPUT_DEBOUNCE_MS);
   }
@@ -573,7 +580,7 @@ export class MapSession {
    * Turn the cached source graph into the effective outgoing payload by applying filters and layout.
    * The source graph stays untouched here; only the transport-ready snapshot is produced and cached.
    */
-  private emitGraphFromSource(): void {
+  private sendGraphFromSource(): void {
     if (!this.sourceGraphPayload) {
       return;
     }

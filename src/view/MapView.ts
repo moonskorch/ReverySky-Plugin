@@ -153,7 +153,7 @@ export class MapView extends ItemView {
     const lifecycleGeneration = ++this.lifecycleGeneration;
     const container = this.contentEl as ObsidianHTMLElement;
     const renderWindow = container.win;
-    this.session.setBridgeReady(false);
+    this.session.handleRuntimeUnavailable();
     this.cancelDeferredIframeRender();
     this.disposeRuntimeFrame();
     this.bridge.detach();
@@ -218,9 +218,7 @@ export class MapView extends ItemView {
           if (lifecycleGeneration !== this.lifecycleGeneration) {
             return;
           }
-          this.session.setBridgeReady(true);
-          this.session.sendCurrentRuntimeSettings();
-          this.session.flushOrRefresh();
+          this.session.handleRuntimeReady();
         },
         onNoteOpen: (payload: NoteOpenPayload) => {
           if (lifecycleGeneration !== this.lifecycleGeneration) {
