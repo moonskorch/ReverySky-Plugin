@@ -8,6 +8,24 @@ if (typeof HTMLElement !== "undefined" && typeof HTMLElement.prototype.createEl 
   };
 }
 
+if (typeof HTMLElement !== "undefined" && typeof HTMLElement.prototype.setCssStyles !== "function") {
+  HTMLElement.prototype.setCssStyles = function (styles: Partial<CSSStyleDeclaration>): void {
+    for (const [property, value] of Object.entries(styles)) {
+      if (typeof value === "string") {
+        this.style.setProperty(property.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`), value);
+      }
+    }
+  };
+}
+
+if (typeof HTMLElement !== "undefined" && typeof HTMLElement.prototype.setCssProps !== "function") {
+  HTMLElement.prototype.setCssProps = function (props: Record<string, string>): void {
+    for (const [property, value] of Object.entries(props)) {
+      this.style.setProperty(property, value);
+    }
+  };
+}
+
 if (typeof Node !== "undefined" && !Object.getOwnPropertyDescriptor(Node.prototype, "win")) {
   Object.defineProperty(Node.prototype, "win", {
     configurable: true,

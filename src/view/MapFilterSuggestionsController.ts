@@ -123,13 +123,14 @@ export class MapFilterSuggestionsController {
     const anchorRect = this.anchorEl.getBoundingClientRect();
     const rootRect = this.rootEl.getBoundingClientRect();
     const gapPx = 4;
-    this.filterSuggestionsEl.style.left = "auto";
-    this.filterSuggestionsEl.style.right = `${rootRect.right - anchorRect.right}px`;
-    this.filterSuggestionsEl.style.top = `${anchorRect.bottom - rootRect.top + gapPx}px`;
-    this.filterSuggestionsEl.style.setProperty(
-      "--reverysky-filter-suggestions-anchor-width",
-      `${anchorRect.width}px`
-    );
+    this.filterSuggestionsEl.setCssStyles({
+      left: "auto",
+      right: `${rootRect.right - anchorRect.right}px`,
+      top: `${anchorRect.bottom - rootRect.top + gapPx}px`
+    });
+    this.filterSuggestionsEl.setCssProps({
+      "--reverysky-filter-suggestions-anchor-width": `${anchorRect.width}px`
+    });
   }
 
   dispose(): void {
@@ -264,7 +265,6 @@ export class MapFilterSuggestionsController {
 
   private applyTagSuggestionOperator(): void {
     const currentValue = this.getQuery();
-    const trimmedCurrent = currentValue.trim();
     const hasActiveTrailingTagOperator = /(^|\s)-?tag:(?:"[^"]*"|[^\s]*)$/i.test(currentValue);
     const nextValue = hasActiveTrailingTagOperator
       ? currentValue
@@ -609,7 +609,7 @@ export class MapFilterSuggestionsController {
       return [];
     }
 
-    return Array.from(this.filterSuggestionsListboxEl.querySelectorAll('[role="option"]')) as HTMLElement[];
+    return Array.from(this.filterSuggestionsListboxEl.querySelectorAll<HTMLElement>('[role="option"]'));
   }
 
   private syncFilterSuggestionActiveState(): void {
