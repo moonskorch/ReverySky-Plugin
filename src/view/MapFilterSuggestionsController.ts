@@ -123,13 +123,17 @@ export class MapFilterSuggestionsController {
     const anchorRect = this.anchorEl.getBoundingClientRect();
     const rootRect = this.rootEl.getBoundingClientRect();
     const gapPx = 4;
+    const rootPaddingPx = 8;
+    const maxHeight = Math.max(0, rootRect.bottom - anchorRect.bottom - gapPx - rootPaddingPx);
+
     this.filterSuggestionsEl.setCssStyles({
       left: "auto",
       right: `${rootRect.right - anchorRect.right}px`,
       top: `${anchorRect.bottom - rootRect.top + gapPx}px`
     });
     this.filterSuggestionsEl.setCssProps({
-      "--reverysky-filter-suggestions-anchor-width": `${anchorRect.width}px`
+      "--reverysky-filter-suggestions-anchor-width": `${anchorRect.width}px`,
+      "--reverysky-filter-suggestions-max-height": `${maxHeight}px`
     });
   }
 

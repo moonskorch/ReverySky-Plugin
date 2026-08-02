@@ -166,6 +166,7 @@ describe("MapFilterPanelController", () => {
     expect(suggestions.style.top).toBe("68px");
     expect(suggestions.style.width).toBe("");
     expect(suggestions.style.getPropertyValue("--reverysky-filter-suggestions-anchor-width")).toBe("280px");
+    expect(suggestions.style.getPropertyValue("--reverysky-filter-suggestions-max-height")).toBe("364px");
   });
 
   it("filters every suggestion list to prefix matches while typing", () => {

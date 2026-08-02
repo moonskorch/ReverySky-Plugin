@@ -106,10 +106,16 @@ test.describe("filter suggestions", () => {
 
       const anchorRect = anchor.getBoundingClientRect();
       const rootRect = root.getBoundingClientRect();
+      const gapPx = 4;
+      const rootPaddingPx = 8;
       suggestions.style.left = "auto";
       suggestions.style.right = `${rootRect.right - anchorRect.right}px`;
-      suggestions.style.top = `${anchorRect.bottom - rootRect.top + 4}px`;
+      suggestions.style.top = `${anchorRect.bottom - rootRect.top + gapPx}px`;
       suggestions.style.setProperty("--reverysky-filter-suggestions-anchor-width", `${anchorRect.width}px`);
+      suggestions.style.setProperty(
+        "--reverysky-filter-suggestions-max-height",
+        `${Math.max(0, rootRect.bottom - anchorRect.bottom - gapPx - rootPaddingPx)}px`
+      );
     });
 
     const anchorBox = await page.locator("[data-suggestions-anchor]").boundingBox();
