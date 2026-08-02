@@ -69,8 +69,10 @@ export class Plugin {
 export class ItemView {
   public contentEl: HTMLElement;
   public app: unknown;
+  public leaf: unknown;
 
   constructor(leaf: { app?: unknown }) {
+    this.leaf = leaf;
     this.app = leaf?.app ?? {};
     this.contentEl = document.createElement("div");
   }

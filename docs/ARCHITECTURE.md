@@ -28,6 +28,7 @@ Main system parts:
 
 - Graph view shell
   Creates the iframe, wires the bridge lifecycle, and delegates filter UI and note-open routing to focused collaborators.
+  The Obsidian view sets `navigation = true` so the workspace treats ReverySky as graph-like navigable content rather than a static utility pane.
   Main code: `src/view/MapView.ts`
   Depends on: `MapSession`, `MapFilterPanelController`, `MapNoteOpenRouter`, `UnityIframeBridge`
 
