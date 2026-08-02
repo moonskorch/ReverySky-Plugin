@@ -120,6 +120,27 @@ describe("MapFilterPanelController", () => {
     expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
   });
 
+  it("uses unique suggestion list ids for separate controller instances", () => {
+    const firstController = new MapFilterPanelController(createSession());
+    const secondController = new MapFilterPanelController(createSession());
+    const firstContainer = createObsidianTestContainer();
+    const secondContainer = createObsidianTestContainer();
+    firstController.render(firstContainer);
+    secondController.render(secondContainer);
+
+    const firstInput = firstContainer.querySelector("input.search-input") as HTMLInputElement;
+    const secondInput = secondContainer.querySelector("input.search-input") as HTMLInputElement;
+    firstInput.dispatchEvent(new Event("focus"));
+    secondInput.dispatchEvent(new Event("focus"));
+
+    const firstListbox = firstContainer.querySelector('[role="listbox"]') as HTMLElement;
+    const secondListbox = secondContainer.querySelector('[role="listbox"]') as HTMLElement;
+
+    expect(firstListbox.id).not.toBe(secondListbox.id);
+    expect(firstInput.getAttribute("aria-controls")).toBe(firstListbox.id);
+    expect(secondInput.getAttribute("aria-controls")).toBe(secondListbox.id);
+  });
+
   it("renders suggestions outside the scrollable panel and positions them from the search area", () => {
     const session = createSession();
     const controller = new MapFilterPanelController(session);
@@ -147,41 +168,235 @@ describe("MapFilterPanelController", () => {
     expect(suggestions.style.getPropertyValue("--reverysky-filter-suggestions-anchor-width")).toBe("280px");
   });
 
-  it("keeps every suggestion mode in the shared overlay while typing operator prefixes", () => {
+  it("filters every suggestion list to prefix matches while typing", () => {
     const session = createSession();
     const controller = new MapFilterPanelController(session);
     const container = createObsidianTestContainer();
     controller.render(container);
 
-    const root = container.querySelector(".reverysky-map-root") as HTMLElement;
-    const panel = container.querySelector(".reverysky-map-filter-panel") as HTMLElement;
     const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
-    const suggestions = container.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
-
-    const expectSharedOverlay = (expectedText: string) => {
-      expect(container.querySelectorAll(".reverysky-map-filter-suggestions")).toHaveLength(1);
-      expect(panel.contains(suggestions)).toBe(false);
-      expect(root.contains(suggestions)).toBe(true);
-      expect(suggestions.textContent).toContain(expectedText);
-    };
 
     searchInput.dispatchEvent(new Event("focus"));
-    expectSharedOverlay("Search settings");
+    expect(container.querySelectorAll(".reverysky-map-filter-suggestion-option")).toHaveLength(3);
+
+    searchInput.value = "pa";
+    searchInput.dispatchEvent(new Event("input"));
+    expect(container.querySelectorAll(".reverysky-map-filter-suggestion-option")).toHaveLength(1);
+    const pathOperatorOption = container.querySelector(".reverysky-map-filter-suggestion-option") as HTMLElement;
+    expect(pathOperatorOption.textContent).toContain("path:");
+    pathOperatorOption.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    expect(searchInput.value).toBe("path:");
+
+    searchInput.value = "path:Pr";
+    searchInput.dispatchEvent(new Event("input"));
+    const folderOptions = Array.from(container.querySelectorAll(".reverysky-map-folder-suggestion-option"));
+    expect(folderOptions.length).toBeGreaterThan(0);
+    expect(folderOptions.every((option) => option.textContent?.toLowerCase().startsWith("projects"))).toBe(true);
 
     searchInput.value = "path:";
     searchInput.dispatchEvent(new Event("input"));
-    expectSharedOverlay("Folders");
+    expect(container.textContent).toContain("Folders");
+    expect(container.querySelectorAll(".reverysky-map-folder-suggestion-option").length).toBeGreaterThan(0);
 
-    searchInput.value = "date:";
+    searchInput.value = "tag:#wo";
     searchInput.dispatchEvent(new Event("input"));
-    expectSharedOverlay("Date presets");
+    const tagOptions = Array.from(container.querySelectorAll(".reverysky-map-tag-suggestion-option"));
+    expect(tagOptions).toHaveLength(1);
+    expect(tagOptions[0]?.textContent).toBe("#work/subtag");
 
-    searchInput.value = "tag:";
+    searchInput.value = "date:to";
     searchInput.dispatchEvent(new Event("input"));
-    expectSharedOverlay("Tags");
+    const dateOptions = Array.from(container.querySelectorAll(".reverysky-map-date-suggestion-option"));
+    expect(dateOptions).toHaveLength(1);
+    expect(dateOptions[0]?.textContent).toContain("today");
+    expect(container.textContent).not.toContain("one week ago");
+
+    searchInput.value = "tag:#work pa";
+    searchInput.dispatchEvent(new Event("input"));
+    expect(container.querySelectorAll(".reverysky-map-filter-suggestion-option")).toHaveLength(1);
+    expect(container.querySelector(".reverysky-map-filter-suggestion-option")?.textContent).toContain("path:");
   });
 
-  it("clears query and hides suggestions on Escape", async () => {
+  it("replaces typed root prefixes when applying operator suggestions", () => {
+    const expectRootPrefixReplacement = (prefix: string, expectedValue: string) => {
+      const session = createSession();
+      const controller = new MapFilterPanelController(session);
+      const container = createObsidianTestContainer();
+      controller.render(container);
+
+      const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
+      searchInput.dispatchEvent(new Event("focus"));
+      searchInput.value = prefix;
+      searchInput.dispatchEvent(new Event("input"));
+
+      const option = container.querySelector(".reverysky-map-filter-suggestion-option") as HTMLElement;
+      expect(option.textContent).toContain(expectedValue);
+      option.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+      expect(searchInput.value).toBe(expectedValue);
+      expect(session.getState()).toMatchObject({ pathFilterQuery: expectedValue });
+    };
+
+    expectRootPrefixReplacement("pa", "path:");
+    expectRootPrefixReplacement("da", "date:");
+    expectRootPrefixReplacement("ta", "tag:");
+  });
+
+  it("returns to root suggestions when the active query ends with a trailing space", () => {
+    const session = createSession();
+    const controller = new MapFilterPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
+    searchInput.dispatchEvent(new Event("focus"));
+    searchInput.value = "tag:#work ";
+    searchInput.dispatchEvent(new Event("input"));
+
+    expect(container.textContent).toContain("Search settings");
+    expect(container.querySelectorAll(".reverysky-map-filter-suggestion-option")).toHaveLength(3);
+    expect(container.querySelectorAll(".reverysky-map-tag-suggestion-option")).toHaveLength(0);
+  });
+
+  it("filters date presets by the active trailing date term in mixed queries", () => {
+    const session = createSession();
+    const controller = new MapFilterPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
+    searchInput.value = "path:Projects date:to";
+    searchInput.dispatchEvent(new Event("input"));
+
+    const dateOptions = Array.from(container.querySelectorAll(".reverysky-map-date-suggestion-option"));
+    expect(container.textContent).toContain("Date presets");
+    expect(dateOptions).toHaveLength(1);
+    expect(dateOptions[0]?.textContent).toContain("today");
+    expect(container.textContent).not.toContain("one week ago");
+  });
+
+  it("highlights the first root suggestion on open and moves with arrow keys", () => {
+    const session = createSession();
+    const controller = new MapFilterPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
+    searchInput.dispatchEvent(new Event("focus"));
+
+    const suggestions = container.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
+    const listbox = container.querySelector('[role="listbox"]') as HTMLElement;
+    const rootOptions = container.querySelectorAll(".reverysky-map-filter-suggestion-option");
+    expect(rootOptions).toHaveLength(3);
+    expect(searchInput.getAttribute("role")).toBe("combobox");
+    expect(searchInput.getAttribute("aria-haspopup")).toBe("listbox");
+    expect(searchInput.getAttribute("aria-autocomplete")).toBe("list");
+    expect(searchInput.getAttribute("aria-controls")).toBe(listbox.id);
+    expect(searchInput.getAttribute("aria-expanded")).toBe("true");
+    expect(suggestions.hasAttribute("role")).toBe(false);
+    expect(listbox.getAttribute("role")).toBe("listbox");
+    expect(listbox.contains(rootOptions[0])).toBe(true);
+    expect(rootOptions[0].getAttribute("role")).toBe("option");
+    expect(rootOptions[0].getAttribute("aria-selected")).toBe("true");
+    expect(rootOptions[1].getAttribute("aria-selected")).toBe("false");
+    expect(searchInput.getAttribute("aria-activedescendant")).toBe((rootOptions[0] as HTMLElement).id);
+    expect(rootOptions[0].classList.contains("reverysky-map-filter-suggestion-option--active")).toBe(true);
+    expect(rootOptions[1].classList.contains("reverysky-map-filter-suggestion-option--active")).toBe(false);
+
+    searchInput.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+
+    expect(rootOptions[0].classList.contains("reverysky-map-filter-suggestion-option--active")).toBe(false);
+    expect(rootOptions[1].classList.contains("reverysky-map-filter-suggestion-option--active")).toBe(true);
+    expect(rootOptions[0].getAttribute("aria-selected")).toBe("false");
+    expect(rootOptions[1].getAttribute("aria-selected")).toBe("true");
+    expect(searchInput.getAttribute("aria-activedescendant")).toBe((rootOptions[1] as HTMLElement).id);
+  });
+
+  it("opens hidden suggestions from arrow keys", () => {
+    const createOpenController = () => {
+      const session = createSession();
+      const controller = new MapFilterPanelController(session);
+      const container = createObsidianTestContainer();
+      controller.render(container);
+
+      const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
+      const suggestions = container.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
+      searchInput.dispatchEvent(new Event("focus"));
+      searchInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
+
+      return { container, searchInput, suggestions };
+    };
+
+    const downCase = createOpenController();
+    downCase.searchInput.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    const downOptions = downCase.container.querySelectorAll(".reverysky-map-filter-suggestion-option");
+    expect(downCase.suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(false);
+    expect(downOptions[0].getAttribute("aria-selected")).toBe("true");
+    expect(downCase.searchInput.getAttribute("aria-activedescendant")).toBe((downOptions[0] as HTMLElement).id);
+
+    const upCase = createOpenController();
+    upCase.searchInput.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+    const upOptions = upCase.container.querySelectorAll(".reverysky-map-filter-suggestion-option");
+    expect(upCase.suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(false);
+    expect(upOptions[upOptions.length - 1].getAttribute("aria-selected")).toBe("true");
+    expect(upCase.searchInput.getAttribute("aria-activedescendant")).toBe(
+      (upOptions[upOptions.length - 1] as HTMLElement).id
+    );
+  });
+
+  it("keeps empty hints outside options and clears active descendant for empty suggestion lists", () => {
+    const expectEmptyState = (query: string, hint: string) => {
+      const session = createSession();
+      const controller = new MapFilterPanelController(session);
+      const container = createObsidianTestContainer();
+      controller.render(container);
+
+      const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
+      searchInput.dispatchEvent(new Event("focus"));
+      expect(searchInput.hasAttribute("aria-activedescendant")).toBe(true);
+
+      searchInput.value = query;
+      searchInput.dispatchEvent(new Event("input"));
+
+      const listbox = container.querySelector('[role="listbox"]') as HTMLElement;
+      const emptyHint = container.querySelector(".reverysky-map-suggestion-empty") as HTMLElement;
+      expect(emptyHint.textContent).toBe(hint);
+      expect(emptyHint.getAttribute("role")).not.toBe("option");
+      expect(listbox.querySelectorAll('[role="option"]')).toHaveLength(0);
+      expect(searchInput.hasAttribute("aria-activedescendant")).toBe(false);
+    };
+
+    expectEmptyState("zz", "No matches found");
+    expectEmptyState("path:NoSuchFolder", "No folders found");
+    expectEmptyState("tag:#nosuchtag", "No tags found");
+    expectEmptyState("date:never", "No presets found");
+  });
+
+  it("highlights the first item in each second-level suggestion list", () => {
+    const expectFirstItemActive = (operatorIndex: number, selector: string) => {
+      const session = createSession();
+      const controller = new MapFilterPanelController(session);
+      const container = createObsidianTestContainer();
+      controller.render(container);
+
+      const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
+      searchInput.dispatchEvent(new Event("focus"));
+
+      const rootOptions = container.querySelectorAll(".reverysky-map-filter-suggestion-option");
+      (rootOptions[operatorIndex] as HTMLElement).dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+      const options = container.querySelectorAll(selector);
+      expect(options.length).toBeGreaterThan(0);
+      expect(options[0].classList.contains("reverysky-map-filter-suggestion-option--active")).toBe(true);
+    };
+
+    expectFirstItemActive(0, ".reverysky-map-folder-suggestion-option");
+    expectFirstItemActive(1, ".reverysky-map-date-suggestion-option");
+    expectFirstItemActive(2, ".reverysky-map-tag-suggestion-option");
+  });
+
+  it("hides open suggestions before clearing query and reopening root suggestions on Escape", async () => {
     vi.useFakeTimers();
 
     const session = createSession();
@@ -197,9 +412,19 @@ describe("MapFilterPanelController", () => {
     expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(false);
 
     searchInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(searchInput.value).toBe("tag:#project");
+    expect(session.getState()).toMatchObject({ pathFilterQuery: "tag:#project" });
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
+    expect(searchInput.getAttribute("aria-expanded")).toBe("false");
+    expect(searchInput.hasAttribute("aria-activedescendant")).toBe(false);
+
+    searchInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     expect(searchInput.value).toBe("");
     expect(session.getState()).toMatchObject({ pathFilterQuery: "" });
-    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(false);
+    expect(searchInput.getAttribute("aria-expanded")).toBe("true");
+    expect(searchInput.hasAttribute("aria-activedescendant")).toBe(true);
+    expect(suggestions.textContent).toContain("Search settings");
   });
 
   it("applies operator and value suggestions to the active query", () => {
@@ -218,8 +443,102 @@ describe("MapFilterPanelController", () => {
     controller.refreshSuggestions();
     const folderOptions = container.querySelectorAll(".reverysky-map-folder-suggestion-option");
     (folderOptions[0] as HTMLElement).dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-    expect(searchInput.value.startsWith("path:")).toBe(true);
+    expect(searchInput.value).toBe("path:Archive ");
     expect(searchInput.value).toContain("Archive");
+  });
+
+  it("scrolls the active long-list suggestion into view while navigating with arrows", () => {
+    const session = createSession();
+    vi.spyOn(session, "getFolderSuggestions").mockReturnValue(
+      Array.from({ length: 14 }, (_value, index) => ({
+        path: `Long/Folder-${String(index + 1).padStart(2, "0")}`,
+        normalizedPath: `long/folder-${String(index + 1).padStart(2, "0")}`,
+        count: 1,
+        depth: 2
+      }))
+    );
+
+    const scrollCalls: string[] = [];
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value(this: HTMLElement) {
+        scrollCalls.push(this.textContent ?? "");
+      }
+    });
+
+    try {
+      const controller = new MapFilterPanelController(session);
+      const container = createObsidianTestContainer();
+      controller.render(container);
+
+      const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
+      searchInput.dispatchEvent(new Event("focus"));
+
+      const operatorOptions = container.querySelectorAll(".reverysky-map-filter-suggestion-option");
+      (operatorOptions[0] as HTMLElement).dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      expect(scrollCalls.at(-1)).toContain("Long/Folder-01");
+
+      scrollCalls.length = 0;
+      searchInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      searchInput.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+      expect(scrollCalls.at(-1)).toContain("Long/Folder-14");
+
+      scrollCalls.length = 0;
+      searchInput.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+      expect(scrollCalls.at(-1)).toContain("Long/Folder-13");
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+        configurable: true,
+        value: originalScrollIntoView
+      });
+    }
+  });
+
+  it("returns to the root suggestion pane after selecting a second-level item with Enter", () => {
+    const session = createSession();
+    const controller = new MapFilterPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
+    searchInput.dispatchEvent(new Event("focus"));
+
+    const operatorOptions = container.querySelectorAll(".reverysky-map-filter-suggestion-option");
+    (operatorOptions[0] as HTMLElement).dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+    searchInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+
+    const rootOptions = container.querySelectorAll(".reverysky-map-filter-suggestion-option");
+    expect(rootOptions).toHaveLength(3);
+    expect(container.querySelectorAll(".reverysky-map-folder-suggestion-option")).toHaveLength(0);
+    expect(container.textContent).toContain("Search settings");
+    expect(searchInput.value.startsWith("path:")).toBe(true);
+  });
+
+  it("redraws suggestions once when moving between filter levels", () => {
+    const session = createSession();
+    const controller = new MapFilterPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
+    searchInput.dispatchEvent(new Event("focus"));
+
+    const suggestions = container.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
+    const redrawSpy = vi.spyOn(suggestions, "replaceChildren");
+    const operatorOptions = container.querySelectorAll(".reverysky-map-filter-suggestion-option");
+    (operatorOptions[0] as HTMLElement).dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+    expect(redrawSpy).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain("Folders");
+
+    redrawSpy.mockClear();
+    const folderOptions = container.querySelectorAll(".reverysky-map-folder-suggestion-option");
+    (folderOptions[0] as HTMLElement).dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+    expect(redrawSpy).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain("Search settings");
   });
 
   it("syncs restored session state into the input, message, toggle, and dropdown", async () => {

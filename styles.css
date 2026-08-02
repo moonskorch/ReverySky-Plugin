@@ -587,6 +587,18 @@ button.reverysky-map-tags-toggle .reverysky-map-tags-toggle-thumb {
   border-color: var(--reverysky-control-border-hover);
 }
 
+.reverysky-map-filter-suggestion-option--active,
+.reverysky-map-filter-suggestion-option--active:hover,
+.reverysky-map-date-suggestion-option--active,
+.reverysky-map-date-suggestion-option--active:hover,
+.reverysky-map-folder-suggestion-option--active,
+.reverysky-map-folder-suggestion-option--active:hover,
+.reverysky-map-tag-suggestion-option--active,
+.reverysky-map-tag-suggestion-option--active:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--reverysky-control-border-hover);
+}
+
 .reverysky-map-filter-suggestion-option--stacked {
   margin-top: 0.25rem;
 }

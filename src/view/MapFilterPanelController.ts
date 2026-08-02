@@ -7,26 +7,18 @@ import {
   MapSession,
   RENDER_SCALE_STEP
 } from "./MapSession";
+import { MapFilterSuggestionsController } from "./MapFilterSuggestionsController";
 
-const FILTER_SUGGESTIONS_HIDE_DELAY_MS = 120;
 type ObsidianHTMLElement = HTMLElement & {
   createEl: <K extends keyof HTMLElementTagNameMap>(tagName: K) => HTMLElementTagNameMap[K];
   setAttr?: (name: string, value: string) => void;
 };
 
-// 0..3 map to the default, path, date, and tag suggestion panes.
-type FilterSuggestionMode = 0 | 1 | 2 | 3;
-
 /**
  * Owns the filter-panel UI state machine and keeps the DOM synchronized with `MapSession`.
  */
 export class MapFilterPanelController {
-  private filterSuggestionsHideTimer: number | null = null;
-  private filterSuggestionsHideTimerWindow: Window | null = null;
   private filterMessageEl: HTMLElement | null = null;
-  private filterSuggestionsEl: HTMLElement | null = null;
-  private filterSuggestionsAnchorEl: HTMLElement | null = null;
-  private filterSuggestionsRootEl: HTMLElement | null = null;
   private filterPanelEl: HTMLElement | null = null;
   private filterToggleButtonEl: HTMLButtonElement | null = null;
   private settingsSectionEl: HTMLElement | null = null;
@@ -41,8 +33,8 @@ export class MapFilterPanelController {
   private renderScaleInputEl: HTMLInputElement | null = null;
   private renderScaleValueEl: HTMLElement | null = null;
   private renderScaleMessageEl: HTMLElement | null = null;
-  private filterSuggestionMode: FilterSuggestionMode = 0;
   private searchComponent: SearchComponent | null = null;
+  private filterSuggestionsController: MapFilterSuggestionsController | null = null;
   private filterPanelOpen = false;
   private settingsSectionCollapsed = true;
   private graphicsSectionCollapsed = true;
@@ -93,7 +85,7 @@ export class MapFilterPanelController {
     filterContainer.className = "reverysky-map-filter-panel";
     this.filterPanelEl = filterContainer;
     filterContainer.addEventListener("scroll", () => {
-      this.positionFilterSuggestions();
+      this.filterSuggestionsController?.position();
     });
 
     const filterSection = createChild(filterContainer as ObsidianHTMLElement, "div");
@@ -142,7 +134,6 @@ export class MapFilterPanelController {
 
     const filterSearchArea = createChild(filterSectionContent as ObsidianHTMLElement, "div");
     filterSearchArea.className = "reverysky-map-filter-search-area";
-    this.filterSuggestionsAnchorEl = filterSearchArea;
 
     const filterSearchLabel = createChild(filterSearchArea as ObsidianHTMLElement, "div");
     filterSearchLabel.className = "reverysky-map-filter-field-label";
@@ -151,35 +142,25 @@ export class MapFilterPanelController {
     const searchHost = createChild(filterSearchArea as ObsidianHTMLElement, "div");
     this.searchComponent = new SearchComponent(searchHost);
     this.searchComponent.setPlaceholder("Search in...");
-    this.searchComponent.onChange((value) => {
-      this.onPathFilterInputChanged(value);
-    });
-    this.searchComponent.inputEl.setAttribute("aria-label", "Search in filter");
-    this.searchComponent.inputEl.addEventListener("focus", () => {
-      this.showFilterSuggestions(this.resolveAutoSuggestionMode());
-    });
-    this.searchComponent.inputEl.addEventListener("click", () => {
-      this.showFilterSuggestions(this.resolveAutoSuggestionMode());
-    });
-    this.searchComponent.inputEl.addEventListener("blur", () => {
-      this.scheduleHideFilterSuggestions();
-    });
-    this.searchComponent.inputEl.addEventListener("keydown", (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        if (this.searchComponent) {
-          this.searchComponent.setValue("");
-        }
-        this.onPathFilterInputChanged("");
-        this.hideFilterSuggestions();
+    this.filterSuggestionsController = new MapFilterSuggestionsController({
+      session: this.session,
+      inputEl: this.searchComponent.inputEl,
+      rootEl: root,
+      anchorEl: filterSearchArea,
+      getQuery: () => this.searchComponent?.getValue() ?? this.session.getFilterUiState().pathFilterQuery,
+      setQueryValue: (value) => {
+        this.searchComponent?.setValue(value);
+      },
+      commitQuery: (query) => {
+        this.commitPathFilterQuery(query);
+      },
+      openPanel: () => {
+        this.setFilterPanelOpen(true);
       }
     });
-
-    this.filterSuggestionsRootEl = root;
-    this.filterSuggestionsEl = createChild(root, "div");
-    this.filterSuggestionsEl.className =
-      "reverysky-map-filter-suggestions reverysky-map-filter-suggestions--overlay";
-    this.filterSuggestionsEl.classList.add("reverysky-map-filter-suggestions--hidden");
+    this.searchComponent.onChange((value) => {
+      this.filterSuggestionsController?.handleInputChanged(value);
+    });
 
     this.filterMessageEl = createChild(filterSectionContent as ObsidianHTMLElement, "div");
     this.filterMessageEl.className = "reverysky-map-filter-message";
@@ -338,39 +319,14 @@ export class MapFilterPanelController {
   }
 
   refreshSuggestions(): void {
-    if (!this.filterSuggestionsEl) {
-      return;
-    }
-
-    // The controller renders suggestion DOM, but the ranked suggestion data comes from the session cache.
-    this.filterSuggestionsEl.replaceChildren();
-    if (this.filterSuggestionMode === 1) {
-      const currentQuery =
-        this.searchComponent?.getValue() ?? this.session.getFilterUiState().pathFilterQuery;
-      this.renderFolderSuggestions(this.filterSuggestionsEl, currentQuery);
-      return;
-    }
-    if (this.filterSuggestionMode === 2) {
-      this.renderDateSuggestions(this.filterSuggestionsEl);
-      return;
-    }
-    if (this.filterSuggestionMode === 3) {
-      const currentQuery =
-        this.searchComponent?.getValue() ?? this.session.getFilterUiState().pathFilterQuery;
-      this.renderTagSuggestions(this.filterSuggestionsEl, currentQuery);
-      return;
-    }
-
-    this.renderOperatorSuggestions(this.filterSuggestionsEl);
+    this.filterSuggestionsController?.refresh();
   }
 
   dispose(): void {
-    this.clearFilterSuggestionsHideTimer();
+    this.filterSuggestionsController?.dispose();
+    this.filterSuggestionsController = null;
     this.searchComponent = null;
     this.filterMessageEl = null;
-    this.filterSuggestionsEl = null;
-    this.filterSuggestionsAnchorEl = null;
-    this.filterSuggestionsRootEl = null;
     this.filterPanelEl = null;
     this.filterToggleButtonEl = null;
     this.settingsSectionEl = null;
@@ -385,7 +341,6 @@ export class MapFilterPanelController {
     this.renderScaleInputEl = null;
     this.renderScaleValueEl = null;
     this.renderScaleMessageEl = null;
-    this.filterSuggestionMode = 0;
     this.filterPanelOpen = false;
     this.settingsSectionCollapsed = true;
     this.graphicsSectionCollapsed = true;
@@ -400,7 +355,7 @@ export class MapFilterPanelController {
     this.filterPanelEl.classList.toggle("reverysky-map-filter-panel--closed", !isOpen);
     this.filterToggleButtonEl.classList.toggle("reverysky-map-filter-toggle--hidden", isOpen);
     if (!isOpen) {
-      this.hideFilterSuggestions();
+      this.filterSuggestionsController?.hide();
     }
   }
 
@@ -422,7 +377,7 @@ export class MapFilterPanelController {
   private setSettingsSectionCollapsed(isCollapsed: boolean): void {
     this.settingsSectionCollapsed = isCollapsed;
     if (isCollapsed) {
-      this.hideFilterSuggestions();
+      this.filterSuggestionsController?.hide();
     }
     this.refreshCollapsibleSections();
   }
@@ -462,358 +417,9 @@ export class MapFilterPanelController {
     toggleButton?.setAttribute("aria-label", `${isCollapsed ? "Expand" : "Collapse"} ${label}`);
   }
 
-  private onPathFilterInputChanged(nextQuery: string): void {
+  private commitPathFilterQuery(nextQuery: string): void {
     this.session.setFilterQuery(nextQuery);
     this.refreshFilterMessage();
-
-    const autoSuggestionMode = this.resolveAutoSuggestionMode();
-    if (autoSuggestionMode !== 0) {
-      this.showFilterSuggestions(autoSuggestionMode);
-      return;
-    }
-
-    if (
-      this.filterSuggestionsEl &&
-      !this.filterSuggestionsEl.classList.contains("reverysky-map-filter-suggestions--hidden")
-    ) {
-      this.filterSuggestionMode = 0;
-      this.refreshSuggestions();
-    }
-  }
-
-  private showFilterSuggestions(mode: FilterSuggestionMode): void {
-    if (!this.filterSuggestionsEl || !this.searchComponent) {
-      return;
-    }
-
-    this.filterSuggestionMode = mode;
-    this.setFilterPanelOpen(true);
-    this.refreshSuggestions();
-    this.clearFilterSuggestionsHideTimer();
-    this.positionFilterSuggestions();
-    this.filterSuggestionsEl.classList.remove("reverysky-map-filter-suggestions--hidden");
-  }
-
-  private resolveAutoSuggestionMode(): FilterSuggestionMode {
-    const uiState = this.session.getFilterUiState();
-    const currentQuery =
-      this.searchComponent?.inputEl?.value ?? this.searchComponent?.getValue() ?? uiState.pathFilterQuery;
-    if (/\s$/.test(currentQuery)) {
-      return 0;
-    }
-    if (/(^|\s)-?path:(?:"[^"]*"|[^\s]*)$/i.test(currentQuery)) {
-      return 1;
-    }
-    if (/(^|\s)-?date:[^\s]*$/i.test(currentQuery)) {
-      return 2;
-    }
-    if (/(^|\s)-?tag:(?:"[^"]*"|[^\s]*)$/i.test(currentQuery)) {
-      return 3;
-    }
-    return 0;
-  }
-
-  private scheduleHideFilterSuggestions(): void {
-    this.clearFilterSuggestionsHideTimer();
-    const timerWindow = this.filterSuggestionsEl?.ownerDocument.defaultView ?? window;
-    this.filterSuggestionsHideTimerWindow = timerWindow;
-    this.filterSuggestionsHideTimer = timerWindow.setTimeout(() => {
-      this.filterSuggestionsHideTimer = null;
-      this.filterSuggestionsHideTimerWindow = null;
-      this.hideFilterSuggestions();
-    }, FILTER_SUGGESTIONS_HIDE_DELAY_MS);
-  }
-
-  private hideFilterSuggestions(): void {
-    if (!this.filterSuggestionsEl) {
-      return;
-    }
-
-    this.filterSuggestionMode = 0;
-    this.filterSuggestionsEl.classList.add("reverysky-map-filter-suggestions--hidden");
-  }
-
-  private positionFilterSuggestions(): void {
-    if (!this.filterSuggestionsEl || !this.filterSuggestionsAnchorEl || !this.filterSuggestionsRootEl) {
-      return;
-    }
-
-    const anchorRect = this.filterSuggestionsAnchorEl.getBoundingClientRect();
-    const rootRect = this.filterSuggestionsRootEl.getBoundingClientRect();
-    const gapPx = 4;
-    this.filterSuggestionsEl.style.left = "auto";
-    this.filterSuggestionsEl.style.right = `${rootRect.right - anchorRect.right}px`;
-    this.filterSuggestionsEl.style.top = `${anchorRect.bottom - rootRect.top + gapPx}px`;
-    this.filterSuggestionsEl.style.setProperty(
-      "--reverysky-filter-suggestions-anchor-width",
-      `${anchorRect.width}px`
-    );
-  }
-
-  private applyPathSuggestionOperator(): void {
-    if (!this.searchComponent) {
-      return;
-    }
-
-    const currentValue = this.searchComponent.getValue();
-    const trimmedCurrent = currentValue.trim();
-    const alreadyContainsPathOperator = /(^|\s)-?path:/i.test(trimmedCurrent);
-    const nextValue = alreadyContainsPathOperator
-      ? currentValue
-      : trimmedCurrent.length === 0
-        ? "path:"
-        : `${currentValue}${/\s$/.test(currentValue) ? "" : " "}path:`;
-
-    this.searchComponent.setValue(nextValue);
-    this.onPathFilterInputChanged(nextValue);
-    this.showFilterSuggestions(1);
-  }
-
-  private applyDateSuggestionOperator(): void {
-    if (!this.searchComponent) {
-      return;
-    }
-
-    const currentValue = this.searchComponent.getValue();
-    const trimmedCurrent = currentValue.trim();
-    const alreadyContainsDateOperator = /(^|\s)-?date:/i.test(trimmedCurrent);
-    const nextValue = alreadyContainsDateOperator
-      ? currentValue
-      : trimmedCurrent.length === 0
-        ? "date:"
-        : `${currentValue}${/\s$/.test(currentValue) ? "" : " "}date:`;
-
-    this.searchComponent.setValue(nextValue);
-    this.onPathFilterInputChanged(nextValue);
-    this.showFilterSuggestions(2);
-  }
-
-  private applyTagSuggestionOperator(): void {
-    if (!this.searchComponent) {
-      return;
-    }
-
-    const currentValue = this.searchComponent.getValue();
-    const trimmedCurrent = currentValue.trim();
-    const hasActiveTrailingTagOperator = /(^|\s)-?tag:(?:"[^"]*"|[^\s]*)$/i.test(currentValue);
-    const nextValue = hasActiveTrailingTagOperator
-      ? currentValue
-      : trimmedCurrent.length === 0
-        ? "tag:"
-        : `${currentValue}${/\s$/.test(currentValue) ? "" : " "}tag:`;
-
-    this.searchComponent.setValue(nextValue);
-    this.onPathFilterInputChanged(nextValue);
-    this.showFilterSuggestions(3);
-  }
-
-  private applyDateValueSuggestion(suffix: string): void {
-    if (!this.searchComponent) {
-      return;
-    }
-
-    const currentValue = this.searchComponent.getValue();
-    const replaceActiveDateTermPattern = /(^|\s)(-?date:)[^\s]*$/i;
-
-    let nextValue: string;
-    if (replaceActiveDateTermPattern.test(currentValue)) {
-      nextValue = currentValue.replace(
-        replaceActiveDateTermPattern,
-        (_match, prefix: string, operator: string) => `${prefix}${operator}${suffix}`
-      );
-    } else if (/(^|\s)-?date:/i.test(currentValue)) {
-      nextValue = `${currentValue}${/\s$/.test(currentValue) ? "" : " "}date:${suffix}`;
-    } else {
-      nextValue = `date:${suffix}`;
-    }
-
-    this.searchComponent.setValue(nextValue);
-    this.onPathFilterInputChanged(nextValue);
-    this.hideFilterSuggestions();
-  }
-
-  private applyPathValueSuggestion(folderPath: string): void {
-    if (!this.searchComponent) {
-      return;
-    }
-
-    const term = this.formatPathFilterTerm(folderPath);
-    const currentValue = this.searchComponent.getValue();
-    const replaceActivePathTermPattern = /(^|\s)(-?path:)(?:"[^"]*"|[^\s]*)$/i;
-
-    let nextValue: string;
-    if (replaceActivePathTermPattern.test(currentValue)) {
-      nextValue = currentValue.replace(
-        replaceActivePathTermPattern,
-        (_match, prefix: string, operator: string) => `${prefix}${operator}${term}`
-      );
-    } else if (/(^|\s)-?path:/i.test(currentValue)) {
-      nextValue = `${currentValue}${/\s$/.test(currentValue) ? "" : " "}path:${term}`;
-    } else {
-      nextValue = `path:${term}`;
-    }
-
-    this.searchComponent.setValue(nextValue);
-    this.onPathFilterInputChanged(nextValue);
-    this.hideFilterSuggestions();
-  }
-
-  private applyTagValueSuggestion(tag: string): void {
-    if (!this.searchComponent) {
-      return;
-    }
-
-    const currentValue = this.searchComponent.getValue();
-    const term = this.formatTagFilterTerm(tag);
-    const replaceActiveTagTermPattern = /(^|\s)(-?tag:)(?:"[^"]*"|[^\s]*)$/i;
-
-    let nextValue: string;
-    if (replaceActiveTagTermPattern.test(currentValue)) {
-      nextValue = currentValue.replace(
-        replaceActiveTagTermPattern,
-        (_match, prefix: string, operator: string) => `${prefix}${operator}${term}`
-      );
-    } else {
-      nextValue = `${currentValue}${/\s$/.test(currentValue) || currentValue.length === 0 ? "" : " "}tag:${term}`;
-    }
-
-    this.searchComponent.setValue(nextValue);
-    this.onPathFilterInputChanged(nextValue);
-    this.hideFilterSuggestions();
-  }
-
-  private renderOperatorSuggestions(host: HTMLElement): void {
-    const suggestionsTitle = createChild(host as ObsidianHTMLElement, "div");
-    suggestionsTitle.className = "reverysky-map-suggestion-title";
-    suggestionsTitle.textContent = "Search settings";
-
-    const pathOption = createChild(host as ObsidianHTMLElement, "div");
-    pathOption.className = "reverysky-map-filter-suggestion-option";
-    pathOption.setAttribute("role", "button");
-
-    const strong = createChild(pathOption as ObsidianHTMLElement, "span");
-    strong.className = "reverysky-map-suggestion-key";
-    strong.textContent = "path:";
-
-    const desc = createChild(pathOption as ObsidianHTMLElement, "span");
-    desc.className = "reverysky-map-suggestion-desc";
-    desc.textContent = " match in file path";
-
-    pathOption.addEventListener("mousedown", (event) => {
-      event.preventDefault();
-      this.applyPathSuggestionOperator();
-    });
-
-    const dateOption = createChild(host as ObsidianHTMLElement, "div");
-    dateOption.className = "reverysky-map-filter-suggestion-option reverysky-map-filter-suggestion-option--stacked";
-    dateOption.setAttribute("role", "button");
-
-    const dateStrong = createChild(dateOption as ObsidianHTMLElement, "span");
-    dateStrong.className = "reverysky-map-suggestion-key";
-    dateStrong.textContent = "date:";
-
-    const dateDesc = createChild(dateOption as ObsidianHTMLElement, "span");
-    dateDesc.className = "reverysky-map-suggestion-desc";
-    dateDesc.textContent = " match note date";
-
-    dateOption.addEventListener("mousedown", (event) => {
-      event.preventDefault();
-      this.applyDateSuggestionOperator();
-    });
-
-    const tagOption = createChild(host as ObsidianHTMLElement, "div");
-    tagOption.className = "reverysky-map-filter-suggestion-option reverysky-map-filter-suggestion-option--stacked";
-    tagOption.setAttribute("role", "button");
-
-    const tagStrong = createChild(tagOption as ObsidianHTMLElement, "span");
-    tagStrong.className = "reverysky-map-suggestion-key";
-    tagStrong.textContent = "tag:";
-
-    const tagDesc = createChild(tagOption as ObsidianHTMLElement, "span");
-    tagDesc.className = "reverysky-map-suggestion-desc";
-    tagDesc.textContent = " match note tag";
-
-    tagOption.addEventListener("mousedown", (event) => {
-      event.preventDefault();
-      this.applyTagSuggestionOperator();
-    });
-  }
-
-  private renderDateSuggestions(host: HTMLElement): void {
-    const suggestionsTitle = createChild(host as ObsidianHTMLElement, "div");
-    suggestionsTitle.className = "reverysky-map-suggestion-title";
-    suggestionsTitle.textContent = "Date presets";
-
-    const presets = this.session.getDateFilterPresetSuggestions();
-    for (const suggestion of presets) {
-      const option = createChild(host as ObsidianHTMLElement, "div");
-      option.className = "reverysky-map-date-suggestion-option";
-      option.setAttribute("role", "button");
-
-      const valuePart = createChild(option as ObsidianHTMLElement, "span");
-      valuePart.className = "reverysky-map-date-suggestion-value";
-      valuePart.textContent = `date:${suggestion.suffix}`;
-
-      const labelPart = createChild(option as ObsidianHTMLElement, "span");
-      labelPart.className = "reverysky-map-date-suggestion-label";
-      labelPart.textContent = `  ${suggestion.label}`;
-
-      option.title = suggestion.description;
-      option.addEventListener("mousedown", (event) => {
-        event.preventDefault();
-        this.applyDateValueSuggestion(suggestion.suffix);
-      });
-    }
-  }
-
-  private renderFolderSuggestions(host: HTMLElement, query: string): void {
-    const suggestionsTitle = createChild(host as ObsidianHTMLElement, "div");
-    suggestionsTitle.className = "reverysky-map-suggestion-title";
-    suggestionsTitle.textContent = "Folders";
-
-    const ranked = this.session.getFolderSuggestions(query);
-    if (!ranked.length) {
-      const emptyHint = createChild(host as ObsidianHTMLElement, "div");
-      emptyHint.className = "reverysky-map-suggestion-empty";
-      emptyHint.textContent = "No folders found";
-      return;
-    }
-
-    for (const suggestion of ranked) {
-      const option = createChild(host as ObsidianHTMLElement, "div");
-      option.className = "reverysky-map-folder-suggestion-option";
-      option.setAttribute("role", "button");
-      option.textContent = suggestion.path;
-      option.addEventListener("mousedown", (event) => {
-        event.preventDefault();
-        this.applyPathValueSuggestion(suggestion.path);
-      });
-    }
-  }
-
-  private renderTagSuggestions(host: HTMLElement, query: string): void {
-    const suggestionsTitle = createChild(host as ObsidianHTMLElement, "div");
-    suggestionsTitle.className = "reverysky-map-suggestion-title";
-    suggestionsTitle.textContent = "Tags";
-
-    const ranked = this.session.getTagSuggestions(query);
-    if (!ranked.length) {
-      const emptyHint = createChild(host as ObsidianHTMLElement, "div");
-      emptyHint.className = "reverysky-map-suggestion-empty";
-      emptyHint.textContent = "No tags found";
-      return;
-    }
-
-    for (const suggestion of ranked) {
-      const option = createChild(host as ObsidianHTMLElement, "div");
-      option.className = "reverysky-map-folder-suggestion-option reverysky-map-tag-suggestion-option";
-      option.setAttribute("role", "button");
-      option.textContent = suggestion.displayTag;
-      option.addEventListener("mousedown", (event) => {
-        event.preventDefault();
-        this.applyTagValueSuggestion(suggestion.tag);
-      });
-    }
   }
 
   private syncSearchComponentValue(): void {
@@ -902,26 +508,6 @@ export class MapFilterPanelController {
 
   private formatRenderScale(value: number): string {
     return value.toFixed(1);
-  }
-
-  private formatPathFilterTerm(folderPath: string): string {
-    const needsQuotes = /\s/.test(folderPath) || /["]/.test(folderPath);
-    const escaped = folderPath.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
-    return needsQuotes ? `"${escaped}"` : escaped;
-  }
-
-  private formatTagFilterTerm(tag: string): string {
-    return `#${tag.trim().replace(/^#/, "")}`;
-  }
-
-  private clearFilterSuggestionsHideTimer(): void {
-    if (!this.filterSuggestionsHideTimer) {
-      return;
-    }
-
-    (this.filterSuggestionsHideTimerWindow ?? window).clearTimeout(this.filterSuggestionsHideTimer);
-    this.filterSuggestionsHideTimer = null;
-    this.filterSuggestionsHideTimerWindow = null;
   }
 }
 

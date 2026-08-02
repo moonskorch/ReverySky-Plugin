@@ -2140,8 +2140,9 @@ describe("MapView bridge integration", () => {
     ).find((el) => el.textContent === "Dream Notes") as HTMLButtonElement | undefined;
     expect(dreamOption).toBeDefined();
     dreamOption?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-    expect(searchInput.value).toBe("path:\"Dream Notes\"");
-    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
+    expect(searchInput.value).toBe("path:\"Dream Notes\" ");
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(false);
+    expect(suggestions.textContent).toContain("Search settings");
 
     searchInput.value = "path:Notes";
     searchInput.dispatchEvent(new Event("input"));
@@ -2225,8 +2226,9 @@ describe("MapView bridge integration", () => {
     expect(workOption).toBeDefined();
     workOption?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
-    expect(searchInput.value).toBe("tag:#work/subtag");
-    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
+    expect(searchInput.value).toBe("tag:#work/subtag ");
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(false);
+    expect(suggestions.textContent).toContain("Search settings");
 
     vi.advanceTimersByTime(500);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
@@ -2316,8 +2318,9 @@ describe("MapView bridge integration", () => {
     expect(projectOption).toBeDefined();
     projectOption?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
-    expect(searchInput.value).toBe("tag:#work tag:#project");
-    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
+    expect(searchInput.value).toBe("tag:#work tag:#project ");
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(false);
+    expect(suggestions.textContent).toContain("Search settings");
 
     vi.advanceTimersByTime(500);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(3);
@@ -2415,13 +2418,14 @@ describe("MapView bridge integration", () => {
     expect(weekPreset).toBeDefined();
     weekPreset?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
-    expect(searchInput.value).toBe("date:>=2026-01-24");
-    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
+    expect(searchInput.value).toBe("date:>=2026-01-24 ");
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(false);
+    expect(suggestions.textContent).toContain("Search settings");
 
     searchInput.dispatchEvent(new Event("click"));
     expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(false);
-    expect(suggestions.textContent).toContain("Date presets");
-    expect(suggestions.textContent).not.toContain("Search settings");
+    expect(suggestions.textContent).toContain("Search settings");
+    expect(suggestions.textContent).not.toContain("Date presets");
   });
 
   it("builds one-month preset with end-of-month clamping", async () => {
@@ -2575,6 +2579,9 @@ describe("MapView bridge integration", () => {
     expect(dateOption).toBeDefined();
     dateOption?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     expect(suggestions.textContent).toContain("Date presets");
+    expect(
+      view.contentEl.querySelectorAll(".reverysky-map-date-suggestion-option").length
+    ).toBeGreaterThan(0);
     expect(suggestions.textContent).not.toContain("Folders");
 
     searchInput.dispatchEvent(new Event("focus"));
@@ -3113,7 +3120,7 @@ describe("MapView bridge integration", () => {
     expect(notesOption).toBeDefined();
     notesOption?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
-    expect(searchInput.value).toBe("path:Notes");
+    expect(searchInput.value).toBe("path:Notes ");
   });
 
   it("hides path filter suggestions after input blur delay", async () => {

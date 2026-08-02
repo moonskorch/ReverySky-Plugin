@@ -411,7 +411,10 @@ Open graph leaves do not share live filter state. Each leaf's `MapSession` owns 
   Owns the markdown-editor focus detection logic that feeds the graph-focus path.
 
 - `src/view/MapFilterPanelController.ts` -> `MapFilterPanelController`
-  Owns filter-panel DOM creation, suggestion rendering, and UI-only interaction state.
+  Owns filter-panel DOM creation, control wiring, and delegation to the focused suggestion controller.
+
+- `src/view/MapFilterSuggestionsController.ts` -> `MapFilterSuggestionsController`
+  Owns filter suggestion rendering, suggestion-pane transitions, keyboard behavior, ARIA state, and suggestion hide timers.
 
 - `src/view/MapNoteOpenRouter.ts` -> `MapNoteOpenRouter`
   Owns note-open resolution from bridge payloads back into Obsidian workspace behavior.
@@ -465,7 +468,8 @@ Open graph leaves do not share live filter state. Each leaf's `MapSession` owns 
   It is stored as plugin data under `mapViewState`, then passed to a newly created `MapView` as `initialState` on the next open.
   It is not per-window persisted state.
 
-- Filter panel visibility, active suggestion pane, and hide-delay timers are owned by `MapFilterPanelController`.
+- Filter panel visibility is owned by `MapFilterPanelController`.
+  Active suggestion pane, selected suggestion index, ARIA active descendant state, and suggestion hide-delay timers are owned by `MapFilterSuggestionsController`.
   They are UI-only transient state and are intentionally not persisted in plugin data.
 
 - Runtime notes, links, tag names, runtime mode, pending focus note id, layout preference, and note-length-derived visual scale are owned by the Unity runtime.
@@ -499,6 +503,28 @@ Important current contract facts:
 - `renderScale` is a plugin-owned iframe startup hint and does not belong to the bridge payload contract;
 - invalid outgoing payloads are rejected before dispatch;
 - invalid incoming bridge messages are ignored with non-fatal error reporting.
+
+### Filter suggestion behavior
+Filter suggestions are a UI contract, not persisted plugin state.
+
+- The root suggestion pane offers filter operators: `path:`, `date:`, and `tag:`.
+  Typing an operator prefix filters this pane.
+  Selecting a root operator replaces the active trailing prefix and opens the matching second-level pane.
+- Second-level panes offer values for the active operator: folders for `path:`, presets for `date:`, and known tags for `tag:`.
+  Filtering uses only the active trailing term, so compound queries such as `path:Projects date:to` filter date presets by `date:to`.
+- Selecting a second-level value commits that value to the query and returns to the root pane.
+  This keeps compound filter construction available after every value choice.
+- A trailing whitespace after a completed token returns suggestions to the root pane.
+- Keyboard behavior follows ordinary combobox expectations.
+  `ArrowDown` and `ArrowUp` navigate an open pane; when suggestions are closed, `ArrowDown` opens on the first item and `ArrowUp` opens on the last item.
+  `Enter` commits the active suggestion.
+  `Escape` first hides an open suggestion pane; with no pane open, it clears the filter query and restores the root pane.
+- Accessibility semantics mirror the visible behavior.
+  The filter input is a combobox that controls an inner `listbox`.
+  Suggestion rows are `option` elements with `aria-selected`.
+  The active row is exposed through `aria-activedescendant`.
+  Empty states and section titles stay outside the `listbox` and clear the active descendant.
+- The behavior is covered by `tests/view/MapFilterPanelController.test.ts` for focused suggestion interactions and by `tests/view/MapView.test.ts` for view-level integration.
 
 ## Build, Packaging, and Deployment Boundaries
 Source and generated surfaces are intentionally separate:
