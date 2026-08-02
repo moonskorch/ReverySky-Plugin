@@ -525,7 +525,10 @@ button.reverysky-map-tags-toggle .reverysky-map-tags-toggle-thumb {
   box-shadow: none;
   z-index: 140;
   width: var(--reverysky-filter-suggestions-anchor-width, 100%);
-  max-height: var(--reverysky-suggestion-panel-max-height);
+  max-height: min(
+    var(--reverysky-suggestion-panel-max-height),
+    var(--reverysky-filter-suggestions-max-height, var(--reverysky-suggestion-panel-max-height))
+  );
   overflow-y: auto;
 }
 

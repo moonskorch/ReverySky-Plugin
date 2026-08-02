@@ -38,6 +38,7 @@
 - Runtime flow is `bridge:ready` first, then `graph:set`.
 - Keep path normalization stable (`/` separators, vault-relative paths) across bridge layers.
 - Unity runtime is served from a local loopback HTTP server (`127.0.0.1`), not external hosting.
+- For UI styling, do not set inline styles directly; use CSS classes, `setCssProps`, or `setCssStyles` instead.
 - Do not modify `*.unity`, `*.prefab`, `*.asset`, or `*.meta` unless the task explicitly requires it.
 - If such files must change, say which ones and why before editing.
 - `reference/ReverySky` may be used only for targeted comparison or selective fragment adaptation, not rollback, reset, or bulk-copy.
