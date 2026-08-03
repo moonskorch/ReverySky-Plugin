@@ -40,7 +40,7 @@ export type MapViewDependencies = {
  * Filter-panel interactions and note-open routing live in dedicated collaborators.
  */
 export class MapView extends ItemView {
-  navigation = true;
+  navigation = false;
   private readonly bridge: BridgePort;
   private readonly notify: (message: string) => void;
   private readonly now: () => number;

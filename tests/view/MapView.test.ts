@@ -102,6 +102,31 @@ describe("MapView bridge integration", () => {
     vi.useRealTimers();
   });
 
+  it("keeps the map leaf out of Obsidian document navigation", () => {
+    const app = {
+      workspace: {
+        activeLeaf: null,
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn()
+    };
+
+    const view = new MapView(
+      { app } as never,
+      plugin as never,
+      {
+        buildGraph: vi.fn().mockReturnValue(makePayload()) as BuildGraphForTest,
+        notify: vi.fn()
+      }
+    );
+
+    expect(view.navigation).toBe(false);
+  });
+
   it("creates iframe on open, wires bridge handshake, and detaches/cleans on close", async () => {
     const app = {
       marker: "app",
