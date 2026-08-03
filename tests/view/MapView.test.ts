@@ -2953,7 +2953,7 @@ describe("MapView bridge integration", () => {
         notify: vi.fn(),
         now: () => 1700000000000,
         initialState: {
-          pathFilterQuery: "date:>2026-01-01 date:<2026-02-01",
+          filterQuery: "date:>2026-01-01 date:<2026-02-01",
           showTags: false
         }
       }
@@ -3036,7 +3036,7 @@ describe("MapView bridge integration", () => {
         notify: vi.fn(),
         now: () => 1700000000000,
         initialState: {
-          pathFilterQuery: "tag:#project",
+          filterQuery: "tag:#project",
           showTags: false
         }
       }
@@ -3319,7 +3319,7 @@ describe("MapView bridge integration", () => {
         notify: vi.fn(),
         now: () => 1700000000000,
         initialState: {
-          pathFilterQuery: "path:archive"
+          filterQuery: "path:archive"
         }
       }
     );
@@ -3541,12 +3541,12 @@ describe("MapView bridge integration", () => {
         buildGraph: vi.fn().mockReturnValue(makePathPayload()) as BuildGraphForTest,
         notify: vi.fn(),
         now: () => 1700000000000,
-        initialState: { pathFilterQuery: "tag:#new", renderScale: 1.5 }
+        initialState: { filterQuery: "tag:#new", renderScale: 1.5 }
       }
     );
 
     await view.onOpen();
-    await view.setState({ pathFilterQuery: "tag:#old", renderScale: 1.2 });
+    await view.setState({ filterQuery: "tag:#old", renderScale: 1.2 });
 
     const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
     expect(searchInput.value).toBe("tag:#new");
@@ -3594,7 +3594,7 @@ describe("MapView bridge integration", () => {
         notify: vi.fn(),
         now: () => 1700000000000,
         initialState: {
-          pathFilterQuery: "tag:#project"
+          filterQuery: "tag:#project"
         }
       }
     );

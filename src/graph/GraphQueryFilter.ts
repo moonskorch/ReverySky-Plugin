@@ -1,6 +1,6 @@
 import type { GraphNoteNode, GraphPayload } from "../bridge/BridgeTypes";
 
-export type ParsedPathFilter = {
+export type ParsedQueryFilter = {
   includeTerms: string[];
   excludeTerms: string[];
   includeRegexes: RegExp[];
@@ -19,18 +19,18 @@ type ParsedDateClause = {
   day: string;
 };
 
-export type PathFilterParseResult = {
+export type QueryFilterParseResult = {
   isValid: boolean;
-  parsed: ParsedPathFilter | null;
-  hasPathTerms: boolean;
+  parsed: ParsedQueryFilter | null;
+  hasSupportedTerms: boolean;
   hasUnsupportedTokens: boolean;
   reason?: string;
 };
 
 /**
- * Parse and apply the view's path filter syntax without mutating the source graph.
+ * Parse and apply the view's query filter syntax without mutating the source graph.
  */
-export class GraphPathFilter {
+export class GraphQueryFilter {
   private static readonly NO_MATCH_SENTINEL = "\u0000__empty_path_term__";
   private static readonly NO_MATCH_DATE_SENTINEL = "\u0000__empty_date_term__";
   private static readonly NO_MATCH_TAG_SENTINEL = "\u0000__empty_tag_term__";
@@ -38,23 +38,23 @@ export class GraphPathFilter {
   /**
    * Convert the free-form search box text into structured include/exclude filters.
    */
-  static parsePathQuery(query: string): PathFilterParseResult {
+  static parseQuery(query: string): QueryFilterParseResult {
     const rawQuery = typeof query === "string" ? query.trim() : "";
     if (!rawQuery) {
       return {
         isValid: true,
         parsed: null,
-        hasPathTerms: false,
+        hasSupportedTerms: false,
         hasUnsupportedTokens: false
       };
     }
 
-    const tokenized = GraphPathFilter.tokenize(rawQuery);
+    const tokenized = this.tokenize(rawQuery);
     if (!tokenized.ok) {
       return {
         isValid: false,
         parsed: null,
-        hasPathTerms: false,
+        hasSupportedTerms: false,
         hasUnsupportedTokens: false,
         reason: tokenized.reason
       };
@@ -81,12 +81,12 @@ export class GraphPathFilter {
       if (!body.toLowerCase().startsWith("path:")) {
         if (body.toLowerCase().startsWith("date:")) {
           const rawDateTerm = body.slice("date:".length).trim();
-          const dateClause = GraphPathFilter.tryParseDateClause(rawDateTerm);
+          const dateClause = this.tryParseDateClause(rawDateTerm);
           if (dateClause.kind === "invalid") {
             return {
               isValid: false,
               parsed: null,
-              hasPathTerms: false,
+              hasSupportedTerms: false,
               hasUnsupportedTokens: unsupportedTokens.length > 0,
               reason: dateClause.reason
             };
@@ -99,7 +99,7 @@ export class GraphPathFilter {
 
             includeDateClauses.push({
               comparator: "eq",
-              day: GraphPathFilter.NO_MATCH_DATE_SENTINEL
+              day: this.NO_MATCH_DATE_SENTINEL
             });
             continue;
           }
@@ -120,18 +120,18 @@ export class GraphPathFilter {
               continue;
             }
 
-            includeTagTerms.push(GraphPathFilter.NO_MATCH_TAG_SENTINEL);
+            includeTagTerms.push(this.NO_MATCH_TAG_SENTINEL);
             continue;
           }
 
-          const normalizedTagTerm = GraphPathFilter.normalizeTagMatchValue(rawTagTerm);
+          const normalizedTagTerm = this.normalizeTagMatchValue(rawTagTerm);
           if (!normalizedTagTerm) {
             // Empty tag filters intentionally match nothing instead of being ignored.
             if (isNegated) {
               continue;
             }
 
-            includeTagTerms.push(GraphPathFilter.NO_MATCH_TAG_SENTINEL);
+            includeTagTerms.push(this.NO_MATCH_TAG_SENTINEL);
             continue;
           }
 
@@ -153,16 +153,16 @@ export class GraphPathFilter {
         if (isNegated) {
           continue;
         }
-        includeTerms.push(GraphPathFilter.NO_MATCH_SENTINEL);
+        includeTerms.push(this.NO_MATCH_SENTINEL);
         continue;
       }
 
-      const regexTerm = GraphPathFilter.tryParseRegexLiteral(rawTerm);
+      const regexTerm = this.tryParseRegexLiteral(rawTerm);
       if (regexTerm.kind === "invalid") {
         return {
           isValid: false,
           parsed: null,
-          hasPathTerms: false,
+          hasSupportedTerms: false,
           hasUnsupportedTokens: unsupportedTokens.length > 0,
           reason: regexTerm.reason
         };
@@ -176,12 +176,12 @@ export class GraphPathFilter {
         continue;
       }
 
-      const normalizedTerm = GraphPathFilter.normalizeMatchValue(rawTerm);
+      const normalizedTerm = this.normalizeMatchValue(rawTerm);
       if (!normalizedTerm) {
         if (isNegated) {
           continue;
         }
-        includeTerms.push(GraphPathFilter.NO_MATCH_SENTINEL);
+        includeTerms.push(this.NO_MATCH_SENTINEL);
         continue;
       }
 
@@ -192,11 +192,11 @@ export class GraphPathFilter {
       }
     }
 
-    const hasPathTerms = includeTerms.length > 0 || excludeTerms.length > 0;
+    const hasPathOperatorTerms = includeTerms.length > 0 || excludeTerms.length > 0;
     const hasRegexTerms = includeRegexes.length > 0 || excludeRegexes.length > 0;
     const hasDateTerms = includeDateClauses.length > 0 || excludeDateClauses.length > 0;
     const hasTagTerms = includeTagTerms.length > 0 || excludeTagTerms.length > 0;
-    const hasSupportedTerms = hasPathTerms || hasRegexTerms || hasDateTerms || hasTagTerms;
+    const hasSupportedTerms = hasPathOperatorTerms || hasRegexTerms || hasDateTerms || hasTagTerms;
 
     return {
       isValid: true,
@@ -213,7 +213,7 @@ export class GraphPathFilter {
             unsupportedTokens
           }
         : null,
-      hasPathTerms: hasSupportedTerms,
+      hasSupportedTerms,
       hasUnsupportedTokens: unsupportedTokens.length > 0
     };
   }
@@ -221,7 +221,7 @@ export class GraphPathFilter {
   /**
    * Keep the no-filter fast path as a no-op; clone only when filtering changes the payload.
    */
-  static applyPathFilter(payload: GraphPayload, parsed: ParsedPathFilter | null): GraphPayload {
+  static applyFilter(payload: GraphPayload, parsed: ParsedQueryFilter | null): GraphPayload {
     if (
       !parsed ||
       (!parsed.includeTerms.length &&
@@ -236,7 +236,7 @@ export class GraphPathFilter {
       return payload;
     }
 
-    const notes = payload.notes.filter((note) => GraphPathFilter.matchesNote(note, parsed));
+    const notes = payload.notes.filter((note) => this.matchesNote(note, parsed));
     const keepIds = new Set(notes.map((note) => note.id));
     const links = payload.links.filter(
       (link) => keepIds.has(link.sourceId) && keepIds.has(link.targetId)
@@ -253,9 +253,9 @@ export class GraphPathFilter {
     };
   }
 
-  private static matchesNote(note: GraphNoteNode, parsed: ParsedPathFilter): boolean {
-    const normalizedPath = GraphPathFilter.normalizeMatchValue(note.path);
-    const noteDay = GraphPathFilter.toIsoDayKey(note.date);
+  private static matchesNote(note: GraphNoteNode, parsed: ParsedQueryFilter): boolean {
+    const normalizedPath = this.normalizeMatchValue(note.path);
+    const noteDay = this.toIsoDayKey(note.date);
 
     for (const exclude of parsed.excludeTerms) {
       if (normalizedPath.includes(exclude)) {
@@ -268,12 +268,12 @@ export class GraphPathFilter {
       }
     }
     for (const excludeDate of parsed.excludeDateClauses) {
-      if (noteDay && GraphPathFilter.matchesDateClause(noteDay, excludeDate)) {
+      if (noteDay && this.matchesDateClause(noteDay, excludeDate)) {
         return false;
       }
     }
     for (const excludeTag of parsed.excludeTagTerms) {
-      if (GraphPathFilter.noteHasMatchingTag(note, excludeTag)) {
+      if (this.noteHasMatchingTag(note, excludeTag)) {
         return false;
       }
     }
@@ -289,12 +289,12 @@ export class GraphPathFilter {
       }
     }
     for (const includeDate of parsed.includeDateClauses) {
-      if (!noteDay || !GraphPathFilter.matchesDateClause(noteDay, includeDate)) {
+      if (!noteDay || !this.matchesDateClause(noteDay, includeDate)) {
         return false;
       }
     }
     for (const includeTag of parsed.includeTagTerms) {
-      if (!GraphPathFilter.noteHasMatchingTag(note, includeTag)) {
+      if (!this.noteHasMatchingTag(note, includeTag)) {
         return false;
       }
     }
@@ -312,7 +312,7 @@ export class GraphPathFilter {
 
   private static noteHasMatchingTag(note: GraphNoteNode, queryTag: string): boolean {
     return note.tags.some((tag) => {
-      const normalizedTag = GraphPathFilter.normalizeTagMatchValue(tag);
+      const normalizedTag = this.normalizeTagMatchValue(tag);
       return normalizedTag === queryTag || normalizedTag.startsWith(`${queryTag}/`);
     });
   }
@@ -324,7 +324,7 @@ export class GraphPathFilter {
 
     const trimmed = value.trim();
     const leadingDayMatch = trimmed.match(/^(\d{4}-\d{2}-\d{2})(?:$|[Tt\s].*)/);
-    if (leadingDayMatch?.[1] && GraphPathFilter.isValidCalendarDay(leadingDayMatch[1])) {
+    if (leadingDayMatch?.[1] && this.isValidCalendarDay(leadingDayMatch[1])) {
       return leadingDayMatch[1];
     }
 
@@ -365,7 +365,7 @@ export class GraphPathFilter {
     if (!regexLiteralMatch) {
       return {
         kind: "invalid",
-        reason: "Invalid regex in path filter."
+        reason: "Invalid regex in query filter."
       };
     }
 
@@ -380,7 +380,7 @@ export class GraphPathFilter {
     } catch {
       return {
         kind: "invalid",
-        reason: "Invalid regex in path filter."
+        reason: "Invalid regex in query filter."
       };
     }
   }
@@ -406,7 +406,7 @@ export class GraphPathFilter {
 
     const operator = dateMatch[1] ?? "";
     const day = dateMatch[2] ?? "";
-    if (!GraphPathFilter.isValidCalendarDay(day)) {
+    if (!this.isValidCalendarDay(day)) {
       return {
         kind: "invalid",
         reason: "Invalid calendar date in date filter."
@@ -512,4 +512,48 @@ export class GraphPathFilter {
       tokens
     };
   }
+}
+
+export function areQueryFiltersEqual(left: ParsedQueryFilter | null, right: ParsedQueryFilter | null): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (!left || !right) {
+    return false;
+  }
+
+  return (
+    areStringArraysEqual(left.includeTerms, right.includeTerms) &&
+    areStringArraysEqual(left.excludeTerms, right.excludeTerms) &&
+    areRegexArraysEqual(left.includeRegexes, right.includeRegexes) &&
+    areRegexArraysEqual(left.excludeRegexes, right.excludeRegexes) &&
+    areDateClauseArraysEqual(left.includeDateClauses, right.includeDateClauses) &&
+    areDateClauseArraysEqual(left.excludeDateClauses, right.excludeDateClauses) &&
+    areStringArraysEqual(left.includeTagTerms, right.includeTagTerms) &&
+    areStringArraysEqual(left.excludeTagTerms, right.excludeTagTerms)
+  );
+}
+
+function areStringArraysEqual(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function areRegexArraysEqual(left: RegExp[], right: RegExp[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value.source === right[index]?.source && value.flags === right[index]?.flags)
+  );
+}
+
+function areDateClauseArraysEqual(
+  left: ParsedQueryFilter["includeDateClauses"],
+  right: ParsedQueryFilter["includeDateClauses"]
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => (
+      value.comparator === right[index]?.comparator &&
+      value.day === right[index]?.day
+    ))
+  );
 }

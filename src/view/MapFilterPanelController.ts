@@ -147,12 +147,12 @@ export class MapFilterPanelController {
       inputEl: this.searchComponent.inputEl,
       rootEl: root,
       anchorEl: filterSearchArea,
-      getQuery: () => this.searchComponent?.getValue() ?? this.session.getFilterUiState().pathFilterQuery,
+      getQuery: () => this.searchComponent?.getValue() ?? this.session.getFilterUiState().filterQuery,
       setQueryValue: (value) => {
         this.searchComponent?.setValue(value);
       },
       commitQuery: (query) => {
-        this.commitPathFilterQuery(query);
+        this.commitFilterQuery(query);
       },
       openPanel: () => {
         this.setFilterPanelOpen(true);
@@ -417,7 +417,7 @@ export class MapFilterPanelController {
     toggleButton?.setAttribute("aria-label", `${isCollapsed ? "Expand" : "Collapse"} ${label}`);
   }
 
-  private commitPathFilterQuery(nextQuery: string): void {
+  private commitFilterQuery(nextQuery: string): void {
     this.session.setFilterQuery(nextQuery);
     this.refreshFilterMessage();
   }
@@ -428,11 +428,11 @@ export class MapFilterPanelController {
     }
 
     const uiState = this.session.getFilterUiState();
-    if (this.searchComponent.getValue() === uiState.pathFilterQuery) {
+    if (this.searchComponent.getValue() === uiState.filterQuery) {
       return;
     }
 
-    this.searchComponent.setValue(uiState.pathFilterQuery);
+    this.searchComponent.setValue(uiState.filterQuery);
   }
 
   private refreshFilterMessage(): void {
@@ -441,12 +441,12 @@ export class MapFilterPanelController {
     }
 
     const uiState = this.session.getFilterUiState();
-    const hasCustomMessage = uiState.pathFilterMessage.trim().length > 0;
-    this.filterMessageEl.textContent = hasCustomMessage ? uiState.pathFilterMessage : "";
+    const hasCustomMessage = uiState.filterMessage.trim().length > 0;
+    this.filterMessageEl.textContent = hasCustomMessage ? uiState.filterMessage : "";
     this.filterMessageEl.classList.toggle("reverysky-map-filter-message--hidden", !hasCustomMessage);
     this.filterMessageEl.classList.toggle(
       "reverysky-map-filter-message--invalid",
-      !uiState.pathFilterParseValid
+      !uiState.filterParseValid
     );
   }
 

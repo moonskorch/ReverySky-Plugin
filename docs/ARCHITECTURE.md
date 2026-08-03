@@ -35,7 +35,7 @@ Main system parts:
 - Graph session and filter UI
   Owns per-view live graph state, graph refresh timing, Obsidian metadata-resolution gating, filter derivation, render-scale preference, and the transient filter-panel interaction state.
   Main code: `src/view/MapSession.ts`, `src/view/MapFilterPanelController.ts`
-  Depends on: `VaultGraphBuilder`, `GraphPathFilter`, Obsidian workspace APIs, browser DOM events
+  Depends on: `VaultGraphBuilder`, `GraphQueryFilter`, Obsidian workspace APIs, browser DOM events
 
 - Markdown editor focus adapter
   Translates markdown editor focus updates into the same graph-focus path used by active-file changes.
@@ -210,7 +210,7 @@ The next non-transient graph-index publication applies pending focus once, then 
    vault metadata changes, path filter input changes, tag visibility toggles, or layout changes.
 3. `src/view/MapFilterPanelController.ts` updates session-owned state through `MapSession.setFilterQuery()`, `setShowTags()`, or `MapSession.setMapLayoutPreference()`.
 4. For valid filter, tag-visibility, and layout changes, `src/view/MapSession.ts` re-enters `emitGraphFromSource()` using the latest source graph snapshot. Filter input is debounced before graph emission; invalid filter input updates UI and persistence state but does not emit `graph:set`.
-5. `src/graph/GraphPathFilter.ts`
+5. `src/graph/GraphQueryFilter.ts`
    Parses the query and returns the filtered `GraphPayload` subset.
 6. `src/view/MapView.ts` receives the `sendGraph` callback from `MapSession`, forwards the payload through `UnityIframeBridge`, and asks `MapFilterPanelController` to refresh visible suggestions when needed.
 7. `src/bridge/UnityIframeBridge.ts` -> `sendGraphSet()`
@@ -377,7 +377,7 @@ For rename, `MapFocusController.onRename(...)` preserves focus only when the ren
 6. Render-scale slider input updates the in-memory snapshot immediately and requests `saveData(...)` on slider commit.
 7. Other graph setting changes request `saveData(...)` directly because they are low-frequency actions.
 8. `toggleMapView()` close, `onunload()`, and workspace `quit` flush the latest in-memory snapshot before shutdown paths continue.
-9. Obsidian workspace view state is intentionally not used as a persistence source for `pathFilterQuery`, `showTags`, `mapLayout`, or `renderScale`.
+9. Obsidian workspace view state is intentionally not used as a persistence source for `filterQuery`, `showTags`, `mapLayout`, or `renderScale`.
 
 Open graph leaves do not share live filter state. Each leaf's `MapSession` owns its own current filter, effective graph, bridge readiness, and refresh timers. Persistence remains one plugin-level snapshot, so later opens restore the most recently reported settings rather than per-window settings.
 
@@ -423,7 +423,7 @@ Open graph leaves do not share live filter state. Each leaf's `MapSession` owns 
 - `src/graph/VaultGraphBuilder.ts` -> `VaultGraphBuilder.build(app)`
   Owns graph extraction from Obsidian state.
 
-- `src/graph/GraphPathFilter.ts` -> parse/apply helpers
+- `src/graph/GraphQueryFilter.ts` -> parse/apply helpers
   Owns query parsing and graph narrowing before handoff to Unity.
 
 - `src/bridge/UnityIframeBridge.ts` -> `attach()`, `sendGraphSet()`, `sendStatus()`, `sendNoteFocus()`, `onMessage()`
@@ -447,7 +447,7 @@ Open graph leaves do not share live filter state. Each leaf's `MapSession` owns 
   The session emits the filtered payload that Unity receives through the shell view.
   If more than one graph leaf is open, each leaf has its own effective graph and can rebuild or re-emit independently.
 
-- `pathFilterQuery`, `showTags`, `mapLayout`, and `renderScale` are owned by `MapSession`.
+- `filterQuery`, `showTags`, `mapLayout`, and `renderScale` are owned by `MapSession`.
   They are live per-view state while the leaf is open.
   They are reported to `ReverySkyMapPlugin`, which keeps one latest snapshot in plugin data under `mapViewState` and re-applies that snapshot on later opens.
 

@@ -21,7 +21,12 @@ import {
   normalizeFrameRateMode,
   type FrameRateMode
 } from "../bridge/FrameRateMode";
-import { GraphPathFilter, type ParsedPathFilter, type PathFilterParseResult } from "../graph/GraphPathFilter";
+import {
+  GraphQueryFilter,
+  areQueryFiltersEqual,
+  type ParsedQueryFilter,
+  type QueryFilterParseResult
+} from "../graph/GraphQueryFilter";
 import { makeStableNoteId } from "../graph/VaultGraphBuilder";
 import { MapFocusController } from "./MapFocusController";
 
@@ -35,7 +40,7 @@ export const MIN_RENDER_SCALE = 0.5;
 export const MAX_RENDER_SCALE = 1.5;
 export const RENDER_SCALE_STEP = 0.1;
 export type MapViewState = {
-  pathFilterQuery?: unknown;
+  filterQuery?: unknown;
   showTags?: unknown;
   mapLayout?: unknown;
   renderScale?: unknown;
@@ -43,14 +48,14 @@ export type MapViewState = {
 };
 
 export type MapFilterUiState = {
-  pathFilterQuery: string;
+  filterQuery: string;
   showTags: boolean;
   mapLayout: MapLayoutPreference;
   renderScale: number;
   renderScaleRestartRequired: boolean;
   frameRateMode: FrameRateMode;
-  pathFilterParseValid: boolean;
-  pathFilterMessage: string;
+  filterParseValid: boolean;
+  filterMessage: string;
 };
 
 export type FolderPathSuggestion = {
@@ -112,16 +117,16 @@ export class MapSession {
   private refreshTimerWindow: Window | null = null;
   private refreshSubscriptionsRegistered = false;
   private isLive = false;
-  private pathFilterQuery = "";
+  private filterQuery = "";
   private showTags = true;
   private mapLayout: MapLayoutPreference = DEFAULT_MAP_LAYOUT_PREFERENCE;
   private renderScale = DEFAULT_RENDER_SCALE;
   private appliedRenderScale = DEFAULT_RENDER_SCALE;
   private frameRateMode: FrameRateMode = DEFAULT_FRAME_RATE_MODE;
   // Parsed filter currently applied to the outgoing graph; live input commits it only after debounce.
-  private activePathFilter: ParsedPathFilter | null = null;
-  private pathFilterParseValid = true;
-  private pathFilterMessage = "";
+  private activeQueryFilter: ParsedQueryFilter | null = null;
+  private filterParseValid = true;
+  private filterMessage = "";
   private filterInputDebounceTimer: number | null = null;
   private filterInputDebounceTimerWindow: Window | null = null;
   private folderPathSuggestions: FolderPathSuggestion[] = [];
@@ -146,7 +151,7 @@ export class MapSession {
 
   getState(): Record<string, unknown> {
     return {
-      pathFilterQuery: this.pathFilterQuery,
+      filterQuery: this.filterQuery,
       showTags: this.showTags,
       mapLayout: this.mapLayout,
       renderScale: this.renderScale,
@@ -156,16 +161,15 @@ export class MapSession {
 
   async setState(state: unknown): Promise<void> {
     const nextState = (state ?? {}) as MapViewState;
-    const nextQuery =
-      typeof nextState.pathFilterQuery === "string" ? nextState.pathFilterQuery : "";
+    const nextQuery = typeof nextState.filterQuery === "string" ? nextState.filterQuery : "";
     const nextShowTags = typeof nextState.showTags === "boolean" ? nextState.showTags : true;
     const nextLayoutPreference = normalizeMapLayoutPreference(nextState.mapLayout);
-    this.pathFilterQuery = nextQuery;
+    this.filterQuery = nextQuery;
     this.showTags = nextShowTags;
     this.mapLayout = nextLayoutPreference;
     this.renderScale = normalizeRenderScale(nextState.renderScale);
     this.frameRateMode = normalizeFrameRateMode(nextState.frameRateMode);
-    this.applyParsedFilterResult(GraphPathFilter.parsePathQuery(nextQuery));
+    this.applyParsedQueryResult(GraphQueryFilter.parseQuery(nextQuery));
   }
 
   start(registerEvent: (eventRef: EventRef) => void): void {
@@ -207,21 +211,21 @@ export class MapSession {
 
   setFilterQuery(query: string): void {
     const nextQuery = typeof query === "string" ? query : "";
-    if (nextQuery === this.pathFilterQuery) {
+    if (nextQuery === this.filterQuery) {
       return;
     }
 
-    const parseResult = GraphPathFilter.parsePathQuery(nextQuery);
-    const nextActivePathFilter = this.resolveActivePathFilter(parseResult);
+    const parseResult = GraphQueryFilter.parseQuery(nextQuery);
+    const nextActiveQueryFilter = this.resolveActiveQueryFilter(parseResult);
     // Compare parsed filters so whitespace-only query edits do not rebuild the runtime graph.
     const shouldSendGraph =
       parseResult.isValid &&
-      !this.areParsedPathFiltersEqual(this.activePathFilter, nextActivePathFilter);
+      !areQueryFiltersEqual(this.activeQueryFilter, nextActiveQueryFilter);
 
-    this.pathFilterQuery = nextQuery;
+    this.filterQuery = nextQuery;
     this.notifyStateChanged({ persist: false });
-    this.applyParsedFilterUiState(parseResult);
-    this.scheduleFilterGraphUpdate(shouldSendGraph, nextActivePathFilter);
+    this.applyParsedQueryUiState(parseResult);
+    this.scheduleFilterGraphUpdate(shouldSendGraph, nextActiveQueryFilter);
   }
 
   setShowTags(showTags: boolean): void {
@@ -267,14 +271,14 @@ export class MapSession {
 
   getFilterUiState(): MapFilterUiState {
     return {
-      pathFilterQuery: this.pathFilterQuery,
+      filterQuery: this.filterQuery,
       showTags: this.showTags,
       mapLayout: this.mapLayout,
       renderScale: this.renderScale,
       renderScaleRestartRequired: this.renderScale !== this.appliedRenderScale,
       frameRateMode: this.frameRateMode,
-      pathFilterParseValid: this.pathFilterParseValid,
-      pathFilterMessage: this.pathFilterMessage
+      filterParseValid: this.filterParseValid,
+      filterMessage: this.filterMessage
     };
   }
 
@@ -571,12 +575,12 @@ export class MapSession {
 
   private scheduleFilterGraphUpdate(
     shouldSendGraph: boolean,
-    nextActivePathFilter: ParsedPathFilter | null
+    nextActiveQueryFilter: ParsedQueryFilter | null
   ): void {
     if (!this.isLive) {
       // Before the live view starts, keep the filter ready for the first graph emission.
       if (shouldSendGraph) {
-        this.activePathFilter = nextActivePathFilter;
+        this.activeQueryFilter = nextActiveQueryFilter;
       }
       this.notifyStateChanged();
       return;
@@ -591,7 +595,7 @@ export class MapSession {
       this.notifyStateChanged();
       if (shouldSendGraph) {
         // Apply the parsed candidate at the same moment the graph is rebuilt.
-        this.activePathFilter = nextActivePathFilter;
+        this.activeQueryFilter = nextActiveQueryFilter;
         this.sendGraphFromSource();
       }
     }, FILTER_INPUT_DEBOUNCE_MS);
@@ -614,8 +618,8 @@ export class MapSession {
   }
 
   private applyActiveFilters(payload: GraphPayload): GraphPayload {
-    const pathFiltered = GraphPathFilter.applyPathFilter(payload, this.activePathFilter);
-    const tagsFiltered = this.applyTagsVisibilityFilter(pathFiltered);
+    const queryFiltered = GraphQueryFilter.applyFilter(payload, this.activeQueryFilter);
+    const tagsFiltered = this.applyTagsVisibilityFilter(queryFiltered);
     return {
       ...tagsFiltered,
       mapLayout: this.mapLayout
@@ -825,76 +829,32 @@ export class MapSession {
     return value.trim().replace(/^#/, "").toLowerCase();
   }
 
-  private applyParsedFilterResult(parseResult: PathFilterParseResult): void {
-    this.applyParsedFilterUiState(parseResult);
+  private applyParsedQueryResult(parseResult: QueryFilterParseResult): void {
+    this.applyParsedQueryUiState(parseResult);
     if (parseResult.isValid) {
-      this.activePathFilter = parseResult.hasPathTerms ? parseResult.parsed : null;
+      this.activeQueryFilter = parseResult.hasSupportedTerms ? parseResult.parsed : null;
     }
   }
 
-  private applyParsedFilterUiState(parseResult: PathFilterParseResult): void {
-    this.pathFilterParseValid = parseResult.isValid;
+  private applyParsedQueryUiState(parseResult: QueryFilterParseResult): void {
+    this.filterParseValid = parseResult.isValid;
 
     if (!parseResult.isValid) {
-      this.pathFilterMessage = "";
+      this.filterMessage = "";
       return;
     }
 
-    this.pathFilterMessage = parseResult.hasUnsupportedTokens
+    this.filterMessage = parseResult.hasUnsupportedTokens
       ? "Only path:, date:, and tag: terms are applied in this view."
       : "";
   }
 
-  private resolveActivePathFilter(parseResult: PathFilterParseResult): ParsedPathFilter | null {
-    if (!parseResult.isValid || !parseResult.hasPathTerms) {
+  private resolveActiveQueryFilter(parseResult: QueryFilterParseResult): ParsedQueryFilter | null {
+    if (!parseResult.isValid || !parseResult.hasSupportedTerms) {
       return null;
     }
 
     return parseResult.parsed;
-  }
-
-  private areParsedPathFiltersEqual(left: ParsedPathFilter | null, right: ParsedPathFilter | null): boolean {
-    if (left === right) {
-      return true;
-    }
-    if (!left || !right) {
-      return false;
-    }
-
-    return (
-      this.areStringArraysEqual(left.includeTerms, right.includeTerms) &&
-      this.areStringArraysEqual(left.excludeTerms, right.excludeTerms) &&
-      this.areRegexArraysEqual(left.includeRegexes, right.includeRegexes) &&
-      this.areRegexArraysEqual(left.excludeRegexes, right.excludeRegexes) &&
-      this.areDateClauseArraysEqual(left.includeDateClauses, right.includeDateClauses) &&
-      this.areDateClauseArraysEqual(left.excludeDateClauses, right.excludeDateClauses) &&
-      this.areStringArraysEqual(left.includeTagTerms, right.includeTagTerms) &&
-      this.areStringArraysEqual(left.excludeTagTerms, right.excludeTagTerms)
-    );
-  }
-
-  private areStringArraysEqual(left: string[], right: string[]): boolean {
-    return left.length === right.length && left.every((value, index) => value === right[index]);
-  }
-
-  private areRegexArraysEqual(left: RegExp[], right: RegExp[]): boolean {
-    return (
-      left.length === right.length &&
-      left.every((value, index) => value.source === right[index]?.source && value.flags === right[index]?.flags)
-    );
-  }
-
-  private areDateClauseArraysEqual(
-    left: ParsedPathFilter["includeDateClauses"],
-    right: ParsedPathFilter["includeDateClauses"]
-  ): boolean {
-    return (
-      left.length === right.length &&
-      left.every((value, index) => (
-        value.comparator === right[index]?.comparator &&
-        value.day === right[index]?.day
-      ))
-    );
   }
 
   private notifyStateChanged(options?: { persist?: boolean }): void {

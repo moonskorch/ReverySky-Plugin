@@ -55,7 +55,7 @@ Current TS baseline test suites:
   - validates ignoring foreign source messages and listener cleanup on `detach()`.
 - `tests/graph/VaultGraphBuilder.test.ts`
   - validates graph extraction from Obsidian vault files and metadata cache.
-- `tests/graph/GraphPathFilter.test.ts`
+- `tests/graph/GraphQueryFilter.test.ts`
   - validates path, date, tag, and unsupported-token filter behavior.
 - `tests/graph/GraphNormalizer.test.ts`
   - validates path normalization (`\` -> `/`);

@@ -162,7 +162,7 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
     await harness.plugin.onload();
     (harness.plugin as unknown as { unityWebglServer: typeof runtimeServer | null }).unityWebglServer = runtimeServer;
     (harness.plugin as unknown as { updateMapViewState: (state: Record<string, unknown>) => void }).updateMapViewState({
-      pathFilterQuery: "tag:#project",
+      filterQuery: "tag:#project",
       showTags: false,
       mapLayout: "dates",
       frameRateMode: "fps60"
@@ -172,7 +172,7 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
 
     expect(harness.saveData).toHaveBeenCalledWith({
       mapViewState: {
-        pathFilterQuery: "tag:#project",
+        filterQuery: "tag:#project",
         showTags: false,
         mapLayout: "dates",
         frameRateMode: "fps60"
@@ -223,7 +223,7 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
 
     (harness.plugin as unknown as { unityWebglServer: typeof runtimeServer | null }).unityWebglServer = runtimeServer;
     (harness.plugin as unknown as { updateMapViewState: (state: Record<string, unknown>) => void }).updateMapViewState({
-      pathFilterQuery: "path:Projects",
+      filterQuery: "path:Projects",
       showTags: true,
       mapLayout: "chronological",
       frameRateMode: "fps24"
@@ -232,7 +232,7 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
 
     expect(harness.saveData).toHaveBeenCalledWith({
       mapViewState: {
-        pathFilterQuery: "path:Projects",
+        filterQuery: "path:Projects",
         showTags: true,
         mapLayout: "chronological",
         frameRateMode: "fps24"
@@ -258,7 +258,7 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
 
     await harness.plugin.onload();
     (harness.plugin as unknown as { updateMapViewState: (state: Record<string, unknown>) => void }).updateMapViewState({
-      pathFilterQuery: "tag:#daily",
+      filterQuery: "tag:#daily",
       showTags: false,
       mapLayout: "dates",
       frameRateMode: "fps60"
@@ -275,7 +275,7 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
 
     expect(harness.saveData).toHaveBeenCalledWith({
       mapViewState: {
-        pathFilterQuery: "tag:#daily",
+        filterQuery: "tag:#daily",
         showTags: false,
         mapLayout: "dates",
         frameRateMode: "fps60"
@@ -303,7 +303,7 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
         updateMapViewState: (state: Record<string, unknown>, persist?: boolean) => void;
       }
     ).updateMapViewState({
-      pathFilterQuery: "path:Projects"
+      filterQuery: "path:Projects"
     }, false);
 
     await expect(
@@ -323,7 +323,7 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
     const harness = createPluginHarness({
       loadDataResult: {
         mapViewState: {
-          pathFilterQuery: "path:Archive",
+          filterQuery: "path:Archive",
           showTags: true,
           mapLayout: "dynamicLinks"
         }

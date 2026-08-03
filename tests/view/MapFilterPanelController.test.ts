@@ -235,7 +235,7 @@ describe("MapFilterPanelController", () => {
       option.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
       expect(searchInput.value).toBe(expectedValue);
-      expect(session.getState()).toMatchObject({ pathFilterQuery: expectedValue });
+      expect(session.getState()).toMatchObject({ filterQuery: expectedValue });
     };
 
     expectRootPrefixReplacement("pa", "path:");
@@ -401,7 +401,7 @@ describe("MapFilterPanelController", () => {
     vi.useFakeTimers();
 
     const session = createSession();
-    await session.setState({ pathFilterQuery: "tag:#project" });
+    await session.setState({ filterQuery: "tag:#project" });
     const controller = new MapFilterPanelController(session);
     const container = createObsidianTestContainer();
     controller.render(container);
@@ -414,14 +414,14 @@ describe("MapFilterPanelController", () => {
 
     searchInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     expect(searchInput.value).toBe("tag:#project");
-    expect(session.getState()).toMatchObject({ pathFilterQuery: "tag:#project" });
+    expect(session.getState()).toMatchObject({ filterQuery: "tag:#project" });
     expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
     expect(searchInput.getAttribute("aria-expanded")).toBe("false");
     expect(searchInput.hasAttribute("aria-activedescendant")).toBe(false);
 
     searchInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     expect(searchInput.value).toBe("");
-    expect(session.getState()).toMatchObject({ pathFilterQuery: "" });
+    expect(session.getState()).toMatchObject({ filterQuery: "" });
     expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(false);
     expect(searchInput.getAttribute("aria-expanded")).toBe("true");
     expect(searchInput.hasAttribute("aria-activedescendant")).toBe(true);
@@ -609,7 +609,7 @@ describe("MapFilterPanelController", () => {
   it("syncs restored session state into the input, message, toggle, and dropdown", async () => {
     const session = createSession();
     await session.setState({
-      pathFilterQuery: "tag:#project",
+      filterQuery: "tag:#project",
       showTags: false,
       mapLayout: "dates",
       renderScale: 1.2,

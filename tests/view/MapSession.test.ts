@@ -158,7 +158,7 @@ describe("MapSession", () => {
     session.start(() => undefined);
 
     await session.setState({
-      pathFilterQuery: "tag:#restored",
+      filterQuery: "tag:#restored",
       showTags: false,
       mapLayout: "dates",
       renderScale: 1.2
@@ -168,7 +168,7 @@ describe("MapSession", () => {
     session.setFilterQuery("tag:#project");
 
     expect(onStateChanged).toHaveBeenLastCalledWith({
-      pathFilterQuery: "tag:#project",
+      filterQuery: "tag:#project",
       showTags: false,
       mapLayout: "dates",
       renderScale: 1.2,
@@ -178,7 +178,7 @@ describe("MapSession", () => {
     vi.runOnlyPendingTimers();
 
     expect(onStateChanged).toHaveBeenLastCalledWith({
-      pathFilterQuery: "tag:#project",
+      filterQuery: "tag:#project",
       showTags: false,
       mapLayout: "dates",
       renderScale: 1.2,
@@ -204,7 +204,7 @@ describe("MapSession", () => {
     session.setFilterQuery(" tag:#project\u00A0");
     vi.advanceTimersByTime(500);
 
-    expect(session.getState()).toMatchObject({ pathFilterQuery: " tag:#project\u00A0" });
+    expect(session.getState()).toMatchObject({ filterQuery: " tag:#project\u00A0" });
     expect(sendGraph).toHaveBeenCalledTimes(2);
   });
 
@@ -275,7 +275,7 @@ describe("MapSession", () => {
 
     expect(session.getState()).toMatchObject({ renderScale: 1.2 });
     expect(onStateChanged).toHaveBeenLastCalledWith({
-      pathFilterQuery: "",
+      filterQuery: "",
       showTags: true,
       mapLayout: "auto",
       renderScale: 1.2,
@@ -285,7 +285,7 @@ describe("MapSession", () => {
     session.persistRenderScale();
 
     expect(onStateChanged).toHaveBeenLastCalledWith({
-      pathFilterQuery: "",
+      filterQuery: "",
       showTags: true,
       mapLayout: "auto",
       renderScale: 1.2,
@@ -1116,7 +1116,7 @@ describe("MapSession", () => {
     });
 
     await session.setState({
-      pathFilterQuery: "tag:#project",
+      filterQuery: "tag:#project",
       showTags: false,
       mapLayout: "dates"
     });
