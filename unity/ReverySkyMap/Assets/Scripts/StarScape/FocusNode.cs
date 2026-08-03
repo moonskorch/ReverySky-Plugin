@@ -7,6 +7,7 @@ public class FocusNode : MonoBehaviour
   [SerializeField] private float selectedDistance = 5.0f;
   [SerializeField] private FocusHighlighter highlighter;
 
+  private Camera inputCamera;
   private MapGraphNode selectedNode;
   public MapGraphNode SelectedNode => selectedNode;
 
@@ -20,16 +21,17 @@ public class FocusNode : MonoBehaviour
 
   private void Start()
   {
+    inputCamera = Camera.main;
     GameInput.Instance.OnSelect += HandleSelect;
   }
 
   private void HandleSelect(Vector2 screenPosition)
   {
-    Ray ray = Camera.main.ScreenPointToRay(screenPosition);
+    Ray ray = inputCamera.ScreenPointToRay(screenPosition);
     bool isHit = Physics.Raycast(
       ray,
       out RaycastHit hit,
-      Camera.main.farClipPlane,
+      inputCamera.farClipPlane,
       GameInput.Instance.InteractableLayers);
 
     if (!isHit) return;

@@ -96,8 +96,6 @@ public sealed class ScapeCameraWarper : MonoBehaviour
   /// </summary>
   public void Rebind(ICartographerEngine engine)
   {
-    if (!cam) cam = Camera.main;
-
     if (engine == null || engine.Stars == null || engine.Stars.Count == 0)
     {
       Clear();

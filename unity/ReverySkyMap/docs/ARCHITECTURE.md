@@ -47,7 +47,7 @@ Obsidian plugin
 - Interaction, focus, and camera
   - Responsibility: turns device input into selection, pan, orbit, zoom, view switching, label emphasis, and note-open actions.
   - Main code location: `Assets/Scripts/GameInput/GameInput.cs`, `Assets/Scripts/StarScape/FocusNode.cs`, `Assets/Scripts/StarScape/FocusHighlighter.cs`, `Assets/Scripts/Camera/CameraOrbitalController.cs`, `Assets/Scripts/UI/ChangeViewControl.cs`, `Assets/Scripts/UI/RotateCameraUI.cs`, `Assets/Scripts/UI/RotateHoldButton.cs`
-  - Important dependencies: `EventSystem`, `Camera.main`, `MapRuntimeContext`, `Cartographer.I`, `GameSettings`
+  - Important dependencies: `EventSystem`, cached main camera references, `MapRuntimeContext`, `Cartographer.I`, `GameSettings`
 - Visual support objects
   - Responsibility: provide prefabs, note-length scale calibration, direct-link crystal buckets, labels, shared culling consumers, notifications, and optional sample graph injection.
   - Main code location: `Assets/Scripts/ScriptableObjects/StarSO.cs`, `Assets/Scripts/ScriptableObjects/TagNodeSO.cs`, `Assets/Scripts/StarScape/StarVisual.cs`, `Assets/Scripts/StarScape/LabelPresenter.cs`, `Assets/Scripts/StarScape/BehaviourCullingTarget.cs`, `Assets/Scripts/Notification/Notification.cs`, `Assets/Scripts/StarScape/SampleDataGenerator.cs`
@@ -189,7 +189,7 @@ Obsidian plugin
   - Responsibility: warps the 2.5D layout around the camera based on the active engine's depth profile.
   - Code anchor: `Assets/Scripts/StarScape/ScapeCameraWarper.cs::Rebind`, `ApplyWarp`, `Clear`
   - Entry point: rebound by `Cartographer` after a `Dates` build
-  - Calls / sends to: active engine `Stars`, `Camera.main`, `layoutParent`
+  - Calls / sends to: active engine `Stars`, serialized `cam`, `layoutParent`
 - `StarSO`
   - Responsibility: instantiates star prefabs and scales them from runtime note-length statistics.
   - Code anchor: `Assets/Scripts/ScriptableObjects/StarSO.cs::Instantiate`

@@ -212,28 +212,17 @@ public sealed class CullingManager : MonoBehaviour
     if (cullingGroup != null)
       return;
 
-    Camera camera = ResolveTargetCamera();
     cullingGroup = new CullingGroup
     {
-      targetCamera = camera,
+      targetCamera = targetCamera,
       onStateChanged = OnCullingStateChanged
     };
 
-    if (camera != null)
-      cullingGroup.SetDistanceReferencePoint(camera.transform);
+    cullingGroup.SetDistanceReferencePoint(targetCamera.transform);
 
     cullingGroup.SetBoundingDistances(new[] { DefaultDistanceBand });
     cullingGroup.SetBoundingSpheres(boundingSpheres);
     cullingGroup.SetBoundingSphereCount(0);
-  }
-
-  private Camera ResolveTargetCamera()
-  {
-    if (targetCamera != null)
-      return targetCamera;
-
-    targetCamera = Camera.main;
-    return targetCamera;
   }
 
   private void EnsureSphereCapacity(int count)

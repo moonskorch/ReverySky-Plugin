@@ -2475,7 +2475,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FocusNode
   layoutParent: {fileID: 1327961058}
   cameraController: {fileID: 330585549}
-  selectedDistance: 8
+  selectedDistance: 10
   highlighter: {fileID: 1780593171}
   FocusRestoreNoteId: 
 --- !u!114 &1780593168
