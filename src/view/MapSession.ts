@@ -111,13 +111,14 @@ export class MapSession {
   private refreshTimer: number | null = null;
   private refreshTimerWindow: Window | null = null;
   private refreshSubscriptionsRegistered = false;
-  private refreshActive = false;
+  private isLive = false;
   private pathFilterQuery = "";
   private showTags = true;
   private mapLayout: MapLayoutPreference = DEFAULT_MAP_LAYOUT_PREFERENCE;
   private renderScale = DEFAULT_RENDER_SCALE;
   private appliedRenderScale = DEFAULT_RENDER_SCALE;
   private frameRateMode: FrameRateMode = DEFAULT_FRAME_RATE_MODE;
+  // Parsed filter currently applied to the outgoing graph; live input commits it only after debounce.
   private activePathFilter: ParsedPathFilter | null = null;
   private pathFilterParseValid = true;
   private pathFilterMessage = "";
@@ -168,7 +169,7 @@ export class MapSession {
   }
 
   start(registerEvent: (eventRef: EventRef) => void): void {
-    this.refreshActive = true;
+    this.isLive = true;
     this.bridgeReady = false;
     this.appliedRenderScale = this.renderScale;
     this.focus.start(registerEvent);
@@ -180,7 +181,7 @@ export class MapSession {
   }
 
   stop(): void {
-    this.refreshActive = false;
+    this.isLive = false;
     this.clearRefreshTimer();
     this.clearFilterInputDebounceTimer();
     this.bridgeReady = false;
@@ -205,11 +206,22 @@ export class MapSession {
   }
 
   setFilterQuery(query: string): void {
-    this.pathFilterQuery = typeof query === "string" ? query : "";
+    const nextQuery = typeof query === "string" ? query : "";
+    if (nextQuery === this.pathFilterQuery) {
+      return;
+    }
+
+    const parseResult = GraphPathFilter.parsePathQuery(nextQuery);
+    const nextActivePathFilter = this.resolveActivePathFilter(parseResult);
+    // Compare parsed filters so whitespace-only query edits do not rebuild the runtime graph.
+    const shouldSendGraph =
+      parseResult.isValid &&
+      !this.areParsedPathFiltersEqual(this.activePathFilter, nextActivePathFilter);
+
+    this.pathFilterQuery = nextQuery;
     this.notifyStateChanged({ persist: false });
-    const parseResult = GraphPathFilter.parsePathQuery(this.pathFilterQuery);
-    this.applyParsedFilterResult(parseResult);
-    this.scheduleFilterGraphUpdate(parseResult.isValid);
+    this.applyParsedFilterUiState(parseResult);
+    this.scheduleFilterGraphUpdate(shouldSendGraph, nextActivePathFilter);
   }
 
   setShowTags(showTags: boolean): void {
@@ -524,7 +536,7 @@ export class MapSession {
   }
 
   private markSemanticRefreshPending(): void {
-    if (!this.refreshActive) {
+    if (!this.isLive) {
       return;
     }
 
@@ -533,7 +545,7 @@ export class MapSession {
   }
 
   private scheduleSourceGraphRebuild(): void {
-    if (!this.refreshActive) {
+    if (!this.isLive) {
       return;
     }
     this.clearRefreshTimer();
@@ -557,8 +569,15 @@ export class MapSession {
     this.tagSuggestions = this.buildTagSuggestions(this.sourceGraphPayload);
   }
 
-  private scheduleFilterGraphUpdate(shouldSendGraph: boolean): void {
-    if (!this.refreshActive) {
+  private scheduleFilterGraphUpdate(
+    shouldSendGraph: boolean,
+    nextActivePathFilter: ParsedPathFilter | null
+  ): void {
+    if (!this.isLive) {
+      // Before the live view starts, keep the filter ready for the first graph emission.
+      if (shouldSendGraph) {
+        this.activePathFilter = nextActivePathFilter;
+      }
       this.notifyStateChanged();
       return;
     }
@@ -571,6 +590,8 @@ export class MapSession {
       this.filterInputDebounceTimerWindow = null;
       this.notifyStateChanged();
       if (shouldSendGraph) {
+        // Apply the parsed candidate at the same moment the graph is rebuilt.
+        this.activePathFilter = nextActivePathFilter;
         this.sendGraphFromSource();
       }
     }, FILTER_INPUT_DEBOUNCE_MS);
@@ -805,6 +826,13 @@ export class MapSession {
   }
 
   private applyParsedFilterResult(parseResult: PathFilterParseResult): void {
+    this.applyParsedFilterUiState(parseResult);
+    if (parseResult.isValid) {
+      this.activePathFilter = parseResult.hasPathTerms ? parseResult.parsed : null;
+    }
+  }
+
+  private applyParsedFilterUiState(parseResult: PathFilterParseResult): void {
     this.pathFilterParseValid = parseResult.isValid;
 
     if (!parseResult.isValid) {
@@ -815,7 +843,58 @@ export class MapSession {
     this.pathFilterMessage = parseResult.hasUnsupportedTokens
       ? "Only path:, date:, and tag: terms are applied in this view."
       : "";
-    this.activePathFilter = parseResult.hasPathTerms ? parseResult.parsed : null;
+  }
+
+  private resolveActivePathFilter(parseResult: PathFilterParseResult): ParsedPathFilter | null {
+    if (!parseResult.isValid || !parseResult.hasPathTerms) {
+      return null;
+    }
+
+    return parseResult.parsed;
+  }
+
+  private areParsedPathFiltersEqual(left: ParsedPathFilter | null, right: ParsedPathFilter | null): boolean {
+    if (left === right) {
+      return true;
+    }
+    if (!left || !right) {
+      return false;
+    }
+
+    return (
+      this.areStringArraysEqual(left.includeTerms, right.includeTerms) &&
+      this.areStringArraysEqual(left.excludeTerms, right.excludeTerms) &&
+      this.areRegexArraysEqual(left.includeRegexes, right.includeRegexes) &&
+      this.areRegexArraysEqual(left.excludeRegexes, right.excludeRegexes) &&
+      this.areDateClauseArraysEqual(left.includeDateClauses, right.includeDateClauses) &&
+      this.areDateClauseArraysEqual(left.excludeDateClauses, right.excludeDateClauses) &&
+      this.areStringArraysEqual(left.includeTagTerms, right.includeTagTerms) &&
+      this.areStringArraysEqual(left.excludeTagTerms, right.excludeTagTerms)
+    );
+  }
+
+  private areStringArraysEqual(left: string[], right: string[]): boolean {
+    return left.length === right.length && left.every((value, index) => value === right[index]);
+  }
+
+  private areRegexArraysEqual(left: RegExp[], right: RegExp[]): boolean {
+    return (
+      left.length === right.length &&
+      left.every((value, index) => value.source === right[index]?.source && value.flags === right[index]?.flags)
+    );
+  }
+
+  private areDateClauseArraysEqual(
+    left: ParsedPathFilter["includeDateClauses"],
+    right: ParsedPathFilter["includeDateClauses"]
+  ): boolean {
+    return (
+      left.length === right.length &&
+      left.every((value, index) => (
+        value.comparator === right[index]?.comparator &&
+        value.day === right[index]?.day
+      ))
+    );
   }
 
   private notifyStateChanged(options?: { persist?: boolean }): void {

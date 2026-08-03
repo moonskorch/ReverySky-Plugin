@@ -186,6 +186,61 @@ describe("MapSession", () => {
     }, undefined);
   });
 
+  it("does not re-emit graph when the parsed filter stays unchanged", () => {
+    vi.useFakeTimers();
+
+    const sendGraph = vi.fn();
+    const session = createSessionForStateTests({ sendGraph });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+
+    expect(sendGraph).toHaveBeenCalledTimes(1);
+
+    session.setFilterQuery("tag:#PROJECT");
+    vi.advanceTimersByTime(500);
+
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+
+    session.setFilterQuery(" tag:#project\u00A0");
+    vi.advanceTimersByTime(500);
+
+    expect(session.getState()).toMatchObject({ pathFilterQuery: " tag:#project\u00A0" });
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+  });
+
+  it("sends the parsed filter when a formatting-only edit extends debounce", () => {
+    vi.useFakeTimers();
+
+    const sendGraph = vi.fn();
+    const session = createSessionForStateTests({ sendGraph });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+
+    session.setFilterQuery("path:Note");
+    session.setFilterQuery("path:Note ");
+    vi.advanceTimersByTime(500);
+
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+  });
+
+  it("ignores exact no-op filter commits", () => {
+    vi.useFakeTimers();
+
+    const sendGraph = vi.fn();
+    const onStateChanged = vi.fn();
+    const session = createSessionForStateTests({ sendGraph, onStateChanged });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    sendGraph.mockClear();
+    onStateChanged.mockClear();
+
+    session.setFilterQuery("");
+    vi.runOnlyPendingTimers();
+
+    expect(onStateChanged).not.toHaveBeenCalled();
+    expect(sendGraph).not.toHaveBeenCalled();
+  });
+
   it("sends frame-rate mode settings without re-emitting graph data", () => {
     const sendGraph = vi.fn();
     const sendRuntimeSettings = vi.fn();
