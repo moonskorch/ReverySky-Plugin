@@ -5,6 +5,8 @@ import {
   IncomingBridgeMessage,
   NoteFocusPayload,
   NoteOpenMessage,
+  RuntimeScreenshotErrorMessage,
+  RuntimeScreenshotResultMessage,
   RuntimeShutdownCompleteMessage
 } from "./BridgeTypes";
 import {
@@ -217,6 +219,72 @@ export class MessageValidator {
 
     if (!this.isNonEmptyString(data.requestId)) {
       errors.push("incoming runtime:shutdown-complete requestId must be a non-empty string");
+    }
+
+    return errors;
+  }
+
+  static validateIncomingRuntimeScreenshotResultMessage(data: RuntimeScreenshotResultMessage): string[] {
+    const errors: string[] = [];
+
+    if (!data || typeof data !== "object") {
+      return ["incoming message must be an object"];
+    }
+
+    if (data.type !== "runtime:screenshot-result") {
+      errors.push("incoming message type must be runtime:screenshot-result");
+    }
+
+    if (data.protocolVersion !== BRIDGE_PROTOCOL_VERSION) {
+      errors.push(
+        `incoming protocolVersion mismatch: expected ${BRIDGE_PROTOCOL_VERSION}, got ${String(data.protocolVersion)}`
+      );
+    }
+
+    if (!this.isNonEmptyString(data.requestId)) {
+      errors.push("incoming runtime:screenshot-result requestId must be a non-empty string");
+    }
+
+    if (!data.payload || typeof data.payload !== "object") {
+      errors.push("incoming runtime:screenshot-result payload must be an object");
+      return errors;
+    }
+
+    if (!(data.payload.blob instanceof Blob)) {
+      errors.push("incoming runtime:screenshot-result payload.blob must be a Blob");
+    }
+
+    return errors;
+  }
+
+  static validateIncomingRuntimeScreenshotErrorMessage(data: RuntimeScreenshotErrorMessage): string[] {
+    const errors: string[] = [];
+
+    if (!data || typeof data !== "object") {
+      return ["incoming message must be an object"];
+    }
+
+    if (data.type !== "runtime:screenshot-error") {
+      errors.push("incoming message type must be runtime:screenshot-error");
+    }
+
+    if (data.protocolVersion !== BRIDGE_PROTOCOL_VERSION) {
+      errors.push(
+        `incoming protocolVersion mismatch: expected ${BRIDGE_PROTOCOL_VERSION}, got ${String(data.protocolVersion)}`
+      );
+    }
+
+    if (!this.isNonEmptyString(data.requestId)) {
+      errors.push("incoming runtime:screenshot-error requestId must be a non-empty string");
+    }
+
+    if (!data.payload || typeof data.payload !== "object") {
+      errors.push("incoming runtime:screenshot-error payload must be an object");
+      return errors;
+    }
+
+    if (!this.isNonEmptyString(data.payload.message)) {
+      errors.push("incoming runtime:screenshot-error payload.message must be a non-empty string");
     }
 
     return errors;

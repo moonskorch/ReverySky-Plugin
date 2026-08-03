@@ -78,11 +78,13 @@ function createPluginHarness(options?: {
   const registerView = vi.fn();
   const registerEditorExtension = vi.fn();
   const addRibbonIcon = vi.fn();
+  const addSettingTab = vi.fn();
   const addCommand = vi.fn();
   const registerEvent = vi.fn();
   const detachLeavesOfType = vi.fn();
   const revealLeaf = vi.fn().mockResolvedValue(undefined);
   const getLeavesOfType = vi.fn((viewType: string) => (viewType === MAP_VIEW_TYPE ? existingLeaves : []));
+  const getActiveViewOfType = vi.fn().mockReturnValue(null);
   const getRightLeaf = vi.fn().mockReturnValue(rightLeaf);
   const workspaceOn = vi.fn().mockReturnValue({ id: "workspace-event-ref" });
   const loadData = vi.fn().mockResolvedValue(options?.loadDataResult ?? null);
@@ -96,6 +98,7 @@ function createPluginHarness(options?: {
     app: {
       workspace: {
         getLeavesOfType,
+        getActiveViewOfType,
         getRightLeaf,
         revealLeaf,
         detachLeavesOfType,
@@ -112,6 +115,7 @@ function createPluginHarness(options?: {
     registerView,
     registerEditorExtension,
     addRibbonIcon,
+    addSettingTab,
     addCommand,
     registerEvent,
     loadData,
@@ -123,10 +127,12 @@ function createPluginHarness(options?: {
     registerView,
     registerEditorExtension,
     addRibbonIcon,
+    addSettingTab,
     addCommand,
     registerEvent,
     workspaceOn,
     getLeavesOfType,
+    getActiveViewOfType,
     getRightLeaf,
     revealLeaf,
     detachLeavesOfType,
@@ -168,6 +174,7 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
       frameRateMode: "fps60"
     });
     expect(harness.registerEditorExtension).toHaveBeenCalledTimes(1);
+    expect(harness.addSettingTab).toHaveBeenCalledTimes(1);
     await (harness.addRibbonIcon.mock.calls[0]?.[2] as () => Promise<void>)();
 
     expect(harness.saveData).toHaveBeenCalledWith({
@@ -207,6 +214,18 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
       active: true
     });
     expect(harness.revealLeaf).toHaveBeenCalledWith(reopenedLeaf);
+  });
+
+  it("delegates screenshot copying to the active map view", async () => {
+    const activeView = {
+      copyRuntimeScreenshotToClipboard: vi.fn().mockResolvedValue(undefined)
+    };
+    const harness = createPluginHarness();
+    harness.plugin.app.workspace.getActiveViewOfType = vi.fn().mockReturnValue(activeView);
+
+    await harness.plugin.copyActiveMapViewScreenshot();
+
+    expect(activeView.copyRuntimeScreenshotToClipboard).toHaveBeenCalledTimes(1);
   });
 
   it("captures map state during plugin unload before detaching the workspace leaf", async () => {

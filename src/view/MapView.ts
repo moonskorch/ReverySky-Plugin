@@ -12,7 +12,14 @@ export const MAP_VIEW_TYPE = "reverysky-map-view";
 
 type BridgePort = Pick<
   UnityIframeBridge,
-  "attach" | "detach" | "shutdown" | "sendGraphSet" | "sendNoteFocus" | "sendRuntimeSettings" | "sendStatus"
+  | "attach"
+  | "detach"
+  | "requestRuntimeScreenshot"
+  | "shutdown"
+  | "sendGraphSet"
+  | "sendNoteFocus"
+  | "sendRuntimeSettings"
+  | "sendStatus"
 >;
 type ObsidianHTMLElement = HTMLElement & {
   createEl: <K extends keyof HTMLElementTagNameMap>(tagName: K) => HTMLElementTagNameMap[K];
@@ -29,6 +36,7 @@ export type MapViewDependencies = {
   buildGraph?: (app: App) => GraphPayload;
   notify?: (message: string) => void;
   now?: () => number;
+  copyScreenshotToClipboard?: (blob: Blob) => Promise<void> | void;
   initialState?: Record<string, unknown> | null;
   onStateChanged?: (state: Record<string, unknown>, options?: { persist?: boolean }) => void;
   onLifecycleOpen?: () => symbol;
@@ -44,6 +52,7 @@ export class MapView extends ItemView {
   private readonly bridge: BridgePort;
   private readonly notify: (message: string) => void;
   private readonly now: () => number;
+  private readonly copyScreenshotToClipboard: (blob: Blob) => Promise<void> | void;
   private readonly session: MapSession;
   private readonly noteOpenRouter: MapNoteOpenRouter;
   private filterPanelController: MapFilterPanelController | null = null;
@@ -69,6 +78,7 @@ export class MapView extends ItemView {
     const buildGraph = deps.buildGraph ?? ((app: App) => VaultGraphBuilder.build(app));
     this.notify = deps.notify ?? ((message: string) => new Notice(message));
     this.now = deps.now ?? Date.now;
+    this.copyScreenshotToClipboard = deps.copyScreenshotToClipboard ?? ((blob: Blob) => this.writeScreenshotToClipboard(blob));
     this.initialState = deps.initialState ? { ...deps.initialState } : null;
     this.onLifecycleOpen = deps.onLifecycleOpen;
     this.onLifecycleClose = deps.onLifecycleClose;
@@ -106,6 +116,16 @@ export class MapView extends ItemView {
 
   requestEditorFocus(path: string): void {
     this.session.requestEditorFocus(path);
+  }
+
+  async copyRuntimeScreenshotToClipboard(): Promise<void> {
+    try {
+      const screenshot = await this.bridge.requestRuntimeScreenshot();
+      await this.copyScreenshotToClipboard(screenshot);
+      this.notify("Screenshot copied to clipboard.");
+    } catch (error) {
+      this.notify(`Failed to copy screenshot: ${this.describeError(error)}`);
+    }
   }
 
   async onOpen(): Promise<void> {
@@ -283,6 +303,48 @@ export class MapView extends ItemView {
     this.iframeLoadAbortController = null;
   }
 
+  private async writeScreenshotToClipboard(blob: Blob): Promise<void> {
+    const imageBuffer = Buffer.from(await blob.arrayBuffer());
+    const electronClipboard = this.getElectronClipboard();
+    if (electronClipboard) {
+      const image = electronClipboard.nativeImage.createFromBuffer(imageBuffer);
+      if (!image.isEmpty()) {
+        electronClipboard.clipboard.writeImage(image);
+        return;
+      }
+    }
+
+    if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          [blob.type || "image/png"]: blob
+        })
+      ]);
+      return;
+    }
+
+    throw new Error("No clipboard API is available.");
+  }
+
+  private getElectronClipboard(): {
+    clipboard: { writeImage: (image: { isEmpty: () => boolean }) => void };
+    nativeImage: { createFromBuffer: (buffer: Buffer) => { isEmpty: () => boolean } };
+  } | null {
+    const maybeRequire = (globalThis as typeof globalThis & { require?: NodeRequire }).require;
+    if (typeof maybeRequire !== "function") {
+      return null;
+    }
+
+    try {
+      return maybeRequire("electron") as {
+        clipboard: { writeImage: (image: { isEmpty: () => boolean }) => void };
+        nativeImage: { createFromBuffer: (buffer: Buffer) => { isEmpty: () => boolean } };
+      };
+    } catch {
+      return null;
+    }
+  }
+
   private removeRuntimeIframe(container: ObsidianHTMLElement): void {
     container.querySelector("iframe.reverysky-map-iframe")?.remove();
   }
@@ -311,6 +373,14 @@ export class MapView extends ItemView {
     }
 
     this.runtimeLease = this.onLifecycleOpen();
+  }
+
+  private describeError(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return String(error);
   }
 }
 

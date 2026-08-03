@@ -226,6 +226,81 @@
           );
         }
 
+        function postRuntimeScreenshotResult(requestId, blob) {
+          if (isShuttingDown || !window.parent) {
+            return;
+          }
+
+          window.parent.postMessage(
+            {
+              protocolVersion: protocolVersion,
+              type: "runtime:screenshot-result",
+              requestId: typeof requestId === "string" ? requestId : "",
+              payload: {
+                blob: blob
+              }
+            },
+            "*"
+          );
+        }
+
+        function postRuntimeScreenshotError(requestId, message) {
+          if (isShuttingDown || !window.parent) {
+            return;
+          }
+
+          window.parent.postMessage(
+            {
+              protocolVersion: protocolVersion,
+              type: "runtime:screenshot-error",
+              requestId: typeof requestId === "string" ? requestId : "",
+              payload: {
+                message: typeof message === "string" && message.trim() ? message.trim() : "Failed to capture screenshot."
+              }
+            },
+            "*"
+          );
+        }
+
+        function waitForNextFrame() {
+          return new Promise((resolve) => {
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                resolve();
+              });
+            });
+          });
+        }
+
+        async function handleRuntimeScreenshotRequest(data) {
+          const requestId = typeof data.requestId === "string" ? data.requestId : "";
+          if (!requestId) {
+            postRuntimeScreenshotError(requestId, "Screenshot requestId is missing.");
+            return;
+          }
+
+          if (!canvas || typeof canvas.toBlob !== "function") {
+            postRuntimeScreenshotError(requestId, "Canvas snapshot is not available.");
+            return;
+          }
+
+          try {
+            await waitForNextFrame();
+            const blob = await new Promise((resolve, reject) => {
+              canvas.toBlob((snapshot) => {
+                if (snapshot) {
+                  resolve(snapshot);
+                  return;
+                }
+                reject(new Error("Canvas returned an empty snapshot."));
+              }, "image/png");
+            });
+            postRuntimeScreenshotResult(requestId, blob);
+          } catch (error) {
+            postRuntimeScreenshotError(requestId, error instanceof Error ? error.message : String(error));
+          }
+        }
+
         function resizeCanvas() {
           resizeTimerId = 0;
           if (isShuttingDown || runtimeMode === "failed") {
@@ -533,6 +608,11 @@
 
           if (data.type === "runtime:settings") {
             applyRuntimeSettings(data);
+            return;
+          }
+
+          if (data.type === "runtime:screenshot-request") {
+            handleRuntimeScreenshotRequest(data);
           }
         }
 

@@ -159,6 +159,37 @@ describe("UnityIframeBridge", () => {
     bridge.detach();
   });
 
+  it("requests a runtime screenshot and resolves with the result blob", async () => {
+    const bridge = new UnityIframeBridge();
+    const postMessage = vi.fn();
+    const iframeWindow = { postMessage } as unknown as Window;
+    const screenshotBlob = new Blob(["snapshot"], { type: "image/png" });
+
+    bridge.attach(iframeWindow, {});
+    const screenshotPromise = bridge.requestRuntimeScreenshot();
+
+    expect(postMessage).toHaveBeenCalledTimes(1);
+    const [requestMessage, targetOrigin] = postMessage.mock.calls[0] as [Record<string, unknown>, string];
+    expect(targetOrigin).toBe("*");
+    expect(requestMessage.type).toBe("runtime:screenshot-request");
+    expect(requestMessage.protocolVersion).toBe(BRIDGE_PROTOCOL_VERSION);
+
+    dispatchMessage(
+      {
+        type: "runtime:screenshot-result",
+        protocolVersion: BRIDGE_PROTOCOL_VERSION,
+        requestId: requestMessage.requestId as string,
+        payload: {
+          blob: screenshotBlob
+        }
+      },
+      iframeWindow
+    );
+
+    await expect(screenshotPromise).resolves.toBe(screenshotBlob);
+    bridge.detach();
+  });
+
   it("reports error and does not send runtime:settings for an invalid frame-rate mode", () => {
     const bridge = new UnityIframeBridge();
     const postMessage = vi.fn();

@@ -23,6 +23,7 @@ function makeBridgeForTest(overrides: Partial<BridgeForTest>): BridgeForTest {
   return {
     attach: vi.fn(),
     detach: vi.fn(),
+    requestRuntimeScreenshot: vi.fn(),
     shutdown: vi.fn().mockResolvedValue("complete"),
     sendGraphSet: vi.fn(),
     sendNoteFocus: vi.fn(),
@@ -125,6 +126,44 @@ describe("MapView bridge integration", () => {
     );
 
     expect(view.navigation).toBe(false);
+  });
+
+  it("copies a runtime screenshot through the injected clipboard helper", async () => {
+    const app = {
+      workspace: {
+        activeLeaf: null,
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn()
+    };
+    const screenshot = new Blob(["snapshot"], { type: "image/png" });
+    const requestRuntimeScreenshot = vi.fn().mockResolvedValue(screenshot);
+    const copyScreenshotToClipboard = vi.fn().mockResolvedValue(undefined);
+    const notify = vi.fn();
+
+    const view = new MapView(
+      { app } as never,
+      plugin as never,
+      {
+        buildGraph: vi.fn().mockReturnValue(makePayload()) as BuildGraphForTest,
+        createBridge: () =>
+          makeBridgeForTest({
+            requestRuntimeScreenshot
+          }),
+        copyScreenshotToClipboard,
+        notify
+      }
+    );
+
+    await view.copyRuntimeScreenshotToClipboard();
+
+    expect(requestRuntimeScreenshot).toHaveBeenCalledTimes(1);
+    expect(copyScreenshotToClipboard).toHaveBeenCalledWith(screenshot);
+    expect(notify).toHaveBeenCalledWith("Screenshot copied to clipboard.");
   });
 
   it("creates iframe on open, wires bridge handshake, and detaches/cleans on close", async () => {

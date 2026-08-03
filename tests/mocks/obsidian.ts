@@ -59,6 +59,8 @@ export class Plugin {
 
   addCommand(_command: { id: string; name: string; callback: () => unknown }): void {}
 
+  addSettingTab(_tab: unknown): void {}
+
   async loadData(): Promise<unknown> {
     return null;
   }
@@ -88,6 +90,41 @@ export class ItemView {
 
 export class Notice {
   constructor(_message: string) {}
+}
+
+export class PluginSettingTab {
+  public containerEl: HTMLElement;
+
+  constructor(public app: unknown, public plugin: unknown) {
+    this.containerEl = document.createElement("div");
+  }
+
+  display(): void {}
+}
+
+export class Setting {
+  constructor(public containerEl: HTMLElement) {}
+
+  setName(_name: string): this {
+    return this;
+  }
+
+  setDesc(_desc: string): this {
+    return this;
+  }
+
+  addButton(callback: (button: {
+    setButtonText: (text: string) => unknown;
+    setCta: () => unknown;
+    onClick: (handler: () => unknown) => unknown;
+  }) => unknown): this {
+    callback({
+      setButtonText: () => undefined,
+      setCta: () => undefined,
+      onClick: () => undefined
+    });
+    return this;
+  }
 }
 
 export class WorkspaceLeaf {}

@@ -7,6 +7,7 @@ import {
   IncomingBridgeMessage,
   NoteOpenPayload,
   OutgoingBridgeMessage,
+  RuntimeScreenshotRequestMessage,
   RuntimeSettingsMessage,
   RuntimeSettingsPayload,
   RuntimeShutdownMessage,
@@ -29,6 +30,14 @@ type PendingShutdown = {
   timeoutWindow: Window;
 };
 
+type PendingRuntimeScreenshot = {
+  requestId: string;
+  resolve: (blob: Blob) => void;
+  reject: (error: Error) => void;
+  timeoutId: number;
+  timeoutWindow: Window;
+};
+
 /**
  * Thin postMessage transport for the Unity iframe.
  * It owns attachment, validation, and routing of incoming bridge events.
@@ -39,6 +48,7 @@ export class UnityIframeBridge {
   private attached = false;
   private callbacks: BridgeCallbacks = {};
   private pendingShutdown: PendingShutdown | null = null;
+  private pendingRuntimeScreenshot: PendingRuntimeScreenshot | null = null;
   private requestSequence = 0;
   private readonly onMessageRef = (event: MessageEvent) => this.onMessage(event);
 
@@ -47,6 +57,7 @@ export class UnityIframeBridge {
    */
   attach(iframeWindow: Window, callbacks: BridgeCallbacks, messageWindow: Window = window): void {
     this.resolvePendingShutdown("superseded");
+    this.rejectPendingRuntimeScreenshot("superseded");
 
     if (this.attached) {
       this.detach();
@@ -61,6 +72,7 @@ export class UnityIframeBridge {
 
   detach(): void {
     this.resolvePendingShutdown("superseded");
+    this.rejectPendingRuntimeScreenshot("superseded");
 
     if (!this.attached) {
       return;
@@ -171,6 +183,43 @@ export class UnityIframeBridge {
     this.postOutgoingMessage(iframeWindow, message);
   }
 
+  requestRuntimeScreenshot(timeoutMs = 2000): Promise<Blob> {
+    const iframeWindow = this.getIframeWindowForSend();
+    if (!iframeWindow) {
+      return Promise.reject(new Error("Bridge is not attached to iframe window."));
+    }
+
+    this.rejectPendingRuntimeScreenshot("superseded");
+
+    const requestId = this.createRequestId();
+    const message: RuntimeScreenshotRequestMessage = {
+      protocolVersion: BRIDGE_PROTOCOL_VERSION,
+      type: "runtime:screenshot-request",
+      requestId
+    };
+
+    return new Promise((resolve, reject) => {
+      const timeoutWindow = this.messageWindow ?? window;
+      const timeoutId = timeoutWindow.setTimeout(() => {
+        this.rejectPendingRuntimeScreenshot("timeout");
+      }, timeoutMs);
+
+      this.pendingRuntimeScreenshot = {
+        requestId,
+        resolve,
+        reject,
+        timeoutId,
+        timeoutWindow
+      };
+
+      try {
+        this.postOutgoingMessage(iframeWindow, message);
+      } catch (error) {
+        this.rejectPendingRuntimeScreenshot(error instanceof Error ? error.message : "postMessage failed");
+      }
+    });
+  }
+
   sendNoteFocus(payload: NoteFocusPayload): void {
     const iframeWindow = this.getIframeWindowForSend();
     if (!iframeWindow) {
@@ -244,6 +293,32 @@ export class UnityIframeBridge {
         return;
       }
       this.resolvePendingShutdown("complete");
+      return;
+    }
+
+    if (data.type === "runtime:screenshot-result") {
+      const incomingErrors = MessageValidator.validateIncomingRuntimeScreenshotResultMessage(data);
+      if (incomingErrors.length > 0) {
+        this.callbacks.onError?.(`Invalid incoming bridge message: ${incomingErrors.join("; ")}`);
+        return;
+      }
+      if (this.pendingRuntimeScreenshot?.requestId !== data.requestId) {
+        return;
+      }
+      this.resolvePendingRuntimeScreenshot(data.payload.blob);
+      return;
+    }
+
+    if (data.type === "runtime:screenshot-error") {
+      const incomingErrors = MessageValidator.validateIncomingRuntimeScreenshotErrorMessage(data);
+      if (incomingErrors.length > 0) {
+        this.callbacks.onError?.(`Invalid incoming bridge message: ${incomingErrors.join("; ")}`);
+        return;
+      }
+      if (this.pendingRuntimeScreenshot?.requestId !== data.requestId) {
+        return;
+      }
+      this.rejectPendingRuntimeScreenshot(data.payload.message);
     }
   }
 
@@ -256,6 +331,28 @@ export class UnityIframeBridge {
     pendingShutdown.timeoutWindow.clearTimeout(pendingShutdown.timeoutId);
     this.pendingShutdown = null;
     pendingShutdown.resolve(result);
+  }
+
+  private resolvePendingRuntimeScreenshot(blob: Blob): void {
+    const pendingRuntimeScreenshot = this.pendingRuntimeScreenshot;
+    if (!pendingRuntimeScreenshot) {
+      return;
+    }
+
+    pendingRuntimeScreenshot.timeoutWindow.clearTimeout(pendingRuntimeScreenshot.timeoutId);
+    this.pendingRuntimeScreenshot = null;
+    pendingRuntimeScreenshot.resolve(blob);
+  }
+
+  private rejectPendingRuntimeScreenshot(reason: string): void {
+    const pendingRuntimeScreenshot = this.pendingRuntimeScreenshot;
+    if (!pendingRuntimeScreenshot) {
+      return;
+    }
+
+    pendingRuntimeScreenshot.timeoutWindow.clearTimeout(pendingRuntimeScreenshot.timeoutId);
+    this.pendingRuntimeScreenshot = null;
+    pendingRuntimeScreenshot.reject(new Error(`Screenshot request ${reason}.`));
   }
 
   private createRequestId(): string {
