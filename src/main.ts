@@ -1,4 +1,4 @@
-import { Notice, Plugin, PluginSettingTab, Setting, WorkspaceLeaf, type App, type Tasks } from "obsidian";
+import { Plugin, WorkspaceLeaf, type Tasks } from "obsidian";
 import { MAP_VIEW_TYPE, MapView } from "./view/MapView";
 import { createMarkdownEditorFocusExtension } from "./view/MarkdownEditorFocus";
 import {
@@ -17,38 +17,6 @@ import path from "node:path";
 type PersistedPluginData = {
   mapViewState?: Record<string, unknown>;
 };
-
-type CopyableMapView = {
-  copyRuntimeScreenshotToClipboard: () => Promise<void>;
-};
-
-class ReverySkyMapSettingsTab extends PluginSettingTab {
-  constructor(app: App, private readonly plugin: ReverySkyMapPlugin) {
-    super(app, plugin);
-  }
-
-  display(): void {
-    const { containerEl } = this;
-    containerEl.empty();
-    containerEl.createEl("h2", { text: "ReverySky 3D Graph" });
-
-    new Setting(containerEl)
-      .setName("Copy graph screenshot")
-      .setDesc("Copies the current graph canvas to the clipboard as a PNG image.")
-      .addButton((button) => {
-        button
-          .setButtonText("Copy screenshot")
-          .setCta()
-          .onClick(() => {
-            void this.plugin.copyActiveMapViewScreenshot();
-          });
-      });
-  }
-}
-
-function isCopyableMapView(view: unknown): view is CopyableMapView {
-  return !!view && typeof (view as CopyableMapView).copyRuntimeScreenshotToClipboard === "function";
-}
 
 /**
  * Obsidian plugin entry point.
@@ -119,13 +87,19 @@ export default class ReverySkyMapPlugin extends Plugin {
       await this.toggleMapView();
     });
 
-    this.addSettingTab(new ReverySkyMapSettingsTab(this.app, this));
-
     this.addCommand({
       id: "open-map",
       name: "Open",
       callback: async () => {
         await this.activateMapView();
+      }
+    });
+
+    this.addCommand({
+      id: "copy-screenshot",
+      name: "Copy screenshot",
+      callback: async () => {
+        await this.copyActiveMapViewScreenshot();
       }
     });
 
@@ -263,6 +237,25 @@ export default class ReverySkyMapPlugin extends Plugin {
     await this.activateMapView();
   }
 
+  private async copyActiveMapViewScreenshot(): Promise<void> {
+    const activeView = this.getActiveMapView();
+    if (!activeView) {
+      return;
+    }
+
+    await activeView.copyRuntimeScreenshotToClipboard();
+  }
+
+  private getActiveMapView(): MapView | null {
+    const { workspace } = this.app;
+    const activeView = workspace.getActiveViewOfType(MapView);
+    if (activeView) {
+      return activeView;
+    }
+
+    return (workspace.getLeavesOfType(MAP_VIEW_TYPE)[0]?.view as MapView | undefined) ?? null;
+  }
+
   private async stopUnityRuntimeServer(): Promise<void> {
     // A view can close while the first runtime URL is still being resolved.
     // Wait for that startup attempt before deciding whether there is a server to stop.
@@ -298,23 +291,6 @@ export default class ReverySkyMapPlugin extends Plugin {
     for (const leaf of leaves) {
       (leaf.view as MapView | undefined)?.requestEditorFocus(path);
     }
-  }
-
-  async copyActiveMapViewScreenshot(): Promise<void> {
-    const activeView = this.app.workspace.getActiveViewOfType?.(MapView) ?? null;
-    if (isCopyableMapView(activeView)) {
-      await activeView.copyRuntimeScreenshotToClipboard();
-      return;
-    }
-
-    const leaf = this.app.workspace.getLeavesOfType(MAP_VIEW_TYPE)[0] ?? null;
-    const view = leaf?.view ?? null;
-    if (isCopyableMapView(view)) {
-      await view.copyRuntimeScreenshotToClipboard();
-      return;
-    }
-
-    new Notice("Open a ReverySky 3D Graph view first.");
   }
 
   /**

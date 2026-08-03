@@ -48,7 +48,7 @@
       .visual-stage {
         position: relative;
         width: 320px;
-        height: 440px;
+        height: 560px;
         overflow: visible;
         background:
           radial-gradient(circle at 24% 14%, rgba(255, 255, 255, 0.12) 0 1px, transparent 2px),
@@ -57,7 +57,7 @@
       }
 
       .visual-stage--collapsed {
-        height: 180px;
+        height: 210px;
       }
 
       .visual-stage--compact-overflow {
@@ -70,7 +70,8 @@
       }
 
       .visual-panel-shell .reverysky-map-filter-panel {
-        display: grid;
+        display: flex;
+        flex-direction: column;
       }
 
       .visual-gear-reference {
@@ -157,95 +158,116 @@
           <button class="reverysky-map-filter-toggle" type="button" aria-label="Open filters"></button>
         </div>
         <div class="reverysky-map-filter-panel">
-          <div class="reverysky-map-filter-section reverysky-map-settings-section">
-            <div class="reverysky-map-filter-header">
-              <button class="reverysky-map-filter-section-toggle" type="button" aria-label="Collapse Selection" aria-expanded="true" tabindex="-1">
-                <span class="reverysky-map-filter-section-chevron">
+          <div class="reverysky-map-filter-panel-body">
+            <div class="reverysky-map-filter-section reverysky-map-settings-section">
+              <div class="reverysky-map-filter-header">
+                <button class="reverysky-map-filter-section-toggle" type="button" aria-label="Collapse Selection" aria-expanded="true" tabindex="-1">
+                  <span class="reverysky-map-filter-section-chevron">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="m9 18 6-6-6-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </span>
+                  <span class="reverysky-map-filter-title">Selection</span>
+                </button>
+                <button class="reverysky-map-filter-close" type="button" aria-label="Close filters">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="m9 18 6-6-6-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M18 6 6 18M6 6l12 12" fill="none" stroke="currentColor" stroke-linecap="round" />
                   </svg>
-                </span>
-                <span class="reverysky-map-filter-title">Selection</span>
-              </button>
-              <button class="reverysky-map-filter-close" type="button" aria-label="Close filters">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M18 6 6 18M6 6l12 12" fill="none" stroke="currentColor" stroke-linecap="round" />
-                </svg>
-              </button>
-            </div>
-
-            <div class="reverysky-map-filter-section-content">
-              <div class="reverysky-map-filter-search-area">
-                <div class="reverysky-map-filter-field-label">Filter</div>
-                <div class="search-input-container">
-                  <input class="search-input" type="search" aria-label="Search in filter" placeholder="Search in..." />
-                </div>
-                <div class="reverysky-map-filter-suggestions reverysky-map-filter-suggestions--hidden"></div>
-              </div>
-
-              <div class="reverysky-map-filter-message reverysky-map-filter-message--hidden"></div>
-
-              <div class="reverysky-map-tags-toggle-row">
-                <div class="reverysky-map-filter-field-label">Tags</div>
-                <button class="reverysky-map-tags-toggle" type="button" aria-label="Toggle tags" aria-checked="true">
-                  <span class="reverysky-map-tags-toggle-thumb"></span>
                 </button>
               </div>
 
-              <div class="reverysky-map-filter-section reverysky-map-filter-control-group">
-                <div class="reverysky-map-filter-field-label">Layout</div>
-                <div class="reverysky-map-engine-select-host">
-                  <select class="reverysky-map-engine-select" aria-label="Select layout">
-                    <option value="auto" selected>Auto</option>
-                    <option value="dynamicLinks">Dynamic links (&lt;500 notes)</option>
-                    <option value="scalableLinks">Scalable links</option>
-                    <option value="dates">Dates</option>
-                  </select>
+              <div class="reverysky-map-filter-section-content">
+                <div class="reverysky-map-filter-search-area">
+                  <div class="reverysky-map-filter-field-label">Filter</div>
+                  <div class="search-input-container">
+                    <input class="search-input" type="search" aria-label="Search in filter" placeholder="Search in..." />
+                  </div>
+                  <div class="reverysky-map-filter-suggestions reverysky-map-filter-suggestions--hidden"></div>
+                </div>
+
+                <div class="reverysky-map-filter-message reverysky-map-filter-message--hidden"></div>
+
+                <div class="reverysky-map-tags-toggle-row">
+                  <div class="reverysky-map-filter-field-label">Tags</div>
+                  <button class="reverysky-map-tags-toggle" type="button" aria-label="Toggle tags" aria-checked="true">
+                    <span class="reverysky-map-tags-toggle-thumb"></span>
+                  </button>
+                </div>
+
+                <div class="reverysky-map-filter-section reverysky-map-filter-control-group">
+                  <div class="reverysky-map-filter-field-label">Layout</div>
+                  <div class="reverysky-map-engine-select-host">
+                    <select class="reverysky-map-engine-select" aria-label="Select layout">
+                      <option value="auto" selected>Auto</option>
+                      <option value="dynamicLinks">Dynamic links (&lt;500 notes)</option>
+                      <option value="scalableLinks">Scalable links</option>
+                      <option value="dates">Dates</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div class="reverysky-map-filter-section reverysky-map-graphics-section">
-            <div class="reverysky-map-filter-header">
-              <button class="reverysky-map-filter-section-toggle" type="button" aria-label="Collapse Graphics" aria-expanded="true" tabindex="-1">
-                <span class="reverysky-map-filter-section-chevron">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="m9 18 6-6-6-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
-                  </svg>
-                </span>
-                <span class="reverysky-map-filter-title">Graphics</span>
-              </button>
-            </div>
-
-            <div class="reverysky-map-filter-section-content">
-              <div class="reverysky-map-filter-section reverysky-map-filter-control-group reverysky-map-render-scale-section">
-                <div class="reverysky-map-render-scale-header">
-                  <div class="reverysky-map-filter-field-label">Render scale</div>
-                  <div class="reverysky-map-render-scale-value">1.0x</div>
-                </div>
-                <input
-                  class="reverysky-map-render-scale-input"
-                  type="range"
-                  min="0.5"
-                  max="1.5"
-                  step="0.1"
-                  value="1"
-                  aria-label="Render scale"
-                />
-                <div class="reverysky-map-render-scale-message reverysky-map-render-scale-message--hidden"></div>
+            <div class="reverysky-map-filter-section reverysky-map-graphics-section">
+              <div class="reverysky-map-filter-header">
+                <button class="reverysky-map-filter-section-toggle" type="button" aria-label="Collapse Graphics" aria-expanded="true" tabindex="-1">
+                  <span class="reverysky-map-filter-section-chevron">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="m9 18 6-6-6-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </span>
+                  <span class="reverysky-map-filter-title">Graphics</span>
+                </button>
               </div>
 
-              <div class="reverysky-map-filter-section reverysky-map-filter-control-group">
-                <div class="reverysky-map-filter-field-label">Frame rate</div>
-                <div class="reverysky-map-engine-select-host">
-                  <select class="reverysky-map-engine-select reverysky-map-frame-rate-mode-select" aria-label="Select frame rate">
-                    <option value="auto" selected>Auto</option>
-                    <option value="fps60">60 FPS</option>
-                    <option value="fps30">30 FPS</option>
-                    <option value="fps24">24 FPS</option>
-                  </select>
+              <div class="reverysky-map-filter-section-content">
+                <div class="reverysky-map-filter-section reverysky-map-filter-control-group reverysky-map-render-scale-section">
+                  <div class="reverysky-map-render-scale-header">
+                    <div class="reverysky-map-filter-field-label">Render scale</div>
+                    <div class="reverysky-map-render-scale-value">1.0x</div>
+                  </div>
+                  <input
+                    class="reverysky-map-render-scale-input"
+                    type="range"
+                    min="0.5"
+                    max="1.5"
+                    step="0.1"
+                    value="1"
+                    aria-label="Render scale"
+                  />
+                  <div class="reverysky-map-render-scale-message reverysky-map-render-scale-message--hidden"></div>
                 </div>
+
+                <div class="reverysky-map-filter-section reverysky-map-filter-control-group">
+                  <div class="reverysky-map-filter-field-label">Frame rate</div>
+                  <div class="reverysky-map-engine-select-host">
+                    <select class="reverysky-map-engine-select reverysky-map-frame-rate-mode-select" aria-label="Select frame rate">
+                      <option value="auto" selected>Auto</option>
+                      <option value="fps60">60 FPS</option>
+                      <option value="fps30">30 FPS</option>
+                      <option value="fps24">24 FPS</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="reverysky-map-filter-section reverysky-map-screenshot-section reverysky-map-filter-section--collapsed">
+              <div class="reverysky-map-filter-header">
+                <button class="reverysky-map-filter-section-toggle" type="button" aria-label="Expand Screenshot" aria-expanded="false" tabindex="-1">
+                  <span class="reverysky-map-filter-section-chevron">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="m9 18 6-6-6-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </span>
+                  <span class="reverysky-map-filter-title">Screenshot</span>
+                </button>
+              </div>
+
+              <div class="reverysky-map-filter-section-content reverysky-map-filter-section-content--collapsed">
+                <button class="reverysky-map-screenshot-button" type="button" aria-label="Copy graph screenshot">
+                  Copy screenshot
+                </button>
               </div>
             </div>
           </div>

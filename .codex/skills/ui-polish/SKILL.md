@@ -19,6 +19,14 @@ Match the owner's reference as closely as practical with the smallest maintainab
 
 Do not ask the owner to explain the implementation.
 
+## Styling principle
+
+For plugin UI, keep the structure local and theme-aware.
+
+* Use custom `reverysky-*` classes for layout, structure, and behavior.
+* Use Obsidian theme variables for color, radius, shadow, spacing, and typography.
+* Avoid hard-coded colors unless the task explicitly calls for a fixed palette.
+
 ## Visual sources of truth
 
 Keep these roles clear.

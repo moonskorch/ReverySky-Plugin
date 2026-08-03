@@ -18,12 +18,23 @@ test.describe("settings panel", () => {
 
     const stage = page.locator("[data-visual-stage]");
     const graphicsSection = page.locator(".reverysky-map-graphics-section");
+    const screenshotSection = page.locator(".reverysky-map-screenshot-section");
+    const screenshotToggle = page.locator(
+      ".reverysky-map-screenshot-section .reverysky-map-filter-section-toggle"
+    );
+    const screenshotButton = page.locator(".reverysky-map-screenshot-button");
     const frameRateSelect = page.locator(".reverysky-map-frame-rate-mode-select");
     const closeButton = page.locator(".reverysky-map-filter-close");
     const gearReference = page.locator(".visual-gear-reference .reverysky-map-filter-toggle");
 
     await expect(graphicsSection).toContainText("Graphics");
     await expect(graphicsSection).toContainText("Render scale");
+    await screenshotToggle.evaluate((button) => {
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 0 }));
+    });
+    await expect(screenshotSection).toContainText("Screenshot");
+    await expect(screenshotButton).toHaveText("Copy screenshot");
+    await expect(screenshotToggle).toHaveAttribute("aria-expanded", "true");
     await expect(frameRateSelect).toHaveValue("auto");
     await expect(
       page.locator(".reverysky-map-settings-section .reverysky-map-filter-section-toggle")
@@ -46,7 +57,10 @@ test.describe("settings panel", () => {
     await page.goto(pathToFileURL(previewPath).href);
 
     const focusedControls: string[] = [];
-    for (let step = 0; step < 6; step += 1) {
+    await page.locator(".reverysky-map-screenshot-section .reverysky-map-filter-section-toggle").evaluate((button) => {
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 0 }));
+    });
+    for (let step = 0; step < 7; step += 1) {
       await page.keyboard.press("Tab");
       focusedControls.push(
         await page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? "")
@@ -59,7 +73,8 @@ test.describe("settings panel", () => {
       "Toggle tags",
       "Select layout",
       "Render scale",
-      "Select frame rate"
+      "Select frame rate",
+      "Copy graph screenshot"
     ]);
   });
 
@@ -74,6 +89,11 @@ test.describe("settings panel", () => {
     const graphicsToggle = page.locator(
       ".reverysky-map-graphics-section .reverysky-map-filter-section-toggle"
     );
+    const screenshotToggle = page.locator(
+      ".reverysky-map-screenshot-section .reverysky-map-filter-section-toggle"
+    );
+    const screenshotSection = page.locator(".reverysky-map-screenshot-section");
+    const screenshotButton = page.locator(".reverysky-map-screenshot-button");
 
     await settingsToggle.click();
     await graphicsToggle.click();
@@ -83,6 +103,9 @@ test.describe("settings panel", () => {
 
     await expect(settingsToggle).toHaveAttribute("aria-expanded", "false");
     await expect(graphicsToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(screenshotToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(screenshotSection).toContainText("Screenshot");
+    await expect(screenshotButton).not.toBeVisible();
 
     await expect(stage).toHaveScreenshot("settings-panel-collapsed.png", {
       animations: "disabled"
@@ -95,13 +118,14 @@ test.describe("settings panel", () => {
 
     const stage = page.locator("[data-visual-stage]");
     const panel = page.locator(".reverysky-map-filter-panel");
+    const panelBody = page.locator(".reverysky-map-filter-panel-body");
     await stage.evaluate((element) => {
       element.classList.add("visual-stage--compact-overflow");
     });
 
-    await expect(panel).toHaveCSS("overflow-y", "auto");
+    await expect(panelBody).toHaveCSS("overflow-y", "auto");
 
-    const beforeWheel = await panel.evaluate((element) => {
+    const beforeWheel = await panelBody.evaluate((element) => {
       const htmlElement = element as HTMLElement;
 
       return {
@@ -118,13 +142,13 @@ test.describe("settings panel", () => {
     expect(beforeWheel.scrollHeight).toBeGreaterThan(beforeWheel.clientHeight);
     expect(beforeWheel.scrollbarGutter).toBeLessThanOrEqual(1);
 
-    const panelBox = await panel.boundingBox();
-    expect(panelBox).not.toBeNull();
-    await page.mouse.move(panelBox!.x + 12, panelBox!.y + panelBox!.height - 12);
+    const panelBodyBox = await panelBody.boundingBox();
+    expect(panelBodyBox).not.toBeNull();
+    await page.mouse.move(panelBodyBox!.x + 12, panelBodyBox!.y + panelBodyBox!.height - 12);
     await page.mouse.wheel(0, 480);
 
-    await expect.poll(() => panel.evaluate((element) => element.scrollTop)).toBeGreaterThan(beforeWheel.scrollTop);
-    const afterWheel = await panel.evaluate((element) => element.scrollTop);
+    await expect.poll(() => panelBody.evaluate((element) => element.scrollTop)).toBeGreaterThan(beforeWheel.scrollTop);
+    const afterWheel = await panelBody.evaluate((element) => element.scrollTop);
     expect(afterWheel).toBeGreaterThan(beforeWheel.scrollTop);
   });
 });

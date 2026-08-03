@@ -199,7 +199,9 @@ export class MapView extends ItemView {
     this.filterPanelController?.dispose();
     this.filterPanelController = null;
     emptyElement(container);
-    this.filterPanelController = new MapFilterPanelController(this.session);
+    this.filterPanelController = new MapFilterPanelController(this.session, {
+      onCopyScreenshotRequested: () => this.copyRuntimeScreenshotToClipboard()
+    });
     const iframeHost = this.filterPanelController.render(container);
 
     let iframeSrc: string;

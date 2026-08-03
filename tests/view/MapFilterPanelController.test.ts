@@ -652,6 +652,33 @@ describe("MapFilterPanelController", () => {
     expect(message.textContent).toBe("");
   });
 
+  it("renders a screenshot section with a collapse toggle and copy action", () => {
+    const session = createSession();
+    const onCopyScreenshotRequested = vi.fn();
+    const controller = new MapFilterPanelController(session, {
+      onCopyScreenshotRequested
+    });
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const filterPanel = container.querySelector(".reverysky-map-filter-panel") as HTMLElement;
+    const filterBody = container.querySelector(".reverysky-map-filter-panel-body") as HTMLElement;
+    const screenshotSection = container.querySelector(".reverysky-map-screenshot-section") as HTMLElement;
+    const screenshotTitle = screenshotSection.querySelector(".reverysky-map-filter-title");
+    const screenshotToggle = screenshotSection.querySelector(".reverysky-map-filter-section-toggle");
+    const screenshotButton = container.querySelector(".reverysky-map-screenshot-button") as HTMLButtonElement;
+
+    expect(filterPanel.lastElementChild).toBe(filterBody);
+    expect(filterBody.lastElementChild).toBe(screenshotSection);
+    expect(screenshotTitle?.textContent).toBe("Screenshot");
+    expect(screenshotToggle).not.toBeNull();
+    expect(screenshotSection.textContent).toContain("Copy screenshot");
+
+    screenshotButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    expect(onCopyScreenshotRequested).toHaveBeenCalledTimes(1);
+  });
+
   it("updates frame-rate mode from the dropdown", () => {
     const session = createSession();
     session.start(() => undefined);

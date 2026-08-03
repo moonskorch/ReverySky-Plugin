@@ -14,12 +14,17 @@ type ObsidianHTMLElement = HTMLElement & {
   setAttr?: (name: string, value: string) => void;
 };
 
+type MapFilterPanelControllerDependencies = {
+  onCopyScreenshotRequested?: () => Promise<void> | void;
+};
+
 /**
  * Owns the filter-panel UI state machine and keeps the DOM synchronized with `MapSession`.
  */
 export class MapFilterPanelController {
   private filterMessageEl: HTMLElement | null = null;
   private filterPanelEl: HTMLElement | null = null;
+  private filterScrollAreaEl: HTMLElement | null = null;
   private filterToggleButtonEl: HTMLButtonElement | null = null;
   private settingsSectionEl: HTMLElement | null = null;
   private settingsSectionToggleButtonEl: HTMLButtonElement | null = null;
@@ -27,6 +32,9 @@ export class MapFilterPanelController {
   private graphicsSectionEl: HTMLElement | null = null;
   private graphicsSectionToggleButtonEl: HTMLButtonElement | null = null;
   private graphicsSectionContentEl: HTMLElement | null = null;
+  private screenshotSectionEl: HTMLElement | null = null;
+  private screenshotSectionToggleButtonEl: HTMLButtonElement | null = null;
+  private screenshotSectionContentEl: HTMLElement | null = null;
   private tagsToggleButtonEl: HTMLButtonElement | null = null;
   private layoutDropdownEl: HTMLSelectElement | null = null;
   private frameRateModeDropdownEl: HTMLSelectElement | null = null;
@@ -35,11 +43,16 @@ export class MapFilterPanelController {
   private renderScaleMessageEl: HTMLElement | null = null;
   private searchComponent: SearchComponent | null = null;
   private filterSuggestionsController: MapFilterSuggestionsController | null = null;
+  private screenshotButtonEl: HTMLButtonElement | null = null;
   private filterPanelOpen = false;
   private settingsSectionCollapsed = true;
   private graphicsSectionCollapsed = true;
+  private screenshotSectionCollapsed = true;
 
-  constructor(private readonly session: MapSession) {}
+  constructor(
+    private readonly session: MapSession,
+    private readonly deps: MapFilterPanelControllerDependencies = {}
+  ) {}
 
   render(container: ObsidianHTMLElement): ObsidianHTMLElement {
     const root = createChild(container, "div") as ObsidianHTMLElement;
@@ -84,11 +97,14 @@ export class MapFilterPanelController {
     const filterContainer = createChild(root, "div");
     filterContainer.className = "reverysky-map-filter-panel";
     this.filterPanelEl = filterContainer;
-    filterContainer.addEventListener("scroll", () => {
+    const filterScrollArea = createChild(filterContainer as ObsidianHTMLElement, "div");
+    filterScrollArea.className = "reverysky-map-filter-panel-body";
+    this.filterScrollAreaEl = filterScrollArea;
+    filterScrollArea.addEventListener("scroll", () => {
       this.filterSuggestionsController?.position();
     });
 
-    const filterSection = createChild(filterContainer as ObsidianHTMLElement, "div");
+    const filterSection = createChild(filterScrollArea as ObsidianHTMLElement, "div");
     filterSection.className = "reverysky-map-filter-section reverysky-map-settings-section";
     this.settingsSectionEl = filterSection;
 
@@ -218,7 +234,7 @@ export class MapFilterPanelController {
       this.refreshLayoutDropdownUi();
     });
 
-    const graphicsSection = createChild(filterContainer as ObsidianHTMLElement, "div");
+    const graphicsSection = createChild(filterScrollArea as ObsidianHTMLElement, "div");
     graphicsSection.className = "reverysky-map-filter-section reverysky-map-graphics-section";
     this.graphicsSectionEl = graphicsSection;
 
@@ -303,6 +319,44 @@ export class MapFilterPanelController {
       this.refreshFrameRateModeDropdownUi();
     });
 
+    const screenshotSection = createChild(filterScrollArea as ObsidianHTMLElement, "div");
+    screenshotSection.className = "reverysky-map-filter-section reverysky-map-screenshot-section";
+    this.screenshotSectionEl = screenshotSection;
+
+    const screenshotSectionHeader = createChild(screenshotSection as ObsidianHTMLElement, "div");
+    screenshotSectionHeader.className = "reverysky-map-filter-header";
+
+    const screenshotSectionToggleButton = createChild(screenshotSectionHeader as ObsidianHTMLElement, "button");
+    screenshotSectionToggleButton.type = "button";
+    screenshotSectionToggleButton.className = "reverysky-map-filter-section-toggle";
+    screenshotSectionToggleButton.tabIndex = -1;
+    this.screenshotSectionToggleButtonEl = screenshotSectionToggleButton;
+
+    const screenshotSectionChevron = createChild(screenshotSectionToggleButton as ObsidianHTMLElement, "span");
+    screenshotSectionChevron.className = "reverysky-map-filter-section-chevron";
+    setIcon(screenshotSectionChevron, "chevron-right");
+
+    const screenshotSectionTitle = createChild(screenshotSectionToggleButton as ObsidianHTMLElement, "span");
+    screenshotSectionTitle.className = "reverysky-map-filter-title";
+    screenshotSectionTitle.textContent = "Screenshot";
+    this.registerSectionToggle(screenshotSectionToggleButton, () => {
+      this.setScreenshotSectionCollapsed(!this.screenshotSectionCollapsed);
+    });
+
+    const screenshotSectionContent = createChild(screenshotSection as ObsidianHTMLElement, "div");
+    screenshotSectionContent.className = "reverysky-map-filter-section-content";
+    this.screenshotSectionContentEl = screenshotSectionContent;
+
+    const screenshotButton = createChild(screenshotSectionContent as ObsidianHTMLElement, "button");
+    screenshotButton.type = "button";
+    screenshotButton.className = "reverysky-map-screenshot-button";
+    screenshotButton.textContent = "Copy screenshot";
+    screenshotButton.setAttribute("aria-label", "Copy graph screenshot");
+    this.screenshotButtonEl = screenshotButton;
+    screenshotButton.addEventListener("click", () => {
+      void this.deps.onCopyScreenshotRequested?.();
+    });
+
     this.setFilterPanelOpen(false);
     this.refreshCollapsibleSections();
     this.syncFromSession();
@@ -328,6 +382,7 @@ export class MapFilterPanelController {
     this.searchComponent = null;
     this.filterMessageEl = null;
     this.filterPanelEl = null;
+    this.filterScrollAreaEl = null;
     this.filterToggleButtonEl = null;
     this.settingsSectionEl = null;
     this.settingsSectionToggleButtonEl = null;
@@ -335,15 +390,20 @@ export class MapFilterPanelController {
     this.graphicsSectionEl = null;
     this.graphicsSectionToggleButtonEl = null;
     this.graphicsSectionContentEl = null;
+    this.screenshotSectionEl = null;
+    this.screenshotSectionToggleButtonEl = null;
+    this.screenshotSectionContentEl = null;
     this.tagsToggleButtonEl = null;
     this.layoutDropdownEl = null;
     this.frameRateModeDropdownEl = null;
     this.renderScaleInputEl = null;
     this.renderScaleValueEl = null;
     this.renderScaleMessageEl = null;
+    this.screenshotButtonEl = null;
     this.filterPanelOpen = false;
     this.settingsSectionCollapsed = true;
     this.graphicsSectionCollapsed = true;
+    this.screenshotSectionCollapsed = true;
   }
 
   private setFilterPanelOpen(isOpen: boolean): void {
@@ -387,6 +447,11 @@ export class MapFilterPanelController {
     this.refreshCollapsibleSections();
   }
 
+  private setScreenshotSectionCollapsed(isCollapsed: boolean): void {
+    this.screenshotSectionCollapsed = isCollapsed;
+    this.refreshCollapsibleSections();
+  }
+
   private refreshCollapsibleSections(): void {
     this.refreshCollapsibleSection(
       this.settingsSectionEl,
@@ -401,6 +466,13 @@ export class MapFilterPanelController {
       this.graphicsSectionContentEl,
       this.graphicsSectionCollapsed,
       "Graphics"
+    );
+    this.refreshCollapsibleSection(
+      this.screenshotSectionEl,
+      this.screenshotSectionToggleButtonEl,
+      this.screenshotSectionContentEl,
+      this.screenshotSectionCollapsed,
+      "Screenshot"
     );
   }
 

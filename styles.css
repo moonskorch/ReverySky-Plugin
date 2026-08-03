@@ -145,19 +145,28 @@
     calc(100% - var(--reverysky-overlay-offset-y) - var(--reverysky-overlay-offset-y))
   );
   overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-width: none;
+  overflow-y: hidden;
   background: var(--background-secondary);
   border: var(--reverysky-panel-border);
   border-radius: var(--reverysky-panel-radius);
   box-shadow: var(--reverysky-panel-shadow);
   padding: 0;
-  display: grid;
-  gap: 0;
+  display: flex;
+  flex-direction: column;
   z-index: 120;
 }
 
-.reverysky-map-filter-panel::-webkit-scrollbar {
+.reverysky-map-filter-panel-body {
+  display: grid;
+  gap: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.reverysky-map-filter-panel-body::-webkit-scrollbar {
   display: none;
 }
 
@@ -202,7 +211,8 @@
 }
 
 .reverysky-map-settings-section.reverysky-map-filter-section--collapsed,
-.reverysky-map-graphics-section.reverysky-map-filter-section--collapsed {
+.reverysky-map-graphics-section.reverysky-map-filter-section--collapsed,
+.reverysky-map-screenshot-section.reverysky-map-filter-section--collapsed {
   padding-bottom: var(--reverysky-filter-header-padding-edge);
 }
 
@@ -211,7 +221,59 @@
 }
 
 .reverysky-map-graphics-section:not(.reverysky-map-filter-section--collapsed) {
-  padding-bottom: var(--reverysky-filter-section-collapsed-padding-y);
+  padding-bottom: var(--reverysky-filter-header-padding-edge);
+}
+
+.reverysky-map-screenshot-section {
+  box-sizing: border-box;
+  border-top: 1px solid var(--background-modifier-border);
+  gap: var(--reverysky-filter-section-gap);
+}
+
+.reverysky-map-screenshot-section:not(.reverysky-map-filter-section--collapsed) {
+  padding-bottom: var(--reverysky-filter-header-padding-edge);
+}
+
+.reverysky-map-screenshot-section > .reverysky-map-filter-section-content {
+  padding: 0 var(--size-4-3) var(--reverysky-filter-header-padding-edge);
+}
+
+.reverysky-map-screenshot-section .reverysky-map-screenshot-button {
+  width: 100%;
+  min-height: var(--input-height);
+  margin: 0;
+  padding: var(--size-4-1) var(--size-4-3);
+  border: 0;
+  border-radius: var(--button-radius, 0.375rem);
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent, #ffffff);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-ui-small, 0.875rem);
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: center;
+  box-shadow: var(--input-shadow, 0 1px 2px rgba(0, 0, 0, 0.2));
+  transition: background-color var(--reverysky-transition-fast), box-shadow var(--reverysky-transition-fast),
+    transform var(--reverysky-transition-fast), filter var(--reverysky-transition-fast);
+}
+
+.reverysky-map-screenshot-section .reverysky-map-screenshot-button:hover {
+  filter: brightness(1.05);
+  box-shadow: var(--input-shadow, 0 1px 2px rgba(0, 0, 0, 0.2));
+}
+
+.reverysky-map-screenshot-section .reverysky-map-screenshot-button:focus,
+.reverysky-map-screenshot-section .reverysky-map-screenshot-button:focus-visible,
+.reverysky-map-screenshot-section .reverysky-map-screenshot-button:active {
+  outline: none;
+  box-shadow: var(--reverysky-control-shadow-focus);
+}
+
+.reverysky-map-screenshot-section .reverysky-map-screenshot-button:active {
+  transform: translateY(1px);
 }
 
 .reverysky-map-filter-search-area {

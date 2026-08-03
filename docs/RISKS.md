@@ -232,6 +232,21 @@ Mitigation:
 - Keep the parent-side loading fallback visible for cases where the runtime page does not build its own status UI.
 - If users report persistent startup stalls, diagnose runtime startup separately from window migration and bridge payload handling.
 
+## 19. Best-Effort Screenshot Copy
+
+Risk:
+- The screenshot action is intentionally on-demand and low-priority; it does not add a background capture loop or continuous polling.
+- PNG encoding and clipboard writes can create a short CPU and memory spike when the user clicks the screenshot button.
+- The runtime may return an empty or black frame if the canvas has not finished presenting a stable image, if the WebGL buffer is unavailable, or if the host is under GPU pressure.
+- Rapid repeat clicks or overlapping requests can produce duplicate work or stale replies if the UI does not keep the action single-flight.
+
+Mitigation:
+- Keep the feature best-effort and user-initiated only.
+- Keep the screenshot flow single-flight so only one capture is processed at a time.
+- Prefer clear error reporting over silent retries when the canvas is not ready or returns no blob.
+- Treat a black or empty screenshot as an expected edge case for this feature, not as a full runtime failure.
+- Avoid background capture or automatic retry logic unless real usage data shows the one-shot approach is too fragile.
+
 ## Architecture Risks and Hardening Plan
 
 The core architecture is intentional: ReverySky 3D Graph embeds a Unity WebGL runtime inside an Obsidian plugin and sends live graph data across several runtime boundaries.

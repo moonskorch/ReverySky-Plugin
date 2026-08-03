@@ -27,12 +27,15 @@ Plugin -> runtime:
 - `note:focus`: current-note focus hint with required `id` and `path`.
 - `runtime:status`: iframe-wrapper status text update that does not change Unity graph state.
 - `runtime:settings`: Unity runtime frame-rate settings that apply without rebuilding graph state.
+- `runtime:screenshot-request`: best-effort request to capture the current Unity canvas as PNG and return it to the parent.
 - `runtime:shutdown`: lifecycle message requesting the iframe runtime wrapper to stop bridge activity before the parent view detaches.
 
 Runtime -> plugin:
 - `bridge:ready`: runtime is initialized and ready to receive payloads after successful Unity WebGL boot.
 - `graph:ready`: runtime has finished the current graph build or stabilization phase for a matching `graph:set` request.
 - `note:open`: request for Obsidian to open a note by required `id` and `path`.
+- `runtime:screenshot-result`: response to a matching screenshot request carrying a PNG `Blob`.
+- `runtime:screenshot-error`: response to a matching screenshot request when capture fails.
 - `runtime:shutdown-complete`: acknowledgement for a matching `runtime:shutdown` request.
 
 If Unity WebGL boot fails, the iframe wrapper keeps the failure status visible and intentionally does not emit `bridge:ready`; no `graph:set` is expected for that iframe.
@@ -97,6 +100,26 @@ Rules:
 - `payload.frameRateMode` must be one of: `auto`, `fps60`, `fps30`, `fps24`.
 - The iframe wrapper forwards valid settings to Unity `ObsidianBridge.OnRuntimeSettings(...)`.
 - The Unity runtime applies the selected frame-rate mode live; it must not rebuild graph data, reset focus, or recreate the iframe.
+
+## Screenshot Messages
+`runtime:screenshot-request` asks the iframe wrapper to capture `unity-canvas` as PNG and reply with either a blob result or a human-readable error. The flow is best-effort and may fail if the canvas is unavailable, not ready, or produces no blob.
+
+Parent -> runtime:
+
+```json
+{
+  "protocolVersion": "2.0.0",
+  "type": "runtime:screenshot-request",
+  "requestId": "screenshot_..."
+}
+```
+
+Rules:
+- `requestId` is required.
+- The iframe wrapper captures the canvas after a short render delay and posts either `runtime:screenshot-result` or `runtime:screenshot-error`.
+- `runtime:screenshot-result` carries a `payload.blob` value containing the PNG image data.
+- `runtime:screenshot-error` carries a `payload.message` value with a human-readable failure reason.
+- The parent treats the response as a one-shot reply for the matching pending request.
 
 ## Runtime Shutdown Messages
 `runtime:shutdown` is a bridge/runtime-wrapper lifecycle handshake, not a full Unity engine teardown.
@@ -173,9 +196,12 @@ type GraphLink = {
 - Outgoing `graph:set` payloads are validated before postMessage dispatch.
 - Outgoing `runtime:status` messages are skipped when the status text is empty after trimming.
 - Outgoing `runtime:settings` payloads are validated before postMessage dispatch.
+- Outgoing `runtime:screenshot-request` messages are validated before postMessage dispatch.
 - Incoming `bridge:ready` is accepted only when `protocolVersion` matches exactly.
 - Incoming `graph:ready` is accepted only when `protocolVersion` matches and `requestId` is a non-empty string.
 - Incoming `note:open` is accepted only when `protocolVersion` matches and the payload includes non-empty `id` and `path`.
+- Incoming `runtime:screenshot-result` is accepted only when `protocolVersion` matches, `requestId` is a non-empty string matching the pending request, and `payload.blob` is a `Blob`.
+- Incoming `runtime:screenshot-error` is accepted only when `protocolVersion` matches, `requestId` is a non-empty string matching the pending request, and `payload.message` is a non-empty string.
 - Incoming `runtime:shutdown-complete` is accepted only when `protocolVersion` matches and `requestId` is a non-empty string matching the pending shutdown request.
 - Invalid envelopes are rejected with explicit, non-fatal error reporting.
 - Unity runtime ingest is fail-soft: it treats `vault.noteCount` as informational (uses `notes` as source of truth).
