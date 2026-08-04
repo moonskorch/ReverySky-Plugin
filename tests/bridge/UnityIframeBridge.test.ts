@@ -159,11 +159,15 @@ describe("UnityIframeBridge", () => {
     bridge.detach();
   });
 
-  it("requests a runtime screenshot and resolves with the result blob", async () => {
+  it("requests a runtime screenshot and resolves with a blob-like result", async () => {
     const bridge = new UnityIframeBridge();
     const postMessage = vi.fn();
     const iframeWindow = { postMessage } as unknown as Window;
-    const screenshotBlob = new Blob(["snapshot"], { type: "image/png" });
+    const screenshotBlob = Object.assign(Object.create(null), {
+      size: 8,
+      type: "image/png",
+      arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8))
+    });
 
     bridge.attach(iframeWindow, {});
     const screenshotPromise = bridge.requestRuntimeScreenshot();
@@ -180,13 +184,13 @@ describe("UnityIframeBridge", () => {
         protocolVersion: BRIDGE_PROTOCOL_VERSION,
         payload: {
           ok: true,
-          blob: screenshotBlob
+          blob: screenshotBlob as Blob
         }
       },
       iframeWindow
     );
 
-    await expect(screenshotPromise).resolves.toBe(screenshotBlob);
+    await expect(screenshotPromise).resolves.toBe(screenshotBlob as Blob);
     bridge.detach();
   });
 

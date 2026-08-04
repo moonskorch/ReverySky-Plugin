@@ -146,4 +146,38 @@ describe("MessageValidator", () => {
 
     expect(errors).toContain("incoming runtime:shutdown-complete requestId must be a non-empty string");
   });
+
+  it("accepts incoming runtime:screenshot-response with a blob-like object", () => {
+    const blobLike = Object.assign(Object.create(null), {
+      size: 8,
+      type: "image/png",
+      arrayBuffer: async () => new ArrayBuffer(8)
+    });
+
+    const errors = MessageValidator.validateIncomingRuntimeScreenshotResponseMessage({
+      type: "runtime:screenshot-response",
+      protocolVersion: BRIDGE_PROTOCOL_VERSION,
+      payload: {
+        ok: true,
+        blob: blobLike as Blob
+      }
+    });
+
+    expect(errors).toEqual([]);
+  });
+
+  it("rejects incoming runtime:screenshot-response when blob-like fields are missing", () => {
+    const errors = MessageValidator.validateIncomingRuntimeScreenshotResponseMessage({
+      type: "runtime:screenshot-response",
+      protocolVersion: BRIDGE_PROTOCOL_VERSION,
+      payload: {
+        ok: true,
+        blob: { size: 8, type: "image/png" } as Blob
+      }
+    });
+
+    expect(errors).toContain(
+      "incoming runtime:screenshot-response payload.blob must be a Blob-like object when ok is true"
+    );
+  });
 });

@@ -246,8 +246,8 @@ export class MessageValidator {
     }
 
     if (data.payload.ok === true) {
-      if (!(data.payload.blob instanceof Blob)) {
-        errors.push("incoming runtime:screenshot-response payload.blob must be a Blob when ok is true");
+      if (!this.isBlobLike(data.payload.blob)) {
+        errors.push("incoming runtime:screenshot-response payload.blob must be a Blob-like object when ok is true");
       }
       return errors;
     }
@@ -261,6 +261,20 @@ export class MessageValidator {
 
   private static isNonEmptyString(value: unknown): value is string {
     return typeof value === "string" && value.trim().length > 0;
+  }
+
+  private static isBlobLike(value: unknown): value is Blob {
+    if (!value || typeof value !== "object") {
+      return false;
+    }
+
+    const blob = value as Blob;
+
+    return (
+      typeof blob.size === "number" &&
+      typeof blob.type === "string" &&
+      typeof blob.arrayBuffer === "function"
+    );
   }
 
   private static isValidDateString(value: unknown): value is string {
