@@ -398,7 +398,7 @@ export class MapSession {
     return this.focus.resolveOpenLinkSourcePath();
   }
 
-  requestEditorFocus(path: string): void {
+  requestFocusFromEditor(path: string): void {
     this.primeNoteSignatureForPath(path);
     this.focus.onMarkdownFocus(path);
   }

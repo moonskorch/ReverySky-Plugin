@@ -1820,7 +1820,7 @@ describe("MapView bridge integration", () => {
       mapLayout: "auto"
     });
     expect(bridge.sendNoteFocus).not.toHaveBeenCalled();
-    view.requestEditorFocus("Folder/Old.md");
+    view.requestFocusFromEditor("Folder/Old.md");
     expect(bridge.sendNoteFocus).toHaveBeenLastCalledWith({
       id: makeStableNoteId("Folder/Old.md"),
       path: "Folder/Old.md"

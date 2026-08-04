@@ -22,7 +22,7 @@ The system has three runtime boundaries:
 Main system parts:
 
 - Obsidian plugin shell
-  Registers the custom view and the `Open` command, lazily creates the shared local WebGL server, and owns the latest plugin-level graph settings snapshot.
+  Registers the custom view, delegates command wiring to the command module, lazily creates the shared local WebGL server, and owns the latest plugin-level graph settings snapshot.
   Main code: `src/main.ts`
   Depends on: Obsidian `Plugin`, `WorkspaceLeaf`, `UnityWebglLocalServer`
 
@@ -158,12 +158,12 @@ This name is part of the JavaScript-to-Unity bridge contract because the iframe 
 The object is intentionally kept independent from a specific scene so the WebGL bridge is available early and survives scene changes.
 
 ## Execution Paths
-Most plugin-side behavior now flows through a small shell in `MapView`, while `src/main.ts` owns plugin lifecycle, view activation, and persistence of the last graph-view state. The main entry points are the plugin startup path, the graph command, the view startup path, and incoming bridge messages from the runtime. The routes below show how control moves from those entry points through the code.
+Most plugin-side behavior now flows through a small shell in `MapView`, while `src/main.ts` owns plugin lifecycle, runtime startup, and persistence of the last graph-view state. Command wiring is delegated to `src/commands/MapCommands.ts`. The main entry points are the plugin startup path, the graph command, the view startup path, and incoming bridge messages from the runtime. The routes below show how control moves from those entry points through the code.
 
 ### Path 1. Command -> view activation -> iframe startup
 1. `src/main.ts` -> `ReverySkyMapPlugin.onload()`
    Loads plugin data `mapViewState`, registers `MAP_VIEW_TYPE`, and registers the `open-map` command.
-2. `src/main.ts` -> command callback -> `activateMapView()`
+2. `src/commands/MapCommands.ts` -> `activateMapView()`
    Finds an existing graph leaf or creates one with `workspace.getRightLeaf(false)` and `leaf.setViewState(...)`.
    The plugin intentionally opens and owns a single graph leaf: repeated open actions reveal the existing leaf instead of creating another one.
    Some cleanup and focus paths use Obsidian's array-based leaf APIs defensively. Duplicate ReverySky 3D Graph leaves are expected to keep working through the shared runtime server, but they are a recovery case rather than the primary workflow.
@@ -231,12 +231,12 @@ The `Auto` frame-rate mode sets `QualitySettings.vSyncCount = 1` and `Applicatio
 
 ### Path 4. Markdown editor focus -> graph focus
 1. `src/main.ts` -> `ReverySkyMapPlugin.onload()` -> `registerEditorExtension(...)`
-   Registers `createMarkdownEditorFocusExtension(...)` once at plugin scope so the plugin can hear focus changes from any open markdown editor.
+   Registers `createMarkdownEditorFocusListener(...)` once at plugin scope so the plugin can hear focus changes from any open markdown editor.
 2. `src/view/MarkdownEditorFocus.ts` -> `EditorView.updateListener.of(...)`
    Watches CodeMirror updates and ignores everything except a real markdown-editor focus gain with a resolvable vault path.
-3. `src/main.ts` -> callback -> `requestEditorFocus(path)`
+3. `src/main.ts` -> callback -> `forwardFocusToViews(this, path)`
    Routes the focused path to every open graph view of `MAP_VIEW_TYPE`.
-4. `src/view/MapView.ts` -> `requestEditorFocus(path)` -> `MapSession.requestEditorFocus(path)`
+4. `src/view/MapView.ts` -> `requestFocusFromEditor(path)` -> `MapSession.requestFocusFromEditor(path)`
    The view shell does not decide focus policy; it only forwards the signal into session state.
 5. `src/view/MapSession.ts` -> `MapFocusController.onMarkdownFocus(path)`
    Passes the markdown editor focus event through the shared duplicate-suppression gate.
@@ -282,8 +282,8 @@ For rename, `MapFocusController.onRename(...)` preserves focus only when the ren
   Expected: focus the edited note; do not rebuild the graph.
   Current code:
   `handleMarkdownEditorFocusUpdate(...)` accepts a real CodeMirror focus gain and extracts the markdown path ->
-  plugin `requestEditorFocus(path)` forwards that path to open graph views ->
-  `MapSession.requestEditorFocus(path)` delegates to `MapFocusController.onMarkdownFocus(path)` ->
+  plugin `forwardFocusToViews(this, path)` forwards that path to open graph views ->
+  `MapSession.requestFocusFromEditor(path)` delegates to `MapFocusController.onMarkdownFocus(path)` ->
   `MapSession.trySendFocusForPath(path)` validates bridge/path and latest-graph membership ->
   `UnityIframeBridge.sendNoteFocus(...)` sends `note:focus`.
 
@@ -397,7 +397,10 @@ Open graph leaves do not share live filter state. Each leaf's `MapSession` owns 
 ### Key plugin-side control points
 
 - `src/main.ts` -> `ReverySkyMapPlugin`
-  Owns plugin startup, command registration, view activation, persistence of the last graph-view state, shared runtime-server startup, and graph-view runtime leases.
+  Owns plugin startup, persistence of the last graph-view state, shared runtime-server startup, and graph-view runtime leases.
+
+- `src/commands/MapCommands.ts`
+  Owns command registration and the command callbacks for opening, closing, toggling, screenshot copy, and editor-focus routing.
 
 - `src/view/MapView.ts` -> `MapView`
   Owns the shell execution paths after the view exists: iframe startup, bridge wiring, and collaborator orchestration.

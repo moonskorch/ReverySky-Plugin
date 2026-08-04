@@ -545,7 +545,7 @@ describe("MapSession", () => {
     expect(buildGraph).toHaveBeenCalledTimes(0);
     expect(sendGraph).toHaveBeenCalledTimes(0);
 
-    session.requestEditorFocus(noteFile.path);
+    session.requestFocusFromEditor(noteFile.path);
     metadataCallbacks.changed?.(
       noteFile,
       "plain text changed",
@@ -794,7 +794,7 @@ describe("MapSession", () => {
     session.handleRuntimeReady();
 
     app.workspace.activeLeaf = projectLeaf;
-    session.requestEditorFocus(projectLeaf.view.file.path);
+    session.requestFocusFromEditor(projectLeaf.view.file.path);
 
     expect(sendGraph).toHaveBeenCalledTimes(1);
     expect(sendFocus).toHaveBeenCalledTimes(1);
@@ -840,7 +840,7 @@ describe("MapSession", () => {
     });
 
     session.start(() => undefined);
-    session.requestEditorFocus("Projects/ReverySky/Spec.md");
+    session.requestFocusFromEditor("Projects/ReverySky/Spec.md");
 
     expect(sendGraph).not.toHaveBeenCalled();
     expect(sendFocus).not.toHaveBeenCalled();
@@ -881,7 +881,7 @@ describe("MapSession", () => {
 
     session.setFilterQuery("path:Archive");
     vi.advanceTimersByTime(500);
-    session.requestEditorFocus("Projects/ReverySky/Spec.md");
+    session.requestFocusFromEditor("Projects/ReverySky/Spec.md");
 
     expect(sendGraph).toHaveBeenCalledTimes(2);
     expect(sendFocus).not.toHaveBeenCalled();
@@ -1013,7 +1013,7 @@ describe("MapSession", () => {
 
     session.start(() => undefined);
     session.handleRuntimeReady();
-    session.requestEditorFocus(oldPath);
+    session.requestFocusFromEditor(oldPath);
     expect(sendFocus).toHaveBeenLastCalledWith({
       id: makeStableNoteId(oldPath),
       path: oldPath

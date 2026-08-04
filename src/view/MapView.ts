@@ -116,8 +116,8 @@ export class MapView extends ItemView {
     return "ReverySky 3D Graph";
   }
 
-  requestEditorFocus(path: string): void {
-    this.session.requestEditorFocus(path);
+  requestFocusFromEditor(path: string): void {
+    this.session.requestFocusFromEditor(path);
   }
 
   copyRuntimeScreenshotToClipboard(): Promise<void> {

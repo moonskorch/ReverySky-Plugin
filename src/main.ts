@@ -1,6 +1,6 @@
 import { Plugin, WorkspaceLeaf, type Tasks } from "obsidian";
 import { MAP_VIEW_TYPE, MapView } from "./view/MapView";
-import { createMarkdownEditorFocusExtension } from "./view/MarkdownEditorFocus";
+import { createMarkdownEditorFocusListener } from "./view/MarkdownEditorFocus";
 import {
   UnityWebglLocalServer,
   type UnityWebglRuntimeSource
@@ -12,6 +12,10 @@ import {
   EmbeddedUnityRuntimeInstaller
 } from "./runtime/EmbeddedUnityRuntimeInstaller";
 import { getEmbeddedUnityIndexHtml } from "./runtime/EmbeddedUnityIndexHtml";
+import {
+  registerCommands,
+  forwardFocusToViews
+} from "./commands/MapCommands";
 import path from "node:path";
 
 type PersistedPluginData = {
@@ -83,29 +87,11 @@ export default class ReverySkyMapPlugin extends Plugin {
       })
     );
 
-    this.addRibbonIcon("sparkles", "Toggle ReverySky 3D Graph", async () => {
-      await this.toggleMapView();
-    });
-
-    this.addCommand({
-      id: "open-map",
-      name: "Open",
-      callback: async () => {
-        await this.activateMapView();
-      }
-    });
-
-    this.addCommand({
-      id: "copy-screenshot",
-      name: "Copy screenshot",
-      callback: async () => {
-        await this.copyActiveMapViewScreenshot();
-      }
-    });
+    registerCommands(this);
 
     this.registerEditorExtension(
-      createMarkdownEditorFocusExtension((path) => {
-        this.requestEditorFocus(path);
+      createMarkdownEditorFocusListener((path) => {
+        forwardFocusToViews(this, path);
       })
     );
 
@@ -206,56 +192,6 @@ export default class ReverySkyMapPlugin extends Plugin {
     return `${baseUrl}/index.html`;
   }
 
-  private async activateMapView(): Promise<void> {
-    const { workspace } = this.app;
-    let leaf: WorkspaceLeaf | null = workspace.getLeavesOfType(MAP_VIEW_TYPE)[0] ?? null;
-
-    if (!leaf) {
-      leaf = workspace.getRightLeaf(false);
-      if (!leaf) {
-        return;
-      }
-      await leaf.setViewState({
-        type: MAP_VIEW_TYPE,
-        active: true
-      });
-    }
-
-    await workspace.revealLeaf(leaf);
-  }
-
-  private async toggleMapView(): Promise<void> {
-    const { workspace } = this.app;
-    const leaves = workspace.getLeavesOfType(MAP_VIEW_TYPE);
-
-    if (leaves.length > 0) {
-      await this.flushPersistedMapViewState();
-      workspace.detachLeavesOfType(MAP_VIEW_TYPE);
-      return;
-    }
-
-    await this.activateMapView();
-  }
-
-  private async copyActiveMapViewScreenshot(): Promise<void> {
-    const activeView = this.getActiveMapView();
-    if (!activeView) {
-      return;
-    }
-
-    await activeView.copyRuntimeScreenshotToClipboard();
-  }
-
-  private getActiveMapView(): MapView | null {
-    const { workspace } = this.app;
-    const activeView = workspace.getActiveViewOfType(MapView);
-    if (activeView) {
-      return activeView;
-    }
-
-    return (workspace.getLeavesOfType(MAP_VIEW_TYPE)[0]?.view as MapView | undefined) ?? null;
-  }
-
   private async stopUnityRuntimeServer(): Promise<void> {
     // A view can close while the first runtime URL is still being resolved.
     // Wait for that startup attempt before deciding whether there is a server to stop.
@@ -285,14 +221,6 @@ export default class ReverySkyMapPlugin extends Plugin {
     await this.stopUnityRuntimeServer();
   }
 
-  private requestEditorFocus(path: string): void {
-    const leaves = this.app.workspace.getLeavesOfType(MAP_VIEW_TYPE);
-
-    for (const leaf of leaves) {
-      (leaf.view as MapView | undefined)?.requestEditorFocus(path);
-    }
-  }
-
   /**
    * Resolve the installed plugin folder so the bundled WebGL export can be served from disk.
    */
@@ -316,7 +244,7 @@ export default class ReverySkyMapPlugin extends Plugin {
     });
   }
 
-  private async flushPersistedMapViewState(): Promise<void> {
+  async flushPersistedMapViewState(): Promise<void> {
     await this.persistMapViewState();
   }
 

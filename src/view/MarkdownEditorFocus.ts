@@ -25,7 +25,7 @@ export function handleMarkdownEditorFocusUpdate(
   onMarkdownFocus(path);
 }
 
-export function createMarkdownEditorFocusExtension(
+export function createMarkdownEditorFocusListener(
   onMarkdownFocus: (path: string) => void
 ): Extension {
   return EditorView.updateListener.of((update) => {

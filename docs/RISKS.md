@@ -123,7 +123,7 @@ Risk:
 - Persistence restores only the most recently reported state on later opens.
 
 Mitigation:
-- Keep `activateMapView()` single-leaf behavior intact.
+- Keep `src/commands/MapCommands.ts` -> `activateMapView()` single-leaf behavior intact.
 - Keep plugin-level runtime server ownership serialized and lease-based so one graph leaf cannot stop the server while another is active.
 - Keep cleanup and focus-broadcast paths defensive where Obsidian exposes array-based leaf APIs.
 - Keep independent per-leaf sessions unless real performance reports justify a shared source-graph cache.

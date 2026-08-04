@@ -59,6 +59,7 @@ vi.mock("../src/runtime/EmbeddedUnityIndexHtml", () => ({
 }));
 
 import ReverySkyMapPlugin from "../src/main";
+import { forwardFocusToViews } from "../src/commands/MapCommands";
 import { MAP_VIEW_TYPE } from "../src/view/MapView";
 
 type MockLeaf = {
@@ -375,32 +376,59 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
 
     await harness.plugin.onload();
 
-    expect(harness.addCommand).toHaveBeenCalledTimes(2);
-    expect(harness.addCommand.mock.calls[1]?.[0]).toMatchObject({
+    expect(harness.addCommand).toHaveBeenCalledTimes(3);
+    expect(harness.addCommand.mock.calls[2]?.[0]).toMatchObject({
       id: "copy-screenshot",
       name: "Copy screenshot"
     });
 
-    await (harness.addCommand.mock.calls[1]?.[0]?.callback as () => Promise<void>)();
+    await (harness.addCommand.mock.calls[2]?.[0]?.callback as () => Promise<void>)();
 
     expect(copyRuntimeScreenshotToClipboard).toHaveBeenCalledTimes(1);
+  });
+
+  it("registers a close command that closes an open map leaf", async () => {
+    const activeLeaf: MockLeaf = {
+      setViewState: vi.fn()
+    };
+    const harness = createPluginHarness({
+      existingLeaves: [activeLeaf]
+    });
+
+    await harness.plugin.onload();
+    (harness.plugin as unknown as { updateMapViewState: (state: Record<string, unknown>) => void }).updateMapViewState({
+      filterQuery: "tag:#close-test"
+    });
+
+    expect(harness.addCommand).toHaveBeenCalledTimes(3);
+    expect(harness.addCommand.mock.calls[1]?.[0]).toMatchObject({
+      id: "close-map",
+      name: "Close"
+    });
+
+    await (harness.addCommand.mock.calls[1]?.[0]?.callback as () => Promise<void>)();
+
+    expect(harness.saveData).toHaveBeenCalledWith({
+      mapViewState: {
+        filterQuery: "tag:#close-test"
+      }
+    });
+    expect(harness.detachLeavesOfType).toHaveBeenCalledWith(MAP_VIEW_TYPE);
   });
 
   it("routes editor focus requests to open map views", async () => {
     const focusA = vi.fn();
     const focusB = vi.fn();
     const mapLeaves = [
-      { view: { requestEditorFocus: focusA } },
-      { view: { requestEditorFocus: focusB } }
+      { view: { requestFocusFromEditor: focusA } },
+      { view: { requestFocusFromEditor: focusB } }
     ];
     const harness = createPluginHarness({
       existingLeaves: mapLeaves as never[]
     });
 
     await harness.plugin.onload();
-    (harness.plugin as unknown as { requestEditorFocus: (path: string) => void }).requestEditorFocus(
-      "Folder/Note.md"
-    );
+    forwardFocusToViews(harness.plugin, "Folder/Note.md");
 
     expect(focusA).toHaveBeenCalledWith("Folder/Note.md");
     expect(focusB).toHaveBeenCalledWith("Folder/Note.md");
