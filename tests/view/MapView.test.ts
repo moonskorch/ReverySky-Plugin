@@ -166,6 +166,60 @@ describe("MapView bridge integration", () => {
     expect(notify).toHaveBeenCalledWith("Screenshot copied to clipboard.");
   });
 
+  it("coalesces overlapping screenshot copies into a single request", async () => {
+    const app = {
+      workspace: {
+        activeLeaf: null,
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn()
+    };
+    const screenshot = new Blob(["snapshot"], { type: "image/png" });
+    let resolveScreenshot: ((blob: Blob) => void) | null = null;
+    const requestRuntimeScreenshot = vi.fn(
+      () =>
+        new Promise<Blob>((resolve) => {
+          resolveScreenshot = resolve;
+        })
+    );
+    const copyScreenshotToClipboard = vi.fn().mockResolvedValue(undefined);
+    const notify = vi.fn();
+
+    const view = new MapView(
+      { app } as never,
+      plugin as never,
+      {
+        buildGraph: vi.fn().mockReturnValue(makePayload()) as BuildGraphForTest,
+        createBridge: () =>
+          makeBridgeForTest({
+            requestRuntimeScreenshot
+          }),
+        copyScreenshotToClipboard,
+        notify
+      }
+    );
+
+    const firstCopyPromise = view.copyRuntimeScreenshotToClipboard();
+    const secondCopyPromise = view.copyRuntimeScreenshotToClipboard();
+
+    expect(secondCopyPromise).toBe(firstCopyPromise);
+    expect(requestRuntimeScreenshot).toHaveBeenCalledTimes(1);
+
+    resolveScreenshot?.(screenshot);
+
+    await firstCopyPromise;
+    await secondCopyPromise;
+
+    expect(copyScreenshotToClipboard).toHaveBeenCalledTimes(1);
+    expect(copyScreenshotToClipboard).toHaveBeenCalledWith(screenshot);
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify).toHaveBeenCalledWith("Screenshot copied to clipboard.");
+  });
+
   it("creates iframe on open, wires bridge handshake, and detaches/cleans on close", async () => {
     const app = {
       marker: "app",

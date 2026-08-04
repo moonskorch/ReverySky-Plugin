@@ -59,6 +59,7 @@ export class MapView extends ItemView {
   private iframeLoadAbortController: AbortController | null = null;
   private windowMigrationCleanup: (() => void) | null = null;
   private deferredIframeRenderCleanup: (() => void) | null = null;
+  private pendingScreenshotCopy: Promise<void> | null = null;
   private lifecycleGeneration = 0;
   private readonly initialState: Record<string, unknown> | null;
   private readonly onLifecycleOpen?: () => symbol;
@@ -118,14 +119,25 @@ export class MapView extends ItemView {
     this.session.requestEditorFocus(path);
   }
 
-  async copyRuntimeScreenshotToClipboard(): Promise<void> {
-    try {
-      const screenshot = await this.bridge.requestRuntimeScreenshot();
-      await this.copyScreenshotToClipboard(screenshot);
-      this.notify("Screenshot copied to clipboard.");
-    } catch (error) {
-      this.notify(`Failed to copy screenshot: ${this.describeError(error)}`);
+  copyRuntimeScreenshotToClipboard(): Promise<void> {
+    if (this.pendingScreenshotCopy) {
+      return this.pendingScreenshotCopy;
     }
+
+    const screenshotCopy = (async () => {
+      try {
+        const screenshot = await this.bridge.requestRuntimeScreenshot();
+        await this.copyScreenshotToClipboard(screenshot);
+        this.notify("Screenshot copied to clipboard.");
+      } catch (error) {
+        this.notify(`Failed to copy screenshot: ${this.describeError(error)}`);
+      } finally {
+        this.pendingScreenshotCopy = null;
+      }
+    })();
+
+    this.pendingScreenshotCopy = screenshotCopy;
+    return screenshotCopy;
   }
 
   async onOpen(): Promise<void> {
