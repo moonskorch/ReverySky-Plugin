@@ -34,7 +34,7 @@ Runtime -> plugin:
 - `bridge:ready`: runtime is initialized and ready to receive payloads after successful Unity WebGL boot.
 - `graph:ready`: runtime has finished the current graph build or stabilization phase for a matching `graph:set` request.
 - `note:open`: request for Obsidian to open a note by required `id` and `path`.
-- `runtime:screenshot-response`: response to a matching screenshot request. `payload.ok: true` carries a PNG `Blob`; `payload.ok: false` reports capture failure without a bridge error string.
+- `runtime:screenshot-response`: response to a screenshot request. `payload.ok: true` carries a PNG `Blob`; `payload.ok: false` reports capture failure without a bridge error string.
 - `runtime:shutdown-complete`: acknowledgement for a matching `runtime:shutdown` request.
 
 If Unity WebGL boot fails, the iframe wrapper keeps the failure status visible and intentionally does not emit `bridge:ready`; no `graph:set` is expected for that iframe.
@@ -108,17 +108,15 @@ Parent -> runtime:
 ```json
 {
   "protocolVersion": "2.0.0",
-  "type": "runtime:screenshot-request",
-  "requestId": "screenshot_..."
+  "type": "runtime:screenshot-request"
 }
 ```
 
 Rules:
-- `requestId` is required.
 - The iframe wrapper captures the canvas after a short render delay and posts `runtime:screenshot-response`.
 - `runtime:screenshot-response` carries `payload.ok: true` with a `payload.blob` PNG image when capture succeeds.
 - `runtime:screenshot-response` carries `payload.ok: false` when capture fails.
-- The parent treats the response as a one-shot reply for the matching pending request.
+- The parent treats the response as a one-shot reply for the pending screenshot request.
 - The parent view reports any screenshot-copy failure with the same user-facing notice: `Failed to copy screenshot.`
 
 ## Runtime Shutdown Messages
@@ -200,7 +198,7 @@ type GraphLink = {
 - Incoming `bridge:ready` is accepted only when `protocolVersion` matches exactly.
 - Incoming `graph:ready` is accepted only when `protocolVersion` matches and `requestId` is a non-empty string.
 - Incoming `note:open` is accepted only when `protocolVersion` matches and the payload includes non-empty `id` and `path`.
-- Incoming `runtime:screenshot-response` is accepted only when `protocolVersion` matches, `requestId` is a non-empty string matching the pending request, and `payload.ok` is boolean with `payload.blob` present only when `ok` is `true`. Malformed screenshot responses are treated as a failed copy attempt by the parent view.
+- Incoming `runtime:screenshot-response` is accepted only when `protocolVersion` matches and `payload.ok` is boolean with `payload.blob` present only when `ok` is `true`. Malformed screenshot responses are treated as a failed copy attempt by the parent view.
 - Incoming `runtime:shutdown-complete` is accepted only when `protocolVersion` matches and `requestId` is a non-empty string matching the pending shutdown request.
 - Invalid envelopes are rejected with explicit, non-fatal error reporting.
 - Unity runtime ingest is fail-soft: it treats `vault.noteCount` as informational (uses `notes` as source of truth).

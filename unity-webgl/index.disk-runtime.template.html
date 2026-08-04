@@ -226,7 +226,7 @@
           );
         }
 
-        function postRuntimeScreenshotResponse(requestId, payload) {
+        function postRuntimeScreenshotResponse(payload) {
           if (isShuttingDown || !window.parent) {
             return;
           }
@@ -235,20 +235,19 @@
             {
               protocolVersion: protocolVersion,
               type: "runtime:screenshot-response",
-              requestId: typeof requestId === "string" ? requestId : "",
               payload: payload
             },
             "*"
           );
         }
 
-        function postRuntimeScreenshotFailure(requestId, message) {
+        function postRuntimeScreenshotFailure(message) {
           console.warn(message);
           if (isShuttingDown || !window.parent) {
             return;
           }
 
-          postRuntimeScreenshotResponse(requestId, {
+          postRuntimeScreenshotResponse({
             ok: false
           });
         }
@@ -264,14 +263,8 @@
         }
 
         async function handleRuntimeScreenshotRequest(data) {
-          const requestId = typeof data.requestId === "string" ? data.requestId : "";
-          if (!requestId) {
-            console.warn("Screenshot requestId is missing.");
-            return;
-          }
-
           if (!canvas || typeof canvas.toBlob !== "function") {
-            postRuntimeScreenshotFailure(requestId, "Canvas snapshot is not available.");
+            postRuntimeScreenshotFailure("Canvas snapshot is not available.");
             return;
           }
 
@@ -286,12 +279,12 @@
                 reject(new Error("Canvas returned an empty snapshot."));
               }, "image/png");
             });
-            postRuntimeScreenshotResponse(requestId, {
+            postRuntimeScreenshotResponse({
               ok: true,
               blob: blob
             });
           } catch (error) {
-            postRuntimeScreenshotFailure(requestId, error instanceof Error ? error.message : String(error));
+            postRuntimeScreenshotFailure(error instanceof Error ? error.message : String(error));
           }
         }
 

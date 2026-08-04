@@ -219,6 +219,7 @@ describe("MapView bridge integration", () => {
     const requestRuntimeScreenshot = vi.fn().mockResolvedValue(screenshot);
     const copyScreenshotToClipboard = vi.fn().mockRejectedValue(new Error("clipboard failed"));
     const notify = vi.fn();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     const view = new MapView(
       { app } as never,
@@ -238,6 +239,7 @@ describe("MapView bridge integration", () => {
 
     expect(requestRuntimeScreenshot).toHaveBeenCalledTimes(1);
     expect(copyScreenshotToClipboard).toHaveBeenCalledWith(screenshot);
+    expect(warn).toHaveBeenCalledWith("Failed to copy screenshot.", expect.any(Error));
     expect(notify).toHaveBeenCalledWith("Failed to copy screenshot.");
   });
 

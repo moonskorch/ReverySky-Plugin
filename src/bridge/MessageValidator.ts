@@ -240,10 +240,6 @@ export class MessageValidator {
       );
     }
 
-    if (!this.isNonEmptyString(data.requestId)) {
-      errors.push("incoming runtime:screenshot-response requestId must be a non-empty string");
-    }
-
     if (!data.payload || typeof data.payload !== "object") {
       errors.push("incoming runtime:screenshot-response payload must be an object");
       return errors;

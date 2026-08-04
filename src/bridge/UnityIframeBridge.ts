@@ -31,7 +31,6 @@ type PendingShutdown = {
 };
 
 type PendingRuntimeScreenshot = {
-  requestId: string;
   resolve: (blob: Blob | null) => void;
   timeoutId: number;
   timeoutWindow: Window;
@@ -185,26 +184,25 @@ export class UnityIframeBridge {
   requestRuntimeScreenshot(timeoutMs = 2000): Promise<Blob | null> {
     const iframeWindow = this.getIframeWindowForSend();
     if (!iframeWindow) {
+      console.warn("Bridge is not attached to iframe window.");
       return Promise.resolve(null);
     }
 
     this.resolvePendingRuntimeScreenshot(null);
 
-    const requestId = this.createRequestId();
     const message: RuntimeScreenshotRequestMessage = {
       protocolVersion: BRIDGE_PROTOCOL_VERSION,
-      type: "runtime:screenshot-request",
-      requestId
+      type: "runtime:screenshot-request"
     };
 
     return new Promise((resolve) => {
       const timeoutWindow = this.messageWindow ?? window;
       const timeoutId = timeoutWindow.setTimeout(() => {
+        console.warn("Screenshot request timed out.");
         this.resolvePendingRuntimeScreenshot(null);
       }, timeoutMs);
 
       this.pendingRuntimeScreenshot = {
-        requestId,
         resolve,
         timeoutId,
         timeoutWindow
@@ -213,6 +211,7 @@ export class UnityIframeBridge {
       try {
         this.postOutgoingMessage(iframeWindow, message);
       } catch {
+        console.warn("Failed to post screenshot request.");
         this.resolvePendingRuntimeScreenshot(null);
       }
     });
@@ -297,15 +296,14 @@ export class UnityIframeBridge {
     if (data.type === "runtime:screenshot-response") {
       const incomingErrors = MessageValidator.validateIncomingRuntimeScreenshotResponseMessage(data);
       if (incomingErrors.length > 0) {
+        console.warn(`Invalid incoming screenshot response: ${incomingErrors.join("; ")}`);
         this.resolvePendingRuntimeScreenshot(null);
-        return;
-      }
-      if (this.pendingRuntimeScreenshot?.requestId !== data.requestId) {
         return;
       }
       if (data.payload.ok) {
         this.resolvePendingRuntimeScreenshot(data.payload.blob);
       } else {
+        console.warn("Screenshot capture failed.");
         this.resolvePendingRuntimeScreenshot(null);
       }
       return;

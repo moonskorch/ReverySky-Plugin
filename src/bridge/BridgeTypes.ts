@@ -60,13 +60,11 @@ export type RuntimeShutdownCompleteMessage = {
 export type RuntimeScreenshotRequestMessage = {
   protocolVersion: string;
   type: "runtime:screenshot-request";
-  requestId: string;
 };
 
 export type RuntimeScreenshotResponseMessage = {
   protocolVersion: string;
   type: "runtime:screenshot-response";
-  requestId: string;
   payload:
     | {
         ok: true;

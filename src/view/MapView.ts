@@ -135,7 +135,8 @@ export class MapView extends ItemView {
 
         await this.copyScreenshotToClipboard(screenshot);
         this.notify("Screenshot copied to clipboard.");
-      } catch {
+      } catch (error) {
+        console.warn(SCREENSHOT_COPY_FAILURE_MESSAGE, error);
         this.notify(SCREENSHOT_COPY_FAILURE_MESSAGE);
       } finally {
         this.pendingScreenshotCopy = null;

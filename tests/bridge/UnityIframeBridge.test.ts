@@ -178,7 +178,6 @@ describe("UnityIframeBridge", () => {
       {
         type: "runtime:screenshot-response",
         protocolVersion: BRIDGE_PROTOCOL_VERSION,
-        requestId: requestMessage.requestId as string,
         payload: {
           ok: true,
           blob: screenshotBlob
@@ -194,19 +193,18 @@ describe("UnityIframeBridge", () => {
   it("returns null for a runtime screenshot when the response reports failure", async () => {
     const bridge = new UnityIframeBridge();
     const postMessage = vi.fn();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const iframeWindow = { postMessage } as unknown as Window;
 
     bridge.attach(iframeWindow, {});
     const screenshotPromise = bridge.requestRuntimeScreenshot();
 
     expect(postMessage).toHaveBeenCalledTimes(1);
-    const [requestMessage] = postMessage.mock.calls[0] as [Record<string, unknown>, string];
 
     dispatchMessage(
       {
         type: "runtime:screenshot-response",
         protocolVersion: BRIDGE_PROTOCOL_VERSION,
-        requestId: requestMessage.requestId as string,
         payload: {
           ok: false
         }
@@ -215,26 +213,25 @@ describe("UnityIframeBridge", () => {
     );
 
     await expect(screenshotPromise).resolves.toBeNull();
+    expect(warn).toHaveBeenCalledWith("Screenshot capture failed.");
     bridge.detach();
   });
 
   it("returns null for a runtime screenshot when the response is malformed", async () => {
     const bridge = new UnityIframeBridge();
     const postMessage = vi.fn();
-    const onError = vi.fn();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const iframeWindow = { postMessage } as unknown as Window;
 
-    bridge.attach(iframeWindow, { onError });
+    bridge.attach(iframeWindow, {});
     const screenshotPromise = bridge.requestRuntimeScreenshot();
 
     expect(postMessage).toHaveBeenCalledTimes(1);
-    const [requestMessage] = postMessage.mock.calls[0] as [Record<string, unknown>, string];
 
     dispatchMessage(
       {
         type: "runtime:screenshot-response",
         protocolVersion: BRIDGE_PROTOCOL_VERSION,
-        requestId: requestMessage.requestId as string,
         payload: {
           ok: true
         }
@@ -243,7 +240,7 @@ describe("UnityIframeBridge", () => {
     );
 
     await expect(screenshotPromise).resolves.toBeNull();
-    expect(onError).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("Invalid incoming screenshot response:"));
     bridge.detach();
   });
 
@@ -251,6 +248,7 @@ describe("UnityIframeBridge", () => {
     vi.useFakeTimers();
     const bridge = new UnityIframeBridge();
     const postMessage = vi.fn();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const iframeWindow = { postMessage } as unknown as Window;
 
     bridge.attach(iframeWindow, {});
@@ -259,6 +257,7 @@ describe("UnityIframeBridge", () => {
     await vi.advanceTimersByTimeAsync(10);
 
     await expect(screenshotPromise).resolves.toBeNull();
+    expect(warn).toHaveBeenCalledWith("Screenshot request timed out.");
     bridge.detach();
   });
 
