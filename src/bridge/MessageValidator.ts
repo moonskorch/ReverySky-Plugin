@@ -5,8 +5,7 @@ import {
   IncomingBridgeMessage,
   NoteFocusPayload,
   NoteOpenMessage,
-  RuntimeScreenshotErrorMessage,
-  RuntimeScreenshotResultMessage,
+  RuntimeScreenshotResponseMessage,
   RuntimeShutdownCompleteMessage
 } from "./BridgeTypes";
 import {
@@ -224,15 +223,15 @@ export class MessageValidator {
     return errors;
   }
 
-  static validateIncomingRuntimeScreenshotResultMessage(data: RuntimeScreenshotResultMessage): string[] {
+  static validateIncomingRuntimeScreenshotResponseMessage(data: RuntimeScreenshotResponseMessage): string[] {
     const errors: string[] = [];
 
     if (!data || typeof data !== "object") {
       return ["incoming message must be an object"];
     }
 
-    if (data.type !== "runtime:screenshot-result") {
-      errors.push("incoming message type must be runtime:screenshot-result");
+    if (data.type !== "runtime:screenshot-response") {
+      errors.push("incoming message type must be runtime:screenshot-response");
     }
 
     if (data.protocolVersion !== BRIDGE_PROTOCOL_VERSION) {
@@ -242,49 +241,23 @@ export class MessageValidator {
     }
 
     if (!this.isNonEmptyString(data.requestId)) {
-      errors.push("incoming runtime:screenshot-result requestId must be a non-empty string");
+      errors.push("incoming runtime:screenshot-response requestId must be a non-empty string");
     }
 
     if (!data.payload || typeof data.payload !== "object") {
-      errors.push("incoming runtime:screenshot-result payload must be an object");
+      errors.push("incoming runtime:screenshot-response payload must be an object");
       return errors;
     }
 
-    if (!(data.payload.blob instanceof Blob)) {
-      errors.push("incoming runtime:screenshot-result payload.blob must be a Blob");
-    }
-
-    return errors;
-  }
-
-  static validateIncomingRuntimeScreenshotErrorMessage(data: RuntimeScreenshotErrorMessage): string[] {
-    const errors: string[] = [];
-
-    if (!data || typeof data !== "object") {
-      return ["incoming message must be an object"];
-    }
-
-    if (data.type !== "runtime:screenshot-error") {
-      errors.push("incoming message type must be runtime:screenshot-error");
-    }
-
-    if (data.protocolVersion !== BRIDGE_PROTOCOL_VERSION) {
-      errors.push(
-        `incoming protocolVersion mismatch: expected ${BRIDGE_PROTOCOL_VERSION}, got ${String(data.protocolVersion)}`
-      );
-    }
-
-    if (!this.isNonEmptyString(data.requestId)) {
-      errors.push("incoming runtime:screenshot-error requestId must be a non-empty string");
-    }
-
-    if (!data.payload || typeof data.payload !== "object") {
-      errors.push("incoming runtime:screenshot-error payload must be an object");
+    if (data.payload.ok === true) {
+      if (!(data.payload.blob instanceof Blob)) {
+        errors.push("incoming runtime:screenshot-response payload.blob must be a Blob when ok is true");
+      }
       return errors;
     }
 
-    if (!this.isNonEmptyString(data.payload.message)) {
-      errors.push("incoming runtime:screenshot-error payload.message must be a non-empty string");
+    if (data.payload.ok !== false) {
+      errors.push("incoming runtime:screenshot-response payload.ok must be a boolean");
     }
 
     return errors;

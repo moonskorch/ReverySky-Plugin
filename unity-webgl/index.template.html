@@ -256,7 +256,7 @@
           );
         }
 
-        function postRuntimeScreenshotResult(requestId, blob) {
+        function postRuntimeScreenshotResponse(requestId, payload) {
           if (isShuttingDown || !window.parent) {
             return;
           }
@@ -264,32 +264,23 @@
           window.parent.postMessage(
             {
               protocolVersion: protocolVersion,
-              type: "runtime:screenshot-result",
+              type: "runtime:screenshot-response",
               requestId: typeof requestId === "string" ? requestId : "",
-              payload: {
-                blob: blob
-              }
+              payload: payload
             },
             "*"
           );
         }
 
-        function postRuntimeScreenshotError(requestId, message) {
+        function postRuntimeScreenshotFailure(requestId, message) {
+          console.warn(message);
           if (isShuttingDown || !window.parent) {
             return;
           }
 
-          window.parent.postMessage(
-            {
-              protocolVersion: protocolVersion,
-              type: "runtime:screenshot-error",
-              requestId: typeof requestId === "string" ? requestId : "",
-              payload: {
-                message: typeof message === "string" && message.trim() ? message.trim() : "Failed to capture screenshot."
-              }
-            },
-            "*"
-          );
+          postRuntimeScreenshotResponse(requestId, {
+            ok: false
+          });
         }
 
         function waitForNextFrame() {
@@ -305,12 +296,12 @@
         async function handleRuntimeScreenshotRequest(data) {
           const requestId = typeof data.requestId === "string" ? data.requestId : "";
           if (!requestId) {
-            postRuntimeScreenshotError(requestId, "Screenshot requestId is missing.");
+            console.warn("Screenshot requestId is missing.");
             return;
           }
 
           if (!canvas || typeof canvas.toBlob !== "function") {
-            postRuntimeScreenshotError(requestId, "Canvas snapshot is not available.");
+            postRuntimeScreenshotFailure(requestId, "Canvas snapshot is not available.");
             return;
           }
 
@@ -325,9 +316,12 @@
                 reject(new Error("Canvas returned an empty snapshot."));
               }, "image/png");
             });
-            postRuntimeScreenshotResult(requestId, blob);
+            postRuntimeScreenshotResponse(requestId, {
+              ok: true,
+              blob: blob
+            });
           } catch (error) {
-            postRuntimeScreenshotError(requestId, error instanceof Error ? error.message : String(error));
+            postRuntimeScreenshotFailure(requestId, error instanceof Error ? error.message : String(error));
           }
         }
 

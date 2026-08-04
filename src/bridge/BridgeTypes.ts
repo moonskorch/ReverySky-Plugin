@@ -63,22 +63,18 @@ export type RuntimeScreenshotRequestMessage = {
   requestId: string;
 };
 
-export type RuntimeScreenshotResultMessage = {
+export type RuntimeScreenshotResponseMessage = {
   protocolVersion: string;
-  type: "runtime:screenshot-result";
+  type: "runtime:screenshot-response";
   requestId: string;
-  payload: {
-    blob: Blob;
-  };
-};
-
-export type RuntimeScreenshotErrorMessage = {
-  protocolVersion: string;
-  type: "runtime:screenshot-error";
-  requestId: string;
-  payload: {
-    message: string;
-  };
+  payload:
+    | {
+        ok: true;
+        blob: Blob;
+      }
+    | {
+        ok: false;
+      };
 };
 
 export type RuntimeStatusMessage = {
@@ -139,8 +135,7 @@ export type IncomingBridgeMessage =
   | BridgeReadyMessage
   | GraphReadyMessage
   | NoteOpenMessage
-  | RuntimeScreenshotResultMessage
-  | RuntimeScreenshotErrorMessage
+  | RuntimeScreenshotResponseMessage
   | RuntimeShutdownCompleteMessage;
 export type OutgoingBridgeMessage =
   | GraphSetMessage

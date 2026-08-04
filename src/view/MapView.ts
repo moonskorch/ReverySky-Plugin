@@ -9,6 +9,7 @@ import { MapNoteOpenRouter } from "./MapNoteOpenRouter";
 import { MapSession } from "./MapSession";
 
 export const MAP_VIEW_TYPE = "reverysky-map-view";
+const SCREENSHOT_COPY_FAILURE_MESSAGE = "Failed to copy screenshot.";
 
 type BridgePort = Pick<
   UnityIframeBridge,
@@ -127,10 +128,15 @@ export class MapView extends ItemView {
     const screenshotCopy = (async () => {
       try {
         const screenshot = await this.bridge.requestRuntimeScreenshot();
+        if (!screenshot) {
+          this.notify(SCREENSHOT_COPY_FAILURE_MESSAGE);
+          return;
+        }
+
         await this.copyScreenshotToClipboard(screenshot);
         this.notify("Screenshot copied to clipboard.");
-      } catch (error) {
-        this.notify(`Failed to copy screenshot: ${this.describeError(error)}`);
+      } catch {
+        this.notify(SCREENSHOT_COPY_FAILURE_MESSAGE);
       } finally {
         this.pendingScreenshotCopy = null;
       }
@@ -389,13 +395,6 @@ export class MapView extends ItemView {
     this.runtimeLease = this.onLifecycleOpen();
   }
 
-  private describeError(error: unknown): string {
-    if (error instanceof Error) {
-      return error.message;
-    }
-
-    return String(error);
-  }
 }
 
 function emptyElement(element: ObsidianHTMLElement): void {

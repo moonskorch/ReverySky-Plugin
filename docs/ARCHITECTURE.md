@@ -143,7 +143,7 @@ The reverse path for runtime events is:
 The bridge is implemented across several runtime boundaries:
 
 - `src/view/MapView.ts` - creates the iframe and attaches the bridge to `iframe.contentWindow`.
-- `src/bridge/UnityIframeBridge.ts` - sends plugin-to-runtime messages and receives runtime-to-plugin messages, including the best-effort screenshot request/result flow used by the settings-panel button.
+- `src/bridge/UnityIframeBridge.ts` - sends plugin-to-runtime messages and receives runtime-to-plugin messages, including the best-effort screenshot request/response flow used by the settings-panel button.
 - `unity-webgl/index.template.html` and `unity-webgl/index.disk-runtime.template.html` - contain the iframe JavaScript wrapper. This wrapper listens for `postMessage` events, applies wrapper-only status updates, calls `unityInstance.SendMessage(...)` for Unity-bound messages, captures screenshot requests by reading the Unity canvas, and posts runtime events back to `window.parent`.
 - `unity/ReverySkyMap/Assets/Scripts/Bridge/ObsidianBridge.cs` - Unity-side bridge component. It receives graph and focus messages from JavaScript, normalizes payloads, updates `MapRuntimeContext`, and forwards note-open events back to the iframe JavaScript wrapper.
 

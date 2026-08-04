@@ -176,10 +176,11 @@ describe("UnityIframeBridge", () => {
 
     dispatchMessage(
       {
-        type: "runtime:screenshot-result",
+        type: "runtime:screenshot-response",
         protocolVersion: BRIDGE_PROTOCOL_VERSION,
         requestId: requestMessage.requestId as string,
         payload: {
+          ok: true,
           blob: screenshotBlob
         }
       },
@@ -187,6 +188,77 @@ describe("UnityIframeBridge", () => {
     );
 
     await expect(screenshotPromise).resolves.toBe(screenshotBlob);
+    bridge.detach();
+  });
+
+  it("returns null for a runtime screenshot when the response reports failure", async () => {
+    const bridge = new UnityIframeBridge();
+    const postMessage = vi.fn();
+    const iframeWindow = { postMessage } as unknown as Window;
+
+    bridge.attach(iframeWindow, {});
+    const screenshotPromise = bridge.requestRuntimeScreenshot();
+
+    expect(postMessage).toHaveBeenCalledTimes(1);
+    const [requestMessage] = postMessage.mock.calls[0] as [Record<string, unknown>, string];
+
+    dispatchMessage(
+      {
+        type: "runtime:screenshot-response",
+        protocolVersion: BRIDGE_PROTOCOL_VERSION,
+        requestId: requestMessage.requestId as string,
+        payload: {
+          ok: false
+        }
+      },
+      iframeWindow
+    );
+
+    await expect(screenshotPromise).resolves.toBeNull();
+    bridge.detach();
+  });
+
+  it("returns null for a runtime screenshot when the response is malformed", async () => {
+    const bridge = new UnityIframeBridge();
+    const postMessage = vi.fn();
+    const onError = vi.fn();
+    const iframeWindow = { postMessage } as unknown as Window;
+
+    bridge.attach(iframeWindow, { onError });
+    const screenshotPromise = bridge.requestRuntimeScreenshot();
+
+    expect(postMessage).toHaveBeenCalledTimes(1);
+    const [requestMessage] = postMessage.mock.calls[0] as [Record<string, unknown>, string];
+
+    dispatchMessage(
+      {
+        type: "runtime:screenshot-response",
+        protocolVersion: BRIDGE_PROTOCOL_VERSION,
+        requestId: requestMessage.requestId as string,
+        payload: {
+          ok: true
+        }
+      },
+      iframeWindow
+    );
+
+    await expect(screenshotPromise).resolves.toBeNull();
+    expect(onError).not.toHaveBeenCalled();
+    bridge.detach();
+  });
+
+  it("returns null for a runtime screenshot when the request times out", async () => {
+    vi.useFakeTimers();
+    const bridge = new UnityIframeBridge();
+    const postMessage = vi.fn();
+    const iframeWindow = { postMessage } as unknown as Window;
+
+    bridge.attach(iframeWindow, {});
+    const screenshotPromise = bridge.requestRuntimeScreenshot(10);
+
+    await vi.advanceTimersByTimeAsync(10);
+
+    await expect(screenshotPromise).resolves.toBeNull();
     bridge.detach();
   });
 

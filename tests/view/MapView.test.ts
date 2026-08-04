@@ -166,6 +166,81 @@ describe("MapView bridge integration", () => {
     expect(notify).toHaveBeenCalledWith("Screenshot copied to clipboard.");
   });
 
+  it("shows the screenshot failure notice when the bridge returns null", async () => {
+    const app = {
+      workspace: {
+        activeLeaf: null,
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn()
+    };
+    const requestRuntimeScreenshot = vi.fn().mockResolvedValue(null);
+    const copyScreenshotToClipboard = vi.fn().mockResolvedValue(undefined);
+    const notify = vi.fn();
+
+    const view = new MapView(
+      { app } as never,
+      plugin as never,
+      {
+        buildGraph: vi.fn().mockReturnValue(makePayload()) as BuildGraphForTest,
+        createBridge: () =>
+          makeBridgeForTest({
+            requestRuntimeScreenshot
+          }),
+        copyScreenshotToClipboard,
+        notify
+      }
+    );
+
+    await view.copyRuntimeScreenshotToClipboard();
+
+    expect(requestRuntimeScreenshot).toHaveBeenCalledTimes(1);
+    expect(copyScreenshotToClipboard).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledWith("Failed to copy screenshot.");
+  });
+
+  it("shows the screenshot failure notice when clipboard copy throws", async () => {
+    const app = {
+      workspace: {
+        activeLeaf: null,
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn()
+    };
+    const screenshot = new Blob(["snapshot"], { type: "image/png" });
+    const requestRuntimeScreenshot = vi.fn().mockResolvedValue(screenshot);
+    const copyScreenshotToClipboard = vi.fn().mockRejectedValue(new Error("clipboard failed"));
+    const notify = vi.fn();
+
+    const view = new MapView(
+      { app } as never,
+      plugin as never,
+      {
+        buildGraph: vi.fn().mockReturnValue(makePayload()) as BuildGraphForTest,
+        createBridge: () =>
+          makeBridgeForTest({
+            requestRuntimeScreenshot
+          }),
+        copyScreenshotToClipboard,
+        notify
+      }
+    );
+
+    await view.copyRuntimeScreenshotToClipboard();
+
+    expect(requestRuntimeScreenshot).toHaveBeenCalledTimes(1);
+    expect(copyScreenshotToClipboard).toHaveBeenCalledWith(screenshot);
+    expect(notify).toHaveBeenCalledWith("Failed to copy screenshot.");
+  });
+
   it("coalesces overlapping screenshot copies into a single request", async () => {
     const app = {
       workspace: {

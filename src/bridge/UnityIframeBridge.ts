@@ -32,8 +32,7 @@ type PendingShutdown = {
 
 type PendingRuntimeScreenshot = {
   requestId: string;
-  resolve: (blob: Blob) => void;
-  reject: (error: Error) => void;
+  resolve: (blob: Blob | null) => void;
   timeoutId: number;
   timeoutWindow: Window;
 };
@@ -57,7 +56,7 @@ export class UnityIframeBridge {
    */
   attach(iframeWindow: Window, callbacks: BridgeCallbacks, messageWindow: Window = window): void {
     this.resolvePendingShutdown("superseded");
-    this.rejectPendingRuntimeScreenshot("superseded");
+    this.resolvePendingRuntimeScreenshot(null);
 
     if (this.attached) {
       this.detach();
@@ -72,7 +71,7 @@ export class UnityIframeBridge {
 
   detach(): void {
     this.resolvePendingShutdown("superseded");
-    this.rejectPendingRuntimeScreenshot("superseded");
+    this.resolvePendingRuntimeScreenshot(null);
 
     if (!this.attached) {
       return;
@@ -183,13 +182,13 @@ export class UnityIframeBridge {
     this.postOutgoingMessage(iframeWindow, message);
   }
 
-  requestRuntimeScreenshot(timeoutMs = 2000): Promise<Blob> {
+  requestRuntimeScreenshot(timeoutMs = 2000): Promise<Blob | null> {
     const iframeWindow = this.getIframeWindowForSend();
     if (!iframeWindow) {
-      return Promise.reject(new Error("Bridge is not attached to iframe window."));
+      return Promise.resolve(null);
     }
 
-    this.rejectPendingRuntimeScreenshot("superseded");
+    this.resolvePendingRuntimeScreenshot(null);
 
     const requestId = this.createRequestId();
     const message: RuntimeScreenshotRequestMessage = {
@@ -198,24 +197,23 @@ export class UnityIframeBridge {
       requestId
     };
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const timeoutWindow = this.messageWindow ?? window;
       const timeoutId = timeoutWindow.setTimeout(() => {
-        this.rejectPendingRuntimeScreenshot("timeout");
+        this.resolvePendingRuntimeScreenshot(null);
       }, timeoutMs);
 
       this.pendingRuntimeScreenshot = {
         requestId,
         resolve,
-        reject,
         timeoutId,
         timeoutWindow
       };
 
       try {
         this.postOutgoingMessage(iframeWindow, message);
-      } catch (error) {
-        this.rejectPendingRuntimeScreenshot(error instanceof Error ? error.message : "postMessage failed");
+      } catch {
+        this.resolvePendingRuntimeScreenshot(null);
       }
     });
   }
@@ -296,29 +294,21 @@ export class UnityIframeBridge {
       return;
     }
 
-    if (data.type === "runtime:screenshot-result") {
-      const incomingErrors = MessageValidator.validateIncomingRuntimeScreenshotResultMessage(data);
+    if (data.type === "runtime:screenshot-response") {
+      const incomingErrors = MessageValidator.validateIncomingRuntimeScreenshotResponseMessage(data);
       if (incomingErrors.length > 0) {
-        this.callbacks.onError?.(`Invalid incoming bridge message: ${incomingErrors.join("; ")}`);
+        this.resolvePendingRuntimeScreenshot(null);
         return;
       }
       if (this.pendingRuntimeScreenshot?.requestId !== data.requestId) {
         return;
       }
-      this.resolvePendingRuntimeScreenshot(data.payload.blob);
+      if (data.payload.ok) {
+        this.resolvePendingRuntimeScreenshot(data.payload.blob);
+      } else {
+        this.resolvePendingRuntimeScreenshot(null);
+      }
       return;
-    }
-
-    if (data.type === "runtime:screenshot-error") {
-      const incomingErrors = MessageValidator.validateIncomingRuntimeScreenshotErrorMessage(data);
-      if (incomingErrors.length > 0) {
-        this.callbacks.onError?.(`Invalid incoming bridge message: ${incomingErrors.join("; ")}`);
-        return;
-      }
-      if (this.pendingRuntimeScreenshot?.requestId !== data.requestId) {
-        return;
-      }
-      this.rejectPendingRuntimeScreenshot(data.payload.message);
     }
   }
 
@@ -333,7 +323,7 @@ export class UnityIframeBridge {
     pendingShutdown.resolve(result);
   }
 
-  private resolvePendingRuntimeScreenshot(blob: Blob): void {
+  private resolvePendingRuntimeScreenshot(blob: Blob | null): void {
     const pendingRuntimeScreenshot = this.pendingRuntimeScreenshot;
     if (!pendingRuntimeScreenshot) {
       return;
@@ -342,17 +332,6 @@ export class UnityIframeBridge {
     pendingRuntimeScreenshot.timeoutWindow.clearTimeout(pendingRuntimeScreenshot.timeoutId);
     this.pendingRuntimeScreenshot = null;
     pendingRuntimeScreenshot.resolve(blob);
-  }
-
-  private rejectPendingRuntimeScreenshot(reason: string): void {
-    const pendingRuntimeScreenshot = this.pendingRuntimeScreenshot;
-    if (!pendingRuntimeScreenshot) {
-      return;
-    }
-
-    pendingRuntimeScreenshot.timeoutWindow.clearTimeout(pendingRuntimeScreenshot.timeoutId);
-    this.pendingRuntimeScreenshot = null;
-    pendingRuntimeScreenshot.reject(new Error(`Screenshot request ${reason}.`));
   }
 
   private createRequestId(): string {
