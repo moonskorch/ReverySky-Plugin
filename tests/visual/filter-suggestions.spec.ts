@@ -18,7 +18,7 @@ test.describe("filter suggestions", () => {
     await page.goto(pathToFileURL(previewPath).href);
 
     const stage = page.locator("[data-visual-stage]");
-    const panel = page.locator(".reverysky-map-filter-panel");
+    const panel = page.locator(".reverysky-map-settings-panel");
     const suggestions = page.locator(".reverysky-map-filter-suggestions");
 
     await expect(suggestions).toContainText("Date presets");
@@ -43,7 +43,7 @@ test.describe("filter suggestions", () => {
     expect(suggestionsMetrics.scrollHeight).toBeLessThanOrEqual(suggestionsMetrics.clientHeight + 1);
 
     const isInsidePanel = await suggestions.evaluate((element) => {
-      const panelElement = document.querySelector(".reverysky-map-filter-panel");
+      const panelElement = document.querySelector(".reverysky-map-settings-panel");
       return panelElement?.contains(element) ?? false;
     });
     expect(isInsidePanel).toBe(false);
@@ -131,7 +131,7 @@ test.describe("filter suggestions", () => {
 
     const root = page.locator(".reverysky-map-root");
     const host = page.locator("[data-webgl-host]");
-    const panel = page.locator(".reverysky-map-filter-panel");
+    const panel = page.locator(".reverysky-map-settings-panel");
     const suggestions = page.locator("[data-filter-suggestions]");
     const beforeBox = await host.boundingBox();
     expect(beforeBox).not.toBeNull();

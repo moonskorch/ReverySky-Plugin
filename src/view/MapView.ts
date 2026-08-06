@@ -46,7 +46,7 @@ export type MapViewDependencies = {
 
 /**
  * Own the Obsidian view shell and iframe bridge lifecycle around the Unity graph.
- * Filter-panel interactions and note-open routing live in dedicated collaborators.
+ * Settings-panel interactions and note-open routing live in dedicated collaborators.
  */
 export class MapView extends ItemView {
   navigation = false;
@@ -56,7 +56,7 @@ export class MapView extends ItemView {
   private readonly copyScreenshotToClipboard: (blob: Blob) => Promise<void> | void;
   private readonly session: MapSession;
   private readonly noteOpenRouter: MapNoteOpenRouter;
-  private filterPanelController: MapSettingsPanelController | null = null;
+  private settingsPanelController: MapSettingsPanelController | null = null;
   private iframeLoadAbortController: AbortController | null = null;
   private windowMigrationCleanup: (() => void) | null = null;
   private deferredIframeRenderCleanup: (() => void) | null = null;
@@ -90,7 +90,7 @@ export class MapView extends ItemView {
       now: this.now,
       sendGraph: (payload) => {
         this.bridge.sendGraphSet(payload);
-        this.filterPanelController?.refreshSuggestions();
+        this.settingsPanelController?.refreshSuggestions();
       },
       sendStatus: (message) => {
         this.bridge.sendStatus(message);
@@ -219,13 +219,13 @@ export class MapView extends ItemView {
     container: ObsidianHTMLElement,
     lifecycleGeneration: number
   ): Promise<void> {
-    this.filterPanelController?.dispose();
-    this.filterPanelController = null;
+    this.settingsPanelController?.dispose();
+    this.settingsPanelController = null;
     emptyElement(container);
-    this.filterPanelController = new MapSettingsPanelController(this.session, {
+    this.settingsPanelController = new MapSettingsPanelController(this.session, {
       onCopyScreenshotRequested: () => this.copyRuntimeScreenshotToClipboard()
     });
-    const iframeHost = this.filterPanelController.render(container);
+    const iframeHost = this.settingsPanelController.render(container);
 
     let iframeSrc: string;
     try {
@@ -319,8 +319,8 @@ export class MapView extends ItemView {
 
   private disposeRuntimeShell(): void {
     this.disposeRuntimeFrame();
-    this.filterPanelController?.dispose();
-    this.filterPanelController = null;
+    this.settingsPanelController?.dispose();
+    this.settingsPanelController = null;
   }
 
   private disposeRuntimeFrame(): void {

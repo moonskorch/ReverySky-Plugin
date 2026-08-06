@@ -20,18 +20,18 @@ test.describe("filter toggle panel alignment", () => {
     await page.goto(pathToFileURL(previewPath).href);
 
     const stage = page.locator("[data-visual-stage]");
-    const filterToggle = page.locator(".reverysky-map-filter-toggle");
-    const closeButton = page.locator(".reverysky-map-filter-close");
+    const settingsToggle = page.locator(".reverysky-map-settings-toggle");
+    const closeButton = page.locator(".reverysky-map-settings-close");
 
-    const filterToggleBox = await filterToggle.boundingBox();
+    const settingsToggleBox = await settingsToggle.boundingBox();
     const closeBox = await closeButton.boundingBox();
-    expect(filterToggleBox).not.toBeNull();
+    expect(settingsToggleBox).not.toBeNull();
     expect(closeBox).not.toBeNull();
     expect(
-      Math.abs((filterToggleBox!.x + filterToggleBox!.width / 2) - (closeBox!.x + closeBox!.width / 2))
+      Math.abs((settingsToggleBox!.x + settingsToggleBox!.width / 2) - (closeBox!.x + closeBox!.width / 2))
     ).toBeLessThanOrEqual(1);
     expect(
-      Math.abs((filterToggleBox!.y + filterToggleBox!.height / 2) - (closeBox!.y + closeBox!.height / 2))
+      Math.abs((settingsToggleBox!.y + settingsToggleBox!.height / 2) - (closeBox!.y + closeBox!.height / 2))
     ).toBeLessThanOrEqual(1);
 
     await expect(stage).toHaveScreenshot("filter-toggle-over-panel-close.png", {

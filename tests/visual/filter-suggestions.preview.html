@@ -56,7 +56,7 @@
           #101010;
       }
 
-      .visual-stage .reverysky-map-filter-panel {
+      .visual-stage .reverysky-map-settings-panel {
         display: grid;
       }
 
@@ -134,27 +134,27 @@
     <div class="visual-stage reverysky-map-root" data-visual-stage>
       <div class="reverysky-map-iframe-host" data-webgl-host aria-hidden="true"></div>
 
-      <div class="reverysky-map-filter-panel">
-        <div class="reverysky-map-filter-section reverysky-map-settings-section">
-          <div class="reverysky-map-filter-header">
-            <button class="reverysky-map-filter-section-toggle" type="button" aria-label="Collapse Selection" aria-expanded="true" tabindex="-1">
-              <span class="reverysky-map-filter-section-chevron">
+      <div class="reverysky-map-settings-panel">
+        <div class="reverysky-map-settings-section reverysky-map-selection-section">
+          <div class="reverysky-map-settings-section-header">
+            <button class="reverysky-map-settings-section-toggle" type="button" aria-label="Collapse Selection" aria-expanded="true" tabindex="-1">
+              <span class="reverysky-map-settings-section-chevron">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="m9 18 6-6-6-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
               </span>
-              <span class="reverysky-map-filter-title">Selection</span>
+              <span class="reverysky-map-settings-section-title">Selection</span>
             </button>
-            <button class="reverysky-map-filter-close" type="button" aria-label="Close filters">
+            <button class="reverysky-map-settings-close" type="button" aria-label="Close filters">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M18 6 6 18M6 6l12 12" fill="none" stroke="currentColor" stroke-linecap="round" />
               </svg>
             </button>
           </div>
 
-          <div class="reverysky-map-filter-section-content">
+          <div class="reverysky-map-settings-section-content">
             <div class="reverysky-map-filter-search-area" data-suggestions-anchor>
-              <div class="reverysky-map-filter-field-label">Filter</div>
+              <div class="reverysky-map-settings-field-label">Filter</div>
               <div class="search-input-container">
                 <input class="search-input" type="search" aria-label="Search in filter" value="date:" />
               </div>
@@ -163,14 +163,14 @@
             <div class="reverysky-map-filter-message reverysky-map-filter-message--hidden"></div>
 
             <div class="reverysky-map-tags-toggle-row">
-              <div class="reverysky-map-filter-field-label">Tags</div>
+              <div class="reverysky-map-settings-field-label">Tags</div>
               <button class="reverysky-map-tags-toggle" type="button" aria-label="Toggle tags" aria-checked="true">
                 <span class="reverysky-map-tags-toggle-thumb"></span>
               </button>
             </div>
 
-            <div class="reverysky-map-filter-section reverysky-map-filter-control-group">
-              <div class="reverysky-map-filter-field-label">Layout</div>
+            <div class="reverysky-map-settings-section reverysky-map-settings-control-group">
+              <div class="reverysky-map-settings-field-label">Layout</div>
               <div class="reverysky-map-engine-select-host">
                 <select class="reverysky-map-engine-select" aria-label="Select layout">
                   <option value="auto" selected>Auto</option>
@@ -183,22 +183,22 @@
           </div>
         </div>
 
-        <div class="reverysky-map-filter-section reverysky-map-graphics-section reverysky-map-filter-section--collapsed">
-          <div class="reverysky-map-filter-header">
-            <button class="reverysky-map-filter-section-toggle" type="button" aria-label="Expand Graphics" aria-expanded="false" tabindex="-1">
-              <span class="reverysky-map-filter-section-chevron">
+        <div class="reverysky-map-settings-section reverysky-map-graphics-section reverysky-map-settings-section--collapsed">
+          <div class="reverysky-map-settings-section-header">
+            <button class="reverysky-map-settings-section-toggle" type="button" aria-label="Expand Graphics" aria-expanded="false" tabindex="-1">
+              <span class="reverysky-map-settings-section-chevron">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="m9 18 6-6-6-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
               </span>
-              <span class="reverysky-map-filter-title">Graphics</span>
+              <span class="reverysky-map-settings-section-title">Graphics</span>
             </button>
           </div>
 
-          <div class="reverysky-map-filter-section-content reverysky-map-filter-section-content--collapsed">
-            <div class="reverysky-map-filter-section reverysky-map-filter-control-group reverysky-map-render-scale-section">
+          <div class="reverysky-map-settings-section-content reverysky-map-settings-section-content--collapsed">
+            <div class="reverysky-map-settings-section reverysky-map-settings-control-group reverysky-map-render-scale-section">
               <div class="reverysky-map-render-scale-header">
-                <div class="reverysky-map-filter-field-label">Render scale</div>
+                <div class="reverysky-map-settings-field-label">Render scale</div>
                 <div class="reverysky-map-render-scale-value">1.0x</div>
               </div>
               <input
@@ -213,8 +213,8 @@
               <div class="reverysky-map-render-scale-message reverysky-map-render-scale-message--hidden"></div>
             </div>
 
-            <div class="reverysky-map-filter-section reverysky-map-filter-control-group">
-              <div class="reverysky-map-filter-field-label">Frame rate</div>
+            <div class="reverysky-map-settings-section reverysky-map-settings-control-group">
+              <div class="reverysky-map-settings-field-label">Frame rate</div>
               <div class="reverysky-map-engine-select-host">
                 <select class="reverysky-map-engine-select reverysky-map-frame-rate-mode-select" aria-label="Select frame rate">
                   <option value="auto" selected>Auto</option>

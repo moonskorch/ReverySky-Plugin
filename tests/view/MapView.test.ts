@@ -16,7 +16,7 @@ type BridgeCallbacks = {
 };
 
 const FILTER_MESSAGE_HIDDEN_CLASS = "reverysky-map-filter-message--hidden";
-const FILTER_PANEL_CLOSED_CLASS = "reverysky-map-filter-panel--closed";
+const SETTINGS_PANEL_CLOSED_CLASS = "reverysky-map-settings-panel--closed";
 const SUGGESTIONS_HIDDEN_CLASS = "reverysky-map-filter-suggestions--hidden";
 
 function makeBridgeForTest(overrides: Partial<BridgeForTest>): BridgeForTest {
@@ -2163,18 +2163,18 @@ describe("MapView bridge integration", () => {
     iframe!.dispatchEvent(new Event("load"));
     callbacks.onReady?.();
 
-    const panel = view.contentEl.querySelector(".reverysky-map-filter-panel") as HTMLElement;
-    expect(panel.classList.contains(FILTER_PANEL_CLOSED_CLASS)).toBe(true);
+    const panel = view.contentEl.querySelector(".reverysky-map-settings-panel") as HTMLElement;
+    expect(panel.classList.contains(SETTINGS_PANEL_CLOSED_CLASS)).toBe(true);
 
-    const gear = view.contentEl.querySelector(".reverysky-map-filter-toggle") as HTMLButtonElement;
+    const gear = view.contentEl.querySelector(".reverysky-map-settings-toggle") as HTMLButtonElement;
     gear.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-    expect(panel.classList.contains(FILTER_PANEL_CLOSED_CLASS)).toBe(false);
+    expect(panel.classList.contains(SETTINGS_PANEL_CLOSED_CLASS)).toBe(false);
 
     const closeButton = view.contentEl.querySelector(
-      ".reverysky-map-filter-close"
+      ".reverysky-map-settings-close"
     ) as HTMLButtonElement;
     closeButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(panel.classList.contains(FILTER_PANEL_CLOSED_CLASS)).toBe(true);
+    expect(panel.classList.contains(SETTINGS_PANEL_CLOSED_CLASS)).toBe(true);
   });
 
   it("opens and closes filter panel with keyboard activation on focused gear button", async () => {
@@ -2230,18 +2230,18 @@ describe("MapView bridge integration", () => {
     iframe!.dispatchEvent(new Event("load"));
     callbacks.onReady?.();
 
-    const panel = view.contentEl.querySelector(".reverysky-map-filter-panel") as HTMLElement;
-    expect(panel.classList.contains(FILTER_PANEL_CLOSED_CLASS)).toBe(true);
+    const panel = view.contentEl.querySelector(".reverysky-map-settings-panel") as HTMLElement;
+    expect(panel.classList.contains(SETTINGS_PANEL_CLOSED_CLASS)).toBe(true);
 
-    const gear = view.contentEl.querySelector(".reverysky-map-filter-toggle") as HTMLButtonElement;
+    const gear = view.contentEl.querySelector(".reverysky-map-settings-toggle") as HTMLButtonElement;
     gear.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
-    expect(panel.classList.contains(FILTER_PANEL_CLOSED_CLASS)).toBe(false);
+    expect(panel.classList.contains(SETTINGS_PANEL_CLOSED_CLASS)).toBe(false);
 
     const closeButton = view.contentEl.querySelector(
-      ".reverysky-map-filter-close"
+      ".reverysky-map-settings-close"
     ) as HTMLButtonElement;
     closeButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(panel.classList.contains(FILTER_PANEL_CLOSED_CLASS)).toBe(true);
+    expect(panel.classList.contains(SETTINGS_PANEL_CLOSED_CLASS)).toBe(true);
   });
 
   it("shows path filter suggestions on focus and applies path operator on option click", async () => {

@@ -85,28 +85,28 @@ export function createCollapsibleSection(
   options: CollapsibleSectionOptions
 ): CollapsibleSectionElements {
   const section = createChild(parent, "div");
-  section.className = `reverysky-map-filter-section ${options.className}`;
+  section.className = `reverysky-map-settings-section ${options.className}`;
 
   const header = createChild(section as ObsidianHTMLElement, "div");
-  header.className = "reverysky-map-filter-header";
+  header.className = "reverysky-map-settings-section-header";
 
   const toggleButton = createChild(header as ObsidianHTMLElement, "button");
   toggleButton.type = "button";
-  toggleButton.className = "reverysky-map-filter-section-toggle";
+  toggleButton.className = "reverysky-map-settings-section-toggle";
   toggleButton.tabIndex = -1;
 
   const chevron = createChild(toggleButton as ObsidianHTMLElement, "span");
-  chevron.className = "reverysky-map-filter-section-chevron";
+  chevron.className = "reverysky-map-settings-section-chevron";
   setIcon(chevron, "chevron-right");
 
   const title = createChild(toggleButton as ObsidianHTMLElement, "span");
-  title.className = "reverysky-map-filter-title";
+  title.className = "reverysky-map-settings-section-title";
   title.textContent = options.label;
 
   registerSectionToggle(toggleButton, options.onToggle);
 
   const content = createChild(section as ObsidianHTMLElement, "div");
-  content.className = "reverysky-map-filter-section-content";
+  content.className = "reverysky-map-settings-section-content";
 
   return {
     section,
@@ -122,14 +122,14 @@ export function createSelectControl(
 ): SelectControlElements {
   const section = createChild(parent, "div");
   section.className = joinClassNames(
-    "reverysky-map-filter-section",
-    "reverysky-map-filter-control-group",
+    "reverysky-map-settings-section",
+    "reverysky-map-settings-control-group",
     "reverysky-map-select-control",
     options.sectionClassName
   );
 
   const label = createChild(section as ObsidianHTMLElement, "div");
-  label.className = "reverysky-map-filter-field-label";
+  label.className = "reverysky-map-settings-field-label";
   label.textContent = options.label;
 
   const host = createChild(section as ObsidianHTMLElement, "div");
@@ -172,7 +172,7 @@ export function createToggleControl(
   row.className = `reverysky-map-toggle-row ${options.rowClassName}`;
 
   const label = createChild(row as ObsidianHTMLElement, "div");
-  label.className = "reverysky-map-filter-field-label";
+  label.className = "reverysky-map-settings-field-label";
   label.textContent = options.label;
 
   const button = createChild(row as ObsidianHTMLElement, "button");
@@ -200,13 +200,13 @@ export function createRangeControl(
 ): RangeControlElements {
   const section = createChild(parent, "div");
   section.className =
-    `reverysky-map-filter-section reverysky-map-filter-control-group reverysky-map-range-control ${options.sectionClassName}`;
+    `reverysky-map-settings-section reverysky-map-settings-control-group reverysky-map-range-control ${options.sectionClassName}`;
 
   const header = createChild(section as ObsidianHTMLElement, "div");
   header.className = "reverysky-map-range-control-header reverysky-map-render-scale-header";
 
   const label = createChild(header as ObsidianHTMLElement, "div");
-  label.className = "reverysky-map-filter-field-label";
+  label.className = "reverysky-map-settings-field-label";
   label.textContent = options.label;
 
   const value = createChild(header as ObsidianHTMLElement, "div");

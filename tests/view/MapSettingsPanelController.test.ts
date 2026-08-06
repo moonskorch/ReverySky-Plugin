@@ -148,7 +148,7 @@ describe("MapSettingsPanelController", () => {
     controller.render(container);
 
     const root = container.querySelector(".reverysky-map-root") as HTMLElement;
-    const panel = container.querySelector(".reverysky-map-filter-panel") as HTMLElement;
+    const panel = container.querySelector(".reverysky-map-settings-panel") as HTMLElement;
     const searchArea = container.querySelector(".reverysky-map-filter-search-area") as HTMLElement;
     const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
     const suggestions = container.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
@@ -503,7 +503,7 @@ describe("MapSettingsPanelController", () => {
       (operatorOptions[0] as HTMLElement).dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
       const root = container.querySelector(".reverysky-map-root") as HTMLElement;
-      const filterPanel = container.querySelector(".reverysky-map-filter-panel") as HTMLElement;
+      const settingsPanel = container.querySelector(".reverysky-map-settings-panel") as HTMLElement;
       const suggestions = container.querySelector(".reverysky-map-filter-suggestions") as HTMLElement;
       const folderOptions = Array.from(
         container.querySelectorAll<HTMLElement>(".reverysky-map-folder-suggestion-option")
@@ -512,7 +512,7 @@ describe("MapSettingsPanelController", () => {
       let rootScrollTop = 0;
       let iframeHostTop = 12;
       let suggestionsScrollTop = 0;
-      let filterPanelScrollTop = 0;
+      let settingsPanelScrollTop = 0;
       iframeHost.getBoundingClientRect = () => makeRect(0, iframeHostTop, 640, 360);
       const iframeHostRectBefore = iframeHost.getBoundingClientRect();
 
@@ -543,11 +543,11 @@ describe("MapSettingsPanelController", () => {
           suggestionsScrollTop = value;
         }
       });
-      Object.defineProperty(filterPanel, "scrollTop", {
+      Object.defineProperty(settingsPanel, "scrollTop", {
         configurable: true,
-        get: () => filterPanelScrollTop,
+        get: () => settingsPanelScrollTop,
         set: (value: number) => {
-          filterPanelScrollTop = value;
+          settingsPanelScrollTop = value;
         }
       });
       folderOptions.forEach((option, index) => {
@@ -567,7 +567,7 @@ describe("MapSettingsPanelController", () => {
 
       expect(folderOptions[3]?.getAttribute("aria-selected")).toBe("true");
       expect(suggestionsScrollTop).toBe(36);
-      expect(filterPanelScrollTop).toBe(0);
+      expect(settingsPanelScrollTop).toBe(0);
       expect(rootScrollTop).toBe(0);
       expect(containerScrollTop).toBe(0);
       expect(iframeHost.getBoundingClientRect()).toMatchObject({
@@ -685,15 +685,15 @@ describe("MapSettingsPanelController", () => {
     const container = createObsidianTestContainer();
     controller.render(container);
 
-    const filterPanel = container.querySelector(".reverysky-map-filter-panel") as HTMLElement;
-    const filterBody = container.querySelector(".reverysky-map-filter-panel-body") as HTMLElement;
+    const settingsPanel = container.querySelector(".reverysky-map-settings-panel") as HTMLElement;
+    const settingsBody = container.querySelector(".reverysky-map-settings-panel-body") as HTMLElement;
     const screenshotSection = container.querySelector(".reverysky-map-screenshot-section") as HTMLElement;
-    const screenshotTitle = screenshotSection.querySelector(".reverysky-map-filter-title");
-    const screenshotToggle = screenshotSection.querySelector(".reverysky-map-filter-section-toggle");
+    const screenshotTitle = screenshotSection.querySelector(".reverysky-map-settings-section-title");
+    const screenshotToggle = screenshotSection.querySelector(".reverysky-map-settings-section-toggle");
     const screenshotButton = container.querySelector(".reverysky-map-screenshot-button") as HTMLButtonElement;
 
-    expect(filterPanel.lastElementChild).toBe(filterBody);
-    expect(filterBody.lastElementChild).toBe(screenshotSection);
+    expect(settingsPanel.lastElementChild).toBe(settingsBody);
+    expect(settingsBody.lastElementChild).toBe(screenshotSection);
     expect(screenshotTitle?.textContent).toBe("Screenshot");
     expect(screenshotToggle).not.toBeNull();
     expect(screenshotSection.textContent).toContain("Copy screenshot");
@@ -733,50 +733,50 @@ describe("MapSettingsPanelController", () => {
     const container = createObsidianTestContainer();
     controller.render(container);
 
-    const filterToggle = container.querySelector(".reverysky-map-filter-toggle") as HTMLButtonElement;
-    const panel = container.querySelector(".reverysky-map-filter-panel") as HTMLElement;
+    const settingsPanelToggle = container.querySelector(".reverysky-map-settings-toggle") as HTMLButtonElement;
+    const panel = container.querySelector(".reverysky-map-settings-panel") as HTMLElement;
     const settingsToggle = container.querySelector(
-      '.reverysky-map-settings-section .reverysky-map-filter-section-toggle'
+      '.reverysky-map-selection-section .reverysky-map-settings-section-toggle'
     ) as HTMLButtonElement;
     const graphicsToggle = container.querySelector(
-      '.reverysky-map-graphics-section .reverysky-map-filter-section-toggle'
+      '.reverysky-map-graphics-section .reverysky-map-settings-section-toggle'
     ) as HTMLButtonElement;
     const settingsContent = container.querySelector(
-      ".reverysky-map-settings-section .reverysky-map-filter-section-content"
+      ".reverysky-map-selection-section .reverysky-map-settings-section-content"
     ) as HTMLElement;
     const graphicsContent = container.querySelector(
-      ".reverysky-map-graphics-section .reverysky-map-filter-section-content"
+      ".reverysky-map-graphics-section .reverysky-map-settings-section-content"
     ) as HTMLElement;
-    const closeButton = container.querySelector(".reverysky-map-filter-close") as HTMLButtonElement;
+    const closeButton = container.querySelector(".reverysky-map-settings-close") as HTMLButtonElement;
 
-    filterToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    settingsPanelToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
     expect(settingsToggle.tabIndex).toBe(-1);
     expect(graphicsToggle.tabIndex).toBe(-1);
     expect(settingsToggle.getAttribute("aria-expanded")).toBe("false");
     expect(graphicsToggle.getAttribute("aria-expanded")).toBe("false");
-    expect(settingsContent.classList.contains("reverysky-map-filter-section-content--collapsed")).toBe(true);
-    expect(graphicsContent.classList.contains("reverysky-map-filter-section-content--collapsed")).toBe(true);
+    expect(settingsContent.classList.contains("reverysky-map-settings-section-content--collapsed")).toBe(true);
+    expect(graphicsContent.classList.contains("reverysky-map-settings-section-content--collapsed")).toBe(true);
 
     settingsToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     graphicsToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
     expect(settingsToggle.getAttribute("aria-expanded")).toBe("true");
     expect(graphicsToggle.getAttribute("aria-expanded")).toBe("true");
-    expect(settingsContent.classList.contains("reverysky-map-filter-section-content--collapsed")).toBe(false);
-    expect(graphicsContent.classList.contains("reverysky-map-filter-section-content--collapsed")).toBe(false);
+    expect(settingsContent.classList.contains("reverysky-map-settings-section-content--collapsed")).toBe(false);
+    expect(graphicsContent.classList.contains("reverysky-map-settings-section-content--collapsed")).toBe(false);
 
     closeButton.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
-    expect(panel.classList.contains("reverysky-map-filter-panel--closed")).toBe(true);
+    expect(panel.classList.contains("reverysky-map-settings-panel--closed")).toBe(true);
     expect(settingsToggle.getAttribute("aria-expanded")).toBe("true");
 
-    filterToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    settingsPanelToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
     expect(settingsToggle.getAttribute("aria-expanded")).toBe("true");
     expect(graphicsToggle.getAttribute("aria-expanded")).toBe("true");
-    expect(settingsContent.classList.contains("reverysky-map-filter-section-content--collapsed")).toBe(false);
-    expect(graphicsContent.classList.contains("reverysky-map-filter-section-content--collapsed")).toBe(false);
+    expect(settingsContent.classList.contains("reverysky-map-settings-section-content--collapsed")).toBe(false);
+    expect(graphicsContent.classList.contains("reverysky-map-settings-section-content--collapsed")).toBe(false);
   });
 
   it("updates render scale from the slider and shows reopen guidance", () => {

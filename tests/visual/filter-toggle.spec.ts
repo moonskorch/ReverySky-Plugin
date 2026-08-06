@@ -17,10 +17,10 @@ test.describe("filter toggle", () => {
     await page.goto(pathToFileURL(previewPath).href);
 
     const stage = page.locator("[data-visual-stage]");
-    const filterToggle = page.locator(".reverysky-map-filter-toggle");
+    const settingsToggle = page.locator(".reverysky-map-settings-toggle");
 
-    await expect(filterToggle).toHaveAttribute("aria-label", "Open filters");
-    await expect(filterToggle).toBeVisible();
+    await expect(settingsToggle).toHaveAttribute("aria-label", "Open filters");
+    await expect(settingsToggle).toBeVisible();
 
     await expect(stage).toHaveScreenshot("filter-toggle-closed.png", {
       animations: "disabled"

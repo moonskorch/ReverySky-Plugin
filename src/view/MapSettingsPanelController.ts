@@ -26,13 +26,13 @@ type MapSettingsPanelControllerDependencies = {
 };
 
 /**
- * Owns the filter-panel UI state machine and keeps the DOM synchronized with `MapSession`.
+ * Owns the settings-panel UI state machine and keeps the DOM synchronized with `MapSession`.
  */
 export class MapSettingsPanelController {
   private filterMessageEl: HTMLElement | null = null;
-  private filterPanelEl: HTMLElement | null = null;
-  private filterScrollAreaEl: HTMLElement | null = null;
-  private filterToggleButtonEl: HTMLButtonElement | null = null;
+  private settingsPanelEl: HTMLElement | null = null;
+  private settingsScrollAreaEl: HTMLElement | null = null;
+  private settingsToggleButtonEl: HTMLButtonElement | null = null;
   private settingsSectionEl: HTMLElement | null = null;
   private settingsSectionToggleButtonEl: HTMLButtonElement | null = null;
   private settingsSectionContentEl: HTMLElement | null = null;
@@ -51,7 +51,7 @@ export class MapSettingsPanelController {
   private searchComponent: SearchComponent | null = null;
   private filterSuggestionsController: MapFilterSuggestionsController | null = null;
   private screenshotButtonEl: HTMLButtonElement | null = null;
-  private filterPanelOpen = false;
+  private settingsPanelOpen = false;
   private settingsSectionCollapsed = true;
   private graphicsSectionCollapsed = true;
   private screenshotSectionCollapsed = true;
@@ -77,13 +77,13 @@ export class MapSettingsPanelController {
 
     const settingsToggleButton = createChild(overlayControls as ObsidianHTMLElement, "button");
     settingsToggleButton.type = "button";
-    settingsToggleButton.className = "reverysky-map-filter-toggle";
-    this.filterToggleButtonEl = settingsToggleButton;
+    settingsToggleButton.className = "reverysky-map-settings-toggle";
+    this.settingsToggleButtonEl = settingsToggleButton;
     settingsToggleButton.setAttribute("aria-label", "Open filters");
     setIcon(settingsToggleButton, "settings");
-    const toggleFilterPanel = () => {
-      const nextOpen = !this.filterPanelOpen;
-      this.setFilterPanelOpen(nextOpen);
+    const toggleSettingsPanel = () => {
+      const nextOpen = !this.settingsPanelOpen;
+      this.setSettingsPanelOpen(nextOpen);
       if (nextOpen) {
         this.syncSearchComponentValue();
         this.refreshFilterMessage();
@@ -91,28 +91,28 @@ export class MapSettingsPanelController {
     };
     settingsToggleButton.addEventListener("mousedown", (event) => {
       event.preventDefault();
-      toggleFilterPanel();
+      toggleSettingsPanel();
     });
     settingsToggleButton.addEventListener("click", (event) => {
       if (event.detail !== 0) {
         return;
       }
       event.preventDefault();
-      toggleFilterPanel();
+      toggleSettingsPanel();
     });
 
-    const filterContainer = createChild(root, "div");
-    filterContainer.className = "reverysky-map-filter-panel";
-    this.filterPanelEl = filterContainer;
-    const filterScrollArea = createChild(filterContainer as ObsidianHTMLElement, "div");
-    filterScrollArea.className = "reverysky-map-filter-panel-body";
-    this.filterScrollAreaEl = filterScrollArea;
-    filterScrollArea.addEventListener("scroll", () => {
+    const settingsContainer = createChild(root, "div");
+    settingsContainer.className = "reverysky-map-settings-panel";
+    this.settingsPanelEl = settingsContainer;
+    const settingsScrollArea = createChild(settingsContainer as ObsidianHTMLElement, "div");
+    settingsScrollArea.className = "reverysky-map-settings-panel-body";
+    this.settingsScrollAreaEl = settingsScrollArea;
+    settingsScrollArea.addEventListener("scroll", () => {
       this.filterSuggestionsController?.position();
     });
 
-    const settingsSection = createCollapsibleSection(filterScrollArea as ObsidianHTMLElement, {
-      className: "reverysky-map-settings-section",
+    const settingsSection = createCollapsibleSection(settingsScrollArea as ObsidianHTMLElement, {
+      className: "reverysky-map-selection-section",
       label: "Selection",
       onToggle: () => {
         this.setSettingsSectionCollapsed(!this.settingsSectionCollapsed);
@@ -124,27 +124,27 @@ export class MapSettingsPanelController {
 
     const panelCloseButton = createChild(settingsSection.header as ObsidianHTMLElement, "button");
     panelCloseButton.type = "button";
-    panelCloseButton.className = "reverysky-map-filter-close";
+    panelCloseButton.className = "reverysky-map-settings-close";
     panelCloseButton.setAttribute("aria-label", "Close filters");
     setIcon(panelCloseButton, "x");
-    const closeFilterPanel = (event?: Event) => {
+    const closeSettingsPanel = (event?: Event) => {
       event?.preventDefault();
-      this.setFilterPanelOpen(false);
+      this.setSettingsPanelOpen(false);
     };
     panelCloseButton.addEventListener("mousedown", (event) => {
-      closeFilterPanel(event);
+      closeSettingsPanel(event);
     });
     panelCloseButton.addEventListener("click", (event) => {
-      closeFilterPanel(event);
+      closeSettingsPanel(event);
     });
 
-    const filterSectionContent = settingsSection.content;
+    const selectionSectionContent = settingsSection.content;
 
-    const filterSearchArea = createChild(filterSectionContent as ObsidianHTMLElement, "div");
+    const filterSearchArea = createChild(selectionSectionContent as ObsidianHTMLElement, "div");
     filterSearchArea.className = "reverysky-map-filter-search-area";
 
     const filterSearchLabel = createChild(filterSearchArea as ObsidianHTMLElement, "div");
-    filterSearchLabel.className = "reverysky-map-filter-field-label";
+    filterSearchLabel.className = "reverysky-map-settings-field-label";
     filterSearchLabel.textContent = "Filter";
 
     const searchHost = createChild(filterSearchArea as ObsidianHTMLElement, "div");
@@ -163,14 +163,14 @@ export class MapSettingsPanelController {
         this.commitFilterQuery(query);
       },
       openPanel: () => {
-        this.setFilterPanelOpen(true);
+        this.setSettingsPanelOpen(true);
       }
     });
     this.searchComponent.onChange((value) => {
       this.filterSuggestionsController?.handleInputChanged(value);
     });
 
-    this.filterMessageEl = createChild(filterSectionContent as ObsidianHTMLElement, "div");
+    this.filterMessageEl = createChild(selectionSectionContent as ObsidianHTMLElement, "div");
     this.filterMessageEl.className = "reverysky-map-filter-message";
 
     const toggleTags = (event: Event) => {
@@ -179,7 +179,7 @@ export class MapSettingsPanelController {
       this.session.setShowTags(!uiState.showTags);
       this.refreshTagsToggleUi();
     };
-    const tagsToggle = createToggleControl(filterSectionContent as ObsidianHTMLElement, {
+    const tagsToggle = createToggleControl(selectionSectionContent as ObsidianHTMLElement, {
       rowClassName: "reverysky-map-tags-toggle-row",
       buttonClassName: "reverysky-map-tags-toggle",
       thumbClassName: "reverysky-map-tags-toggle-thumb",
@@ -189,7 +189,7 @@ export class MapSettingsPanelController {
     });
     this.tagsToggleButtonEl = tagsToggle.button;
 
-    const layoutControl = createSelectControl(filterSectionContent as ObsidianHTMLElement, {
+    const layoutControl = createSelectControl(selectionSectionContent as ObsidianHTMLElement, {
       label: "Layout",
       ariaLabel: "Select layout",
       options: MAP_LAYOUT_PREFERENCE_OPTIONS,
@@ -200,7 +200,7 @@ export class MapSettingsPanelController {
     });
     this.layoutDropdownEl = layoutControl.select;
 
-    const graphicsSection = createCollapsibleSection(filterScrollArea as ObsidianHTMLElement, {
+    const graphicsSection = createCollapsibleSection(settingsScrollArea as ObsidianHTMLElement, {
       className: "reverysky-map-graphics-section",
       label: "Graphics",
       onToggle: () => {
@@ -246,7 +246,7 @@ export class MapSettingsPanelController {
     });
     this.frameRateModeDropdownEl = frameRateModeControl.select;
 
-    const screenshotSection = createCollapsibleSection(filterScrollArea as ObsidianHTMLElement, {
+    const screenshotSection = createCollapsibleSection(settingsScrollArea as ObsidianHTMLElement, {
       className: "reverysky-map-screenshot-section",
       label: "Screenshot",
       onToggle: () => {
@@ -267,7 +267,7 @@ export class MapSettingsPanelController {
       }
     });
 
-    this.setFilterPanelOpen(false);
+    this.setSettingsPanelOpen(false);
     this.refreshCollapsibleSections();
     this.syncFromSession();
     return iframeHost;
@@ -291,9 +291,9 @@ export class MapSettingsPanelController {
     this.filterSuggestionsController = null;
     this.searchComponent = null;
     this.filterMessageEl = null;
-    this.filterPanelEl = null;
-    this.filterScrollAreaEl = null;
-    this.filterToggleButtonEl = null;
+    this.settingsPanelEl = null;
+    this.settingsScrollAreaEl = null;
+    this.settingsToggleButtonEl = null;
     this.settingsSectionEl = null;
     this.settingsSectionToggleButtonEl = null;
     this.settingsSectionContentEl = null;
@@ -310,20 +310,20 @@ export class MapSettingsPanelController {
     this.renderScaleValueEl = null;
     this.renderScaleMessageEl = null;
     this.screenshotButtonEl = null;
-    this.filterPanelOpen = false;
+    this.settingsPanelOpen = false;
     this.settingsSectionCollapsed = true;
     this.graphicsSectionCollapsed = true;
     this.screenshotSectionCollapsed = true;
   }
 
-  private setFilterPanelOpen(isOpen: boolean): void {
-    this.filterPanelOpen = isOpen;
-    if (!this.filterPanelEl || !this.filterToggleButtonEl) {
+  private setSettingsPanelOpen(isOpen: boolean): void {
+    this.settingsPanelOpen = isOpen;
+    if (!this.settingsPanelEl || !this.settingsToggleButtonEl) {
       return;
     }
 
-    this.filterPanelEl.classList.toggle("reverysky-map-filter-panel--closed", !isOpen);
-    this.filterToggleButtonEl.classList.toggle("reverysky-map-filter-toggle--hidden", isOpen);
+    this.settingsPanelEl.classList.toggle("reverysky-map-settings-panel--closed", !isOpen);
+    this.settingsToggleButtonEl.classList.toggle("reverysky-map-settings-toggle--hidden", isOpen);
     if (!isOpen) {
       this.filterSuggestionsController?.hide();
     }
@@ -378,8 +378,8 @@ export class MapSettingsPanelController {
     isCollapsed: boolean,
     label: string
   ): void {
-    section?.classList.toggle("reverysky-map-filter-section--collapsed", isCollapsed);
-    content?.classList.toggle("reverysky-map-filter-section-content--collapsed", isCollapsed);
+    section?.classList.toggle("reverysky-map-settings-section--collapsed", isCollapsed);
+    content?.classList.toggle("reverysky-map-settings-section-content--collapsed", isCollapsed);
     toggleButton?.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
     toggleButton?.setAttribute("aria-label", `${isCollapsed ? "Expand" : "Collapse"} ${label}`);
   }

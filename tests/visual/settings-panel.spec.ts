@@ -20,12 +20,12 @@ test.describe("settings panel", () => {
     const graphicsSection = page.locator(".reverysky-map-graphics-section");
     const screenshotSection = page.locator(".reverysky-map-screenshot-section");
     const screenshotToggle = page.locator(
-      ".reverysky-map-screenshot-section .reverysky-map-filter-section-toggle"
+      ".reverysky-map-screenshot-section .reverysky-map-settings-section-toggle"
     );
     const screenshotButton = page.locator(".reverysky-map-screenshot-button");
     const frameRateSelect = page.locator(".reverysky-map-frame-rate-mode-select");
-    const closeButton = page.locator(".reverysky-map-filter-close");
-    const gearReference = page.locator(".visual-gear-reference .reverysky-map-filter-toggle");
+    const closeButton = page.locator(".reverysky-map-settings-close");
+    const gearReference = page.locator(".visual-gear-reference .reverysky-map-settings-toggle");
 
     await expect(graphicsSection).toContainText("Graphics");
     await expect(graphicsSection).toContainText("Render scale");
@@ -37,7 +37,7 @@ test.describe("settings panel", () => {
     await expect(screenshotToggle).toHaveAttribute("aria-expanded", "true");
     await expect(frameRateSelect).toHaveValue("auto");
     await expect(
-      page.locator(".reverysky-map-settings-section .reverysky-map-filter-section-toggle")
+      page.locator(".reverysky-map-selection-section .reverysky-map-settings-section-toggle")
     ).toHaveCSS("justify-content", "flex-start");
 
     const closeBox = await closeButton.boundingBox();
@@ -57,7 +57,7 @@ test.describe("settings panel", () => {
     await page.goto(pathToFileURL(previewPath).href);
 
     const focusedControls: string[] = [];
-    await page.locator(".reverysky-map-screenshot-section .reverysky-map-filter-section-toggle").evaluate((button) => {
+    await page.locator(".reverysky-map-screenshot-section .reverysky-map-settings-section-toggle").evaluate((button) => {
       button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 0 }));
     });
     for (let step = 0; step < 7; step += 1) {
@@ -84,13 +84,13 @@ test.describe("settings panel", () => {
 
     const stage = page.locator("[data-visual-stage]");
     const settingsToggle = page.locator(
-      ".reverysky-map-settings-section .reverysky-map-filter-section-toggle"
+      ".reverysky-map-selection-section .reverysky-map-settings-section-toggle"
     );
     const graphicsToggle = page.locator(
-      ".reverysky-map-graphics-section .reverysky-map-filter-section-toggle"
+      ".reverysky-map-graphics-section .reverysky-map-settings-section-toggle"
     );
     const screenshotToggle = page.locator(
-      ".reverysky-map-screenshot-section .reverysky-map-filter-section-toggle"
+      ".reverysky-map-screenshot-section .reverysky-map-settings-section-toggle"
     );
     const screenshotSection = page.locator(".reverysky-map-screenshot-section");
     const screenshotButton = page.locator(".reverysky-map-screenshot-button");
@@ -117,8 +117,8 @@ test.describe("settings panel", () => {
     await page.goto(pathToFileURL(previewPath).href);
 
     const stage = page.locator("[data-visual-stage]");
-    const panel = page.locator(".reverysky-map-filter-panel");
-    const panelBody = page.locator(".reverysky-map-filter-panel-body");
+    const panel = page.locator(".reverysky-map-settings-panel");
+    const panelBody = page.locator(".reverysky-map-settings-panel-body");
     await stage.evaluate((element) => {
       element.classList.add("visual-stage--compact-overflow");
     });
