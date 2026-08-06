@@ -45,6 +45,8 @@ The graph settings panel includes two visual controls:
 
 Graph note titles support Latin text with accents, Cyrillic text, common symbols, and monochrome emoji.
 
+![starscape-demo](docs/assets/reverysky-map-starscape-demo.webp)
+
 ## Navigation
 
 - Pan: drag the graph with the primary mouse button to move the camera focus across the current layout.
