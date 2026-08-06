@@ -116,6 +116,10 @@ export class MapView extends ItemView {
     return "ReverySky 3D Graph";
   }
 
+  getIcon(): string {
+    return "sparkles";
+  }
+
   requestFocusFromEditor(path: string): void {
     this.session.requestFocusFromEditor(path);
   }
