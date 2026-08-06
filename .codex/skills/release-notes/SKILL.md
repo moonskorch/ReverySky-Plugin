@@ -35,6 +35,10 @@ Match this pattern:
 ## Writing rules
 
 - Use the real product name and the actual release version.
+- Write the notes in English.
+- When the user points to specific changes, inspect the actual diff and infer the user-visible effect from those edits; do not just rephrase the user's words or polish bullets without checking that they match the change.
+- If several technical edits support one visible outcome, merge them into a single user-facing bullet instead of listing subsystem names or implementation details.
+- If the user provides a draft or candidate lines, keep every item that still matches the diff and replace only the parts that do not; do not drop user-provided content unless it is plainly incorrect or the user asks to remove it.
 - Keep the list short and readable for non-technical users.
 - Avoid marketing language, hype, praise, or exaggerated claims.
 - Prefer `## Changed` as the default section.
