@@ -208,16 +208,25 @@ export class MapFilterSuggestionsController {
 
   private resolveAutoSuggestionMode(): FilterSuggestionMode {
     const currentQuery = this.inputEl.value ?? this.getQuery();
+    if (/(^|\s)-?path:\s*$/i.test(currentQuery)) {
+      return 1;
+    }
+    if (/(^|\s)-?date:\s*$/i.test(currentQuery)) {
+      return 2;
+    }
+    if (/(^|\s)-?tag:\s*$/i.test(currentQuery)) {
+      return 3;
+    }
     if (/\s$/.test(currentQuery)) {
       return 0;
     }
-    if (/(^|\s)-?path:(?:"[^"]*"|[^\s]*)$/i.test(currentQuery)) {
+    if (/(^|\s)-?path:\s*(?:"[^"]*"|[^\s]*)$/i.test(currentQuery)) {
       return 1;
     }
-    if (/(^|\s)-?date:[^\s]*$/i.test(currentQuery)) {
+    if (/(^|\s)-?date:\s*[^\s]*$/i.test(currentQuery)) {
       return 2;
     }
-    if (/(^|\s)-?tag:(?:"[^"]*"|[^\s]*)$/i.test(currentQuery)) {
+    if (/(^|\s)-?tag:\s*(?:"[^"]*"|[^\s]*)$/i.test(currentQuery)) {
       return 3;
     }
     return 0;
@@ -269,7 +278,7 @@ export class MapFilterSuggestionsController {
 
   private applyTagSuggestionOperator(): void {
     const currentValue = this.getQuery();
-    const hasActiveTrailingTagOperator = /(^|\s)-?tag:(?:"[^"]*"|[^\s]*)$/i.test(currentValue);
+    const hasActiveTrailingTagOperator = /(^|\s)-?tag:\s*(?:"[^"]*"|[^\s]*)$/i.test(currentValue);
     const nextValue = hasActiveTrailingTagOperator
       ? currentValue
       : this.applyFilterOperatorToActiveRootPrefix(currentValue, "tag:");
@@ -281,7 +290,7 @@ export class MapFilterSuggestionsController {
 
   private applyDateValueSuggestion(suffix: string): void {
     const currentValue = this.getQuery();
-    const replaceActiveDateTermPattern = /(^|\s)(-?date:)[^\s]*$/i;
+    const replaceActiveDateTermPattern = /(^|\s)(-?date:)\s*[^\s]*$/i;
 
     let nextValue: string;
     if (replaceActiveDateTermPattern.test(currentValue)) {
@@ -304,7 +313,7 @@ export class MapFilterSuggestionsController {
   private applyPathValueSuggestion(folderPath: string): void {
     const term = this.formatPathFilterTerm(folderPath);
     const currentValue = this.getQuery();
-    const replaceActivePathTermPattern = /(^|\s)(-?path:)(?:"[^"]*"|[^\s]*)$/i;
+    const replaceActivePathTermPattern = /(^|\s)(-?path:)\s*(?:"[^"]*"|[^\s]*)$/i;
 
     let nextValue: string;
     if (replaceActivePathTermPattern.test(currentValue)) {
@@ -327,7 +336,7 @@ export class MapFilterSuggestionsController {
   private applyTagValueSuggestion(tag: string): void {
     const currentValue = this.getQuery();
     const term = this.formatTagFilterTerm(tag);
-    const replaceActiveTagTermPattern = /(^|\s)(-?tag:)(?:"[^"]*"|[^\s]*)$/i;
+    const replaceActiveTagTermPattern = /(^|\s)(-?tag:)\s*(?:"[^"]*"|[^\s]*)$/i;
 
     let nextValue: string;
     if (replaceActiveTagTermPattern.test(currentValue)) {
@@ -560,7 +569,7 @@ export class MapFilterSuggestionsController {
   }
 
   private extractActiveDateFilterTermValue(query: string): string {
-    const activePattern = /(^|\s)-?date:([^\s]*)$/i;
+    const activePattern = /(^|\s)-?date:\s*([^\s]*)$/i;
     const match = query.match(activePattern);
     return match?.[2] ?? "";
   }

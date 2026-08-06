@@ -52,6 +52,16 @@ describe("GraphQueryFilter", () => {
     expect(filtered.vault.noteCount).toBe(1);
   });
 
+  it("ignores whitespace between path operator and value", () => {
+    const parse = GraphQueryFilter.parseQuery("path: Projects");
+    expect(parse.isValid).toBe(true);
+    expect(parse.hasSupportedTerms).toBe(true);
+    expect(parse.hasUnsupportedTokens).toBe(false);
+    const filtered = GraphQueryFilter.applyFilter(makePayload(), parse.parsed);
+
+    expect(filtered.notes.map((n) => n.id)).toEqual(["b"]);
+  });
+
   it("supports quoted values with spaces", () => {
     const parse = GraphQueryFilter.parseQuery("path:\"reverysky/spec\"");
     expect(parse.isValid).toBe(true);
@@ -62,6 +72,15 @@ describe("GraphQueryFilter", () => {
 
   it("supports exclusion with -path", () => {
     const parse = GraphQueryFilter.parseQuery("-path:archive");
+    expect(parse.isValid).toBe(true);
+    const filtered = GraphQueryFilter.applyFilter(makePayload(), parse.parsed);
+
+    expect(filtered.notes.map((n) => n.id)).toEqual(["a", "b"]);
+    expect(filtered.links.map((l) => `${l.sourceId}->${l.targetId}`)).toEqual(["a->b"]);
+  });
+
+  it("ignores whitespace between negated path operator and value", () => {
+    const parse = GraphQueryFilter.parseQuery("-path: Archive");
     expect(parse.isValid).toBe(true);
     const filtered = GraphQueryFilter.applyFilter(makePayload(), parse.parsed);
 
@@ -91,6 +110,14 @@ describe("GraphQueryFilter", () => {
 
     const filtered = GraphQueryFilter.applyFilter(makePayload(), parse.parsed);
     expect(filtered.notes.map((n) => n.id)).toEqual(["a"]);
+  });
+
+  it("ignores whitespace between date operator and value", () => {
+    const parse = GraphQueryFilter.parseQuery("date: 2026-01-31");
+    expect(parse.isValid).toBe(true);
+
+    const filtered = GraphQueryFilter.applyFilter(makePayload(), parse.parsed);
+    expect(filtered.notes.map((n) => n.id)).toEqual(["b"]);
   });
 
   it("uses leading calendar day from datetime strings with timezone offset", () => {
@@ -142,6 +169,14 @@ describe("GraphQueryFilter", () => {
 
     const filtered = GraphQueryFilter.applyFilter(makePayload(), parse.parsed);
     expect(filtered.notes.map((n) => n.id)).toEqual(["a", "b"]);
+  });
+
+  it("ignores whitespace between tag operator and value", () => {
+    const parse = GraphQueryFilter.parseQuery("tag: #project");
+    expect(parse.isValid).toBe(true);
+
+    const filtered = GraphQueryFilter.applyFilter(makePayload(), parse.parsed);
+    expect(filtered.notes.map((n) => n.id)).toEqual(["b"]);
   });
 
   it("matches nested tag branches in an Obsidian-friendly way", () => {

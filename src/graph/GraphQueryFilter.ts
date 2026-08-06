@@ -70,7 +70,7 @@ export class GraphQueryFilter {
     const excludeTagTerms: string[] = [];
     const unsupportedTokens: string[] = [];
 
-    for (const token of tokenized.tokens) {
+    for (const token of this.mergeSeparatedOperatorValues(tokenized.tokens)) {
       const trimmed = token.trim();
       if (!trimmed) {
         continue;
@@ -511,6 +511,28 @@ export class GraphQueryFilter {
       ok: true,
       tokens
     };
+  }
+
+  private static mergeSeparatedOperatorValues(tokens: string[]): string[] {
+    const merged: string[] = [];
+
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i] ?? "";
+      const nextToken = tokens[i + 1] ?? "";
+      if (
+        /^-?(?:path|date|tag):$/i.test(token) &&
+        nextToken.length > 0 &&
+        !/^-?(?:path|date|tag):/i.test(nextToken)
+      ) {
+        merged.push(`${token}${nextToken}`);
+        i++;
+        continue;
+      }
+
+      merged.push(token);
+    }
+
+    return merged;
   }
 }
 

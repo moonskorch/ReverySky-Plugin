@@ -796,7 +796,7 @@ export class MapSession {
   }
 
   private extractActivePathFilterTermValue(query: string): string {
-    const activePattern = /(^|\s)-?path:(?:"([^"]*)"|([^\s]*))$/i;
+    const activePattern = /(^|\s)-?path:\s*(?:"([^"]*)"|([^\s]*))$/i;
     const match = query.match(activePattern);
     if (!match) {
       return "";
@@ -809,7 +809,7 @@ export class MapSession {
   }
 
   private extractActiveTagFilterTermValue(query: string): string {
-    const activePattern = /(^|\s)-?tag:(?:"([^"]*)"|([^\s]*))$/i;
+    const activePattern = /(^|\s)-?tag:\s*(?:"([^"]*)"|([^\s]*))$/i;
     const match = query.match(activePattern);
     if (!match) {
       return "";

@@ -194,6 +194,12 @@ describe("MapFilterPanelController", () => {
     expect(folderOptions.length).toBeGreaterThan(0);
     expect(folderOptions.every((option) => option.textContent?.toLowerCase().startsWith("projects"))).toBe(true);
 
+    searchInput.value = "path: Pr";
+    searchInput.dispatchEvent(new Event("input"));
+    const spacedFolderOptions = Array.from(container.querySelectorAll(".reverysky-map-folder-suggestion-option"));
+    expect(spacedFolderOptions.length).toBeGreaterThan(0);
+    expect(spacedFolderOptions.every((option) => option.textContent?.toLowerCase().startsWith("projects"))).toBe(true);
+
     searchInput.value = "path:";
     searchInput.dispatchEvent(new Event("input"));
     expect(container.textContent).toContain("Folders");
@@ -446,6 +452,24 @@ describe("MapFilterPanelController", () => {
     (folderOptions[0] as HTMLElement).dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     expect(searchInput.value).toBe("path:Archive ");
     expect(searchInput.value).toContain("Archive");
+  });
+
+  it("applies path value suggestions after operator separator whitespace", () => {
+    const session = createSession();
+    const controller = new MapFilterPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
+    searchInput.value = "path: ";
+    searchInput.dispatchEvent(new Event("input"));
+
+    const folderOptions = container.querySelectorAll(".reverysky-map-folder-suggestion-option");
+    expect(folderOptions.length).toBeGreaterThan(0);
+    (folderOptions[0] as HTMLElement).dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+    expect(searchInput.value).toBe("path:Archive ");
+    expect(session.getState()).toMatchObject({ filterQuery: "path:Archive " });
   });
 
   it("keeps the WebGL host stable while navigating long suggestion lists", () => {
