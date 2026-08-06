@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GraphPayload, NoteFocusPayload } from "../../src/bridge/BridgeTypes";
-import { MapFilterPanelController } from "../../src/view/MapFilterPanelController";
+import { MapSettingsPanelController } from "../../src/view/MapSettingsPanelController";
 import { MapSession } from "../../src/view/MapSession";
 import { makeBuildGraphMock, makeVoidCallback } from "./testUtils";
 
@@ -91,7 +91,7 @@ function makeRect(left: number, top: number, width: number, height: number): DOM
   } as DOMRect;
 }
 
-describe("MapFilterPanelController", () => {
+describe("MapSettingsPanelController", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -104,7 +104,7 @@ describe("MapFilterPanelController", () => {
     vi.useFakeTimers();
 
     const session = createSession();
-    const controller = new MapFilterPanelController(session);
+    const controller = new MapSettingsPanelController(session);
     const container = createObsidianTestContainer();
     controller.render(container);
 
@@ -121,8 +121,8 @@ describe("MapFilterPanelController", () => {
   });
 
   it("uses unique suggestion list ids for separate controller instances", () => {
-    const firstController = new MapFilterPanelController(createSession());
-    const secondController = new MapFilterPanelController(createSession());
+    const firstController = new MapSettingsPanelController(createSession());
+    const secondController = new MapSettingsPanelController(createSession());
     const firstContainer = createObsidianTestContainer();
     const secondContainer = createObsidianTestContainer();
     firstController.render(firstContainer);
@@ -143,7 +143,7 @@ describe("MapFilterPanelController", () => {
 
   it("renders suggestions outside the scrollable panel and positions them from the search area", () => {
     const session = createSession();
-    const controller = new MapFilterPanelController(session);
+    const controller = new MapSettingsPanelController(session);
     const container = createObsidianTestContainer();
     controller.render(container);
 
@@ -171,7 +171,7 @@ describe("MapFilterPanelController", () => {
 
   it("filters every suggestion list to prefix matches while typing", () => {
     const session = createSession();
-    const controller = new MapFilterPanelController(session);
+    const controller = new MapSettingsPanelController(session);
     const container = createObsidianTestContainer();
     controller.render(container);
 
@@ -227,7 +227,7 @@ describe("MapFilterPanelController", () => {
   it("replaces typed root prefixes when applying operator suggestions", () => {
     const expectRootPrefixReplacement = (prefix: string, expectedValue: string) => {
       const session = createSession();
-      const controller = new MapFilterPanelController(session);
+      const controller = new MapSettingsPanelController(session);
       const container = createObsidianTestContainer();
       controller.render(container);
 
@@ -251,7 +251,7 @@ describe("MapFilterPanelController", () => {
 
   it("returns to root suggestions when the active query ends with a trailing space", () => {
     const session = createSession();
-    const controller = new MapFilterPanelController(session);
+    const controller = new MapSettingsPanelController(session);
     const container = createObsidianTestContainer();
     controller.render(container);
 
@@ -267,7 +267,7 @@ describe("MapFilterPanelController", () => {
 
   it("filters date presets by the active trailing date term in mixed queries", () => {
     const session = createSession();
-    const controller = new MapFilterPanelController(session);
+    const controller = new MapSettingsPanelController(session);
     const container = createObsidianTestContainer();
     controller.render(container);
 
@@ -284,7 +284,7 @@ describe("MapFilterPanelController", () => {
 
   it("highlights the first root suggestion on open and moves with arrow keys", () => {
     const session = createSession();
-    const controller = new MapFilterPanelController(session);
+    const controller = new MapSettingsPanelController(session);
     const container = createObsidianTestContainer();
     controller.render(container);
 
@@ -322,7 +322,7 @@ describe("MapFilterPanelController", () => {
   it("opens hidden suggestions from arrow keys", () => {
     const createOpenController = () => {
       const session = createSession();
-      const controller = new MapFilterPanelController(session);
+      const controller = new MapSettingsPanelController(session);
       const container = createObsidianTestContainer();
       controller.render(container);
 
@@ -355,7 +355,7 @@ describe("MapFilterPanelController", () => {
   it("keeps empty hints outside options and clears active descendant for empty suggestion lists", () => {
     const expectEmptyState = (query: string, hint: string) => {
       const session = createSession();
-      const controller = new MapFilterPanelController(session);
+      const controller = new MapSettingsPanelController(session);
       const container = createObsidianTestContainer();
       controller.render(container);
 
@@ -383,7 +383,7 @@ describe("MapFilterPanelController", () => {
   it("highlights the first item in each second-level suggestion list", () => {
     const expectFirstItemActive = (operatorIndex: number, selector: string) => {
       const session = createSession();
-      const controller = new MapFilterPanelController(session);
+      const controller = new MapSettingsPanelController(session);
       const container = createObsidianTestContainer();
       controller.render(container);
 
@@ -408,7 +408,7 @@ describe("MapFilterPanelController", () => {
 
     const session = createSession();
     await session.setState({ filterQuery: "tag:#project" });
-    const controller = new MapFilterPanelController(session);
+    const controller = new MapSettingsPanelController(session);
     const container = createObsidianTestContainer();
     controller.render(container);
 
@@ -436,7 +436,7 @@ describe("MapFilterPanelController", () => {
 
   it("applies operator and value suggestions to the active query", () => {
     const session = createSession();
-    const controller = new MapFilterPanelController(session);
+    const controller = new MapSettingsPanelController(session);
     const container = createObsidianTestContainer();
     controller.render(container);
 
@@ -456,7 +456,7 @@ describe("MapFilterPanelController", () => {
 
   it("applies path value suggestions after operator separator whitespace", () => {
     const session = createSession();
-    const controller = new MapFilterPanelController(session);
+    const controller = new MapSettingsPanelController(session);
     const container = createObsidianTestContainer();
     controller.render(container);
 
@@ -493,7 +493,7 @@ describe("MapFilterPanelController", () => {
 
     try {
       const container = createObsidianTestContainer();
-      const controller = new MapFilterPanelController(session);
+      const controller = new MapSettingsPanelController(session);
       const iframeHost = controller.render(container);
 
       const searchInput = container.querySelector("input.search-input") as HTMLInputElement;
@@ -586,7 +586,7 @@ describe("MapFilterPanelController", () => {
 
   it("returns to the root suggestion pane after selecting a second-level item with Enter", () => {
     const session = createSession();
-    const controller = new MapFilterPanelController(session);
+    const controller = new MapSettingsPanelController(session);
     const container = createObsidianTestContainer();
     controller.render(container);
 
@@ -607,7 +607,7 @@ describe("MapFilterPanelController", () => {
 
   it("redraws suggestions once when moving between filter levels", () => {
     const session = createSession();
-    const controller = new MapFilterPanelController(session);
+    const controller = new MapSettingsPanelController(session);
     const container = createObsidianTestContainer();
     controller.render(container);
 
@@ -641,7 +641,7 @@ describe("MapFilterPanelController", () => {
     });
     session.start(() => undefined);
 
-    const controller = new MapFilterPanelController(session);
+    const controller = new MapSettingsPanelController(session);
     const container = createObsidianTestContainer();
     controller.render(container);
 
@@ -679,7 +679,7 @@ describe("MapFilterPanelController", () => {
   it("renders a screenshot section with a collapse toggle and copy action", () => {
     const session = createSession();
     const onCopyScreenshotRequested = vi.fn();
-    const controller = new MapFilterPanelController(session, {
+    const controller = new MapSettingsPanelController(session, {
       onCopyScreenshotRequested
     });
     const container = createObsidianTestContainer();
@@ -706,7 +706,7 @@ describe("MapFilterPanelController", () => {
   it("updates frame-rate mode from the dropdown", () => {
     const session = createSession();
     session.start(() => undefined);
-    const controller = new MapFilterPanelController(session);
+    const controller = new MapSettingsPanelController(session);
     const container = createObsidianTestContainer();
     controller.render(container);
 
@@ -729,7 +729,7 @@ describe("MapFilterPanelController", () => {
 
   it("opens with collapsed sections and preserves section state across panel reopen", () => {
     const session = createSession();
-    const controller = new MapFilterPanelController(session);
+    const controller = new MapSettingsPanelController(session);
     const container = createObsidianTestContainer();
     controller.render(container);
 
@@ -783,7 +783,7 @@ describe("MapFilterPanelController", () => {
     const session = createSession();
     const persistRenderScale = vi.spyOn(session, "persistRenderScale");
     session.start(() => undefined);
-    const controller = new MapFilterPanelController(session);
+    const controller = new MapSettingsPanelController(session);
     const container = createObsidianTestContainer();
     controller.render(container);
 

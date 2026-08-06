@@ -4,7 +4,7 @@ import type { GraphPayload, NoteOpenPayload } from "../bridge/BridgeTypes";
 import { UnityIframeBridge } from "../bridge/UnityIframeBridge";
 import { VaultGraphBuilder } from "../graph/VaultGraphBuilder";
 import type ReverySkyMapPlugin from "../main";
-import { MapFilterPanelController } from "./MapFilterPanelController";
+import { MapSettingsPanelController } from "./MapSettingsPanelController";
 import { MapNoteOpenRouter } from "./MapNoteOpenRouter";
 import { MapSession } from "./MapSession";
 
@@ -56,7 +56,7 @@ export class MapView extends ItemView {
   private readonly copyScreenshotToClipboard: (blob: Blob) => Promise<void> | void;
   private readonly session: MapSession;
   private readonly noteOpenRouter: MapNoteOpenRouter;
-  private filterPanelController: MapFilterPanelController | null = null;
+  private filterPanelController: MapSettingsPanelController | null = null;
   private iframeLoadAbortController: AbortController | null = null;
   private windowMigrationCleanup: (() => void) | null = null;
   private deferredIframeRenderCleanup: (() => void) | null = null;
@@ -222,7 +222,7 @@ export class MapView extends ItemView {
     this.filterPanelController?.dispose();
     this.filterPanelController = null;
     emptyElement(container);
-    this.filterPanelController = new MapFilterPanelController(this.session, {
+    this.filterPanelController = new MapSettingsPanelController(this.session, {
       onCopyScreenshotRequested: () => this.copyRuntimeScreenshotToClipboard()
     });
     const iframeHost = this.filterPanelController.render(container);
