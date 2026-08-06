@@ -42,12 +42,11 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3453816760886913913}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f6f2828d3a131304e8fa8e727f7b582e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LookAtCamera
-  mode: 2
 --- !u!114 &9221548045868066544
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -62,6 +61,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Notification
   go: {fileID: 3453816760886913913}
   caption: {fileID: 7197432321932170628}
+  relatedBehaviours:
+  - {fileID: 7922163443552103625}
 --- !u!1 &4997902474420047778
 GameObject:
   m_ObjectHideFlags: 0
@@ -73,7 +74,6 @@ GameObject:
   - component: {fileID: 3694293105214230431}
   - component: {fileID: 3273872631192083615}
   - component: {fileID: 7197432321932170628}
-  - component: {fileID: 9195128224928265263}
   m_Layer: 0
   m_Name: Caption
   m_TagString: Untagged
@@ -244,19 +244,6 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_renderer: {fileID: 3273872631192083615}
   m_maskType: 0
---- !u!114 &9195128224928265263
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4997902474420047778}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f6f2828d3a131304e8fa8e727f7b582e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LookAtCamera
-  mode: 2
 --- !u!1 &5956909295662052531
 GameObject:
   m_ObjectHideFlags: 0
