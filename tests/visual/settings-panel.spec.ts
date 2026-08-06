@@ -17,6 +17,10 @@ test.describe("settings panel", () => {
     await page.goto(pathToFileURL(previewPath).href);
 
     const stage = page.locator("[data-visual-stage]");
+    const selectionSection = page.locator(".reverysky-map-selection-section");
+    const selectionContent = page.locator(
+      ".reverysky-map-selection-section > .reverysky-map-settings-section-content"
+    );
     const selectionToggle = page.locator(
       ".reverysky-map-selection-section .reverysky-map-settings-section-toggle"
     );
@@ -54,6 +58,10 @@ test.describe("settings panel", () => {
     await expect(
       page.locator(".reverysky-map-selection-section .reverysky-map-settings-section-toggle")
     ).toHaveCSS("justify-content", "flex-start");
+    await expect(selectionContent).toHaveCSS("padding-bottom", "10px");
+    await expect(selectionSection).toHaveCSS("padding-bottom", await localSection.evaluate((element) => {
+      return getComputedStyle(element).paddingBottom;
+    }));
 
     const closeBox = await closeButton.boundingBox();
     const gearBox = await gearReference.boundingBox();
@@ -104,6 +112,7 @@ test.describe("settings panel", () => {
     await page.goto(pathToFileURL(previewPath).href);
 
     const stage = page.locator("[data-visual-stage]");
+    const selectionSection = page.locator(".reverysky-map-selection-section");
     const settingsToggle = page.locator(
       ".reverysky-map-selection-section .reverysky-map-settings-section-toggle"
     );
@@ -135,6 +144,9 @@ test.describe("settings panel", () => {
     await expect(localDepthInput).not.toBeVisible();
     await expect(screenshotSection).toContainText("Screenshot");
     await expect(screenshotButton).not.toBeVisible();
+    await expect(selectionSection).toHaveCSS("padding-bottom", await localSection.evaluate((element) => {
+      return getComputedStyle(element).paddingBottom;
+    }));
 
     await expect(stage).toHaveScreenshot("settings-panel-collapsed.png", {
       animations: "disabled"
