@@ -542,6 +542,7 @@ button.reverysky-map-settings-close svg {
   line-height: 1.25;
 }
 
+.reverysky-map-range-control-message--hidden,
 .reverysky-map-render-scale-message--hidden {
   display: none;
 }

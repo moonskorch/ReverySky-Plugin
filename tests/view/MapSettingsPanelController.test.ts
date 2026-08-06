@@ -668,12 +668,78 @@ describe("MapSettingsPanelController", () => {
     expect(container.textContent).toContain("Selection");
     expect(container.textContent).not.toContain("Settings");
     expect(container.textContent).toContain("Layout");
+    expect(container.textContent).toContain("Local");
     expect(container.textContent).toContain("Graphics");
     expect(container.textContent).toContain("Frame rate");
     const graphicsSection = container.querySelector(".reverysky-map-graphics-section") as HTMLElement;
     expect(graphicsSection.textContent).toContain("Render scale");
     expect(graphicsSection.textContent).toContain("Frame rate");
     expect(message.textContent).toBe("");
+  });
+
+  it("renders the local section collapsed before graphics with default controls", () => {
+    const session = createSession();
+    const controller = new MapSettingsPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const settingsBody = container.querySelector(".reverysky-map-settings-panel-body") as HTMLElement;
+    const localSection = container.querySelector(".reverysky-map-local-section") as HTMLElement;
+    const graphicsSection = container.querySelector(".reverysky-map-graphics-section") as HTMLElement;
+    const localToggle = localSection.querySelector(".reverysky-map-settings-section-toggle") as HTMLButtonElement;
+    const localContent = localSection.querySelector(".reverysky-map-settings-section-content") as HTMLElement;
+    const localModeToggle = localSection.querySelector(".reverysky-map-local-toggle") as HTMLButtonElement;
+    const localDepthInput = localSection.querySelector(".reverysky-map-local-depth-input") as HTMLInputElement;
+    const localDepthValue = localSection.querySelector(".reverysky-map-local-depth-value") as HTMLElement;
+    const neighborLinksToggle = localSection.querySelector(
+      ".reverysky-map-neighbor-links-toggle"
+    ) as HTMLButtonElement;
+
+    expect(settingsBody.children[1]).toBe(localSection);
+    expect(settingsBody.children[2]).toBe(graphicsSection);
+    expect(localSection.textContent).toContain("Local");
+    expect(localSection.textContent).toContain("Depth");
+    expect(localSection.textContent).toContain("Neighbor links");
+    expect(localSection.classList.contains("reverysky-map-settings-section--collapsed")).toBe(true);
+    expect(localToggle.getAttribute("aria-expanded")).toBe("false");
+    expect(localContent.classList.contains("reverysky-map-settings-section-content--collapsed")).toBe(true);
+    expect(localModeToggle.getAttribute("aria-checked")).toBe("false");
+    expect(localDepthInput.min).toBe("1");
+    expect(localDepthInput.max).toBe("5");
+    expect(localDepthInput.step).toBe("1");
+    expect(localDepthInput.value).toBe("1");
+    expect(localDepthValue.textContent).toBe("1");
+    expect(neighborLinksToggle.getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("updates local section controls only in the panel UI", () => {
+    const session = createSession();
+    const controller = new MapSettingsPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const localSection = container.querySelector(".reverysky-map-local-section") as HTMLElement;
+    const localModeToggle = localSection.querySelector(".reverysky-map-local-toggle") as HTMLButtonElement;
+    const localDepthInput = localSection.querySelector(".reverysky-map-local-depth-input") as HTMLInputElement;
+    const localDepthValue = localSection.querySelector(".reverysky-map-local-depth-value") as HTMLElement;
+    const neighborLinksToggle = localSection.querySelector(
+      ".reverysky-map-neighbor-links-toggle"
+    ) as HTMLButtonElement;
+
+    localModeToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    localDepthInput.value = "4";
+    localDepthInput.dispatchEvent(new Event("input"));
+    neighborLinksToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+    expect(localModeToggle.getAttribute("aria-checked")).toBe("true");
+    expect(localDepthInput.value).toBe("4");
+    expect(localDepthValue.textContent).toBe("4");
+    expect(neighborLinksToggle.getAttribute("aria-checked")).toBe("true");
+    expect(session.getState()).toMatchObject({
+      filterQuery: "",
+      showTags: true,
+      mapLayout: "auto"
+    });
   });
 
   it("renders a screenshot section with a collapse toggle and copy action", () => {
@@ -741,8 +807,14 @@ describe("MapSettingsPanelController", () => {
     const graphicsToggle = container.querySelector(
       '.reverysky-map-graphics-section .reverysky-map-settings-section-toggle'
     ) as HTMLButtonElement;
+    const localToggle = container.querySelector(
+      '.reverysky-map-local-section .reverysky-map-settings-section-toggle'
+    ) as HTMLButtonElement;
     const settingsContent = container.querySelector(
       ".reverysky-map-selection-section .reverysky-map-settings-section-content"
+    ) as HTMLElement;
+    const localContent = container.querySelector(
+      ".reverysky-map-local-section .reverysky-map-settings-section-content"
     ) as HTMLElement;
     const graphicsContent = container.querySelector(
       ".reverysky-map-graphics-section .reverysky-map-settings-section-content"
@@ -752,30 +824,39 @@ describe("MapSettingsPanelController", () => {
     settingsPanelToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
     expect(settingsToggle.tabIndex).toBe(-1);
+    expect(localToggle.tabIndex).toBe(-1);
     expect(graphicsToggle.tabIndex).toBe(-1);
     expect(settingsToggle.getAttribute("aria-expanded")).toBe("false");
+    expect(localToggle.getAttribute("aria-expanded")).toBe("false");
     expect(graphicsToggle.getAttribute("aria-expanded")).toBe("false");
     expect(settingsContent.classList.contains("reverysky-map-settings-section-content--collapsed")).toBe(true);
+    expect(localContent.classList.contains("reverysky-map-settings-section-content--collapsed")).toBe(true);
     expect(graphicsContent.classList.contains("reverysky-map-settings-section-content--collapsed")).toBe(true);
 
     settingsToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    localToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     graphicsToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
     expect(settingsToggle.getAttribute("aria-expanded")).toBe("true");
+    expect(localToggle.getAttribute("aria-expanded")).toBe("true");
     expect(graphicsToggle.getAttribute("aria-expanded")).toBe("true");
     expect(settingsContent.classList.contains("reverysky-map-settings-section-content--collapsed")).toBe(false);
+    expect(localContent.classList.contains("reverysky-map-settings-section-content--collapsed")).toBe(false);
     expect(graphicsContent.classList.contains("reverysky-map-settings-section-content--collapsed")).toBe(false);
 
     closeButton.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
     expect(panel.classList.contains("reverysky-map-settings-panel--closed")).toBe(true);
     expect(settingsToggle.getAttribute("aria-expanded")).toBe("true");
+    expect(localToggle.getAttribute("aria-expanded")).toBe("true");
 
     settingsPanelToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
 
     expect(settingsToggle.getAttribute("aria-expanded")).toBe("true");
+    expect(localToggle.getAttribute("aria-expanded")).toBe("true");
     expect(graphicsToggle.getAttribute("aria-expanded")).toBe("true");
     expect(settingsContent.classList.contains("reverysky-map-settings-section-content--collapsed")).toBe(false);
+    expect(localContent.classList.contains("reverysky-map-settings-section-content--collapsed")).toBe(false);
     expect(graphicsContent.classList.contains("reverysky-map-settings-section-content--collapsed")).toBe(false);
   });
 

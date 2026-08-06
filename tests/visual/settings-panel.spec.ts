@@ -7,7 +7,7 @@ test.use({
   deviceScaleFactor: 1,
   viewport: {
     width: 480,
-    height: 540
+    height: 780
   }
 });
 
@@ -17,7 +17,13 @@ test.describe("settings panel", () => {
     await page.goto(pathToFileURL(previewPath).href);
 
     const stage = page.locator("[data-visual-stage]");
+    const selectionToggle = page.locator(
+      ".reverysky-map-selection-section .reverysky-map-settings-section-toggle"
+    );
+    const localSection = page.locator(".reverysky-map-local-section");
+    const localToggle = page.locator(".reverysky-map-local-section .reverysky-map-settings-section-toggle");
     const graphicsSection = page.locator(".reverysky-map-graphics-section");
+    const graphicsToggle = page.locator(".reverysky-map-graphics-section .reverysky-map-settings-section-toggle");
     const screenshotSection = page.locator(".reverysky-map-screenshot-section");
     const screenshotToggle = page.locator(
       ".reverysky-map-screenshot-section .reverysky-map-settings-section-toggle"
@@ -27,6 +33,13 @@ test.describe("settings panel", () => {
     const closeButton = page.locator(".reverysky-map-settings-close");
     const gearReference = page.locator(".visual-gear-reference .reverysky-map-settings-toggle");
 
+    await localToggle.evaluate((button) => {
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 0 }));
+    });
+    await expect(localSection).toContainText("Local");
+    await expect(localSection).toContainText("Depth");
+    await expect(localSection).toContainText("Neighbor links");
+    await expect(localToggle).toHaveAttribute("aria-expanded", "true");
     await expect(graphicsSection).toContainText("Graphics");
     await expect(graphicsSection).toContainText("Render scale");
     await screenshotToggle.evaluate((button) => {
@@ -34,7 +47,9 @@ test.describe("settings panel", () => {
     });
     await expect(screenshotSection).toContainText("Screenshot");
     await expect(screenshotButton).toHaveText("Copy screenshot");
+    await expect(selectionToggle).toHaveAttribute("aria-expanded", "true");
     await expect(screenshotToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(graphicsToggle).toHaveAttribute("aria-expanded", "true");
     await expect(frameRateSelect).toHaveValue("auto");
     await expect(
       page.locator(".reverysky-map-selection-section .reverysky-map-settings-section-toggle")
@@ -57,10 +72,13 @@ test.describe("settings panel", () => {
     await page.goto(pathToFileURL(previewPath).href);
 
     const focusedControls: string[] = [];
+    await page.locator(".reverysky-map-local-section .reverysky-map-settings-section-toggle").evaluate((button) => {
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 0 }));
+    });
     await page.locator(".reverysky-map-screenshot-section .reverysky-map-settings-section-toggle").evaluate((button) => {
       button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 0 }));
     });
-    for (let step = 0; step < 7; step += 1) {
+    for (let step = 0; step < 10; step += 1) {
       await page.keyboard.press("Tab");
       focusedControls.push(
         await page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? "")
@@ -72,6 +90,9 @@ test.describe("settings panel", () => {
       "Search in filter",
       "Toggle tags",
       "Select layout",
+      "Toggle local mode",
+      "Local depth",
+      "Toggle neighbor links",
       "Render scale",
       "Select frame rate",
       "Copy graph screenshot"
@@ -86,14 +107,19 @@ test.describe("settings panel", () => {
     const settingsToggle = page.locator(
       ".reverysky-map-selection-section .reverysky-map-settings-section-toggle"
     );
+    const localToggle = page.locator(
+      ".reverysky-map-local-section .reverysky-map-settings-section-toggle"
+    );
     const graphicsToggle = page.locator(
       ".reverysky-map-graphics-section .reverysky-map-settings-section-toggle"
     );
     const screenshotToggle = page.locator(
       ".reverysky-map-screenshot-section .reverysky-map-settings-section-toggle"
     );
+    const localSection = page.locator(".reverysky-map-local-section");
     const screenshotSection = page.locator(".reverysky-map-screenshot-section");
     const screenshotButton = page.locator(".reverysky-map-screenshot-button");
+    const localDepthInput = page.locator(".reverysky-map-local-depth-input");
 
     await settingsToggle.click();
     await graphicsToggle.click();
@@ -102,8 +128,11 @@ test.describe("settings panel", () => {
     });
 
     await expect(settingsToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(localToggle).toHaveAttribute("aria-expanded", "false");
     await expect(graphicsToggle).toHaveAttribute("aria-expanded", "false");
     await expect(screenshotToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(localSection).toContainText("Local");
+    await expect(localDepthInput).not.toBeVisible();
     await expect(screenshotSection).toContainText("Screenshot");
     await expect(screenshotButton).not.toBeVisible();
 

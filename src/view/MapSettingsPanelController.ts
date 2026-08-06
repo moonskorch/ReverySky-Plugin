@@ -36,6 +36,13 @@ export class MapSettingsPanelController {
   private settingsSectionEl: HTMLElement | null = null;
   private settingsSectionToggleButtonEl: HTMLButtonElement | null = null;
   private settingsSectionContentEl: HTMLElement | null = null;
+  private localSectionEl: HTMLElement | null = null;
+  private localSectionToggleButtonEl: HTMLButtonElement | null = null;
+  private localSectionContentEl: HTMLElement | null = null;
+  private localMainToggleButtonEl: HTMLButtonElement | null = null;
+  private localDepthInputEl: HTMLInputElement | null = null;
+  private localDepthValueEl: HTMLElement | null = null;
+  private localNeighborLinksToggleButtonEl: HTMLButtonElement | null = null;
   private graphicsSectionEl: HTMLElement | null = null;
   private graphicsSectionToggleButtonEl: HTMLButtonElement | null = null;
   private graphicsSectionContentEl: HTMLElement | null = null;
@@ -53,6 +60,10 @@ export class MapSettingsPanelController {
   private screenshotButtonEl: HTMLButtonElement | null = null;
   private settingsPanelOpen = false;
   private settingsSectionCollapsed = true;
+  private localSectionCollapsed = true;
+  private localEnabled = false;
+  private localDepth = 1;
+  private localNeighborLinksEnabled = false;
   private graphicsSectionCollapsed = true;
   private screenshotSectionCollapsed = true;
 
@@ -200,6 +211,66 @@ export class MapSettingsPanelController {
     });
     this.layoutDropdownEl = layoutControl.select;
 
+    const localSection = createCollapsibleSection(settingsScrollArea as ObsidianHTMLElement, {
+      className: "reverysky-map-local-section",
+      label: "Local",
+      onToggle: () => {
+        this.setLocalSectionCollapsed(!this.localSectionCollapsed);
+      }
+    });
+    this.localSectionEl = localSection.section;
+    this.localSectionToggleButtonEl = localSection.toggleButton;
+    this.localSectionContentEl = localSection.content;
+    const localSectionContent = localSection.content;
+
+    const toggleLocal = (event: Event) => {
+      event.preventDefault();
+      this.localEnabled = !this.localEnabled;
+      this.refreshLocalControlsUi();
+    };
+    const localToggle = createToggleControl(localSectionContent as ObsidianHTMLElement, {
+      rowClassName: "reverysky-map-local-toggle-row",
+      buttonClassName: "reverysky-map-local-toggle",
+      thumbClassName: "reverysky-map-local-toggle-thumb",
+      label: "Local",
+      ariaLabel: "Toggle local mode",
+      onToggle: toggleLocal
+    });
+    this.localMainToggleButtonEl = localToggle.button;
+
+    const localDepth = createRangeControl(localSectionContent as ObsidianHTMLElement, {
+      sectionClassName: "reverysky-map-local-depth-section",
+      inputClassName: "reverysky-map-local-depth-input",
+      valueClassName: "reverysky-map-local-depth-value",
+      messageClassName: "reverysky-map-local-depth-message reverysky-map-range-control-message--hidden",
+      label: "Depth",
+      ariaLabel: "Local depth",
+      min: "1",
+      max: "5",
+      step: "1",
+      onInput: (input) => {
+        this.localDepth = Number(input.value);
+        this.refreshLocalControlsUi();
+      }
+    });
+    this.localDepthInputEl = localDepth.input;
+    this.localDepthValueEl = localDepth.value;
+
+    const toggleNeighborLinks = (event: Event) => {
+      event.preventDefault();
+      this.localNeighborLinksEnabled = !this.localNeighborLinksEnabled;
+      this.refreshLocalControlsUi();
+    };
+    const neighborLinksToggle = createToggleControl(localSectionContent as ObsidianHTMLElement, {
+      rowClassName: "reverysky-map-neighbor-links-toggle-row",
+      buttonClassName: "reverysky-map-neighbor-links-toggle",
+      thumbClassName: "reverysky-map-neighbor-links-toggle-thumb",
+      label: "Neighbor links",
+      ariaLabel: "Toggle neighbor links",
+      onToggle: toggleNeighborLinks
+    });
+    this.localNeighborLinksToggleButtonEl = neighborLinksToggle.button;
+
     const graphicsSection = createCollapsibleSection(settingsScrollArea as ObsidianHTMLElement, {
       className: "reverysky-map-graphics-section",
       label: "Graphics",
@@ -278,6 +349,7 @@ export class MapSettingsPanelController {
     this.refreshFilterMessage();
     this.refreshTagsToggleUi();
     this.refreshLayoutDropdownUi();
+    this.refreshLocalControlsUi();
     this.refreshRenderScaleUi();
     this.refreshFrameRateModeDropdownUi();
   }
@@ -297,6 +369,13 @@ export class MapSettingsPanelController {
     this.settingsSectionEl = null;
     this.settingsSectionToggleButtonEl = null;
     this.settingsSectionContentEl = null;
+    this.localSectionEl = null;
+    this.localSectionToggleButtonEl = null;
+    this.localSectionContentEl = null;
+    this.localMainToggleButtonEl = null;
+    this.localDepthInputEl = null;
+    this.localDepthValueEl = null;
+    this.localNeighborLinksToggleButtonEl = null;
     this.graphicsSectionEl = null;
     this.graphicsSectionToggleButtonEl = null;
     this.graphicsSectionContentEl = null;
@@ -312,6 +391,10 @@ export class MapSettingsPanelController {
     this.screenshotButtonEl = null;
     this.settingsPanelOpen = false;
     this.settingsSectionCollapsed = true;
+    this.localSectionCollapsed = true;
+    this.localEnabled = false;
+    this.localDepth = 1;
+    this.localNeighborLinksEnabled = false;
     this.graphicsSectionCollapsed = true;
     this.screenshotSectionCollapsed = true;
   }
@@ -342,6 +425,11 @@ export class MapSettingsPanelController {
     this.refreshCollapsibleSections();
   }
 
+  private setLocalSectionCollapsed(isCollapsed: boolean): void {
+    this.localSectionCollapsed = isCollapsed;
+    this.refreshCollapsibleSections();
+  }
+
   private setScreenshotSectionCollapsed(isCollapsed: boolean): void {
     this.screenshotSectionCollapsed = isCollapsed;
     this.refreshCollapsibleSections();
@@ -354,6 +442,13 @@ export class MapSettingsPanelController {
       this.settingsSectionContentEl,
       this.settingsSectionCollapsed,
       "Selection"
+    );
+    this.refreshCollapsibleSection(
+      this.localSectionEl,
+      this.localSectionToggleButtonEl,
+      this.localSectionContentEl,
+      this.localSectionCollapsed,
+      "Local"
     );
     this.refreshCollapsibleSection(
       this.graphicsSectionEl,
@@ -438,6 +533,22 @@ export class MapSettingsPanelController {
     }
 
     this.layoutDropdownEl.value = uiState.mapLayout;
+  }
+
+  private refreshLocalControlsUi(): void {
+    this.localMainToggleButtonEl?.setAttribute("role", "switch");
+    this.localMainToggleButtonEl?.setAttribute("aria-checked", this.localEnabled ? "true" : "false");
+    if (this.localDepthInputEl) {
+      this.localDepthInputEl.value = String(this.localDepth);
+    }
+    if (this.localDepthValueEl) {
+      this.localDepthValueEl.textContent = String(this.localDepth);
+    }
+    this.localNeighborLinksToggleButtonEl?.setAttribute("role", "switch");
+    this.localNeighborLinksToggleButtonEl?.setAttribute(
+      "aria-checked",
+      this.localNeighborLinksEnabled ? "true" : "false"
+    );
   }
 
   private refreshRenderScaleUi(): void {
