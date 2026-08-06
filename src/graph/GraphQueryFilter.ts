@@ -1,4 +1,9 @@
 import type { GraphNoteNode, GraphPayload } from "../bridge/BridgeTypes";
+import {
+  getQueryFilterOperator,
+  getQueryFilterOperatorValue,
+  mergeSeparatedQueryOperatorValues
+} from "./GraphQuerySyntax";
 
 export type ParsedQueryFilter = {
   includeTerms: string[];
@@ -70,7 +75,7 @@ export class GraphQueryFilter {
     const excludeTagTerms: string[] = [];
     const unsupportedTokens: string[] = [];
 
-    for (const token of this.mergeSeparatedOperatorValues(tokenized.tokens)) {
+    for (const token of mergeSeparatedQueryOperatorValues(tokenized.tokens)) {
       const trimmed = token.trim();
       if (!trimmed) {
         continue;
@@ -78,9 +83,10 @@ export class GraphQueryFilter {
 
       const isNegated = trimmed.startsWith("-");
       const body = isNegated ? trimmed.slice(1) : trimmed;
-      if (!body.toLowerCase().startsWith("path:")) {
-        if (body.toLowerCase().startsWith("date:")) {
-          const rawDateTerm = body.slice("date:".length).trim();
+      const operator = getQueryFilterOperator(body);
+      if (operator !== "path") {
+        if (operator === "date") {
+          const rawDateTerm = getQueryFilterOperatorValue(body, operator);
           const dateClause = this.tryParseDateClause(rawDateTerm);
           if (dateClause.kind === "invalid") {
             return {
@@ -112,8 +118,8 @@ export class GraphQueryFilter {
           continue;
         }
 
-        if (body.toLowerCase().startsWith("tag:")) {
-          const rawTagTerm = body.slice("tag:".length).trim();
+        if (operator === "tag") {
+          const rawTagTerm = getQueryFilterOperatorValue(body, operator);
           if (!rawTagTerm) {
             // Empty tag filters intentionally match nothing instead of being ignored.
             if (isNegated) {
@@ -147,7 +153,7 @@ export class GraphQueryFilter {
         continue;
       }
 
-      const rawTerm = body.slice("path:".length).trim();
+      const rawTerm = getQueryFilterOperatorValue(body, operator);
       if (!rawTerm) {
         // Empty path filters intentionally match nothing instead of broadening the query.
         if (isNegated) {
@@ -513,27 +519,6 @@ export class GraphQueryFilter {
     };
   }
 
-  private static mergeSeparatedOperatorValues(tokens: string[]): string[] {
-    const merged: string[] = [];
-
-    for (let i = 0; i < tokens.length; i++) {
-      const token = tokens[i] ?? "";
-      const nextToken = tokens[i + 1] ?? "";
-      if (
-        /^-?(?:path|date|tag):$/i.test(token) &&
-        nextToken.length > 0 &&
-        !/^-?(?:path|date|tag):/i.test(nextToken)
-      ) {
-        merged.push(`${token}${nextToken}`);
-        i++;
-        continue;
-      }
-
-      merged.push(token);
-    }
-
-    return merged;
-  }
 }
 
 export function areQueryFiltersEqual(left: ParsedQueryFilter | null, right: ParsedQueryFilter | null): boolean {

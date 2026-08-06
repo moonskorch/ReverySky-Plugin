@@ -27,6 +27,7 @@ import {
   type ParsedQueryFilter,
   type QueryFilterParseResult
 } from "../graph/GraphQueryFilter";
+import { extractActiveFilterTermValue } from "../graph/GraphQuerySyntax";
 import { makeStableNoteId } from "../graph/VaultGraphBuilder";
 import { MapFocusController } from "./MapFocusController";
 
@@ -284,7 +285,7 @@ export class MapSession {
 
   getFolderSuggestions(query: string): FolderPathSuggestion[] {
     this.ensureFolderSuggestionsReady();
-    const activePathValue = this.extractActivePathFilterTermValue(query);
+    const activePathValue = extractActiveFilterTermValue(query, "path");
     const normalizedActive = this.normalizeSearchTerm(activePathValue);
 
     return this.folderPathSuggestions
@@ -315,7 +316,7 @@ export class MapSession {
 
   getTagSuggestions(query: string): TagSuggestion[] {
     this.ensureTagSuggestionsReady();
-    const activeTagValue = this.extractActiveTagFilterTermValue(query);
+    const activeTagValue = extractActiveFilterTermValue(query, "tag");
     const normalizedActive = this.normalizeTagSuggestionSearchTerm(activeTagValue);
 
     return this.tagSuggestions
@@ -793,32 +794,6 @@ export class MapSession {
     }
 
     return prefixes;
-  }
-
-  private extractActivePathFilterTermValue(query: string): string {
-    const activePattern = /(^|\s)-?path:\s*(?:"([^"]*)"|([^\s]*))$/i;
-    const match = query.match(activePattern);
-    if (!match) {
-      return "";
-    }
-
-    const quotedValue = typeof match[2] === "string" ? match[2] : "";
-    const plainValue = typeof match[3] === "string" ? match[3] : "";
-    const rawValue = quotedValue || plainValue;
-    return rawValue.replace(/\\"/g, "\"").replace(/\\\\/g, "\\");
-  }
-
-  private extractActiveTagFilterTermValue(query: string): string {
-    const activePattern = /(^|\s)-?tag:\s*(?:"([^"]*)"|([^\s]*))$/i;
-    const match = query.match(activePattern);
-    if (!match) {
-      return "";
-    }
-
-    const quotedValue = typeof match[2] === "string" ? match[2] : "";
-    const plainValue = typeof match[3] === "string" ? match[3] : "";
-    const rawValue = quotedValue || plainValue;
-    return rawValue.replace(/\\"/g, "\"").replace(/\\\\/g, "\\");
   }
 
   private normalizeSearchTerm(value: string): string {

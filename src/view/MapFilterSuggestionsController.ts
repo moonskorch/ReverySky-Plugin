@@ -1,4 +1,19 @@
 import { MapSession } from "./MapSession";
+import {
+  applyQueryFilterOperatorSuggestion,
+  applyQueryFilterValueSuggestion,
+  ensureTrailingQuerySeparator,
+  extractActiveFilterTermValue,
+  extractActiveRootFilterTermValue,
+  formatPathQueryFilterValue,
+  formatQueryFilterTerm,
+  formatTagQueryFilterValue,
+  hasTrailingQuerySeparator,
+  isActiveFilterTerm,
+  isTrailingEmptyFilterOperator,
+  normalizeDateFilterSearchTerm,
+  normalizeOperatorSuggestionSearchTerm
+} from "../graph/GraphQuerySyntax";
 
 const FILTER_SUGGESTIONS_HIDE_DELAY_MS = 120;
 let nextFilterSuggestionsId = 0;
@@ -208,25 +223,25 @@ export class MapFilterSuggestionsController {
 
   private resolveAutoSuggestionMode(): FilterSuggestionMode {
     const currentQuery = this.inputEl.value ?? this.getQuery();
-    if (/(^|\s)-?path:\s*$/i.test(currentQuery)) {
+    if (isTrailingEmptyFilterOperator(currentQuery, "path")) {
       return 1;
     }
-    if (/(^|\s)-?date:\s*$/i.test(currentQuery)) {
+    if (isTrailingEmptyFilterOperator(currentQuery, "date")) {
       return 2;
     }
-    if (/(^|\s)-?tag:\s*$/i.test(currentQuery)) {
+    if (isTrailingEmptyFilterOperator(currentQuery, "tag")) {
       return 3;
     }
-    if (/\s$/.test(currentQuery)) {
+    if (hasTrailingQuerySeparator(currentQuery)) {
       return 0;
     }
-    if (/(^|\s)-?path:\s*(?:"[^"]*"|[^\s]*)$/i.test(currentQuery)) {
+    if (isActiveFilterTerm(currentQuery, "path")) {
       return 1;
     }
-    if (/(^|\s)-?date:\s*[^\s]*$/i.test(currentQuery)) {
+    if (isActiveFilterTerm(currentQuery, "date")) {
       return 2;
     }
-    if (/(^|\s)-?tag:\s*(?:"[^"]*"|[^\s]*)$/i.test(currentQuery)) {
+    if (isActiveFilterTerm(currentQuery, "tag")) {
       return 3;
     }
     return 0;
@@ -252,11 +267,9 @@ export class MapFilterSuggestionsController {
 
   private applyPathSuggestionOperator(): void {
     const currentValue = this.getQuery();
-    const trimmedCurrent = currentValue.trim();
-    const alreadyContainsPathOperator = /(^|\s)-?path:/i.test(trimmedCurrent);
-    const nextValue = alreadyContainsPathOperator
-      ? currentValue
-      : this.applyFilterOperatorToActiveRootPrefix(currentValue, "path:");
+    const nextValue = applyQueryFilterOperatorSuggestion(currentValue, "path", {
+      preserveWhenOperatorPresent: true
+    });
 
     this.setQueryValue(nextValue);
     this.commitQuery(nextValue);
@@ -265,11 +278,9 @@ export class MapFilterSuggestionsController {
 
   private applyDateSuggestionOperator(): void {
     const currentValue = this.getQuery();
-    const trimmedCurrent = currentValue.trim();
-    const alreadyContainsDateOperator = /(^|\s)-?date:/i.test(trimmedCurrent);
-    const nextValue = alreadyContainsDateOperator
-      ? currentValue
-      : this.applyFilterOperatorToActiveRootPrefix(currentValue, "date:");
+    const nextValue = applyQueryFilterOperatorSuggestion(currentValue, "date", {
+      preserveWhenOperatorPresent: true
+    });
 
     this.setQueryValue(nextValue);
     this.commitQuery(nextValue);
@@ -278,10 +289,9 @@ export class MapFilterSuggestionsController {
 
   private applyTagSuggestionOperator(): void {
     const currentValue = this.getQuery();
-    const hasActiveTrailingTagOperator = /(^|\s)-?tag:\s*(?:"[^"]*"|[^\s]*)$/i.test(currentValue);
-    const nextValue = hasActiveTrailingTagOperator
-      ? currentValue
-      : this.applyFilterOperatorToActiveRootPrefix(currentValue, "tag:");
+    const nextValue = applyQueryFilterOperatorSuggestion(currentValue, "tag", {
+      preserveWhenActiveTerm: true
+    });
 
     this.setQueryValue(nextValue);
     this.commitQuery(nextValue);
@@ -290,44 +300,22 @@ export class MapFilterSuggestionsController {
 
   private applyDateValueSuggestion(suffix: string): void {
     const currentValue = this.getQuery();
-    const replaceActiveDateTermPattern = /(^|\s)(-?date:)\s*[^\s]*$/i;
-
-    let nextValue: string;
-    if (replaceActiveDateTermPattern.test(currentValue)) {
-      nextValue = currentValue.replace(
-        replaceActiveDateTermPattern,
-        (_match, prefix: string, operator: string) => `${prefix}${operator}${suffix}`
-      );
-    } else if (/(^|\s)-?date:/i.test(currentValue)) {
-      nextValue = `${currentValue}${/\s$/.test(currentValue) ? "" : " "}date:${suffix}`;
-    } else {
-      nextValue = `date:${suffix}`;
-    }
-
-    nextValue = this.ensureTrailingSuggestionSeparator(nextValue);
+    let nextValue = applyQueryFilterValueSuggestion(currentValue, "date", suffix, {
+      resetWhenOperatorMissing: true
+    });
+    nextValue = ensureTrailingQuerySeparator(nextValue);
     this.setQueryValue(nextValue);
     this.commitQuery(nextValue);
     this.showFilterSuggestions(0);
   }
 
   private applyPathValueSuggestion(folderPath: string): void {
-    const term = this.formatPathFilterTerm(folderPath);
+    const term = formatPathQueryFilterValue(folderPath);
     const currentValue = this.getQuery();
-    const replaceActivePathTermPattern = /(^|\s)(-?path:)\s*(?:"[^"]*"|[^\s]*)$/i;
-
-    let nextValue: string;
-    if (replaceActivePathTermPattern.test(currentValue)) {
-      nextValue = currentValue.replace(
-        replaceActivePathTermPattern,
-        (_match, prefix: string, operator: string) => `${prefix}${operator}${term}`
-      );
-    } else if (/(^|\s)-?path:/i.test(currentValue)) {
-      nextValue = `${currentValue}${/\s$/.test(currentValue) ? "" : " "}path:${term}`;
-    } else {
-      nextValue = `path:${term}`;
-    }
-
-    nextValue = this.ensureTrailingSuggestionSeparator(nextValue);
+    let nextValue = applyQueryFilterValueSuggestion(currentValue, "path", term, {
+      resetWhenOperatorMissing: true
+    });
+    nextValue = ensureTrailingQuerySeparator(nextValue);
     this.setQueryValue(nextValue);
     this.commitQuery(nextValue);
     this.showFilterSuggestions(0);
@@ -335,28 +323,18 @@ export class MapFilterSuggestionsController {
 
   private applyTagValueSuggestion(tag: string): void {
     const currentValue = this.getQuery();
-    const term = this.formatTagFilterTerm(tag);
-    const replaceActiveTagTermPattern = /(^|\s)(-?tag:)\s*(?:"[^"]*"|[^\s]*)$/i;
+    const term = formatTagQueryFilterValue(tag);
 
-    let nextValue: string;
-    if (replaceActiveTagTermPattern.test(currentValue)) {
-      nextValue = currentValue.replace(
-        replaceActiveTagTermPattern,
-        (_match, prefix: string, operator: string) => `${prefix}${operator}${term}`
-      );
-    } else {
-      nextValue = `${currentValue}${/\s$/.test(currentValue) || currentValue.length === 0 ? "" : " "}tag:${term}`;
-    }
-
-    nextValue = this.ensureTrailingSuggestionSeparator(nextValue);
+    let nextValue = applyQueryFilterValueSuggestion(currentValue, "tag", term);
+    nextValue = ensureTrailingQuerySeparator(nextValue);
     this.setQueryValue(nextValue);
     this.commitQuery(nextValue);
     this.showFilterSuggestions(0);
   }
 
   private renderOperatorSuggestions(host: HTMLElement, query: string): void {
-    const normalizedQuery = this.normalizeOperatorSuggestionSearchTerm(
-      this.extractActiveRootFilterTermValue(query)
+    const normalizedQuery = normalizeOperatorSuggestionSearchTerm(
+      extractActiveRootFilterTermValue(query)
     );
     const suggestionsTitle = createChild(host as ObsidianHTMLElement, "div");
     suggestionsTitle.className = "reverysky-map-suggestion-title";
@@ -418,7 +396,7 @@ export class MapFilterSuggestionsController {
   }
 
   private renderDateSuggestions(host: HTMLElement, query: string): void {
-    const normalizedQuery = this.normalizeDateFilterSearchTerm(this.extractActiveDateFilterTermValue(query));
+    const normalizedQuery = normalizeDateFilterSearchTerm(extractActiveFilterTermValue(query, "date"));
     const suggestionsTitle = createChild(host as ObsidianHTMLElement, "div");
     suggestionsTitle.className = "reverysky-map-suggestion-title";
     suggestionsTitle.textContent = "Date presets";
@@ -429,8 +407,8 @@ export class MapFilterSuggestionsController {
         return true;
       }
 
-      const dateKey = this.normalizeDateFilterSearchTerm(`date:${suggestion.suffix}`);
-      const labelKey = this.normalizeDateFilterSearchTerm(suggestion.label);
+      const dateKey = normalizeDateFilterSearchTerm(formatQueryFilterTerm("date", suggestion.suffix));
+      const labelKey = normalizeDateFilterSearchTerm(suggestion.label);
       return dateKey.startsWith(normalizedQuery) || labelKey.startsWith(normalizedQuery);
     });
 
@@ -449,7 +427,7 @@ export class MapFilterSuggestionsController {
 
       const valuePart = createChild(option as ObsidianHTMLElement, "span");
       valuePart.className = "reverysky-map-date-suggestion-value";
-      valuePart.textContent = `date:${suggestion.suffix}`;
+      valuePart.textContent = formatQueryFilterTerm("date", suggestion.suffix);
 
       const labelPart = createChild(option as ObsidianHTMLElement, "span");
       labelPart.className = "reverysky-map-date-suggestion-label";
@@ -521,57 +499,6 @@ export class MapFilterSuggestionsController {
     }
 
     this.syncFilterSuggestionActiveState();
-  }
-
-  private formatPathFilterTerm(folderPath: string): string {
-    const needsQuotes = /\s/.test(folderPath) || /["]/.test(folderPath);
-    const escaped = folderPath.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
-    return needsQuotes ? `"${escaped}"` : escaped;
-  }
-
-  private formatTagFilterTerm(tag: string): string {
-    return `#${tag.trim().replace(/^#/, "")}`;
-  }
-
-  private normalizeOperatorSuggestionSearchTerm(value: string): string {
-    return value.trim().toLowerCase().replace(/^-/, "").replace(/:$/, "");
-  }
-
-  private extractActiveRootFilterTermValue(query: string): string {
-    const activePattern = /(^|\s)(-?[^\s:]*)$/;
-    const match = query.match(activePattern);
-    const activeTerm = match?.[2] ?? "";
-    return activeTerm.includes(":") ? "" : activeTerm;
-  }
-
-  private applyFilterOperatorToActiveRootPrefix(currentValue: string, operator: string): string {
-    if (currentValue.trim().length === 0) {
-      return operator;
-    }
-
-    const activePrefixMatch = currentValue.match(/(^|\s)(-?[^\s:]*)$/);
-    const activePrefix = activePrefixMatch?.[2] ?? "";
-    const normalizedActivePrefix = this.normalizeOperatorSuggestionSearchTerm(activePrefix);
-    const operatorKey = operator.replace(/:$/, "");
-    if (normalizedActivePrefix.length > 0 && operatorKey.startsWith(normalizedActivePrefix)) {
-      return currentValue.replace(/(^|\s)(-?[^\s:]*)$/, (_match, prefix: string) => `${prefix}${operator}`);
-    }
-
-    return `${currentValue}${/\s$/.test(currentValue) ? "" : " "}${operator}`;
-  }
-
-  private normalizeDateFilterSearchTerm(value: string): string {
-    return value.trim().toLowerCase().replace(/^(-?date:)/, "").replace(/^[<>=]+/, "").trim();
-  }
-
-  private ensureTrailingSuggestionSeparator(value: string): string {
-    return /\s$/.test(value) ? value : `${value} `;
-  }
-
-  private extractActiveDateFilterTermValue(query: string): string {
-    const activePattern = /(^|\s)-?date:\s*([^\s]*)$/i;
-    const match = query.match(activePattern);
-    return match?.[2] ?? "";
   }
 
   private moveFilterSuggestionSelection(delta: number): void {
