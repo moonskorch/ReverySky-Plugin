@@ -8,7 +8,7 @@
 * A wide panoramic starfield for larger, denser graphs
 * A chronological layout that arranges notes by date
 * Combined filters by path, tag, and date
-* Opening notes from the graph and highlighting the active note
+* Two-way navigation: click a node to fly to it and open its note; activate a note to find it on the graph
 * Pan, zoom, rotation, and timeline navigation
 * Detailed and simplified display modes
 * Graphs with or without tag nodes
@@ -50,9 +50,9 @@ Graph note titles support Latin text with accents, Cyrillic text, common symbols
 - Pan: drag the graph with the primary mouse button to move the camera focus across the current layout.
 - Zoom: use the vertical slider on the left side of the graph, or use the mouse wheel for quick zooming.
 - Rotate: use the on-screen rotate controls, or hold the right mouse button and drag horizontally.
+- Node to note: click any node to fly to it and open its note.
+- Note to node: activate a note to find and highlight it on the graph.
 - Display mode: use the round view button to switch between the standard detailed rendering and a simplified rendering. In link layouts, the standard mode shows tag nodes and link lines; the simplified mode keeps note nodes visible and hides those extra details.
-- Open a note: click a note node in the runtime. The graph focuses that node and opens the matching Markdown note in Obsidian.
-- Follow the active note: when Obsidian focuses a Markdown note, the runtime can focus the matching node in the graph.
 - Date navigation: in the `Dates` layout, use the date slider to move along the time axis while keeping pan, zoom, and rotation available.
 
 ## Filter
