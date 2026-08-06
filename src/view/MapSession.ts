@@ -40,12 +40,20 @@ export const DEFAULT_RENDER_SCALE = 1;
 export const MIN_RENDER_SCALE = 0.5;
 export const MAX_RENDER_SCALE = 1.5;
 export const RENDER_SCALE_STEP = 0.1;
+export const DEFAULT_LOCAL_ENABLED = false;
+export const DEFAULT_LOCAL_DEPTH = 1;
+export const MIN_LOCAL_DEPTH = 1;
+export const MAX_LOCAL_DEPTH = 5;
+export const DEFAULT_LOCAL_NEIGHBOR_LINKS_ENABLED = false;
 export type MapViewState = {
   filterQuery?: unknown;
   showTags?: unknown;
   mapLayout?: unknown;
   renderScale?: unknown;
   frameRateMode?: unknown;
+  localEnabled?: unknown;
+  localDepth?: unknown;
+  localNeighborLinksEnabled?: unknown;
 };
 
 export type MapFilterUiState = {
@@ -55,6 +63,9 @@ export type MapFilterUiState = {
   renderScale: number;
   renderScaleRestartRequired: boolean;
   frameRateMode: FrameRateMode;
+  localEnabled: boolean;
+  localDepth: number;
+  localNeighborLinksEnabled: boolean;
   filterParseValid: boolean;
   filterMessage: string;
 };
@@ -124,6 +135,9 @@ export class MapSession {
   private renderScale = DEFAULT_RENDER_SCALE;
   private appliedRenderScale = DEFAULT_RENDER_SCALE;
   private frameRateMode: FrameRateMode = DEFAULT_FRAME_RATE_MODE;
+  private localEnabled = DEFAULT_LOCAL_ENABLED;
+  private localDepth = DEFAULT_LOCAL_DEPTH;
+  private localNeighborLinksEnabled = DEFAULT_LOCAL_NEIGHBOR_LINKS_ENABLED;
   // Parsed filter currently applied to the outgoing graph; live input commits it only after debounce.
   private activeQueryFilter: ParsedQueryFilter | null = null;
   private filterParseValid = true;
@@ -156,7 +170,10 @@ export class MapSession {
       showTags: this.showTags,
       mapLayout: this.mapLayout,
       renderScale: this.renderScale,
-      frameRateMode: this.frameRateMode
+      frameRateMode: this.frameRateMode,
+      localEnabled: this.localEnabled,
+      localDepth: this.localDepth,
+      localNeighborLinksEnabled: this.localNeighborLinksEnabled
     };
   }
 
@@ -170,6 +187,13 @@ export class MapSession {
     this.mapLayout = nextLayoutPreference;
     this.renderScale = normalizeRenderScale(nextState.renderScale);
     this.frameRateMode = normalizeFrameRateMode(nextState.frameRateMode);
+    this.localEnabled = typeof nextState.localEnabled === "boolean"
+      ? nextState.localEnabled
+      : DEFAULT_LOCAL_ENABLED;
+    this.localDepth = normalizeLocalDepth(nextState.localDepth);
+    this.localNeighborLinksEnabled = typeof nextState.localNeighborLinksEnabled === "boolean"
+      ? nextState.localNeighborLinksEnabled
+      : DEFAULT_LOCAL_NEIGHBOR_LINKS_ENABLED;
     this.applyParsedQueryResult(GraphQueryFilter.parseQuery(nextQuery));
   }
 
@@ -252,6 +276,21 @@ export class MapSession {
     this.notifyStateChanged({ persist: false });
   }
 
+  setLocalEnabled(localEnabled: boolean): void {
+    this.localEnabled = localEnabled;
+    this.notifyStateChanged();
+  }
+
+  setLocalDepth(localDepth: unknown): void {
+    this.localDepth = normalizeLocalDepth(localDepth);
+    this.notifyStateChanged();
+  }
+
+  setLocalNeighborLinksEnabled(localNeighborLinksEnabled: boolean): void {
+    this.localNeighborLinksEnabled = localNeighborLinksEnabled;
+    this.notifyStateChanged();
+  }
+
   persistRenderScale(): void {
     this.notifyStateChanged();
   }
@@ -278,6 +317,9 @@ export class MapSession {
       renderScale: this.renderScale,
       renderScaleRestartRequired: this.renderScale !== this.appliedRenderScale,
       frameRateMode: this.frameRateMode,
+      localEnabled: this.localEnabled,
+      localDepth: this.localDepth,
+      localNeighborLinksEnabled: this.localNeighborLinksEnabled,
       filterParseValid: this.filterParseValid,
       filterMessage: this.filterMessage
     };
@@ -936,4 +978,20 @@ export function normalizeRenderScale(value: unknown): number {
     return DEFAULT_RENDER_SCALE;
   }
   return rounded;
+}
+
+export function normalizeLocalDepth(value: unknown): number {
+  const numericValue = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return DEFAULT_LOCAL_DEPTH;
+  }
+
+  if (
+    !Number.isInteger(numericValue) ||
+    numericValue < MIN_LOCAL_DEPTH ||
+    numericValue > MAX_LOCAL_DEPTH
+  ) {
+    return DEFAULT_LOCAL_DEPTH;
+  }
+  return numericValue;
 }

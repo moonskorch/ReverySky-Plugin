@@ -637,7 +637,10 @@ describe("MapSettingsPanelController", () => {
       showTags: false,
       mapLayout: "dates",
       renderScale: 1.2,
-      frameRateMode: "fps60"
+      frameRateMode: "fps60",
+      localEnabled: true,
+      localDepth: 4,
+      localNeighborLinksEnabled: true
     });
     session.start(() => undefined);
 
@@ -650,6 +653,12 @@ describe("MapSettingsPanelController", () => {
     const engineSelect = container.querySelector(".reverysky-map-engine-select") as HTMLSelectElement;
     const frameRateModeSelect =
       container.querySelector(".reverysky-map-frame-rate-mode-select") as HTMLSelectElement;
+    const localModeToggle = container.querySelector(".reverysky-map-local-toggle") as HTMLButtonElement;
+    const localDepthInput = container.querySelector(".reverysky-map-local-depth-input") as HTMLInputElement;
+    const localDepthValue = container.querySelector(".reverysky-map-local-depth-value") as HTMLElement;
+    const neighborLinksToggle = container.querySelector(
+      ".reverysky-map-neighbor-links-toggle"
+    ) as HTMLButtonElement;
     const renderScaleInput = container.querySelector(".reverysky-map-render-scale-input") as HTMLInputElement;
     const renderScaleValue = container.querySelector(".reverysky-map-render-scale-value") as HTMLElement;
     const renderScaleMessage = container.querySelector(".reverysky-map-render-scale-message") as HTMLElement;
@@ -659,6 +668,10 @@ describe("MapSettingsPanelController", () => {
     expect(tagsToggle.getAttribute("aria-checked")).toBe("false");
     expect(engineSelect.value).toBe("dates");
     expect(frameRateModeSelect.value).toBe("fps60");
+    expect(localModeToggle.getAttribute("aria-checked")).toBe("true");
+    expect(localDepthInput.value).toBe("4");
+    expect(localDepthValue.textContent).toBe("4");
+    expect(neighborLinksToggle.getAttribute("aria-checked")).toBe("true");
     expect(renderScaleInput.min).toBe("0.5");
     expect(renderScaleInput.max).toBe("1.5");
     expect(renderScaleInput.step).toBe("0.1");
@@ -712,7 +725,7 @@ describe("MapSettingsPanelController", () => {
     expect(neighborLinksToggle.getAttribute("aria-checked")).toBe("false");
   });
 
-  it("updates local section controls only in the panel UI", () => {
+  it("updates local section controls in session state", () => {
     const session = createSession();
     const controller = new MapSettingsPanelController(session);
     const container = createObsidianTestContainer();
@@ -738,7 +751,10 @@ describe("MapSettingsPanelController", () => {
     expect(session.getState()).toMatchObject({
       filterQuery: "",
       showTags: true,
-      mapLayout: "auto"
+      mapLayout: "auto",
+      localEnabled: true,
+      localDepth: 4,
+      localNeighborLinksEnabled: true
     });
   });
 

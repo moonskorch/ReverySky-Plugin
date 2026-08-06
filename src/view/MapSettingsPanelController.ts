@@ -61,9 +61,6 @@ export class MapSettingsPanelController {
   private settingsPanelOpen = false;
   private settingsSectionCollapsed = true;
   private localSectionCollapsed = true;
-  private localEnabled = false;
-  private localDepth = 1;
-  private localNeighborLinksEnabled = false;
   private graphicsSectionCollapsed = true;
   private screenshotSectionCollapsed = true;
 
@@ -225,7 +222,8 @@ export class MapSettingsPanelController {
 
     const toggleLocal = (event: Event) => {
       event.preventDefault();
-      this.localEnabled = !this.localEnabled;
+      const uiState = this.session.getFilterUiState();
+      this.session.setLocalEnabled(!uiState.localEnabled);
       this.refreshLocalControlsUi();
     };
     const localToggle = createToggleControl(localSectionContent as ObsidianHTMLElement, {
@@ -249,7 +247,7 @@ export class MapSettingsPanelController {
       max: "5",
       step: "1",
       onInput: (input) => {
-        this.localDepth = Number(input.value);
+        this.session.setLocalDepth(input.value);
         this.refreshLocalControlsUi();
       }
     });
@@ -258,7 +256,8 @@ export class MapSettingsPanelController {
 
     const toggleNeighborLinks = (event: Event) => {
       event.preventDefault();
-      this.localNeighborLinksEnabled = !this.localNeighborLinksEnabled;
+      const uiState = this.session.getFilterUiState();
+      this.session.setLocalNeighborLinksEnabled(!uiState.localNeighborLinksEnabled);
       this.refreshLocalControlsUi();
     };
     const neighborLinksToggle = createToggleControl(localSectionContent as ObsidianHTMLElement, {
@@ -392,9 +391,6 @@ export class MapSettingsPanelController {
     this.settingsPanelOpen = false;
     this.settingsSectionCollapsed = true;
     this.localSectionCollapsed = true;
-    this.localEnabled = false;
-    this.localDepth = 1;
-    this.localNeighborLinksEnabled = false;
     this.graphicsSectionCollapsed = true;
     this.screenshotSectionCollapsed = true;
   }
@@ -536,18 +532,19 @@ export class MapSettingsPanelController {
   }
 
   private refreshLocalControlsUi(): void {
+    const uiState = this.session.getFilterUiState();
     this.localMainToggleButtonEl?.setAttribute("role", "switch");
-    this.localMainToggleButtonEl?.setAttribute("aria-checked", this.localEnabled ? "true" : "false");
+    this.localMainToggleButtonEl?.setAttribute("aria-checked", uiState.localEnabled ? "true" : "false");
     if (this.localDepthInputEl) {
-      this.localDepthInputEl.value = String(this.localDepth);
+      this.localDepthInputEl.value = String(uiState.localDepth);
     }
     if (this.localDepthValueEl) {
-      this.localDepthValueEl.textContent = String(this.localDepth);
+      this.localDepthValueEl.textContent = String(uiState.localDepth);
     }
     this.localNeighborLinksToggleButtonEl?.setAttribute("role", "switch");
     this.localNeighborLinksToggleButtonEl?.setAttribute(
       "aria-checked",
-      this.localNeighborLinksEnabled ? "true" : "false"
+      uiState.localNeighborLinksEnabled ? "true" : "false"
     );
   }
 

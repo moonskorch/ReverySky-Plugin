@@ -99,13 +99,22 @@ describe("MapSession", () => {
     vi.useRealTimers();
   });
 
-  it("normalizes and restores render scale and frame-rate mode state", async () => {
+  it("normalizes and restores render scale, frame-rate mode, and local state", async () => {
     const session = createSessionForStateTests();
-    expect(session.getState()).toMatchObject({ renderScale: 1, frameRateMode: "auto" });
+    expect(session.getState()).toMatchObject({
+      renderScale: 1,
+      frameRateMode: "auto",
+      localEnabled: false,
+      localDepth: 1,
+      localNeighborLinksEnabled: false
+    });
     expect(session.getFilterUiState()).toMatchObject({
       renderScale: 1,
       renderScaleRestartRequired: false,
-      frameRateMode: "auto"
+      frameRateMode: "auto",
+      localEnabled: false,
+      localDepth: 1,
+      localNeighborLinksEnabled: false
     });
 
     await session.setState({ renderScale: 1.24 });
@@ -128,6 +137,28 @@ describe("MapSession", () => {
 
     await session.setState({ frameRateMode: "turbo" });
     expect(session.getState()).toMatchObject({ frameRateMode: "auto" });
+
+    await session.setState({
+      localEnabled: true,
+      localDepth: 4,
+      localNeighborLinksEnabled: true
+    });
+    expect(session.getState()).toMatchObject({
+      localEnabled: true,
+      localDepth: 4,
+      localNeighborLinksEnabled: true
+    });
+
+    await session.setState({
+      localEnabled: "yes",
+      localDepth: 6,
+      localNeighborLinksEnabled: "yes"
+    });
+    expect(session.getState()).toMatchObject({
+      localEnabled: false,
+      localDepth: 1,
+      localNeighborLinksEnabled: false
+    });
   });
 
   it("tracks render scale restart state without re-emitting graph data", async () => {
@@ -172,7 +203,10 @@ describe("MapSession", () => {
       showTags: false,
       mapLayout: "dates",
       renderScale: 1.2,
-      frameRateMode: "auto"
+      frameRateMode: "auto",
+      localEnabled: false,
+      localDepth: 1,
+      localNeighborLinksEnabled: false
     }, { persist: false });
 
     vi.runOnlyPendingTimers();
@@ -182,7 +216,51 @@ describe("MapSession", () => {
       showTags: false,
       mapLayout: "dates",
       renderScale: 1.2,
-      frameRateMode: "auto"
+      frameRateMode: "auto",
+      localEnabled: false,
+      localDepth: 1,
+      localNeighborLinksEnabled: false
+    }, undefined);
+  });
+
+  it("persists local settings when they change", () => {
+    const onStateChanged = vi.fn();
+    const session = createSessionForStateTests({ onStateChanged });
+
+    session.setLocalEnabled(true);
+    expect(onStateChanged).toHaveBeenLastCalledWith({
+      filterQuery: "",
+      showTags: true,
+      mapLayout: "auto",
+      renderScale: 1,
+      frameRateMode: "auto",
+      localEnabled: true,
+      localDepth: 1,
+      localNeighborLinksEnabled: false
+    }, undefined);
+
+    session.setLocalDepth("5");
+    expect(onStateChanged).toHaveBeenLastCalledWith({
+      filterQuery: "",
+      showTags: true,
+      mapLayout: "auto",
+      renderScale: 1,
+      frameRateMode: "auto",
+      localEnabled: true,
+      localDepth: 5,
+      localNeighborLinksEnabled: false
+    }, undefined);
+
+    session.setLocalNeighborLinksEnabled(true);
+    expect(onStateChanged).toHaveBeenLastCalledWith({
+      filterQuery: "",
+      showTags: true,
+      mapLayout: "auto",
+      renderScale: 1,
+      frameRateMode: "auto",
+      localEnabled: true,
+      localDepth: 5,
+      localNeighborLinksEnabled: true
     }, undefined);
   });
 
@@ -279,7 +357,10 @@ describe("MapSession", () => {
       showTags: true,
       mapLayout: "auto",
       renderScale: 1.2,
-      frameRateMode: "auto"
+      frameRateMode: "auto",
+      localEnabled: false,
+      localDepth: 1,
+      localNeighborLinksEnabled: false
     }, { persist: false });
 
     session.persistRenderScale();
@@ -289,7 +370,10 @@ describe("MapSession", () => {
       showTags: true,
       mapLayout: "auto",
       renderScale: 1.2,
-      frameRateMode: "auto"
+      frameRateMode: "auto",
+      localEnabled: false,
+      localDepth: 1,
+      localNeighborLinksEnabled: false
     }, undefined);
   });
 
