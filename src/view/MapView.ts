@@ -335,15 +335,6 @@ export class MapView extends ItemView {
       }
     }
 
-    if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          [blob.type || "image/png"]: blob
-        })
-      ]);
-      return;
-    }
-
     throw new Error("No clipboard API is available.");
   }
 
@@ -351,7 +342,7 @@ export class MapView extends ItemView {
     clipboard: { writeImage: (image: { isEmpty: () => boolean }) => void };
     nativeImage: { createFromBuffer: (buffer: Buffer) => { isEmpty: () => boolean } };
   } | null {
-    const maybeRequire = (globalThis as typeof globalThis & { require?: NodeRequire }).require;
+    const maybeRequire = ((window.activeWindow ?? window) as Window & { require?: NodeJS.Require }).require;
     if (typeof maybeRequire !== "function") {
       return null;
     }

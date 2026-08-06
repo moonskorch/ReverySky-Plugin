@@ -72,6 +72,7 @@
 - Avoid Markdown/text tables in documentation; prefer short bullet lists or explicit per-mode subsections.
 - Prefer existing `src/*` patterns before introducing new abstractions.
 - For Obsidian-facing UI, navigation, file, metadata, and platform interactions, prefer Obsidian APIs when they cover the required behavior. Use standard DOM/Web APIs for plugin-owned iframe/runtime code or behavior outside Obsidian's API surface.
+- Avoid `globalThis` in Obsidian-facing code. Use `window` or `activeWindow` when a window object is needed.
 - Do not modify application code when only documentation maintenance is requested.
 - Never create temporary test files in the repository.
 - Use `apply_patch` for source/doc edits.

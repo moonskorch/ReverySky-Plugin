@@ -76,6 +76,10 @@ The layout control changes how the same vault data is arranged:
 - `Dates`: a chronological layout that arranges notes by date and enables the date slider.
 - `Auto`: chooses `Dynamic links` for smaller datasets and switches to `Scalable links` above 500 notes.
 
+## Screenshot
+
+The optional `Copy screenshot` action captures the current graph view and places it in the system clipboard as a PNG image. This uses clipboard write access only for the screenshot action. ReverySky 3D Graph does not read existing clipboard contents.
+
 ## Privacy, network, and local files
 
 ReverySky 3D Graph processes vault structure locally on your device.
