@@ -2,13 +2,6 @@ import { SearchComponent, setIcon } from "obsidian";
 import { FRAME_RATE_MODE_OPTIONS } from "../bridge/FrameRateMode";
 import { MAP_LAYOUT_PREFERENCE_OPTIONS } from "../bridge/LayoutPreference";
 import {
-  createActionButton,
-  createCollapsibleSection,
-  createRangeControl,
-  createSelectControl,
-  createToggleControl
-} from "./MapSettingsUiElements";
-import {
   MAX_RENDER_SCALE,
   MIN_RENDER_SCALE,
   MapSession,
@@ -21,14 +14,14 @@ type ObsidianHTMLElement = HTMLElement & {
   setAttr?: (name: string, value: string) => void;
 };
 
-type MapSettingsPanelControllerDependencies = {
+type MapFilterPanelControllerDependencies = {
   onCopyScreenshotRequested?: () => Promise<void> | void;
 };
 
 /**
  * Owns the filter-panel UI state machine and keeps the DOM synchronized with `MapSession`.
  */
-export class MapSettingsPanelController {
+export class MapFilterPanelController {
   private filterMessageEl: HTMLElement | null = null;
   private filterPanelEl: HTMLElement | null = null;
   private filterScrollAreaEl: HTMLElement | null = null;
@@ -58,7 +51,7 @@ export class MapSettingsPanelController {
 
   constructor(
     private readonly session: MapSession,
-    private readonly deps: MapSettingsPanelControllerDependencies = {}
+    private readonly deps: MapFilterPanelControllerDependencies = {}
   ) {}
 
   render(container: ObsidianHTMLElement): ObsidianHTMLElement {
@@ -111,18 +104,31 @@ export class MapSettingsPanelController {
       this.filterSuggestionsController?.position();
     });
 
-    const settingsSection = createCollapsibleSection(filterScrollArea as ObsidianHTMLElement, {
-      className: "reverysky-map-settings-section",
-      label: "Selection",
-      onToggle: () => {
-        this.setSettingsSectionCollapsed(!this.settingsSectionCollapsed);
-      }
-    });
-    this.settingsSectionEl = settingsSection.section;
-    this.settingsSectionToggleButtonEl = settingsSection.toggleButton;
-    this.settingsSectionContentEl = settingsSection.content;
+    const filterSection = createChild(filterScrollArea as ObsidianHTMLElement, "div");
+    filterSection.className = "reverysky-map-filter-section reverysky-map-settings-section";
+    this.settingsSectionEl = filterSection;
 
-    const panelCloseButton = createChild(settingsSection.header as ObsidianHTMLElement, "button");
+    const filterSectionHeader = createChild(filterSection as ObsidianHTMLElement, "div");
+    filterSectionHeader.className = "reverysky-map-filter-header";
+
+    const filterSectionToggleButton = createChild(filterSectionHeader as ObsidianHTMLElement, "button");
+    filterSectionToggleButton.type = "button";
+    filterSectionToggleButton.className = "reverysky-map-filter-section-toggle";
+    filterSectionToggleButton.tabIndex = -1;
+    this.settingsSectionToggleButtonEl = filterSectionToggleButton;
+
+    const filterSectionChevron = createChild(filterSectionToggleButton as ObsidianHTMLElement, "span");
+    filterSectionChevron.className = "reverysky-map-filter-section-chevron";
+    setIcon(filterSectionChevron, "chevron-right");
+
+    const filterSectionTitle = createChild(filterSectionToggleButton as ObsidianHTMLElement, "span");
+    filterSectionTitle.className = "reverysky-map-filter-title";
+    filterSectionTitle.textContent = "Selection";
+    this.registerSectionToggle(filterSectionToggleButton, () => {
+      this.setSettingsSectionCollapsed(!this.settingsSectionCollapsed);
+    });
+
+    const panelCloseButton = createChild(filterSectionHeader as ObsidianHTMLElement, "button");
     panelCloseButton.type = "button";
     panelCloseButton.className = "reverysky-map-filter-close";
     panelCloseButton.setAttribute("aria-label", "Close filters");
@@ -138,7 +144,9 @@ export class MapSettingsPanelController {
       closeFilterPanel(event);
     });
 
-    const filterSectionContent = settingsSection.content;
+    const filterSectionContent = createChild(filterSection as ObsidianHTMLElement, "div");
+    filterSectionContent.className = "reverysky-map-filter-section-content";
+    this.settingsSectionContentEl = filterSectionContent;
 
     const filterSearchArea = createChild(filterSectionContent as ObsidianHTMLElement, "div");
     filterSearchArea.className = "reverysky-map-filter-search-area";
@@ -173,98 +181,180 @@ export class MapSettingsPanelController {
     this.filterMessageEl = createChild(filterSectionContent as ObsidianHTMLElement, "div");
     this.filterMessageEl.className = "reverysky-map-filter-message";
 
+    const tagsToggleRow = createChild(filterSectionContent as ObsidianHTMLElement, "div");
+    tagsToggleRow.className = "reverysky-map-tags-toggle-row";
+
+    const tagsLabel = createChild(tagsToggleRow as ObsidianHTMLElement, "div");
+    tagsLabel.className = "reverysky-map-filter-field-label";
+    tagsLabel.textContent = "Tags";
+
+    const tagsToggleButton = createChild(tagsToggleRow as ObsidianHTMLElement, "button");
+    tagsToggleButton.type = "button";
+    tagsToggleButton.className = "reverysky-map-tags-toggle";
+    tagsToggleButton.setAttribute("aria-label", "Toggle tags");
+    this.tagsToggleButtonEl = tagsToggleButton;
+
+    const tagsToggleThumb = createChild(tagsToggleButton as ObsidianHTMLElement, "span");
+    tagsToggleThumb.className = "reverysky-map-tags-toggle-thumb";
+
     const toggleTags = (event: Event) => {
       event.preventDefault();
       const uiState = this.session.getFilterUiState();
       this.session.setShowTags(!uiState.showTags);
       this.refreshTagsToggleUi();
     };
-    const tagsToggle = createToggleControl(filterSectionContent as ObsidianHTMLElement, {
-      rowClassName: "reverysky-map-tags-toggle-row",
-      buttonClassName: "reverysky-map-tags-toggle",
-      thumbClassName: "reverysky-map-tags-toggle-thumb",
-      label: "Tags",
-      ariaLabel: "Toggle tags",
-      onToggle: toggleTags
-    });
-    this.tagsToggleButtonEl = tagsToggle.button;
-
-    const layoutControl = createSelectControl(filterSectionContent as ObsidianHTMLElement, {
-      label: "Layout",
-      ariaLabel: "Select layout",
-      options: MAP_LAYOUT_PREFERENCE_OPTIONS,
-      onChange: (select) => {
-        this.session.setMapLayoutPreference(select.value);
-        this.refreshLayoutDropdownUi();
+    tagsToggleButton.addEventListener("mousedown", toggleTags);
+    tagsToggleButton.addEventListener("click", (event) => {
+      if (event.detail !== 0) {
+        return;
       }
+      toggleTags(event);
     });
-    this.layoutDropdownEl = layoutControl.select;
 
-    const graphicsSection = createCollapsibleSection(filterScrollArea as ObsidianHTMLElement, {
-      className: "reverysky-map-graphics-section",
-      label: "Graphics",
-      onToggle: () => {
-        this.setGraphicsSectionCollapsed(!this.graphicsSectionCollapsed);
-      }
+    const layoutSection = createChild(filterSectionContent as ObsidianHTMLElement, "div");
+    layoutSection.className = "reverysky-map-filter-section reverysky-map-filter-control-group";
+
+    const layoutSectionTitle = createChild(layoutSection as ObsidianHTMLElement, "div");
+    layoutSectionTitle.className = "reverysky-map-filter-field-label";
+    layoutSectionTitle.textContent = "Layout";
+
+    const layoutSelectHost = createChild(layoutSection as ObsidianHTMLElement, "div");
+    layoutSelectHost.className = "reverysky-map-engine-select-host";
+    const layoutDropdown = createChild(layoutSelectHost as ObsidianHTMLElement, "select");
+    this.layoutDropdownEl = layoutDropdown;
+    for (const option of MAP_LAYOUT_PREFERENCE_OPTIONS) {
+      const optionEl = createChild(layoutDropdown as ObsidianHTMLElement, "option");
+      optionEl.value = option.value;
+      optionEl.textContent = option.label;
+    }
+    layoutDropdown.classList.add("reverysky-map-engine-select");
+    layoutDropdown.setAttribute("aria-label", "Select layout");
+    layoutDropdown.addEventListener("change", () => {
+      this.session.setMapLayoutPreference(layoutDropdown.value);
+      this.refreshLayoutDropdownUi();
     });
-    this.graphicsSectionEl = graphicsSection.section;
-    this.graphicsSectionToggleButtonEl = graphicsSection.toggleButton;
-    this.graphicsSectionContentEl = graphicsSection.content;
-    const graphicsSectionContent = graphicsSection.content;
 
-    const renderScale = createRangeControl(graphicsSectionContent as ObsidianHTMLElement, {
-      sectionClassName: "reverysky-map-render-scale-section",
-      inputClassName: "reverysky-map-render-scale-input",
-      valueClassName: "reverysky-map-render-scale-value",
-      messageClassName: "reverysky-map-render-scale-message reverysky-map-render-scale-message--hidden",
-      label: "Render scale",
-      ariaLabel: "Render scale",
-      min: String(MIN_RENDER_SCALE),
-      max: String(MAX_RENDER_SCALE),
-      step: String(RENDER_SCALE_STEP),
-      onInput: (input) => {
-        this.session.setRenderScale(input.value);
-        this.refreshRenderScaleUi();
-      },
-      onChange: () => {
-        this.session.persistRenderScale();
-      }
+    const graphicsSection = createChild(filterScrollArea as ObsidianHTMLElement, "div");
+    graphicsSection.className = "reverysky-map-filter-section reverysky-map-graphics-section";
+    this.graphicsSectionEl = graphicsSection;
+
+    const graphicsSectionHeader = createChild(graphicsSection as ObsidianHTMLElement, "div");
+    graphicsSectionHeader.className = "reverysky-map-filter-header";
+
+    const graphicsSectionToggleButton = createChild(graphicsSectionHeader as ObsidianHTMLElement, "button");
+    graphicsSectionToggleButton.type = "button";
+    graphicsSectionToggleButton.className = "reverysky-map-filter-section-toggle";
+    graphicsSectionToggleButton.tabIndex = -1;
+    this.graphicsSectionToggleButtonEl = graphicsSectionToggleButton;
+
+    const graphicsSectionChevron = createChild(graphicsSectionToggleButton as ObsidianHTMLElement, "span");
+    graphicsSectionChevron.className = "reverysky-map-filter-section-chevron";
+    setIcon(graphicsSectionChevron, "chevron-right");
+
+    const graphicsSectionTitle = createChild(graphicsSectionToggleButton as ObsidianHTMLElement, "span");
+    graphicsSectionTitle.className = "reverysky-map-filter-title";
+    graphicsSectionTitle.textContent = "Graphics";
+    this.registerSectionToggle(graphicsSectionToggleButton, () => {
+      this.setGraphicsSectionCollapsed(!this.graphicsSectionCollapsed);
     });
-    this.renderScaleInputEl = renderScale.input;
-    this.renderScaleValueEl = renderScale.value;
-    this.renderScaleMessageEl = renderScale.message;
 
-    const frameRateModeControl = createSelectControl(graphicsSectionContent as ObsidianHTMLElement, {
-      selectClassName: "reverysky-map-frame-rate-mode-select",
-      label: "Frame rate",
-      ariaLabel: "Select frame rate",
-      options: FRAME_RATE_MODE_OPTIONS,
-      onChange: (select) => {
-        this.session.setFrameRateMode(select.value);
-        this.refreshFrameRateModeDropdownUi();
-      }
+    const graphicsSectionContent = createChild(graphicsSection as ObsidianHTMLElement, "div");
+    graphicsSectionContent.className = "reverysky-map-filter-section-content";
+    this.graphicsSectionContentEl = graphicsSectionContent;
+
+    const renderScaleSection = createChild(graphicsSectionContent as ObsidianHTMLElement, "div");
+    renderScaleSection.className =
+      "reverysky-map-filter-section reverysky-map-filter-control-group reverysky-map-render-scale-section";
+
+    const renderScaleHeader = createChild(renderScaleSection as ObsidianHTMLElement, "div");
+    renderScaleHeader.className = "reverysky-map-render-scale-header";
+
+    const renderScaleTitle = createChild(renderScaleHeader as ObsidianHTMLElement, "div");
+    renderScaleTitle.className = "reverysky-map-filter-field-label";
+    renderScaleTitle.textContent = "Render scale";
+
+    this.renderScaleValueEl = createChild(renderScaleHeader as ObsidianHTMLElement, "div");
+    this.renderScaleValueEl.className = "reverysky-map-render-scale-value";
+
+    const renderScaleInput = createChild(renderScaleSection as ObsidianHTMLElement, "input");
+    renderScaleInput.type = "range";
+    renderScaleInput.min = String(MIN_RENDER_SCALE);
+    renderScaleInput.max = String(MAX_RENDER_SCALE);
+    renderScaleInput.step = String(RENDER_SCALE_STEP);
+    renderScaleInput.className = "reverysky-map-render-scale-input";
+    renderScaleInput.setAttribute("aria-label", "Render scale");
+    this.renderScaleInputEl = renderScaleInput;
+    renderScaleInput.addEventListener("input", () => {
+      this.session.setRenderScale(renderScaleInput.value);
+      this.refreshRenderScaleUi();
     });
-    this.frameRateModeDropdownEl = frameRateModeControl.select;
-
-    const screenshotSection = createCollapsibleSection(filterScrollArea as ObsidianHTMLElement, {
-      className: "reverysky-map-screenshot-section",
-      label: "Screenshot",
-      onToggle: () => {
-        this.setScreenshotSectionCollapsed(!this.screenshotSectionCollapsed);
-      }
+    renderScaleInput.addEventListener("change", () => {
+      this.session.persistRenderScale();
     });
-    this.screenshotSectionEl = screenshotSection.section;
-    this.screenshotSectionToggleButtonEl = screenshotSection.toggleButton;
-    this.screenshotSectionContentEl = screenshotSection.content;
-    const screenshotSectionContent = screenshotSection.content;
 
-    this.screenshotButtonEl = createActionButton(screenshotSectionContent as ObsidianHTMLElement, {
-      className: "reverysky-map-screenshot-button",
-      label: "Copy screenshot",
-      ariaLabel: "Copy graph screenshot",
-      onClick: () => {
-        void this.deps.onCopyScreenshotRequested?.();
-      }
+    this.renderScaleMessageEl = createChild(renderScaleSection as ObsidianHTMLElement, "div");
+    this.renderScaleMessageEl.className =
+      "reverysky-map-render-scale-message reverysky-map-render-scale-message--hidden";
+
+    const frameRateModeSection = createChild(graphicsSectionContent as ObsidianHTMLElement, "div");
+    frameRateModeSection.className = "reverysky-map-filter-section reverysky-map-filter-control-group";
+
+    const frameRateModeTitle = createChild(frameRateModeSection as ObsidianHTMLElement, "div");
+    frameRateModeTitle.className = "reverysky-map-filter-field-label";
+    frameRateModeTitle.textContent = "Frame rate";
+
+    const frameRateModeSelectHost = createChild(frameRateModeSection as ObsidianHTMLElement, "div");
+    frameRateModeSelectHost.className = "reverysky-map-engine-select-host";
+    const frameRateModeDropdown = createChild(frameRateModeSelectHost as ObsidianHTMLElement, "select");
+    this.frameRateModeDropdownEl = frameRateModeDropdown;
+    for (const option of FRAME_RATE_MODE_OPTIONS) {
+      const optionEl = createChild(frameRateModeDropdown as ObsidianHTMLElement, "option");
+      optionEl.value = option.value;
+      optionEl.textContent = option.label;
+    }
+    frameRateModeDropdown.classList.add("reverysky-map-engine-select", "reverysky-map-frame-rate-mode-select");
+    frameRateModeDropdown.setAttribute("aria-label", "Select frame rate");
+    frameRateModeDropdown.addEventListener("change", () => {
+      this.session.setFrameRateMode(frameRateModeDropdown.value);
+      this.refreshFrameRateModeDropdownUi();
+    });
+
+    const screenshotSection = createChild(filterScrollArea as ObsidianHTMLElement, "div");
+    screenshotSection.className = "reverysky-map-filter-section reverysky-map-screenshot-section";
+    this.screenshotSectionEl = screenshotSection;
+
+    const screenshotSectionHeader = createChild(screenshotSection as ObsidianHTMLElement, "div");
+    screenshotSectionHeader.className = "reverysky-map-filter-header";
+
+    const screenshotSectionToggleButton = createChild(screenshotSectionHeader as ObsidianHTMLElement, "button");
+    screenshotSectionToggleButton.type = "button";
+    screenshotSectionToggleButton.className = "reverysky-map-filter-section-toggle";
+    screenshotSectionToggleButton.tabIndex = -1;
+    this.screenshotSectionToggleButtonEl = screenshotSectionToggleButton;
+
+    const screenshotSectionChevron = createChild(screenshotSectionToggleButton as ObsidianHTMLElement, "span");
+    screenshotSectionChevron.className = "reverysky-map-filter-section-chevron";
+    setIcon(screenshotSectionChevron, "chevron-right");
+
+    const screenshotSectionTitle = createChild(screenshotSectionToggleButton as ObsidianHTMLElement, "span");
+    screenshotSectionTitle.className = "reverysky-map-filter-title";
+    screenshotSectionTitle.textContent = "Screenshot";
+    this.registerSectionToggle(screenshotSectionToggleButton, () => {
+      this.setScreenshotSectionCollapsed(!this.screenshotSectionCollapsed);
+    });
+
+    const screenshotSectionContent = createChild(screenshotSection as ObsidianHTMLElement, "div");
+    screenshotSectionContent.className = "reverysky-map-filter-section-content";
+    this.screenshotSectionContentEl = screenshotSectionContent;
+
+    const screenshotButton = createChild(screenshotSectionContent as ObsidianHTMLElement, "button");
+    screenshotButton.type = "button";
+    screenshotButton.className = "reverysky-map-screenshot-button";
+    screenshotButton.textContent = "Copy screenshot";
+    screenshotButton.setAttribute("aria-label", "Copy graph screenshot");
+    this.screenshotButtonEl = screenshotButton;
+    screenshotButton.addEventListener("click", () => {
+      void this.deps.onCopyScreenshotRequested?.();
     });
 
     this.setFilterPanelOpen(false);
@@ -327,6 +417,21 @@ export class MapSettingsPanelController {
     if (!isOpen) {
       this.filterSuggestionsController?.hide();
     }
+  }
+
+  private registerSectionToggle(button: HTMLButtonElement, toggle: () => void): void {
+    button.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      toggle();
+    });
+    button.addEventListener("click", (event) => {
+      if (event.detail !== 0) {
+        return;
+      }
+
+      event.preventDefault();
+      toggle();
+    });
   }
 
   private setSettingsSectionCollapsed(isCollapsed: boolean): void {

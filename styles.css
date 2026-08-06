@@ -200,32 +200,27 @@
 }
 
 .reverysky-map-settings-section > .reverysky-map-filter-section-content,
-.reverysky-map-graphics-section > .reverysky-map-filter-section-content,
-.reverysky-map-local-section > .reverysky-map-filter-section-content {
+.reverysky-map-graphics-section > .reverysky-map-filter-section-content {
   padding: 0 var(--size-4-3) var(--reverysky-filter-section-padding-y);
 }
 
 .reverysky-map-settings-section,
-.reverysky-map-graphics-section,
-.reverysky-map-local-section {
+.reverysky-map-graphics-section {
   box-sizing: border-box;
   gap: var(--reverysky-filter-section-gap);
 }
 
 .reverysky-map-settings-section.reverysky-map-filter-section--collapsed,
 .reverysky-map-graphics-section.reverysky-map-filter-section--collapsed,
-.reverysky-map-local-section.reverysky-map-filter-section--collapsed,
 .reverysky-map-screenshot-section.reverysky-map-filter-section--collapsed {
   padding-bottom: var(--reverysky-filter-header-padding-edge);
 }
 
-.reverysky-map-graphics-section,
-.reverysky-map-local-section {
+.reverysky-map-graphics-section {
   border-top: 1px solid var(--background-modifier-border);
 }
 
-.reverysky-map-graphics-section:not(.reverysky-map-filter-section--collapsed),
-.reverysky-map-local-section:not(.reverysky-map-filter-section--collapsed) {
+.reverysky-map-graphics-section:not(.reverysky-map-filter-section--collapsed) {
   padding-bottom: var(--reverysky-filter-header-padding-edge);
 }
 
@@ -243,7 +238,6 @@
   padding: 0 var(--size-4-3) var(--reverysky-filter-header-padding-edge);
 }
 
-button.reverysky-map-action-button,
 .reverysky-map-screenshot-section .reverysky-map-screenshot-button {
   width: 100%;
   min-height: var(--input-height);
@@ -266,15 +260,11 @@ button.reverysky-map-action-button,
     transform var(--reverysky-transition-fast), filter var(--reverysky-transition-fast);
 }
 
-button.reverysky-map-action-button:hover,
 .reverysky-map-screenshot-section .reverysky-map-screenshot-button:hover {
   filter: brightness(1.05);
   box-shadow: var(--input-shadow, 0 1px 2px rgba(0, 0, 0, 0.2));
 }
 
-button.reverysky-map-action-button:focus,
-button.reverysky-map-action-button:focus-visible,
-button.reverysky-map-action-button:active,
 .reverysky-map-screenshot-section .reverysky-map-screenshot-button:focus,
 .reverysky-map-screenshot-section .reverysky-map-screenshot-button:focus-visible,
 .reverysky-map-screenshot-section .reverysky-map-screenshot-button:active {
@@ -282,7 +272,6 @@ button.reverysky-map-action-button:active,
   box-shadow: var(--reverysky-control-shadow-focus);
 }
 
-button.reverysky-map-action-button:active,
 .reverysky-map-screenshot-section .reverysky-map-screenshot-button:active {
   transform: translateY(1px);
 }
@@ -410,7 +399,6 @@ button.reverysky-map-filter-close svg {
 }
 
 /* Filter Controls */
-.reverysky-map-toggle-row,
 .reverysky-map-tags-toggle-row {
   display: flex;
   align-items: center;
@@ -418,7 +406,6 @@ button.reverysky-map-filter-close svg {
   min-height: var(--input-height, 2rem);
 }
 
-.reverysky-map-select-host,
 .reverysky-map-engine-select-host {
   position: relative;
   width: 100%;
@@ -429,18 +416,15 @@ button.reverysky-map-filter-close svg {
   transition: border-color var(--reverysky-transition-fast), box-shadow var(--reverysky-transition-fast);
 }
 
-.reverysky-map-select-host:hover,
 .reverysky-map-engine-select-host:hover {
   border-color: var(--reverysky-control-border-hover);
 }
 
-.reverysky-map-select-host:focus-within,
 .reverysky-map-engine-select-host:focus-within {
   border-color: var(--reverysky-control-border-hover);
   box-shadow: var(--reverysky-control-shadow-focus);
 }
 
-.reverysky-map-select-host::after,
 .reverysky-map-engine-select-host::after {
   content: "";
   position: absolute;
@@ -455,7 +439,6 @@ button.reverysky-map-filter-close svg {
   transform: translateY(-35%);
 }
 
-.reverysky-map-select,
 .reverysky-map-engine-select {
   box-sizing: border-box;
   width: 100%;
@@ -474,14 +457,10 @@ button.reverysky-map-filter-close svg {
   background-image: none;
 }
 
-.reverysky-map-select:hover,
 .reverysky-map-engine-select:hover {
   box-shadow: none;
 }
 
-.reverysky-map-select:focus,
-.reverysky-map-select:focus-visible,
-.reverysky-map-select:active,
 .reverysky-map-engine-select:focus,
 .reverysky-map-engine-select:focus-visible,
 .reverysky-map-engine-select:active {
@@ -490,18 +469,15 @@ button.reverysky-map-filter-close svg {
   box-shadow: none;
 }
 
-.reverysky-map-select option,
 .reverysky-map-engine-select option {
   background-color: var(--background-primary);
   color: var(--text-normal);
 }
 
-.reverysky-map-range-control,
 .reverysky-map-render-scale-section {
   margin-top: 0.25rem;
 }
 
-.reverysky-map-range-control-header,
 .reverysky-map-render-scale-header {
   display: flex;
   align-items: center;
@@ -509,7 +485,6 @@ button.reverysky-map-filter-close svg {
   gap: var(--reverysky-filter-section-gap);
 }
 
-.reverysky-map-range-control-value,
 .reverysky-map-render-scale-value {
   color: var(--text-muted);
   font-size: var(--font-ui-small, 0.875rem);
@@ -517,7 +492,6 @@ button.reverysky-map-filter-close svg {
   white-space: nowrap;
 }
 
-.reverysky-map-root .reverysky-map-filter-panel input.reverysky-map-range-control-input[type="range"],
 .reverysky-map-root .reverysky-map-filter-panel input.reverysky-map-render-scale-input[type="range"] {
   box-sizing: border-box;
   display: block;
@@ -529,13 +503,11 @@ button.reverysky-map-filter-close svg {
   width: 100%;
 }
 
-.reverysky-map-root .reverysky-map-filter-panel input.reverysky-map-range-control-input[type="range"]:focus-visible,
 .reverysky-map-root .reverysky-map-filter-panel input.reverysky-map-render-scale-input[type="range"]:focus-visible {
   outline: 2px solid var(--background-modifier-border-hover);
   outline-offset: 0.1875rem;
 }
 
-.reverysky-map-range-control-message,
 .reverysky-map-render-scale-message {
   color: var(--text-muted);
   font-size: var(--font-ui-smaller, 0.75rem);
@@ -546,7 +518,6 @@ button.reverysky-map-filter-close svg {
   display: none;
 }
 
-button.reverysky-map-toggle,
 button.reverysky-map-tags-toggle {
   width: var(--reverysky-toggle-width);
   height: var(--reverysky-toggle-height);
@@ -565,15 +536,6 @@ button.reverysky-map-tags-toggle {
   outline: none;
 }
 
-button.reverysky-map-toggle:hover,
-button.reverysky-map-toggle:focus,
-button.reverysky-map-toggle:focus-visible,
-button.reverysky-map-toggle:active,
-button.reverysky-map-toggle[aria-checked="true"],
-button.reverysky-map-toggle[aria-checked="true"]:hover,
-button.reverysky-map-toggle[aria-checked="true"]:focus,
-button.reverysky-map-toggle[aria-checked="true"]:focus-visible,
-button.reverysky-map-toggle[aria-checked="true"]:active,
 button.reverysky-map-tags-toggle:hover,
 button.reverysky-map-tags-toggle:focus,
 button.reverysky-map-tags-toggle:focus-visible,
@@ -589,14 +551,12 @@ button.reverysky-map-tags-toggle[aria-checked="true"]:active {
   backdrop-filter: none;
 }
 
-button.reverysky-map-toggle[aria-checked="true"],
 button.reverysky-map-tags-toggle[aria-checked="true"] {
   background: var(--interactive-accent);
   justify-content: flex-end;
   box-shadow: none;
 }
 
-button.reverysky-map-toggle[aria-checked]:focus-visible,
 button.reverysky-map-tags-toggle[aria-checked]:focus-visible {
   box-shadow: var(
     --reverysky-control-shadow-focus,
@@ -604,7 +564,6 @@ button.reverysky-map-tags-toggle[aria-checked]:focus-visible {
   );
 }
 
-button.reverysky-map-toggle .reverysky-map-toggle-thumb,
 button.reverysky-map-tags-toggle .reverysky-map-tags-toggle-thumb {
   display: block;
   width: var(--reverysky-toggle-thumb-size);
