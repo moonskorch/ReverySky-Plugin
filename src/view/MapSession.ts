@@ -235,6 +235,7 @@ export class MapSession {
     this.bridgeReady = true;
     this.sendCurrentRuntimeSettings();
     this.sendInitialRuntimeGraph();
+    this.trySendFocusForPath(this.getActiveFilePath());
   }
 
   handleRuntimeUnavailable(): void {
@@ -431,6 +432,11 @@ export class MapSession {
     }
 
     this.startupRefreshPending = true;
+  }
+
+  private getActiveFilePath(): string {
+    const activeFile = this.app.workspace.getActiveFile?.() ?? null;
+    return activeFile instanceof TFile ? this.normalizeVaultPath(activeFile.path) : "";
   }
 
   resolveRequestedPath(payload: NoteOpenPayload): string | null {

@@ -981,6 +981,78 @@ describe("MapSession", () => {
     expect(sendFocus).not.toHaveBeenCalled();
   });
 
+  it("sends startup active note focus after the initial global graph", () => {
+    const activeFile = new TFile("Note.md");
+    const sendGraph = vi.fn();
+    const sendFocus = vi.fn();
+    const session = new MapSession({
+      app: {
+        metadataCache: {
+          on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+        },
+        vault: {
+          on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+        },
+        workspace: {
+          activeLeaf: null,
+          getActiveFile: vi.fn().mockReturnValue(activeFile),
+          getLeavesOfType: vi.fn().mockReturnValue([]),
+          iterateAllLeaves: vi.fn(),
+          on: vi.fn().mockReturnValue({ id: "event-ref" })
+        }
+      } as never,
+      buildGraph: makeBuildGraphMock(makePayload()),
+      now: () => 1700000000000,
+      sendGraph,
+      sendFocus
+    });
+
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+
+    expect(sendGraph).toHaveBeenCalledTimes(1);
+    expect(sendFocus).toHaveBeenCalledTimes(1);
+    expect(sendFocus).toHaveBeenLastCalledWith({
+      id: makeStableNoteId("Note.md"),
+      path: "Note.md"
+    });
+  });
+
+  it("does not send startup global focus when the active note is filtered out", async () => {
+    const activeFile = new TFile("Projects/ReverySky/Spec.md");
+    const sendGraph = vi.fn();
+    const sendFocus = vi.fn();
+    const session = new MapSession({
+      app: {
+        metadataCache: {
+          on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+        },
+        vault: {
+          on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+        },
+        workspace: {
+          activeLeaf: null,
+          getActiveFile: vi.fn().mockReturnValue(activeFile),
+          getLeavesOfType: vi.fn().mockReturnValue([]),
+          iterateAllLeaves: vi.fn(),
+          on: vi.fn().mockReturnValue({ id: "event-ref" })
+        }
+      } as never,
+      buildGraph: makeBuildGraphMock(makePathPayload()),
+      now: () => 1700000000000,
+      sendGraph,
+      sendFocus
+    });
+
+    await session.setState({ filterQuery: "path:Archive" });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+
+    expect(sendGraph).toHaveBeenCalledTimes(1);
+    expect((sendGraph.mock.calls[0]?.[0] as GraphPayload).notes.map((note) => note.id)).toEqual(["archive"]);
+    expect(sendFocus).not.toHaveBeenCalled();
+  });
+
   it("does not accept local editor focus before the bridge is ready", async () => {
     const payload = makeLocalPayload();
     const sendGraph = vi.fn();
@@ -1020,6 +1092,55 @@ describe("MapSession", () => {
     expect(sendGraph).toHaveBeenCalledTimes(1);
     expect((sendGraph.mock.calls[0]?.[0] as GraphPayload).notes).toEqual([]);
     expect(sendFocus).not.toHaveBeenCalled();
+  });
+
+  it("rebuilds the startup local ego graph around the active note", async () => {
+    const activeFile = new TFile("Projects/ReverySky/Spec.md");
+    const payload = makeLocalPayload();
+    const sendGraph = vi.fn();
+    const sendFocus = vi.fn();
+    const session = new MapSession({
+      app: {
+        metadataCache: {
+          getFileCache: vi.fn().mockReturnValue(null),
+          on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+        },
+        vault: {
+          getAbstractFileByPath: vi.fn((path: string) => new TFile(path)),
+          on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+        },
+        workspace: {
+          activeLeaf: null,
+          getActiveFile: vi.fn().mockReturnValue(activeFile),
+          getLeavesOfType: vi.fn().mockReturnValue([]),
+          iterateAllLeaves: vi.fn(),
+          on: vi.fn().mockReturnValue({ id: "event-ref" })
+        }
+      } as never,
+      buildGraph: makeBuildGraphMock(payload),
+      now: () => 1700000000000,
+      sendGraph,
+      sendFocus
+    });
+
+    await session.setState({ localEnabled: true });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+    expect((sendGraph.mock.calls[0]?.[0] as GraphPayload).notes).toEqual([]);
+    const sentPayload = sendGraph.mock.calls[1]?.[0] as GraphPayload;
+    expect(sentPayload.vault.noteCount).toBe(3);
+    expect(sentPayload.notes.map((note) => note.id)).toEqual(["daily", "project", "archive"]);
+    expect(sentPayload.links).toEqual([
+      { sourceId: "daily", targetId: "project", kind: "resolved" },
+      { sourceId: "project", targetId: "archive", kind: "resolved" }
+    ]);
+    expect(sendFocus).toHaveBeenCalledTimes(1);
+    expect(sendFocus).toHaveBeenLastCalledWith({
+      id: makeStableNoteId("Projects/ReverySky/Spec.md"),
+      path: "Projects/ReverySky/Spec.md"
+    });
   });
 
   it("does not send editor focus when the note is filtered out of the effective graph", () => {
