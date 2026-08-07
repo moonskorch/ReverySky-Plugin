@@ -32,6 +32,10 @@ export type QueryFilterParseResult = {
   reason?: string;
 };
 
+export type QueryFilterOptions = {
+  alwaysIncludeNoteId?: string;
+};
+
 /**
  * Parse and apply the view's query filter syntax without mutating the source graph.
  */
@@ -227,7 +231,11 @@ export class GraphQueryFilter {
   /**
    * Keep the no-filter fast path as a no-op; clone only when filtering changes the payload.
    */
-  static applyFilter(payload: GraphPayload, parsed: ParsedQueryFilter | null): GraphPayload {
+  static applyFilter(
+    payload: GraphPayload,
+    parsed: ParsedQueryFilter | null,
+    options: QueryFilterOptions = {}
+  ): GraphPayload {
     if (
       !parsed ||
       (!parsed.includeTerms.length &&
@@ -242,7 +250,9 @@ export class GraphQueryFilter {
       return payload;
     }
 
-    const notes = payload.notes.filter((note) => this.matchesNote(note, parsed));
+    const notes = payload.notes.filter((note) => (
+      note.id === options.alwaysIncludeNoteId || this.matchesNote(note, parsed)
+    ));
     const keepIds = new Set(notes.map((note) => note.id));
     const links = payload.links.filter(
       (link) => keepIds.has(link.sourceId) && keepIds.has(link.targetId)

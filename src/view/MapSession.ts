@@ -7,6 +7,8 @@ import {
 } from "obsidian";
 import type {
   MapLayoutPreference,
+  GraphLink,
+  GraphNoteNode,
   GraphPayload,
   NoteFocusPayload,
   NoteOpenPayload,
@@ -87,6 +89,11 @@ export type TagSuggestion = {
   tag: string;
   normalizedTag: string;
   displayTag: string;
+};
+
+type LocalGraphScope = {
+  payload: GraphPayload;
+  centerNoteId?: string;
 };
 
 export type MapSessionDependencies = {
@@ -279,16 +286,23 @@ export class MapSession {
   setLocalEnabled(localEnabled: boolean): void {
     this.localEnabled = localEnabled;
     this.notifyStateChanged();
+    this.sendGraphFromSource();
   }
 
   setLocalDepth(localDepth: unknown): void {
     this.localDepth = normalizeLocalDepth(localDepth);
     this.notifyStateChanged();
+    if (this.localEnabled) {
+      this.sendGraphFromSource();
+    }
   }
 
   setLocalNeighborLinksEnabled(localNeighborLinksEnabled: boolean): void {
     this.localNeighborLinksEnabled = localNeighborLinksEnabled;
     this.notifyStateChanged();
+    if (this.localEnabled) {
+      this.sendGraphFromSource();
+    }
   }
 
   persistRenderScale(): void {
@@ -451,22 +465,45 @@ export class MapSession {
     options?: { skipGraphCheck?: boolean }
   ): boolean {
     const path = this.normalizeVaultPath(pathValue);
-    // TypeScript owns graph membership: ordinary focus is sent only for notes
-    // that belong to the effective graph Unity is rendering now.
-    // Rename bypasses this because the path-derived id can change before the
-    // renamed graph payload reaches Unity.
-    if (!this.bridgeReady ||
-        !this.isGraphRelevantPath(path) ||
-        (!options?.skipGraphCheck && !this.isPathInOutgoingGraph(path))) {
+    if (!this.isGraphRelevantPath(path)) {
+      return false;
+    }
+    if (!this.bridgeReady) {
       return false;
     }
 
+    return this.localEnabled
+      ? this.acceptLocalFocusPath(path)
+      : this.tryAcceptGlobalFocusPath(path, options);
+  }
+
+  private acceptLocalFocusPath(path: string): boolean {
+    this.focusPath = path;
+    if (!this.sourceGraphPayload) {
+      this.rebuildSourceGraph();
+    }
+    this.sendGraphFromSource();
+    this.sendAcceptedFocusPath(path);
+    return true;
+  }
+
+  private tryAcceptGlobalFocusPath(path: string, options?: { skipGraphCheck?: boolean }): boolean {
+    // Global focus may only target a note Unity is already rendering.
+    // Rename is the exception because the path-derived id can change before the renamed graph arrives.
+    if (!options?.skipGraphCheck && !this.isPathInOutgoingGraph(path)) {
+      return false;
+    }
+
+    this.sendAcceptedFocusPath(path);
+    this.focusPath = path;
+    return true;
+  }
+
+  private sendAcceptedFocusPath(path: string): void {
     this.sendFocus({
       id: makeStableNoteId(path),
       path
     });
-    this.focusPath = path;
-    return true;
   }
 
   private isPathInOutgoingGraph(path: string): boolean {
@@ -489,6 +526,11 @@ export class MapSession {
     const path = this.normalizeVaultPath(pathValue);
     if (this.isGraphRelevantPath(path)) {
       this.focusPath = path;
+      if (this.localEnabled && this.bridgeReady) {
+        this.sendGraphFromSource();
+        // Local graph rebuild changes the rendered neighborhood; re-send focus so Unity restores the new center.
+        this.sendAcceptedFocusPath(path);
+      }
     }
   }
 
@@ -661,11 +703,80 @@ export class MapSession {
   }
 
   private applyActiveFilters(payload: GraphPayload): GraphPayload {
-    const queryFiltered = GraphQueryFilter.applyFilter(payload, this.activeQueryFilter);
+    const localScope = this.localEnabled
+      ? this.buildLocalGraphScope(payload)
+      : { payload, centerNoteId: undefined };
+    const queryFiltered = GraphQueryFilter.applyFilter(
+      localScope.payload,
+      this.activeQueryFilter,
+      { alwaysIncludeNoteId: localScope.centerNoteId }
+    );
     const tagsFiltered = this.applyTagsVisibilityFilter(queryFiltered);
     return {
       ...tagsFiltered,
       mapLayout: this.mapLayout
+    };
+  }
+
+  private buildLocalGraphScope(payload: GraphPayload): LocalGraphScope {
+    const centerPath = this.normalizeVaultPath(this.focusPath);
+    if (!this.isGraphRelevantPath(centerPath)) {
+      return {
+        payload: this.toGraphSubset(payload, new Set(), [])
+      };
+    }
+
+    const noteById = new Map<string, GraphNoteNode>();
+    const noteIdByPath = new Map<string, string>();
+    for (const note of payload.notes) {
+      const normalizedPath = this.normalizeVaultPath(note.path);
+      noteById.set(note.id, note);
+      noteIdByPath.set(normalizedPath, note.id);
+    }
+
+    const centerId = noteIdByPath.get(centerPath);
+    if (!centerId) {
+      return {
+        payload: this.toGraphSubset(payload, new Set(), [])
+      };
+    }
+
+    const includedIds = new Set<string>([centerId]);
+    for (const link of payload.links) {
+      if (link.sourceId === centerId && noteById.has(link.targetId)) {
+        includedIds.add(link.targetId);
+      }
+      if (link.targetId === centerId && noteById.has(link.sourceId)) {
+        includedIds.add(link.sourceId);
+      }
+    }
+
+    const links = payload.links.filter((link) => {
+      if (!includedIds.has(link.sourceId) || !includedIds.has(link.targetId)) {
+        return false;
+      }
+      if (this.localNeighborLinksEnabled) {
+        return true;
+      }
+      return link.sourceId === centerId || link.targetId === centerId;
+    });
+
+    return {
+      payload: this.toGraphSubset(payload, includedIds, links),
+      centerNoteId: centerId
+    };
+  }
+
+  private toGraphSubset(payload: GraphPayload, includedIds: Set<string>, links: GraphLink[]): GraphPayload {
+    const notes = payload.notes.filter((note) => includedIds.has(note.id));
+    return {
+      ...payload,
+      vault: {
+        ...payload.vault,
+        noteCount: notes.length
+      },
+      notes,
+      links
     };
   }
 

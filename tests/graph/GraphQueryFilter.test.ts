@@ -52,6 +52,18 @@ describe("GraphQueryFilter", () => {
     expect(filtered.vault.noteCount).toBe(1);
   });
 
+  it("always includes the requested note id when applying a query filter", () => {
+    const parse = GraphQueryFilter.parseQuery("path:daily");
+    expect(parse.isValid).toBe(true);
+    const filtered = GraphQueryFilter.applyFilter(makePayload(), parse.parsed, {
+      alwaysIncludeNoteId: "b"
+    });
+
+    expect(filtered.notes.map((n) => n.id)).toEqual(["a", "b"]);
+    expect(filtered.links.map((l) => `${l.sourceId}->${l.targetId}`)).toEqual(["a->b"]);
+    expect(filtered.vault.noteCount).toBe(2);
+  });
+
   it("ignores whitespace between path operator and value", () => {
     const parse = GraphQueryFilter.parseQuery("path: Projects");
     expect(parse.isValid).toBe(true);
