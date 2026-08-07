@@ -56,7 +56,7 @@ Current TS baseline test suites:
 - `tests/graph/VaultGraphBuilder.test.ts`
   - validates graph extraction from Obsidian vault files and metadata cache.
 - `tests/graph/GraphQueryFilter.test.ts`
-  - validates path, date, tag, and unsupported-token filter behavior.
+  - validates path, date, tag, unsupported-token filter behavior, and always-include center note behavior for Local/Ego scope.
 - `tests/graph/GraphNormalizer.test.ts`
   - validates path normalization (`\` -> `/`);
   - validates tag normalization (trim + `#` removal);
@@ -73,7 +73,7 @@ Current TS baseline test suites:
   - validates `detach()` and container cleanup on `onClose`;
   - validates persisted state handoff and render-scale query startup behavior.
 - `tests/view/MapSession.test.ts`
-  - validates session state normalization, graph refresh timing, filtering, focus precedence, and render-scale reopen state.
+  - validates session state normalization, graph refresh timing, filtering, Local/Ego scope, focus precedence, rename focus, and render-scale reopen state.
 - `tests/view/MapFilterPanelController.test.ts`
   - validates settings panel controls, suggestions, layout selection, tags toggle, and render-scale slider UI state.
 - `tests/view/MapNoteOpenRouter.test.ts`

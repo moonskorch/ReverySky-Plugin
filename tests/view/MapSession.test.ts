@@ -1136,6 +1136,53 @@ describe("MapSession", () => {
     });
   });
 
+  it("does not rebuild local ego graph when focusing the current center again", async () => {
+    let currentTime = 1700000000000;
+    const payload = makeLocalPayload();
+    const sendGraph = vi.fn();
+    const sendFocus = vi.fn();
+    const session = new MapSession({
+      app: {
+        metadataCache: {
+          getFileCache: vi.fn().mockReturnValue(null),
+          on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+        },
+        vault: {
+          getAbstractFileByPath: vi.fn((path: string) => new TFile(path)),
+          on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+        },
+        workspace: {
+          activeLeaf: null,
+          getLeavesOfType: vi.fn().mockReturnValue([]),
+          iterateAllLeaves: vi.fn(),
+          on: vi.fn().mockReturnValue({ id: "event-ref" })
+        }
+      } as never,
+      buildGraph: makeBuildGraphMock(payload),
+      now: () => currentTime,
+      sendGraph,
+      sendFocus
+    });
+
+    await session.setState({ localEnabled: true });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    session.requestFocusFromEditor("Projects/ReverySky/Spec.md");
+
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+    expect(sendFocus).toHaveBeenCalledTimes(1);
+
+    currentTime += 301;
+    session.requestFocusFromEditor("Projects/ReverySky/Spec.md");
+
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+    expect(sendFocus).toHaveBeenCalledTimes(2);
+    expect(sendFocus).toHaveBeenLastCalledWith({
+      id: makeStableNoteId("Projects/ReverySky/Spec.md"),
+      path: "Projects/ReverySky/Spec.md"
+    });
+  });
+
   it("sends local focus intent even when the center is missing from the current source graph", async () => {
     const payload = makeLocalPayload();
     const sendGraph = vi.fn();
@@ -1280,6 +1327,47 @@ describe("MapSession", () => {
     expect(sendFocus).toHaveBeenCalledTimes(1);
   });
 
+  it("does not rebuild local ego graph when Unity focuses the current center again", async () => {
+    const payload = makeLocalPayload();
+    const sendGraph = vi.fn();
+    const sendFocus = vi.fn();
+    const session = new MapSession({
+      app: {
+        metadataCache: {
+          getFileCache: vi.fn().mockReturnValue(null),
+          on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+        },
+        vault: {
+          getAbstractFileByPath: vi.fn((path: string) => new TFile(path)),
+          on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+        },
+        workspace: {
+          activeLeaf: null,
+          getLeavesOfType: vi.fn().mockReturnValue([]),
+          iterateAllLeaves: vi.fn(),
+          on: vi.fn().mockReturnValue({ id: "event-ref" })
+        }
+      } as never,
+      buildGraph: makeBuildGraphMock(payload),
+      now: () => 1700000000000,
+      sendGraph,
+      sendFocus
+    });
+
+    await session.setState({ localEnabled: true });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    session.recordRuntimeFocusPath("Archive/Old.md");
+
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+    expect(sendFocus).toHaveBeenCalledTimes(1);
+
+    session.recordRuntimeFocusPath("Archive/Old.md");
+
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+    expect(sendFocus).toHaveBeenCalledTimes(1);
+  });
+
   it("rebuilds local ego graph around the renamed focus path", async () => {
     vi.useFakeTimers();
 
@@ -1343,11 +1431,18 @@ describe("MapSession", () => {
     expect((sendGraph.mock.calls[1]?.[0] as GraphPayload).notes.map((note) => note.path)).toEqual([oldPath]);
 
     vaultCallbacks.rename?.({ path: newPath }, oldPath);
+    session.requestFocusFromEditor(newPath);
+
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+    expect(sendFocus).toHaveBeenLastCalledWith({
+      id: makeStableNoteId(newPath),
+      path: newPath
+    });
+
     vi.advanceTimersByTime(250);
 
-    expect(sendGraph).toHaveBeenCalledTimes(4);
-    expect((sendGraph.mock.calls[2]?.[0] as GraphPayload).notes).toEqual([]);
-    expect((sendGraph.mock.calls[3]?.[0] as GraphPayload).notes.map((note) => note.path)).toEqual([newPath]);
+    expect(sendGraph).toHaveBeenCalledTimes(3);
+    expect((sendGraph.mock.calls[2]?.[0] as GraphPayload).notes.map((note) => note.path)).toEqual([newPath]);
     expect(sendFocus).toHaveBeenLastCalledWith({
       id: makeStableNoteId(newPath),
       path: newPath

@@ -23,7 +23,7 @@ Fields:
 
 ## Message Types
 Plugin -> runtime:
-- `graph:set`: effective filtered graph payload.
+- `graph:set`: effective graph payload after plugin-side scoping and filters.
 - `note:focus`: current-note focus hint with required `id` and `path`.
 - `runtime:status`: iframe-wrapper status text update that does not change Unity graph state.
 - `runtime:settings`: Unity runtime frame-rate settings that apply without rebuilding graph state.
@@ -209,15 +209,16 @@ type GraphLink = {
 - Unity-side field-to-behavior mapping, runtime defaults, and ingestion-specific fallbacks are documented in `unity/ReverySkyMap/docs/DATA_CONTRACT.md` under `Runtime Field Usage (Unity)`.
 
 ## Current Producer Semantics
-- `graph:set` is the effective filtered payload emitted by the plugin view, not the raw vault snapshot.
+- `graph:set` is the effective payload emitted by the plugin view, not the raw vault snapshot. The effective payload may be narrowed by Local/Ego scope before query and tag filters run.
 - Each emitted `graph:set` gets a unique `requestId` so stale `graph:ready` messages cannot complete a newer graph status.
 - After startup graph emission, `MapSession` accepts the first Obsidian `metadataCache.resolved` event as a one-time correction refresh for the initial `resolvedLinks` snapshot.
 - After graph-relevant metadata changes, `MapSession` waits for Obsidian `metadataCache.resolved` before rebuilding from `metadataCache.resolvedLinks`; while waiting, it may send `runtime:status` instead of `graph:set`.
-- Filter-only changes reuse the latest source graph snapshot and emit only a newly filtered payload.
+- Filter-only changes reuse the latest source graph snapshot and emit only a newly narrowed payload.
+- Local/Ego focus changes update the plugin-side focus path and rebuild the effective payload around that center before dispatch. Active-note rename can skip the immediate Local/Ego rebuild because the rename event already schedules a fresh source graph rebuild.
 - `notes[].date` uses `frontmatter.date`, then `frontmatter.created`, then `frontmatter.created_at`, then file creation time. Missing, blank, or invalid candidates are skipped, and the field is omitted when no valid source exists.
 - `notes[].tags` are produced by merging inline tags and frontmatter tags, then normalizing and deduplicating the result.
 - `notes[].size` is emitted as file size in bytes.
 - `mapLayout`, when present, is a plugin-owned runtime hint and travels with the effective graph payload.
 - `note:focus` carries the current note identity separately; `graph:set` stays focused on the graph payload itself.
 - `runtime:settings` carries frame-rate mode separately; `graph:set` stays focused on graph payload data.
-- `vault.noteCount` reflects the emitted `notes.length` for the filtered payload.
+- `vault.noteCount` reflects the emitted `notes.length` for the effective payload.

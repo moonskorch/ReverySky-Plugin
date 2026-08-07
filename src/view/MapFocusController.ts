@@ -5,18 +5,23 @@ import {
   type WorkspaceLeaf
 } from "obsidian";
 
-const FOCUS_GATE_WINDOW_MS = 250;
+const FOCUS_GATE_WINDOW_MS = 300;
+
+export type FocusRequestOptions = {
+  skipGraphCheck?: boolean;
+  skipLocalGraphRebuild?: boolean;
+};
 
 export type MapFocusControllerDependencies = {
   app: App;
   now: () => number;
-  requestFocus: (path: string, options?: { skipGraphCheck?: boolean }) => boolean;
+  requestFocus: (path: string, options?: FocusRequestOptions) => boolean;
   getFocusPath: () => string;
 };
 
 export class MapFocusController {
   private workspaceFocusRegistered = false;
-  // One short-lived gate covers both Unity-open focus echoes and duplicate Obsidian focus signals.
+  // One short-lived gate collapses duplicate Obsidian focus bursts and expected focus echoes.
   private gatePath = "";
   private gateAt = Number.NEGATIVE_INFINITY;
 
@@ -47,7 +52,7 @@ export class MapFocusController {
   expectFocusEchoForPath(path: unknown): void {
     const normalizedPath = this.normalizePath(path);
     if (this.isRelevantPath(normalizedPath)) {
-      // Obsidian will often emit file-open/editor focus after we open a Unity-requested note.
+      // Obsidian will often emit file-open/editor focus after plugin-driven note activation.
       this.rememberGate(normalizedPath);
     } else {
       this.clearGate();
@@ -81,7 +86,13 @@ export class MapFocusController {
     if (focusPath === normalizedOldPath) {
       // Rename is the only focus source allowed to outrun the current graph:
       // the new path-derived id may not exist in MapSession.outgoingGraphPayload yet.
-      this.deps.requestFocus(normalizedNewPath, { skipGraphCheck: true });
+      const didRequestFocus = this.deps.requestFocus(normalizedNewPath, {
+        skipGraphCheck: true,
+        skipLocalGraphRebuild: true
+      });
+      if (didRequestFocus) {
+        this.rememberGate(normalizedNewPath);
+      }
     }
   }
 
@@ -92,7 +103,8 @@ export class MapFocusController {
     }
 
     if (this.isGatedFocus(normalizedPath)) {
-      // Slide the gate forward so file-open and editor-focus bursts collapse into one decision.
+      // Slide the gate forward so duplicate Obsidian focus bursts and expected
+      // Unity-open or rename echoes collapse into one decision.
       this.rememberGate(normalizedPath);
       return false;
     }

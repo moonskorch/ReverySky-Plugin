@@ -31,7 +31,7 @@ import {
 } from "../graph/GraphQueryFilter";
 import { extractActiveFilterTermValue } from "../graph/GraphQuerySyntax";
 import { makeStableNoteId } from "../graph/VaultGraphBuilder";
-import { MapFocusController } from "./MapFocusController";
+import { MapFocusController, type FocusRequestOptions } from "./MapFocusController";
 
 const GRAPH_REFRESH_DEBOUNCE_MS = 250;
 const FILTER_INPUT_DEBOUNCE_MS = 500;
@@ -462,7 +462,7 @@ export class MapSession {
 
   private trySendFocusForPath(
     pathValue: unknown,
-    options?: { skipGraphCheck?: boolean }
+    options?: FocusRequestOptions
   ): boolean {
     const path = this.normalizeVaultPath(pathValue);
     if (!this.isGraphRelevantPath(path)) {
@@ -473,29 +473,35 @@ export class MapSession {
     }
 
     return this.localEnabled
-      ? this.acceptLocalFocusPath(path)
+      ? this.acceptLocalFocusPath(path, options)
       : this.tryAcceptGlobalFocusPath(path, options);
   }
 
-  private acceptLocalFocusPath(path: string): boolean {
+  private acceptLocalFocusPath(path: string, options?: FocusRequestOptions): boolean {
+    const isSameLocalCenter = this.focusPath === path;
     this.focusPath = path;
-    if (!this.sourceGraphPayload) {
-      this.rebuildSourceGraph();
+    // Rename focus intentionally skips this rebuild: the vault rename event
+    // schedules a fresh source graph rebuild, while the current source graph
+    // can still contain the old path.
+    if (!isSameLocalCenter && !options?.skipLocalGraphRebuild) {
+      if (!this.sourceGraphPayload) {
+        this.rebuildSourceGraph();
+      }
+      this.sendGraphFromSource();
     }
-    this.sendGraphFromSource();
     this.sendAcceptedFocusPath(path);
     return true;
   }
 
-  private tryAcceptGlobalFocusPath(path: string, options?: { skipGraphCheck?: boolean }): boolean {
+  private tryAcceptGlobalFocusPath(path: string, options?: FocusRequestOptions): boolean {
     // Global focus may only target a note Unity is already rendering.
     // Rename is the exception because the path-derived id can change before the renamed graph arrives.
     if (!options?.skipGraphCheck && !this.isPathInOutgoingGraph(path)) {
       return false;
     }
 
-    this.sendAcceptedFocusPath(path);
     this.focusPath = path;
+    this.sendAcceptedFocusPath(path);
     return true;
   }
 
@@ -525,10 +531,11 @@ export class MapSession {
   recordRuntimeFocusPath(pathValue: unknown): void {
     const path = this.normalizeVaultPath(pathValue);
     if (this.isGraphRelevantPath(path)) {
+      const isSameLocalCenter = this.focusPath === path;
       this.focusPath = path;
-      if (this.localEnabled && this.bridgeReady) {
-        this.sendGraphFromSource();
+      if (this.localEnabled && this.bridgeReady && !isSameLocalCenter) {
         // Local graph rebuild changes the rendered neighborhood; re-send focus so Unity restores the new center.
+        this.sendGraphFromSource();
         this.sendAcceptedFocusPath(path);
       }
     }
