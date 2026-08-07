@@ -181,10 +181,10 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 1. After successful Unity WebGL boot, the runtime posts `bridge:ready`.
 2. `src/bridge/UnityIframeBridge.ts` -> `onMessage()`
    Validates the incoming message and calls the registered `onReady` callback.
-3. `src/view/MapView.ts` -> `session.setBridgeReady(true)` -> `session.flushOrRefresh()`
-   Starts the first graph emission or flushes the latest queued graph if refresh work already happened before the handshake.
-4. `src/view/MapSession.ts` -> `refreshGraphNow()` -> `sendGraphFromSource()`
-   Rebuilds the source graph, applies Local/Ego scope when enabled, applies the active query filter and `showTags`, and includes `mapLayout`.
+3. `src/view/MapView.ts` -> `session.handleRuntimeReady()`
+   Marks the bridge ready, sends runtime settings, emits the initial graph, then attempts startup focus for the current active markdown file.
+4. `src/view/MapSession.ts` -> `sendInitialRuntimeGraph()` -> `sendGraphFromSource()`
+   Reuses the latest queued effective graph when one exists; otherwise rebuilds the source graph, applies Local/Ego scope when enabled, applies the active query filter and `showTags`, and includes `mapLayout`.
 5. `src/graph/VaultGraphBuilder.ts` -> `build(app)`
    Reads markdown files from the vault, derives stable note ids, normalizes tags and paths, adds canonical date and byte-size fields, and builds links from `metadataCache.resolvedLinks`.
 6. `src/view/MapView.ts` -> `bridge.sendGraphSet(outgoingPayload)`
@@ -198,6 +198,7 @@ Before `bridge:ready`, `MapSession` keeps only the latest pending graph payload.
 After a graph has been emitted, `MapSession` keeps the latest effective `GraphPayload`.
 Global focus requires membership in that payload; Local/Ego focus can change the effective graph center instead.
 Active-note rename is the intentional Global gate exception: the new path can arrive before Unity ingests the renamed graph.
+Startup focus is a normal focus intent sent after the initial `graph:set`: Global mode requires the active note to be present in the effective graph, while Local/Ego mode may rebuild around that active note before sending `note:focus`.
 The first graph build reads the current Obsidian `metadataCache.resolvedLinks` snapshot, then accepts the first following `metadataCache.resolved` event as a one-time startup correction refresh.
 Graph-relevant live metadata changes use the `metadataCache.resolved` barrier described below.
 Markdown editor focus primes the graph-relevant signature for that one note from the current file cache, so the first content-only edit after focus does not look like a tags/links change.
@@ -221,12 +222,16 @@ Graph emission timing is grouped by event intent:
 3. `src/view/MapFilterPanelController.ts` updates session-owned state through `MapSession.setFilterQuery()`, `setShowTags()`, or `MapSession.setMapLayoutPreference()`.
 4. For valid filter, tag-visibility, Local/Ego, and layout changes, `src/view/MapSession.ts` re-enters `sendGraphFromSource()` using the latest source graph snapshot. Filter input is debounced before graph emission; invalid filter input updates UI and persistence state but does not emit `graph:set`.
 5. `src/graph/GraphQueryFilter.ts`
-   Parses the query and returns the filtered `GraphPayload` subset. When Local/Ego scope is enabled, `MapSession` has already narrowed the source graph to the focused center and direct neighbors; the query filter still runs inside that scope, while the Ego center is always retained.
+   Parses the query and returns the filtered `GraphPayload` subset. When Local/Ego scope is enabled, `MapSession` has already narrowed the source graph to the focused center and notes reachable within the configured local depth; the query filter still runs inside that scope, while the Ego center is always retained.
 6. `src/view/MapView.ts` receives the `sendGraph` callback from `MapSession`, forwards the payload through `UnityIframeBridge`, and asks `MapFilterPanelController` to refresh visible suggestions when needed.
 7. `src/bridge/UnityIframeBridge.ts` -> `sendGraphSet()`
    Sends the effective graph that Unity should render now.
 
 For graph-relevant Obsidian metadata changes, `MapSession` first marks semantic refresh pending and sends `runtime:status` with `Updating graph data...`.
+
+Local/Ego scope is a complete effective-graph transform, not a placeholder setting. `MapSession.buildLocalGraphScope(...)` builds an undirected adjacency view from resolved note links, runs breadth-first search from the current `focusPath` up to `localDepth`, and records each included note's shortest distance from the center. The resulting payload includes only notes at distances `0..localDepth`. With `localNeighborLinksEnabled` disabled, Local/Ego keeps only links that connect different local-depth rings and reach inward from a non-boundary ring; with it enabled, Local/Ego keeps every note-note link whose endpoints are both inside the included scope.
+
+Tag visibility is applied after Local/Ego scope and query filtering, so `tag:` filters still match the real note metadata inside the scoped graph. When `showTags` is disabled, all emitted note tags are cleared. When Local/Ego and `showTags` are both enabled, notes inside the last depth ring do not introduce new tag nodes; they keep only tags that are already visible from an inner ring so Unity can still draw note-tag links to existing shared tag nodes.
 It does not rebuild from `metadataCache.resolvedLinks` until Obsidian emits `metadataCache.resolved`.
 This prevents an intermediate `resolvedLinks` snapshot from being cached and then reused by later filters.
 Startup correction is intentionally different: after the runtime receives the initial graph, the first `metadataCache.resolved` event may trigger one extra graph rebuild without showing the metadata update status.
@@ -284,11 +289,15 @@ In Local/Ego mode, ordinary focus makes the note the `focusPath`; it rebuilds th
 For rename, `MapFocusController.onRename(...)` preserves focus only when the old path matches `focusPath`, then requests focus with `skipGraphCheck` and `skipLocalGraphRebuild`.
 
 - Startup / graph open:
-  Expected: no focused note; show the start panorama.
+  Expected: when a markdown note is active, focus that note after the initial graph; otherwise show the start panorama.
   Current code:
   `MapSession.start(...)` resets bridge and pending graph state ->
-  `MapFocusController.start(...)` registers future `file-open` handling only ->
-  no code reads the current active leaf or sends startup `note:focus`.
+  `MapFocusController.start(...)` registers future `file-open` handling ->
+  runtime `bridge:ready` calls `MapSession.handleRuntimeReady()` ->
+  `sendInitialRuntimeGraph()` sends or replays the effective `graph:set` ->
+  `getActiveFilePath()` reads `workspace.getActiveFile()` and accepts only a markdown `TFile` path ->
+  `trySendFocusForPath(path)` applies the same Global or Local/Ego focus policy used by normal focus ->
+  `UnityIframeBridge.sendNoteFocus(...)` sends `note:focus` only for an accepted active note.
 
 - Markdown editor focus:
   Expected: focus the edited note; in Local/Ego mode, rebuild only when the Ego center changes.
@@ -418,7 +427,7 @@ Open graph leaves do not share live filter state. Each leaf's `MapSession` owns 
   Owns the shell execution paths after the view exists: iframe startup, bridge wiring, and collaborator orchestration.
 
 - `src/view/MapSession.ts` -> `MapSession`
-  Owns per-view live graph state, graph refresh timing, metadata-resolution waiting, Local/Ego scope derivation, graph emission, render-scale restart tracking, and the bridge-facing focus policy.
+  Owns per-view live graph state, graph refresh timing, metadata-resolution waiting, Local/Ego depth and neighbor-link scope derivation, graph emission, render-scale restart tracking, and the bridge-facing focus policy.
 
 - `src/view/MapFocusController.ts` -> `MapFocusController`
   Owns plugin-side focus event routing for workspace `file-open`, markdown editor focus, active-note rename, and short-lived suppression of expected focus echoes after Unity note-open or rename focus. It emits focus intents to `MapSession` instead of sending bridge payloads directly.
@@ -460,12 +469,15 @@ Open graph leaves do not share live filter state. Each leaf's `MapSession` owns 
 
 - The source graph and effective graph are both owned by `MapSession`.
   `sourceGraphPayload` is the latest full vault snapshot built from Obsidian state.
-  `outgoingGraphPayload` is the effective payload Unity should render now: optional Local/Ego scope, then query filter, then tag visibility, then layout hint.
+  `outgoingGraphPayload` is the effective payload Unity should render now: optional Local/Ego depth scope and neighbor-link selection, then query filter, then tag visibility, then layout hint.
   If more than one graph leaf is open, each leaf has its own effective graph and can rebuild or re-emit independently.
 
 - `filterQuery`, `showTags`, `mapLayout`, `renderScale`, and Local/Ego settings are owned by `MapSession`.
   They are live per-view state while the leaf is open.
   They are reported to `ReverySkyMapPlugin`, which keeps one latest snapshot in plugin data under `mapViewState` and re-applies that snapshot on later opens.
+
+- Local/Ego settings are fully active in the effective graph pipeline.
+  `localEnabled` switches between global and scoped payloads, `localDepth` controls breadth-first expansion from the focused note, and `localNeighborLinksEnabled` controls whether same-ring and cross-neighborhood links inside the included scope are retained.
 
 - Markdown focus events are routed by `MapFocusController`.
   The controller does not store focus history or a focus queue. It keeps only a short-lived path gate to collapse duplicate Obsidian focus signals and consume expected Unity-open or rename echoes, then emits a focus intent to `MapSession`.
@@ -513,6 +525,7 @@ Important current contract facts:
 - `path` values must stay vault-relative and use `/` separators;
 - `notes[].size` is a non-negative byte count produced from Obsidian file metadata and mapped to Unity `NoteData.Length`;
 - `graph:set` carries the effective graph after Local/Ego scope and filters; focus changes are sent separately via `note:focus`, which must include both `id` and `path`;
+- Local/Ego `graph:set` payloads use `localDepth` for note inclusion, `localNeighborLinksEnabled` for included-link selection, and boundary-tag trimming for tag-node visibility;
 - ordinary Global `note:focus` dispatch is gated by the latest effective graph on the TypeScript side; Local/Ego focus rebuilds only when the center changes; active-note rename can bypass the Global gate to cover bridge ordering around path-derived ids;
 - `graph:ready` must echo the latest `graph:set` `requestId` before the iframe clears the loading status;
 - `runtime:status` updates iframe wrapper status text only and is not forwarded into Unity;

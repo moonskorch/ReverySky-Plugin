@@ -94,6 +94,7 @@ export type TagSuggestion = {
 type LocalGraphScope = {
   payload: GraphPayload;
   centerNoteId?: string;
+  distanceByNoteId: Map<string, number>;
 };
 
 export type MapSessionDependencies = {
@@ -718,13 +719,19 @@ export class MapSession {
   private applyActiveFilters(payload: GraphPayload): GraphPayload {
     const localScope = this.localEnabled
       ? this.buildLocalGraphScope(payload)
-      : { payload, centerNoteId: undefined };
+      : { payload, centerNoteId: undefined, distanceByNoteId: new Map() };
+
     const queryFiltered = GraphQueryFilter.applyFilter(
       localScope.payload,
       this.activeQueryFilter,
       { alwaysIncludeNoteId: localScope.centerNoteId }
     );
-    const tagsFiltered = this.applyTagsVisibilityFilter(queryFiltered);
+
+    const tagsFiltered = this.applyTagsVisibilityFilter(
+      queryFiltered,
+      localScope.distanceByNoteId
+    );
+
     return {
       ...tagsFiltered,
       mapLayout: this.mapLayout
@@ -735,7 +742,8 @@ export class MapSession {
     const centerPath = this.normalizeVaultPath(this.focusPath);
     if (!this.isGraphRelevantPath(centerPath)) {
       return {
-        payload: this.toGraphSubset(payload, new Set(), [])
+        payload: this.toGraphSubset(payload, new Set(), []),
+        distanceByNoteId: new Map()
       };
     }
 
@@ -750,19 +758,52 @@ export class MapSession {
     const centerId = noteIdByPath.get(centerPath);
     if (!centerId) {
       return {
-        payload: this.toGraphSubset(payload, new Set(), [])
+        payload: this.toGraphSubset(payload, new Set(), []),
+        distanceByNoteId: new Map()
       };
     }
 
-    const includedIds = new Set<string>([centerId]);
+    const adjacentNoteIds = new Map<string, Set<string>>();
     for (const link of payload.links) {
-      if (link.sourceId === centerId && noteById.has(link.targetId)) {
-        includedIds.add(link.targetId);
+      if (!noteById.has(link.sourceId) || !noteById.has(link.targetId)) {
+        continue;
       }
-      if (link.targetId === centerId && noteById.has(link.sourceId)) {
-        includedIds.add(link.sourceId);
+
+      let sourceNeighbors = adjacentNoteIds.get(link.sourceId);
+      if (!sourceNeighbors) {
+        sourceNeighbors = new Set();
+        adjacentNoteIds.set(link.sourceId, sourceNeighbors);
+      }
+      sourceNeighbors.add(link.targetId);
+
+      let targetNeighbors = adjacentNoteIds.get(link.targetId);
+      if (!targetNeighbors) {
+        targetNeighbors = new Set();
+        adjacentNoteIds.set(link.targetId, targetNeighbors);
+      }
+      targetNeighbors.add(link.sourceId);
+    }
+
+    const distanceByNoteId = new Map<string, number>([[centerId, 0]]);
+    const queue = [centerId];
+    for (let index = 0; index < queue.length; index++) {
+      const currentId = queue[index];
+      const currentDistance = distanceByNoteId.get(currentId) ?? 0;
+      if (currentDistance >= this.localDepth) {
+        continue;
+      }
+
+      for (const neighborId of adjacentNoteIds.get(currentId) ?? []) {
+        if (distanceByNoteId.has(neighborId)) {
+          continue;
+        }
+
+        distanceByNoteId.set(neighborId, currentDistance + 1);
+        queue.push(neighborId);
       }
     }
+
+    const includedIds = new Set(distanceByNoteId.keys());
 
     const links = payload.links.filter((link) => {
       if (!includedIds.has(link.sourceId) || !includedIds.has(link.targetId)) {
@@ -771,12 +812,20 @@ export class MapSession {
       if (this.localNeighborLinksEnabled) {
         return true;
       }
-      return link.sourceId === centerId || link.targetId === centerId;
+      const sourceDistance = distanceByNoteId.get(link.sourceId);
+      const targetDistance = distanceByNoteId.get(link.targetId);
+      return (
+        typeof sourceDistance === "number" &&
+        typeof targetDistance === "number" &&
+        Math.min(sourceDistance, targetDistance) < this.localDepth &&
+        sourceDistance !== targetDistance
+      );
     });
 
     return {
       payload: this.toGraphSubset(payload, includedIds, links),
-      centerNoteId: centerId
+      centerNoteId: centerId,
+      distanceByNoteId
     };
   }
 
@@ -793,18 +842,69 @@ export class MapSession {
     };
   }
 
-  private applyTagsVisibilityFilter(payload: GraphPayload): GraphPayload {
-    if (this.showTags) {
+  private applyTagsVisibilityFilter(
+    payload: GraphPayload,
+    distanceByNoteId: Map<string, number>
+  ): GraphPayload {
+    if (this.showTags && distanceByNoteId.size === 0) {
       return payload;
     }
 
+    const visibleInnerTags = this.buildVisibleInnerTagSet(payload, distanceByNoteId);
     return {
       ...payload,
       notes: payload.notes.map((note) => ({
         ...note,
-        tags: []
+        tags: this.getVisibleNoteTags(note, distanceByNoteId, visibleInnerTags)
       }))
     };
+  }
+
+  private getVisibleNoteTags(
+    note: GraphNoteNode,
+    distanceByNoteId: Map<string, number>,
+    visibleInnerTags: Set<string>
+  ): string[] {
+    if (!this.showTags) {
+      return [];
+    }
+
+    if (distanceByNoteId.size === 0) {
+      return note.tags;
+    }
+
+    const distance = distanceByNoteId.get(note.id);
+    if (typeof distance !== "number") {
+      return [];
+    }
+
+    if (distance < this.localDepth) {
+      return note.tags;
+    }
+
+    return note.tags.filter((tag) => visibleInnerTags.has(this.normalizeLocalTagKey(tag)));
+  }
+
+  private buildVisibleInnerTagSet(
+    payload: GraphPayload,
+    distanceByNoteId: Map<string, number>
+  ): Set<string> {
+    const visibleTags = new Set<string>();
+    for (const note of payload.notes) {
+      const distance = distanceByNoteId.get(note.id);
+      if (typeof distance !== "number" || distance >= this.localDepth) {
+        continue;
+      }
+
+      for (const tag of note.tags) {
+        visibleTags.add(this.normalizeLocalTagKey(tag));
+      }
+    }
+    return visibleTags;
+  }
+
+  private normalizeLocalTagKey(tag: string): string {
+    return tag.trim().toLowerCase();
   }
 
   private buildGraphRelevantSignature(cache: CachedMetadata | null): string {

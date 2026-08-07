@@ -112,6 +112,74 @@ function makeLocalPayload(): GraphPayload {
   };
 }
 
+function makeDepthPayload(): GraphPayload {
+  return {
+    graphVersion: "0.0.1",
+    generatedAt: "2026-01-01T00:00:00.000Z",
+    vault: { noteCount: 7 },
+    notes: [
+      {
+        id: "center",
+        path: "Depth/Center.md",
+        title: "Center",
+        tags: ["center"],
+        size: 20
+      },
+      {
+        id: "left",
+        path: "Depth/Left.md",
+        title: "Left",
+        tags: ["left"],
+        size: 21
+      },
+      {
+        id: "right",
+        path: "Depth/Right.md",
+        title: "Right",
+        tags: ["right"],
+        size: 22
+      },
+      {
+        id: "outer-left",
+        path: "Depth/OuterLeft.md",
+        title: "Outer Left",
+        tags: ["outer-left"],
+        size: 23
+      },
+      {
+        id: "outer-right",
+        path: "Depth/OuterRight.md",
+        title: "Outer Right",
+        tags: ["outer-right"],
+        size: 24
+      },
+      {
+        id: "far",
+        path: "Depth/Far.md",
+        title: "Far",
+        tags: ["far"],
+        size: 25
+      },
+      {
+        id: "isolated",
+        path: "Depth/Isolated.md",
+        title: "Isolated",
+        tags: ["isolated"],
+        size: 26
+      }
+    ],
+    links: [
+      { sourceId: "center", targetId: "left", kind: "resolved" },
+      { sourceId: "right", targetId: "center", kind: "resolved" },
+      { sourceId: "left", targetId: "outer-left", kind: "resolved" },
+      { sourceId: "outer-right", targetId: "right", kind: "resolved" },
+      { sourceId: "outer-left", targetId: "outer-right", kind: "resolved" },
+      { sourceId: "outer-left", targetId: "far", kind: "resolved" }
+    ],
+    mapLayout: "auto"
+  };
+}
+
 function createSessionForStateTests(options?: {
   sendGraph?: (payload: GraphPayload) => void;
   sendRuntimeSettings?: (payload: { frameRateMode: "auto" | "fps60" | "fps30" | "fps24" }) => void;
@@ -138,6 +206,37 @@ function createSessionForStateTests(options?: {
     sendFocus: makeVoidCallback<[NoteFocusPayload]>(),
     sendRuntimeSettings: options?.sendRuntimeSettings,
     onStateChanged: options?.onStateChanged
+  });
+}
+
+function createLocalGraphSession(
+  payload: GraphPayload,
+  options?: {
+    sendGraph?: (payload: GraphPayload) => void;
+    sendFocus?: (payload: NoteFocusPayload) => void;
+  }
+): MapSession {
+  return new MapSession({
+    app: {
+      metadataCache: {
+        getFileCache: vi.fn().mockReturnValue(null),
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        getAbstractFileByPath: vi.fn((path: string) => new TFile(path)),
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+      },
+      workspace: {
+        activeLeaf: null,
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    } as never,
+    buildGraph: makeBuildGraphMock(payload),
+    now: () => 1700000000000,
+    sendGraph: options?.sendGraph ?? makeVoidCallback<[GraphPayload]>(),
+    sendFocus: options?.sendFocus ?? makeVoidCallback<[NoteFocusPayload]>()
   });
 }
 
@@ -1395,6 +1494,211 @@ describe("MapSession", () => {
     expect(sentPayload.notes.map((note) => note.id)).toEqual(["project", "archive"]);
     expect(sentPayload.links).toEqual([
       { sourceId: "project", targetId: "archive", kind: "resolved" }
+    ]);
+  });
+
+  it("builds local ego graph to the configured depth and hides tags only on the boundary ring", async () => {
+    const payload = makeDepthPayload();
+    const sendGraph = vi.fn();
+    const session = createLocalGraphSession(payload, { sendGraph });
+
+    await session.setState({ localEnabled: true, localDepth: 2 });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    session.requestFocusFromEditor("Depth/Center.md");
+
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+    const sentPayload = sendGraph.mock.calls[1]?.[0] as GraphPayload;
+    expect(sentPayload.vault.noteCount).toBe(5);
+    expect(sentPayload.notes.map((note) => note.id)).toEqual([
+      "center",
+      "left",
+      "right",
+      "outer-left",
+      "outer-right"
+    ]);
+    expect(sentPayload.links).toEqual([
+      { sourceId: "center", targetId: "left", kind: "resolved" },
+      { sourceId: "right", targetId: "center", kind: "resolved" },
+      { sourceId: "left", targetId: "outer-left", kind: "resolved" },
+      { sourceId: "outer-right", targetId: "right", kind: "resolved" }
+    ]);
+    expect(sentPayload.notes.map((note) => [note.id, note.tags])).toEqual([
+      ["center", ["center"]],
+      ["left", ["left"]],
+      ["right", ["right"]],
+      ["outer-left", []],
+      ["outer-right", []]
+    ]);
+  });
+
+  it("limits local ego graph to depth one by default", async () => {
+    const payload = makeDepthPayload();
+    const sendGraph = vi.fn();
+    const session = createLocalGraphSession(payload, { sendGraph });
+
+    await session.setState({ localEnabled: true });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    session.requestFocusFromEditor("Depth/Center.md");
+
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+    const sentPayload = sendGraph.mock.calls[1]?.[0] as GraphPayload;
+    expect(sentPayload.vault.noteCount).toBe(3);
+    expect(sentPayload.notes.map((note) => note.id)).toEqual(["center", "left", "right"]);
+    expect(sentPayload.links).toEqual([
+      { sourceId: "center", targetId: "left", kind: "resolved" },
+      { sourceId: "right", targetId: "center", kind: "resolved" }
+    ]);
+    expect(sentPayload.notes.map((note) => [note.id, note.tags])).toEqual([
+      ["center", ["center"]],
+      ["left", []],
+      ["right", []]
+    ]);
+  });
+
+  it("expands and contracts the local ego graph when local depth changes", async () => {
+    const payload = makeDepthPayload();
+    const sendGraph = vi.fn();
+    const session = createLocalGraphSession(payload, { sendGraph });
+
+    await session.setState({ localEnabled: true });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    session.requestFocusFromEditor("Depth/Center.md");
+
+    session.setLocalDepth(2);
+    session.setLocalDepth(1);
+
+    expect(sendGraph).toHaveBeenCalledTimes(4);
+    expect((sendGraph.mock.calls[1]?.[0] as GraphPayload).notes.map((note) => note.id)).toEqual([
+      "center",
+      "left",
+      "right"
+    ]);
+    expect((sendGraph.mock.calls[2]?.[0] as GraphPayload).notes.map((note) => note.id)).toEqual([
+      "center",
+      "left",
+      "right",
+      "outer-left",
+      "outer-right"
+    ]);
+    expect((sendGraph.mock.calls[3]?.[0] as GraphPayload).notes.map((note) => note.id)).toEqual([
+      "center",
+      "left",
+      "right"
+    ]);
+  });
+
+  it("keeps neighbor links out unless the local neighbor-links option is enabled", async () => {
+    const payload = makeDepthPayload();
+    const sendGraph = vi.fn();
+    const session = createLocalGraphSession(payload, { sendGraph });
+
+    await session.setState({ localEnabled: true, localDepth: 2 });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    session.requestFocusFromEditor("Depth/Center.md");
+
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+    expect((sendGraph.mock.calls[1]?.[0] as GraphPayload).links).toEqual([
+      { sourceId: "center", targetId: "left", kind: "resolved" },
+      { sourceId: "right", targetId: "center", kind: "resolved" },
+      { sourceId: "left", targetId: "outer-left", kind: "resolved" },
+      { sourceId: "outer-right", targetId: "right", kind: "resolved" }
+    ]);
+
+    session.setLocalNeighborLinksEnabled(true);
+
+    expect(sendGraph).toHaveBeenCalledTimes(3);
+    expect((sendGraph.mock.calls[2]?.[0] as GraphPayload).links).toEqual([
+      { sourceId: "center", targetId: "left", kind: "resolved" },
+      { sourceId: "right", targetId: "center", kind: "resolved" },
+      { sourceId: "left", targetId: "outer-left", kind: "resolved" },
+      { sourceId: "outer-right", targetId: "right", kind: "resolved" },
+      { sourceId: "outer-left", targetId: "outer-right", kind: "resolved" }
+    ]);
+  });
+
+  it("keeps boundary links to tags that are already visible from inner local rings", async () => {
+    const payload = makeDepthPayload();
+    const center = payload.notes.find((note) => note.id === "center");
+    const outerLeft = payload.notes.find((note) => note.id === "outer-left");
+    expect(center).toBeDefined();
+    expect(outerLeft).toBeDefined();
+    center!.tags = ["center", "shared"];
+    outerLeft!.tags = ["outer-left", "shared"];
+    const sendGraph = vi.fn();
+    const session = createLocalGraphSession(payload, { sendGraph });
+
+    await session.setState({ localEnabled: true, localDepth: 2 });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    session.requestFocusFromEditor("Depth/Center.md");
+
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+    const sentPayload = sendGraph.mock.calls[1]?.[0] as GraphPayload;
+    expect(sentPayload.notes.map((note) => [note.id, note.tags])).toEqual([
+      ["center", ["center", "shared"]],
+      ["left", ["left"]],
+      ["right", ["right"]],
+      ["outer-left", ["shared"]],
+      ["outer-right", []]
+    ]);
+  });
+
+  it("matches a local boundary note by tag without sending that boundary tag to Unity", async () => {
+    vi.useFakeTimers();
+
+    const payload = makeDepthPayload();
+    const sendGraph = vi.fn();
+    const session = createLocalGraphSession(payload, { sendGraph });
+
+    await session.setState({ localEnabled: true, localDepth: 2 });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    session.requestFocusFromEditor("Depth/Center.md");
+
+    session.setFilterQuery("tag:#outer-left");
+    vi.advanceTimersByTime(500);
+
+    expect(sendGraph).toHaveBeenCalledTimes(3);
+    const sentPayload = sendGraph.mock.calls[2]?.[0] as GraphPayload;
+    expect(sentPayload.notes.map((note) => note.id)).toEqual(["center", "outer-left"]);
+    expect(sentPayload.notes.map((note) => [note.id, note.tags])).toEqual([
+      ["center", ["center"]],
+      ["outer-left", []]
+    ]);
+  });
+
+  it("uses the shortest local distance when a note is reachable through a cycle", async () => {
+    const payload = makeDepthPayload();
+    payload.links.splice(4, 0, { sourceId: "outer-left", targetId: "center", kind: "resolved" });
+    const sendGraph = vi.fn();
+    const session = createLocalGraphSession(payload, { sendGraph });
+
+    await session.setState({ localEnabled: true, localDepth: 2 });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    session.requestFocusFromEditor("Depth/Center.md");
+
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+    const sentPayload = sendGraph.mock.calls[1]?.[0] as GraphPayload;
+    expect(sentPayload.notes.map((note) => [note.id, note.tags])).toEqual([
+      ["center", ["center"]],
+      ["left", ["left"]],
+      ["right", ["right"]],
+      ["outer-left", ["outer-left"]],
+      ["outer-right", []],
+      ["far", []]
+    ]);
+    expect(sentPayload.links).toEqual([
+      { sourceId: "center", targetId: "left", kind: "resolved" },
+      { sourceId: "right", targetId: "center", kind: "resolved" },
+      { sourceId: "outer-right", targetId: "right", kind: "resolved" },
+      { sourceId: "outer-left", targetId: "center", kind: "resolved" },
+      { sourceId: "outer-left", targetId: "outer-right", kind: "resolved" },
+      { sourceId: "outer-left", targetId: "far", kind: "resolved" }
     ]);
   });
 
