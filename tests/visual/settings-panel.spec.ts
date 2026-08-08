@@ -40,7 +40,7 @@ test.describe("settings panel", () => {
     await localToggle.evaluate((button) => {
       button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 0 }));
     });
-    await expect(localSection).toContainText("Local");
+    await expect(localSection).toContainText("Ego Graph");
     await expect(localSection).toContainText("Depth");
     await expect(localSection).toContainText("Neighbor links");
     await expect(localToggle).toHaveAttribute("aria-expanded", "true");
@@ -98,8 +98,8 @@ test.describe("settings panel", () => {
       "Search in filter",
       "Toggle tags",
       "Select layout",
-      "Toggle local mode",
-      "Local depth",
+      "Toggle Ego mode",
+      "Ego Graph depth",
       "Toggle neighbor links",
       "Render scale",
       "Select frame rate",
@@ -140,7 +140,7 @@ test.describe("settings panel", () => {
     await expect(localToggle).toHaveAttribute("aria-expanded", "false");
     await expect(graphicsToggle).toHaveAttribute("aria-expanded", "false");
     await expect(screenshotToggle).toHaveAttribute("aria-expanded", "false");
-    await expect(localSection).toContainText("Local");
+    await expect(localSection).toContainText("Ego Graph");
     await expect(localDepthInput).not.toBeVisible();
     await expect(screenshotSection).toContainText("Screenshot");
     await expect(screenshotButton).not.toBeVisible();

@@ -681,7 +681,7 @@ describe("MapSettingsPanelController", () => {
     expect(container.textContent).toContain("Selection");
     expect(container.textContent).not.toContain("Settings");
     expect(container.textContent).toContain("Layout");
-    expect(container.textContent).toContain("Local");
+    expect(container.textContent).toContain("Ego Graph");
     expect(container.textContent).toContain("Graphics");
     expect(container.textContent).toContain("Frame rate");
     const graphicsSection = container.querySelector(".reverysky-map-graphics-section") as HTMLElement;
@@ -710,7 +710,7 @@ describe("MapSettingsPanelController", () => {
 
     expect(settingsBody.children[1]).toBe(localSection);
     expect(settingsBody.children[2]).toBe(graphicsSection);
-    expect(localSection.textContent).toContain("Local");
+    expect(localSection.textContent).toContain("Ego Graph");
     expect(localSection.textContent).toContain("Depth");
     expect(localSection.textContent).toContain("Neighbor links");
     expect(localSection.classList.contains("reverysky-map-settings-section--collapsed")).toBe(true);

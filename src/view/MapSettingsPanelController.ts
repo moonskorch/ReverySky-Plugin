@@ -210,7 +210,7 @@ export class MapSettingsPanelController {
 
     const localSection = createCollapsibleSection(settingsScrollArea as ObsidianHTMLElement, {
       className: "reverysky-map-local-section",
-      label: "Local",
+      label: "Ego Graph",
       onToggle: () => {
         this.setLocalSectionCollapsed(!this.localSectionCollapsed);
       }
@@ -230,8 +230,8 @@ export class MapSettingsPanelController {
       rowClassName: "reverysky-map-local-toggle-row",
       buttonClassName: "reverysky-map-local-toggle",
       thumbClassName: "reverysky-map-local-toggle-thumb",
-      label: "Local",
-      ariaLabel: "Toggle local mode",
+      label: "Ego mode",
+      ariaLabel: "Toggle Ego mode",
       onToggle: toggleLocal
     });
     this.localMainToggleButtonEl = localToggle.button;
@@ -242,7 +242,7 @@ export class MapSettingsPanelController {
       valueClassName: "reverysky-map-local-depth-value",
       messageClassName: "reverysky-map-local-depth-message reverysky-map-range-control-message--hidden",
       label: "Depth",
-      ariaLabel: "Local depth",
+      ariaLabel: "Ego Graph depth",
       min: "1",
       max: "5",
       step: "1",
@@ -444,7 +444,7 @@ export class MapSettingsPanelController {
       this.localSectionToggleButtonEl,
       this.localSectionContentEl,
       this.localSectionCollapsed,
-      "Local"
+      "Ego Graph"
     );
     this.refreshCollapsibleSection(
       this.graphicsSectionEl,
