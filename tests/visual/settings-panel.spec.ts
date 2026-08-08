@@ -24,8 +24,8 @@ test.describe("settings panel", () => {
     const selectionToggle = page.locator(
       ".reverysky-map-selection-section .reverysky-map-settings-section-toggle"
     );
-    const localSection = page.locator(".reverysky-map-local-section");
-    const localToggle = page.locator(".reverysky-map-local-section .reverysky-map-settings-section-toggle");
+    const egoSection = page.locator(".reverysky-map-ego-section");
+    const egoToggle = page.locator(".reverysky-map-ego-section .reverysky-map-settings-section-toggle");
     const graphicsSection = page.locator(".reverysky-map-graphics-section");
     const graphicsToggle = page.locator(".reverysky-map-graphics-section .reverysky-map-settings-section-toggle");
     const screenshotSection = page.locator(".reverysky-map-screenshot-section");
@@ -37,13 +37,13 @@ test.describe("settings panel", () => {
     const closeButton = page.locator(".reverysky-map-settings-close");
     const gearReference = page.locator(".visual-gear-reference .reverysky-map-settings-toggle");
 
-    await localToggle.evaluate((button) => {
+    await egoToggle.evaluate((button) => {
       button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 0 }));
     });
-    await expect(localSection).toContainText("Ego Graph");
-    await expect(localSection).toContainText("Depth");
-    await expect(localSection).toContainText("Neighbor links");
-    await expect(localToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(egoSection).toContainText("Ego Graph");
+    await expect(egoSection).toContainText("Depth");
+    await expect(egoSection).toContainText("Neighbor links");
+    await expect(egoToggle).toHaveAttribute("aria-expanded", "true");
     await expect(graphicsSection).toContainText("Graphics");
     await expect(graphicsSection).toContainText("Render scale");
     await screenshotToggle.evaluate((button) => {
@@ -59,7 +59,7 @@ test.describe("settings panel", () => {
       page.locator(".reverysky-map-selection-section .reverysky-map-settings-section-toggle")
     ).toHaveCSS("justify-content", "flex-start");
     await expect(selectionContent).toHaveCSS("padding-bottom", "10px");
-    await expect(selectionSection).toHaveCSS("padding-bottom", await localSection.evaluate((element) => {
+    await expect(selectionSection).toHaveCSS("padding-bottom", await egoSection.evaluate((element) => {
       return getComputedStyle(element).paddingBottom;
     }));
 
@@ -80,7 +80,7 @@ test.describe("settings panel", () => {
     await page.goto(pathToFileURL(previewPath).href);
 
     const focusedControls: string[] = [];
-    await page.locator(".reverysky-map-local-section .reverysky-map-settings-section-toggle").evaluate((button) => {
+    await page.locator(".reverysky-map-ego-section .reverysky-map-settings-section-toggle").evaluate((button) => {
       button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 0 }));
     });
     await page.locator(".reverysky-map-screenshot-section .reverysky-map-settings-section-toggle").evaluate((button) => {
@@ -116,8 +116,8 @@ test.describe("settings panel", () => {
     const settingsToggle = page.locator(
       ".reverysky-map-selection-section .reverysky-map-settings-section-toggle"
     );
-    const localToggle = page.locator(
-      ".reverysky-map-local-section .reverysky-map-settings-section-toggle"
+    const egoToggle = page.locator(
+      ".reverysky-map-ego-section .reverysky-map-settings-section-toggle"
     );
     const graphicsToggle = page.locator(
       ".reverysky-map-graphics-section .reverysky-map-settings-section-toggle"
@@ -125,10 +125,10 @@ test.describe("settings panel", () => {
     const screenshotToggle = page.locator(
       ".reverysky-map-screenshot-section .reverysky-map-settings-section-toggle"
     );
-    const localSection = page.locator(".reverysky-map-local-section");
+    const egoSection = page.locator(".reverysky-map-ego-section");
     const screenshotSection = page.locator(".reverysky-map-screenshot-section");
     const screenshotButton = page.locator(".reverysky-map-screenshot-button");
-    const localDepthInput = page.locator(".reverysky-map-local-depth-input");
+    const egoDepthInput = page.locator(".reverysky-map-ego-depth-input");
 
     await settingsToggle.click();
     await graphicsToggle.click();
@@ -137,14 +137,14 @@ test.describe("settings panel", () => {
     });
 
     await expect(settingsToggle).toHaveAttribute("aria-expanded", "false");
-    await expect(localToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(egoToggle).toHaveAttribute("aria-expanded", "false");
     await expect(graphicsToggle).toHaveAttribute("aria-expanded", "false");
     await expect(screenshotToggle).toHaveAttribute("aria-expanded", "false");
-    await expect(localSection).toContainText("Ego Graph");
-    await expect(localDepthInput).not.toBeVisible();
+    await expect(egoSection).toContainText("Ego Graph");
+    await expect(egoDepthInput).not.toBeVisible();
     await expect(screenshotSection).toContainText("Screenshot");
     await expect(screenshotButton).not.toBeVisible();
-    await expect(selectionSection).toHaveCSS("padding-bottom", await localSection.evaluate((element) => {
+    await expect(selectionSection).toHaveCSS("padding-bottom", await egoSection.evaluate((element) => {
       return getComputedStyle(element).paddingBottom;
     }));
 

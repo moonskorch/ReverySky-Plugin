@@ -5,6 +5,12 @@ import { makeStableNoteId } from "../../src/graph/VaultGraphBuilder";
 import { MapSession } from "../../src/view/MapSession";
 import { callMaybe, makeBuildGraphMock, makeVoidCallback } from "./testUtils";
 
+function makeTestTFile(path: string): TFile {
+  const file = new TFile();
+  file.path = path;
+  return file;
+}
+
 function makePayload(): GraphPayload {
   return {
     graphVersion: "0.0.1",
@@ -61,7 +67,7 @@ function makePathPayload(): GraphPayload {
   };
 }
 
-function makeLocalPayload(): GraphPayload {
+function makeEgoPayload(): GraphPayload {
   return {
     graphVersion: "0.0.1",
     generatedAt: "2026-01-01T00:00:00.000Z",
@@ -209,7 +215,7 @@ function createSessionForStateTests(options?: {
   });
 }
 
-function createLocalGraphSession(
+function createEgoGraphSession(
   payload: GraphPayload,
   options?: {
     sendGraph?: (payload: GraphPayload) => void;
@@ -223,7 +229,7 @@ function createLocalGraphSession(
         on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
       },
       vault: {
-        getAbstractFileByPath: vi.fn((path: string) => new TFile(path)),
+        getAbstractFileByPath: vi.fn((path: string) => makeTestTFile(path)),
         on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
       },
       workspace: {
@@ -249,22 +255,22 @@ describe("MapSession", () => {
     vi.useRealTimers();
   });
 
-  it("normalizes and restores render scale, frame-rate mode, and local state", async () => {
+  it("normalizes and restores render scale, frame-rate mode, and ego state", async () => {
     const session = createSessionForStateTests();
     expect(session.getState()).toMatchObject({
       renderScale: 1,
       frameRateMode: "auto",
-      localEnabled: false,
-      localDepth: 1,
-      localNeighborLinksEnabled: false
+      egoEnabled: false,
+      egoDepth: 1,
+      egoNeighborLinksEnabled: false
     });
     expect(session.getFilterUiState()).toMatchObject({
       renderScale: 1,
       renderScaleRestartRequired: false,
       frameRateMode: "auto",
-      localEnabled: false,
-      localDepth: 1,
-      localNeighborLinksEnabled: false
+      egoEnabled: false,
+      egoDepth: 1,
+      egoNeighborLinksEnabled: false
     });
 
     await session.setState({ renderScale: 1.24 });
@@ -289,25 +295,41 @@ describe("MapSession", () => {
     expect(session.getState()).toMatchObject({ frameRateMode: "auto" });
 
     await session.setState({
-      localEnabled: true,
-      localDepth: 4,
-      localNeighborLinksEnabled: true
+      egoEnabled: true,
+      egoDepth: 4,
+      egoNeighborLinksEnabled: true
     });
     expect(session.getState()).toMatchObject({
+      egoEnabled: true,
+      egoDepth: 4,
+      egoNeighborLinksEnabled: true
+    });
+
+    await session.setState({
+      egoEnabled: "yes",
+      egoDepth: 6,
+      egoNeighborLinksEnabled: "yes"
+    });
+    expect(session.getState()).toMatchObject({
+      egoEnabled: false,
+      egoDepth: 1,
+      egoNeighborLinksEnabled: false
+    });
+  });
+
+  it("ignores legacy local state keys", async () => {
+    const session = createSessionForStateTests();
+
+    await session.setState({
       localEnabled: true,
       localDepth: 4,
       localNeighborLinksEnabled: true
     });
 
-    await session.setState({
-      localEnabled: "yes",
-      localDepth: 6,
-      localNeighborLinksEnabled: "yes"
-    });
     expect(session.getState()).toMatchObject({
-      localEnabled: false,
-      localDepth: 1,
-      localNeighborLinksEnabled: false
+      egoEnabled: false,
+      egoDepth: 1,
+      egoNeighborLinksEnabled: false
     });
   });
 
@@ -354,9 +376,9 @@ describe("MapSession", () => {
       mapLayout: "dates",
       renderScale: 1.2,
       frameRateMode: "auto",
-      localEnabled: false,
-      localDepth: 1,
-      localNeighborLinksEnabled: false
+      egoEnabled: false,
+      egoDepth: 1,
+      egoNeighborLinksEnabled: false
     }, { persist: false });
 
     vi.runOnlyPendingTimers();
@@ -367,50 +389,50 @@ describe("MapSession", () => {
       mapLayout: "dates",
       renderScale: 1.2,
       frameRateMode: "auto",
-      localEnabled: false,
-      localDepth: 1,
-      localNeighborLinksEnabled: false
+      egoEnabled: false,
+      egoDepth: 1,
+      egoNeighborLinksEnabled: false
     }, undefined);
   });
 
-  it("persists local settings when they change", () => {
+  it("persists ego settings when they change", () => {
     const onStateChanged = vi.fn();
     const session = createSessionForStateTests({ onStateChanged });
 
-    session.setLocalEnabled(true);
+    session.setEgoEnabled(true);
     expect(onStateChanged).toHaveBeenLastCalledWith({
       filterQuery: "",
       showTags: true,
       mapLayout: "auto",
       renderScale: 1,
       frameRateMode: "auto",
-      localEnabled: true,
-      localDepth: 1,
-      localNeighborLinksEnabled: false
+      egoEnabled: true,
+      egoDepth: 1,
+      egoNeighborLinksEnabled: false
     }, undefined);
 
-    session.setLocalDepth("5");
+    session.setEgoDepth("5");
     expect(onStateChanged).toHaveBeenLastCalledWith({
       filterQuery: "",
       showTags: true,
       mapLayout: "auto",
       renderScale: 1,
       frameRateMode: "auto",
-      localEnabled: true,
-      localDepth: 5,
-      localNeighborLinksEnabled: false
+      egoEnabled: true,
+      egoDepth: 5,
+      egoNeighborLinksEnabled: false
     }, undefined);
 
-    session.setLocalNeighborLinksEnabled(true);
+    session.setEgoNeighborLinksEnabled(true);
     expect(onStateChanged).toHaveBeenLastCalledWith({
       filterQuery: "",
       showTags: true,
       mapLayout: "auto",
       renderScale: 1,
       frameRateMode: "auto",
-      localEnabled: true,
-      localDepth: 5,
-      localNeighborLinksEnabled: true
+      egoEnabled: true,
+      egoDepth: 5,
+      egoNeighborLinksEnabled: true
     }, undefined);
   });
 
@@ -508,9 +530,9 @@ describe("MapSession", () => {
       mapLayout: "auto",
       renderScale: 1.2,
       frameRateMode: "auto",
-      localEnabled: false,
-      localDepth: 1,
-      localNeighborLinksEnabled: false
+      egoEnabled: false,
+      egoDepth: 1,
+      egoNeighborLinksEnabled: false
     }, { persist: false });
 
     session.persistRenderScale();
@@ -521,9 +543,9 @@ describe("MapSession", () => {
       mapLayout: "auto",
       renderScale: 1.2,
       frameRateMode: "auto",
-      localEnabled: false,
-      localDepth: 1,
-      localNeighborLinksEnabled: false
+      egoEnabled: false,
+      egoDepth: 1,
+      egoNeighborLinksEnabled: false
     }, undefined);
   });
 
@@ -730,7 +752,7 @@ describe("MapSession", () => {
   it("primes editor-focus signature before the first plain text edit", () => {
     vi.useFakeTimers();
 
-    const noteFile = new TFile("Folder/Note.md");
+    const noteFile = makeTestTFile("Folder/Note.md");
     const focusedCache = {
       links: [{ link: "RefA" }],
       tags: [{ tag: "#tag-a" }]
@@ -990,7 +1012,7 @@ describe("MapSession", () => {
         file: { path: "Projects/ReverySky/Spec.md" }
       }
     };
-    const projectFile = new TFile(projectLeaf.view.file.path);
+    const projectFile = makeTestTFile(projectLeaf.view.file.path);
 
     const payload = makePathPayload();
     const sendGraph = vi.fn();
@@ -1047,7 +1069,7 @@ describe("MapSession", () => {
 
   it("does not send editor focus before the bridge is ready", () => {
     const payload = makePathPayload();
-    const projectFile = new TFile("Projects/ReverySky/Spec.md");
+    const projectFile = makeTestTFile("Projects/ReverySky/Spec.md");
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
     const session = new MapSession({
@@ -1081,7 +1103,7 @@ describe("MapSession", () => {
   });
 
   it("sends startup active note focus after the initial global graph", () => {
-    const activeFile = new TFile("Note.md");
+    const activeFile = makeTestTFile("Note.md");
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
     const session = new MapSession({
@@ -1118,7 +1140,7 @@ describe("MapSession", () => {
   });
 
   it("does not send startup global focus when the active note is filtered out", async () => {
-    const activeFile = new TFile("Projects/ReverySky/Spec.md");
+    const activeFile = makeTestTFile("Projects/ReverySky/Spec.md");
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
     const session = new MapSession({
@@ -1152,8 +1174,8 @@ describe("MapSession", () => {
     expect(sendFocus).not.toHaveBeenCalled();
   });
 
-  it("does not accept local editor focus before the bridge is ready", async () => {
-    const payload = makeLocalPayload();
+  it("does not accept editor focus before the bridge is ready", async () => {
+    const payload = makeEgoPayload();
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
     const session = new MapSession({
@@ -1163,7 +1185,7 @@ describe("MapSession", () => {
           on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
         },
         vault: {
-          getAbstractFileByPath: vi.fn((path: string) => new TFile(path)),
+          getAbstractFileByPath: vi.fn((path: string) => makeTestTFile(path)),
           on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
         },
         workspace: {
@@ -1179,7 +1201,7 @@ describe("MapSession", () => {
       sendFocus
     });
 
-    await session.setState({ localEnabled: true });
+    await session.setState({ egoEnabled: true });
     session.start(() => undefined);
     session.requestFocusFromEditor("Projects/ReverySky/Spec.md");
 
@@ -1193,9 +1215,9 @@ describe("MapSession", () => {
     expect(sendFocus).not.toHaveBeenCalled();
   });
 
-  it("rebuilds the startup local ego graph around the active note", async () => {
-    const activeFile = new TFile("Projects/ReverySky/Spec.md");
-    const payload = makeLocalPayload();
+  it("rebuilds the startup Ego graph around the active note", async () => {
+    const activeFile = makeTestTFile("Projects/ReverySky/Spec.md");
+    const payload = makeEgoPayload();
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
     const session = new MapSession({
@@ -1205,7 +1227,7 @@ describe("MapSession", () => {
           on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
         },
         vault: {
-          getAbstractFileByPath: vi.fn((path: string) => new TFile(path)),
+          getAbstractFileByPath: vi.fn((path: string) => makeTestTFile(path)),
           on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
         },
         workspace: {
@@ -1222,7 +1244,7 @@ describe("MapSession", () => {
       sendFocus
     });
 
-    await session.setState({ localEnabled: true });
+    await session.setState({ egoEnabled: true });
     session.start(() => undefined);
     session.handleRuntimeReady();
 
@@ -1249,7 +1271,7 @@ describe("MapSession", () => {
       rename?: (file: { path?: string }, oldPath: string) => void;
     } = {};
     const payload = makePathPayload();
-    const projectFile = new TFile("Projects/ReverySky/Spec.md");
+    const projectFile = makeTestTFile("Projects/ReverySky/Spec.md");
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
     const session = new MapSession({
@@ -1294,8 +1316,8 @@ describe("MapSession", () => {
     expect(sendFocus).not.toHaveBeenCalled();
   });
 
-  it("rebuilds a local ego graph around editor focus without requiring membership in the previous graph", async () => {
-    const payload = makeLocalPayload();
+  it("rebuilds an Ego graph around editor focus without requiring membership in the previous graph", async () => {
+    const payload = makeEgoPayload();
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
     const session = new MapSession({
@@ -1305,7 +1327,7 @@ describe("MapSession", () => {
           on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
         },
         vault: {
-          getAbstractFileByPath: vi.fn((path: string) => new TFile(path)),
+          getAbstractFileByPath: vi.fn((path: string) => makeTestTFile(path)),
           on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
         },
         workspace: {
@@ -1321,7 +1343,7 @@ describe("MapSession", () => {
       sendFocus
     });
 
-    await session.setState({ localEnabled: true });
+    await session.setState({ egoEnabled: true });
     session.start(() => undefined);
     session.handleRuntimeReady();
 
@@ -1356,9 +1378,9 @@ describe("MapSession", () => {
     });
   });
 
-  it("does not rebuild local ego graph when focusing the current center again", async () => {
+  it("does not rebuild the Ego graph when focusing the current center again", async () => {
     let currentTime = 1700000000000;
-    const payload = makeLocalPayload();
+    const payload = makeEgoPayload();
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
     const session = new MapSession({
@@ -1368,7 +1390,7 @@ describe("MapSession", () => {
           on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
         },
         vault: {
-          getAbstractFileByPath: vi.fn((path: string) => new TFile(path)),
+          getAbstractFileByPath: vi.fn((path: string) => makeTestTFile(path)),
           on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
         },
         workspace: {
@@ -1384,7 +1406,7 @@ describe("MapSession", () => {
       sendFocus
     });
 
-    await session.setState({ localEnabled: true });
+    await session.setState({ egoEnabled: true });
     session.start(() => undefined);
     session.handleRuntimeReady();
     session.requestFocusFromEditor("Projects/ReverySky/Spec.md");
@@ -1403,8 +1425,8 @@ describe("MapSession", () => {
     });
   });
 
-  it("sends local focus intent even when the center is missing from the current source graph", async () => {
-    const payload = makeLocalPayload();
+  it("sends Ego focus intent even when the center is missing from the current source graph", async () => {
+    const payload = makeEgoPayload();
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
     const session = new MapSession({
@@ -1414,7 +1436,7 @@ describe("MapSession", () => {
           on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
         },
         vault: {
-          getAbstractFileByPath: vi.fn((path: string) => new TFile(path)),
+          getAbstractFileByPath: vi.fn((path: string) => makeTestTFile(path)),
           on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
         },
         workspace: {
@@ -1430,7 +1452,7 @@ describe("MapSession", () => {
       sendFocus
     });
 
-    await session.setState({ localEnabled: true });
+    await session.setState({ egoEnabled: true });
     session.start(() => undefined);
     session.handleRuntimeReady();
 
@@ -1444,10 +1466,10 @@ describe("MapSession", () => {
     });
   });
 
-  it("applies query filters inside local ego graph while keeping the center", async () => {
+  it("applies query filters inside the Ego graph while keeping the center", async () => {
     vi.useFakeTimers();
 
-    const payload = makeLocalPayload();
+    const payload = makeEgoPayload();
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
     const session = new MapSession({
@@ -1457,7 +1479,7 @@ describe("MapSession", () => {
           on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
         },
         vault: {
-          getAbstractFileByPath: vi.fn((path: string) => new TFile(path)),
+          getAbstractFileByPath: vi.fn((path: string) => makeTestTFile(path)),
           on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
         },
         workspace: {
@@ -1473,7 +1495,7 @@ describe("MapSession", () => {
       sendFocus
     });
 
-    await session.setState({ localEnabled: true });
+    await session.setState({ egoEnabled: true });
     session.start(() => undefined);
     session.handleRuntimeReady();
     session.requestFocusFromEditor("Archive/Old.md");
@@ -1497,12 +1519,12 @@ describe("MapSession", () => {
     ]);
   });
 
-  it("builds local ego graph to the configured depth and hides tags only on the boundary ring", async () => {
+  it("builds the Ego graph to the configured depth and hides tags only on the boundary ring", async () => {
     const payload = makeDepthPayload();
     const sendGraph = vi.fn();
-    const session = createLocalGraphSession(payload, { sendGraph });
+    const session = createEgoGraphSession(payload, { sendGraph });
 
-    await session.setState({ localEnabled: true, localDepth: 2 });
+    await session.setState({ egoEnabled: true, egoDepth: 2 });
     session.start(() => undefined);
     session.handleRuntimeReady();
     session.requestFocusFromEditor("Depth/Center.md");
@@ -1532,12 +1554,12 @@ describe("MapSession", () => {
     ]);
   });
 
-  it("limits local ego graph to depth one by default", async () => {
+  it("limits the Ego graph to depth one by default", async () => {
     const payload = makeDepthPayload();
     const sendGraph = vi.fn();
-    const session = createLocalGraphSession(payload, { sendGraph });
+    const session = createEgoGraphSession(payload, { sendGraph });
 
-    await session.setState({ localEnabled: true });
+    await session.setState({ egoEnabled: true });
     session.start(() => undefined);
     session.handleRuntimeReady();
     session.requestFocusFromEditor("Depth/Center.md");
@@ -1557,18 +1579,18 @@ describe("MapSession", () => {
     ]);
   });
 
-  it("expands and contracts the local ego graph when local depth changes", async () => {
+  it("expands and contracts the Ego graph when Ego depth changes", async () => {
     const payload = makeDepthPayload();
     const sendGraph = vi.fn();
-    const session = createLocalGraphSession(payload, { sendGraph });
+    const session = createEgoGraphSession(payload, { sendGraph });
 
-    await session.setState({ localEnabled: true });
+    await session.setState({ egoEnabled: true });
     session.start(() => undefined);
     session.handleRuntimeReady();
     session.requestFocusFromEditor("Depth/Center.md");
 
-    session.setLocalDepth(2);
-    session.setLocalDepth(1);
+    session.setEgoDepth(2);
+    session.setEgoDepth(1);
 
     expect(sendGraph).toHaveBeenCalledTimes(4);
     expect((sendGraph.mock.calls[1]?.[0] as GraphPayload).notes.map((note) => note.id)).toEqual([
@@ -1590,12 +1612,12 @@ describe("MapSession", () => {
     ]);
   });
 
-  it("keeps neighbor links out unless the local neighbor-links option is enabled", async () => {
+  it("keeps neighbor links out unless the Ego neighbor-links option is enabled", async () => {
     const payload = makeDepthPayload();
     const sendGraph = vi.fn();
-    const session = createLocalGraphSession(payload, { sendGraph });
+    const session = createEgoGraphSession(payload, { sendGraph });
 
-    await session.setState({ localEnabled: true, localDepth: 2 });
+    await session.setState({ egoEnabled: true, egoDepth: 2 });
     session.start(() => undefined);
     session.handleRuntimeReady();
     session.requestFocusFromEditor("Depth/Center.md");
@@ -1608,7 +1630,7 @@ describe("MapSession", () => {
       { sourceId: "outer-right", targetId: "right", kind: "resolved" }
     ]);
 
-    session.setLocalNeighborLinksEnabled(true);
+    session.setEgoNeighborLinksEnabled(true);
 
     expect(sendGraph).toHaveBeenCalledTimes(3);
     expect((sendGraph.mock.calls[2]?.[0] as GraphPayload).links).toEqual([
@@ -1620,7 +1642,7 @@ describe("MapSession", () => {
     ]);
   });
 
-  it("keeps boundary links to tags that are already visible from inner local rings", async () => {
+  it("keeps boundary links to tags that are already visible from inner Ego rings", async () => {
     const payload = makeDepthPayload();
     const center = payload.notes.find((note) => note.id === "center");
     const outerLeft = payload.notes.find((note) => note.id === "outer-left");
@@ -1629,9 +1651,9 @@ describe("MapSession", () => {
     center!.tags = ["center", "shared"];
     outerLeft!.tags = ["outer-left", "shared"];
     const sendGraph = vi.fn();
-    const session = createLocalGraphSession(payload, { sendGraph });
+    const session = createEgoGraphSession(payload, { sendGraph });
 
-    await session.setState({ localEnabled: true, localDepth: 2 });
+    await session.setState({ egoEnabled: true, egoDepth: 2 });
     session.start(() => undefined);
     session.handleRuntimeReady();
     session.requestFocusFromEditor("Depth/Center.md");
@@ -1647,14 +1669,14 @@ describe("MapSession", () => {
     ]);
   });
 
-  it("matches a local boundary note by tag without sending that boundary tag to Unity", async () => {
+  it("matches an Ego boundary note by tag without sending that boundary tag to Unity", async () => {
     vi.useFakeTimers();
 
     const payload = makeDepthPayload();
     const sendGraph = vi.fn();
-    const session = createLocalGraphSession(payload, { sendGraph });
+    const session = createEgoGraphSession(payload, { sendGraph });
 
-    await session.setState({ localEnabled: true, localDepth: 2 });
+    await session.setState({ egoEnabled: true, egoDepth: 2 });
     session.start(() => undefined);
     session.handleRuntimeReady();
     session.requestFocusFromEditor("Depth/Center.md");
@@ -1671,13 +1693,13 @@ describe("MapSession", () => {
     ]);
   });
 
-  it("uses the shortest local distance when a note is reachable through a cycle", async () => {
+  it("uses the shortest Ego distance when a note is reachable through a cycle", async () => {
     const payload = makeDepthPayload();
     payload.links.splice(4, 0, { sourceId: "outer-left", targetId: "center", kind: "resolved" });
     const sendGraph = vi.fn();
-    const session = createLocalGraphSession(payload, { sendGraph });
+    const session = createEgoGraphSession(payload, { sendGraph });
 
-    await session.setState({ localEnabled: true, localDepth: 2 });
+    await session.setState({ egoEnabled: true, egoDepth: 2 });
     session.start(() => undefined);
     session.handleRuntimeReady();
     session.requestFocusFromEditor("Depth/Center.md");
@@ -1702,8 +1724,8 @@ describe("MapSession", () => {
     ]);
   });
 
-  it("rebuilds local ego graph from Unity focus and gates the Obsidian echo", async () => {
-    const payload = makeLocalPayload();
+  it("rebuilds the Ego graph from Unity focus and gates the Obsidian echo", async () => {
+    const payload = makeEgoPayload();
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
     const session = new MapSession({
@@ -1713,7 +1735,7 @@ describe("MapSession", () => {
           on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
         },
         vault: {
-          getAbstractFileByPath: vi.fn((path: string) => new TFile(path)),
+          getAbstractFileByPath: vi.fn((path: string) => makeTestTFile(path)),
           on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
         },
         workspace: {
@@ -1729,7 +1751,7 @@ describe("MapSession", () => {
       sendFocus
     });
 
-    await session.setState({ localEnabled: true });
+    await session.setState({ egoEnabled: true });
     session.start(() => undefined);
     session.handleRuntimeReady();
 
@@ -1752,8 +1774,8 @@ describe("MapSession", () => {
     expect(sendFocus).toHaveBeenCalledTimes(1);
   });
 
-  it("does not rebuild local ego graph when Unity focuses the current center again", async () => {
-    const payload = makeLocalPayload();
+  it("does not rebuild the Ego graph when Unity focuses the current center again", async () => {
+    const payload = makeEgoPayload();
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
     const session = new MapSession({
@@ -1763,7 +1785,7 @@ describe("MapSession", () => {
           on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
         },
         vault: {
-          getAbstractFileByPath: vi.fn((path: string) => new TFile(path)),
+          getAbstractFileByPath: vi.fn((path: string) => makeTestTFile(path)),
           on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
         },
         workspace: {
@@ -1779,7 +1801,7 @@ describe("MapSession", () => {
       sendFocus
     });
 
-    await session.setState({ localEnabled: true });
+    await session.setState({ egoEnabled: true });
     session.start(() => undefined);
     session.handleRuntimeReady();
     session.recordRuntimeFocusPath("Archive/Old.md");
@@ -1793,7 +1815,7 @@ describe("MapSession", () => {
     expect(sendFocus).toHaveBeenCalledTimes(1);
   });
 
-  it("rebuilds local ego graph around the renamed focus path", async () => {
+  it("rebuilds the Ego graph around the renamed focus path", async () => {
     vi.useFakeTimers();
 
     const vaultCallbacks: {
@@ -1823,7 +1845,7 @@ describe("MapSession", () => {
           on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
         },
         vault: {
-          getAbstractFileByPath: vi.fn((path: string) => new TFile(path)),
+          getAbstractFileByPath: vi.fn((path: string) => makeTestTFile(path)),
           on: vi.fn((name: "create" | "delete" | "rename", callback: (...args: never[]) => void) => {
             if (name === "rename") {
               vaultCallbacks.rename = callback as typeof vaultCallbacks.rename;
@@ -1847,7 +1869,7 @@ describe("MapSession", () => {
       sendFocus
     });
 
-    await session.setState({ localEnabled: true });
+    await session.setState({ egoEnabled: true });
     session.start(() => undefined);
     session.handleRuntimeReady();
     session.requestFocusFromEditor(oldPath);
@@ -1952,7 +1974,7 @@ describe("MapSession", () => {
 
     const oldPath = "Folder/Old.md";
     const newPath = "Moved/New.md";
-    const noteFile = new TFile(oldPath);
+    const noteFile = makeTestTFile(oldPath);
     const payloadBefore = makePayload();
     payloadBefore.notes = [
       { id: makeStableNoteId(oldPath), path: oldPath, title: "Old", tags: [], date: "2026-01-03T00:00:00.000Z", size: 30 }

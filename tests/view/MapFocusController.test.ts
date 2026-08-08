@@ -251,7 +251,7 @@ describe("MapFocusController", () => {
     expect(requestFocus).toHaveBeenCalledTimes(1);
     expect(requestFocus).toHaveBeenLastCalledWith("Folder/New.md", {
       skipGraphCheck: true,
-      skipLocalGraphRebuild: true
+      skipEgoGraphRebuild: true
     });
   });
 
@@ -268,7 +268,7 @@ describe("MapFocusController", () => {
     expect(requestFocus).toHaveBeenCalledTimes(1);
     expect(requestFocus).toHaveBeenLastCalledWith("Folder/New.md", {
       skipGraphCheck: true,
-      skipLocalGraphRebuild: true
+      skipEgoGraphRebuild: true
     });
 
     currentTime += 301;
@@ -294,7 +294,7 @@ describe("MapFocusController", () => {
     expect(requestFocus).toHaveBeenCalledTimes(1);
     expect(requestFocus).toHaveBeenLastCalledWith("Moved/New.md", {
       skipGraphCheck: true,
-      skipLocalGraphRebuild: true
+      skipEgoGraphRebuild: true
     });
   });
 

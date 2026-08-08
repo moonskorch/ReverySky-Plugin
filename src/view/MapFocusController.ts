@@ -9,7 +9,7 @@ const FOCUS_GATE_WINDOW_MS = 300;
 
 export type FocusRequestOptions = {
   skipGraphCheck?: boolean;
-  skipLocalGraphRebuild?: boolean;
+  skipEgoGraphRebuild?: boolean;
 };
 
 export type MapFocusControllerDependencies = {
@@ -88,7 +88,7 @@ export class MapFocusController {
       // the new path-derived id may not exist in MapSession.outgoingGraphPayload yet.
       const didRequestFocus = this.deps.requestFocus(normalizedNewPath, {
         skipGraphCheck: true,
-        skipLocalGraphRebuild: true
+        skipEgoGraphRebuild: true
       });
       if (didRequestFocus) {
         this.rememberGate(normalizedNewPath);

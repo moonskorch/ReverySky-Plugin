@@ -36,13 +36,13 @@ export class MapSettingsPanelController {
   private settingsSectionEl: HTMLElement | null = null;
   private settingsSectionToggleButtonEl: HTMLButtonElement | null = null;
   private settingsSectionContentEl: HTMLElement | null = null;
-  private localSectionEl: HTMLElement | null = null;
-  private localSectionToggleButtonEl: HTMLButtonElement | null = null;
-  private localSectionContentEl: HTMLElement | null = null;
-  private localMainToggleButtonEl: HTMLButtonElement | null = null;
-  private localDepthInputEl: HTMLInputElement | null = null;
-  private localDepthValueEl: HTMLElement | null = null;
-  private localNeighborLinksToggleButtonEl: HTMLButtonElement | null = null;
+  private egoSectionEl: HTMLElement | null = null;
+  private egoSectionToggleButtonEl: HTMLButtonElement | null = null;
+  private egoSectionContentEl: HTMLElement | null = null;
+  private egoMainToggleButtonEl: HTMLButtonElement | null = null;
+  private egoDepthInputEl: HTMLInputElement | null = null;
+  private egoDepthValueEl: HTMLElement | null = null;
+  private egoNeighborLinksToggleButtonEl: HTMLButtonElement | null = null;
   private graphicsSectionEl: HTMLElement | null = null;
   private graphicsSectionToggleButtonEl: HTMLButtonElement | null = null;
   private graphicsSectionContentEl: HTMLElement | null = null;
@@ -60,7 +60,7 @@ export class MapSettingsPanelController {
   private screenshotButtonEl: HTMLButtonElement | null = null;
   private settingsPanelOpen = false;
   private settingsSectionCollapsed = true;
-  private localSectionCollapsed = true;
+  private egoSectionCollapsed = true;
   private graphicsSectionCollapsed = true;
   private screenshotSectionCollapsed = true;
 
@@ -208,67 +208,67 @@ export class MapSettingsPanelController {
     });
     this.layoutDropdownEl = layoutControl.select;
 
-    const localSection = createCollapsibleSection(settingsScrollArea as ObsidianHTMLElement, {
-      className: "reverysky-map-local-section",
+    const egoSection = createCollapsibleSection(settingsScrollArea as ObsidianHTMLElement, {
+      className: "reverysky-map-ego-section",
       label: "Ego Graph",
       onToggle: () => {
-        this.setLocalSectionCollapsed(!this.localSectionCollapsed);
+        this.setEgoSectionCollapsed(!this.egoSectionCollapsed);
       }
     });
-    this.localSectionEl = localSection.section;
-    this.localSectionToggleButtonEl = localSection.toggleButton;
-    this.localSectionContentEl = localSection.content;
-    const localSectionContent = localSection.content;
+    this.egoSectionEl = egoSection.section;
+    this.egoSectionToggleButtonEl = egoSection.toggleButton;
+    this.egoSectionContentEl = egoSection.content;
+    const egoSectionContent = egoSection.content;
 
-    const toggleLocal = (event: Event) => {
+    const toggleEgo = (event: Event) => {
       event.preventDefault();
       const uiState = this.session.getFilterUiState();
-      this.session.setLocalEnabled(!uiState.localEnabled);
-      this.refreshLocalControlsUi();
+      this.session.setEgoEnabled(!uiState.egoEnabled);
+      this.refreshEgoControlsUi();
     };
-    const localToggle = createToggleControl(localSectionContent as ObsidianHTMLElement, {
-      rowClassName: "reverysky-map-local-toggle-row",
-      buttonClassName: "reverysky-map-local-toggle",
-      thumbClassName: "reverysky-map-local-toggle-thumb",
+    const egoToggle = createToggleControl(egoSectionContent as ObsidianHTMLElement, {
+      rowClassName: "reverysky-map-ego-toggle-row",
+      buttonClassName: "reverysky-map-ego-toggle",
+      thumbClassName: "reverysky-map-ego-toggle-thumb",
       label: "Ego mode",
       ariaLabel: "Toggle Ego mode",
-      onToggle: toggleLocal
+      onToggle: toggleEgo
     });
-    this.localMainToggleButtonEl = localToggle.button;
+    this.egoMainToggleButtonEl = egoToggle.button;
 
-    const localDepth = createRangeControl(localSectionContent as ObsidianHTMLElement, {
-      sectionClassName: "reverysky-map-local-depth-section",
-      inputClassName: "reverysky-map-local-depth-input",
-      valueClassName: "reverysky-map-local-depth-value",
-      messageClassName: "reverysky-map-local-depth-message reverysky-map-range-control-message--hidden",
+    const egoDepth = createRangeControl(egoSectionContent as ObsidianHTMLElement, {
+      sectionClassName: "reverysky-map-ego-depth-section",
+      inputClassName: "reverysky-map-ego-depth-input",
+      valueClassName: "reverysky-map-ego-depth-value",
+      messageClassName: "reverysky-map-ego-depth-message reverysky-map-range-control-message--hidden",
       label: "Depth",
       ariaLabel: "Ego Graph depth",
       min: "1",
       max: "5",
       step: "1",
       onInput: (input) => {
-        this.session.setLocalDepth(input.value);
-        this.refreshLocalControlsUi();
+        this.session.setEgoDepth(input.value);
+        this.refreshEgoControlsUi();
       }
     });
-    this.localDepthInputEl = localDepth.input;
-    this.localDepthValueEl = localDepth.value;
+    this.egoDepthInputEl = egoDepth.input;
+    this.egoDepthValueEl = egoDepth.value;
 
-    const toggleNeighborLinks = (event: Event) => {
+    const toggleEgoNeighborLinks = (event: Event) => {
       event.preventDefault();
       const uiState = this.session.getFilterUiState();
-      this.session.setLocalNeighborLinksEnabled(!uiState.localNeighborLinksEnabled);
-      this.refreshLocalControlsUi();
+      this.session.setEgoNeighborLinksEnabled(!uiState.egoNeighborLinksEnabled);
+      this.refreshEgoControlsUi();
     };
-    const neighborLinksToggle = createToggleControl(localSectionContent as ObsidianHTMLElement, {
-      rowClassName: "reverysky-map-neighbor-links-toggle-row",
-      buttonClassName: "reverysky-map-neighbor-links-toggle",
-      thumbClassName: "reverysky-map-neighbor-links-toggle-thumb",
+    const neighborLinksToggle = createToggleControl(egoSectionContent as ObsidianHTMLElement, {
+      rowClassName: "reverysky-map-ego-neighbor-links-toggle-row",
+      buttonClassName: "reverysky-map-ego-neighbor-links-toggle",
+      thumbClassName: "reverysky-map-ego-neighbor-links-toggle-thumb",
       label: "Neighbor links",
       ariaLabel: "Toggle neighbor links",
-      onToggle: toggleNeighborLinks
+      onToggle: toggleEgoNeighborLinks
     });
-    this.localNeighborLinksToggleButtonEl = neighborLinksToggle.button;
+    this.egoNeighborLinksToggleButtonEl = neighborLinksToggle.button;
 
     const graphicsSection = createCollapsibleSection(settingsScrollArea as ObsidianHTMLElement, {
       className: "reverysky-map-graphics-section",
@@ -348,7 +348,7 @@ export class MapSettingsPanelController {
     this.refreshFilterMessage();
     this.refreshTagsToggleUi();
     this.refreshLayoutDropdownUi();
-    this.refreshLocalControlsUi();
+    this.refreshEgoControlsUi();
     this.refreshRenderScaleUi();
     this.refreshFrameRateModeDropdownUi();
   }
@@ -368,13 +368,13 @@ export class MapSettingsPanelController {
     this.settingsSectionEl = null;
     this.settingsSectionToggleButtonEl = null;
     this.settingsSectionContentEl = null;
-    this.localSectionEl = null;
-    this.localSectionToggleButtonEl = null;
-    this.localSectionContentEl = null;
-    this.localMainToggleButtonEl = null;
-    this.localDepthInputEl = null;
-    this.localDepthValueEl = null;
-    this.localNeighborLinksToggleButtonEl = null;
+    this.egoSectionEl = null;
+    this.egoSectionToggleButtonEl = null;
+    this.egoSectionContentEl = null;
+    this.egoMainToggleButtonEl = null;
+    this.egoDepthInputEl = null;
+    this.egoDepthValueEl = null;
+    this.egoNeighborLinksToggleButtonEl = null;
     this.graphicsSectionEl = null;
     this.graphicsSectionToggleButtonEl = null;
     this.graphicsSectionContentEl = null;
@@ -390,7 +390,7 @@ export class MapSettingsPanelController {
     this.screenshotButtonEl = null;
     this.settingsPanelOpen = false;
     this.settingsSectionCollapsed = true;
-    this.localSectionCollapsed = true;
+    this.egoSectionCollapsed = true;
     this.graphicsSectionCollapsed = true;
     this.screenshotSectionCollapsed = true;
   }
@@ -421,8 +421,8 @@ export class MapSettingsPanelController {
     this.refreshCollapsibleSections();
   }
 
-  private setLocalSectionCollapsed(isCollapsed: boolean): void {
-    this.localSectionCollapsed = isCollapsed;
+  private setEgoSectionCollapsed(isCollapsed: boolean): void {
+    this.egoSectionCollapsed = isCollapsed;
     this.refreshCollapsibleSections();
   }
 
@@ -440,10 +440,10 @@ export class MapSettingsPanelController {
       "Selection"
     );
     this.refreshCollapsibleSection(
-      this.localSectionEl,
-      this.localSectionToggleButtonEl,
-      this.localSectionContentEl,
-      this.localSectionCollapsed,
+      this.egoSectionEl,
+      this.egoSectionToggleButtonEl,
+      this.egoSectionContentEl,
+      this.egoSectionCollapsed,
       "Ego Graph"
     );
     this.refreshCollapsibleSection(
@@ -531,20 +531,20 @@ export class MapSettingsPanelController {
     this.layoutDropdownEl.value = uiState.mapLayout;
   }
 
-  private refreshLocalControlsUi(): void {
+  private refreshEgoControlsUi(): void {
     const uiState = this.session.getFilterUiState();
-    this.localMainToggleButtonEl?.setAttribute("role", "switch");
-    this.localMainToggleButtonEl?.setAttribute("aria-checked", uiState.localEnabled ? "true" : "false");
-    if (this.localDepthInputEl) {
-      this.localDepthInputEl.value = String(uiState.localDepth);
+    this.egoMainToggleButtonEl?.setAttribute("role", "switch");
+    this.egoMainToggleButtonEl?.setAttribute("aria-checked", uiState.egoEnabled ? "true" : "false");
+    if (this.egoDepthInputEl) {
+      this.egoDepthInputEl.value = String(uiState.egoDepth);
     }
-    if (this.localDepthValueEl) {
-      this.localDepthValueEl.textContent = String(uiState.localDepth);
+    if (this.egoDepthValueEl) {
+      this.egoDepthValueEl.textContent = String(uiState.egoDepth);
     }
-    this.localNeighborLinksToggleButtonEl?.setAttribute("role", "switch");
-    this.localNeighborLinksToggleButtonEl?.setAttribute(
+    this.egoNeighborLinksToggleButtonEl?.setAttribute("role", "switch");
+    this.egoNeighborLinksToggleButtonEl?.setAttribute(
       "aria-checked",
-      uiState.localNeighborLinksEnabled ? "true" : "false"
+      uiState.egoNeighborLinksEnabled ? "true" : "false"
     );
   }
 

@@ -42,20 +42,20 @@ export const DEFAULT_RENDER_SCALE = 1;
 export const MIN_RENDER_SCALE = 0.5;
 export const MAX_RENDER_SCALE = 1.5;
 export const RENDER_SCALE_STEP = 0.1;
-export const DEFAULT_LOCAL_ENABLED = false;
-export const DEFAULT_LOCAL_DEPTH = 1;
-export const MIN_LOCAL_DEPTH = 1;
-export const MAX_LOCAL_DEPTH = 5;
-export const DEFAULT_LOCAL_NEIGHBOR_LINKS_ENABLED = false;
+export const DEFAULT_EGO_ENABLED = false;
+export const DEFAULT_EGO_DEPTH = 1;
+export const MIN_EGO_DEPTH = 1;
+export const MAX_EGO_DEPTH = 5;
+export const DEFAULT_EGO_NEIGHBOR_LINKS_ENABLED = false;
 export type MapViewState = {
   filterQuery?: unknown;
   showTags?: unknown;
   mapLayout?: unknown;
   renderScale?: unknown;
   frameRateMode?: unknown;
-  localEnabled?: unknown;
-  localDepth?: unknown;
-  localNeighborLinksEnabled?: unknown;
+  egoEnabled?: unknown;
+  egoDepth?: unknown;
+  egoNeighborLinksEnabled?: unknown;
 };
 
 export type MapFilterUiState = {
@@ -65,9 +65,9 @@ export type MapFilterUiState = {
   renderScale: number;
   renderScaleRestartRequired: boolean;
   frameRateMode: FrameRateMode;
-  localEnabled: boolean;
-  localDepth: number;
-  localNeighborLinksEnabled: boolean;
+  egoEnabled: boolean;
+  egoDepth: number;
+  egoNeighborLinksEnabled: boolean;
   filterParseValid: boolean;
   filterMessage: string;
 };
@@ -91,7 +91,7 @@ export type TagSuggestion = {
   displayTag: string;
 };
 
-type LocalGraphScope = {
+type EgoGraphScope = {
   payload: GraphPayload;
   centerNoteId?: string;
   distanceByNoteId: Map<string, number>;
@@ -143,9 +143,9 @@ export class MapSession {
   private renderScale = DEFAULT_RENDER_SCALE;
   private appliedRenderScale = DEFAULT_RENDER_SCALE;
   private frameRateMode: FrameRateMode = DEFAULT_FRAME_RATE_MODE;
-  private localEnabled = DEFAULT_LOCAL_ENABLED;
-  private localDepth = DEFAULT_LOCAL_DEPTH;
-  private localNeighborLinksEnabled = DEFAULT_LOCAL_NEIGHBOR_LINKS_ENABLED;
+  private egoEnabled = DEFAULT_EGO_ENABLED;
+  private egoDepth = DEFAULT_EGO_DEPTH;
+  private egoNeighborLinksEnabled = DEFAULT_EGO_NEIGHBOR_LINKS_ENABLED;
   // Parsed filter currently applied to the outgoing graph; live input commits it only after debounce.
   private activeQueryFilter: ParsedQueryFilter | null = null;
   private filterParseValid = true;
@@ -179,9 +179,9 @@ export class MapSession {
       mapLayout: this.mapLayout,
       renderScale: this.renderScale,
       frameRateMode: this.frameRateMode,
-      localEnabled: this.localEnabled,
-      localDepth: this.localDepth,
-      localNeighborLinksEnabled: this.localNeighborLinksEnabled
+      egoEnabled: this.egoEnabled,
+      egoDepth: this.egoDepth,
+      egoNeighborLinksEnabled: this.egoNeighborLinksEnabled
     };
   }
 
@@ -195,13 +195,13 @@ export class MapSession {
     this.mapLayout = nextLayoutPreference;
     this.renderScale = normalizeRenderScale(nextState.renderScale);
     this.frameRateMode = normalizeFrameRateMode(nextState.frameRateMode);
-    this.localEnabled = typeof nextState.localEnabled === "boolean"
-      ? nextState.localEnabled
-      : DEFAULT_LOCAL_ENABLED;
-    this.localDepth = normalizeLocalDepth(nextState.localDepth);
-    this.localNeighborLinksEnabled = typeof nextState.localNeighborLinksEnabled === "boolean"
-      ? nextState.localNeighborLinksEnabled
-      : DEFAULT_LOCAL_NEIGHBOR_LINKS_ENABLED;
+    this.egoEnabled = typeof nextState.egoEnabled === "boolean"
+      ? nextState.egoEnabled
+      : DEFAULT_EGO_ENABLED;
+    this.egoDepth = normalizeEgoDepth(nextState.egoDepth);
+    this.egoNeighborLinksEnabled = typeof nextState.egoNeighborLinksEnabled === "boolean"
+      ? nextState.egoNeighborLinksEnabled
+      : DEFAULT_EGO_NEIGHBOR_LINKS_ENABLED;
     this.applyParsedQueryResult(GraphQueryFilter.parseQuery(nextQuery));
   }
 
@@ -285,24 +285,24 @@ export class MapSession {
     this.notifyStateChanged({ persist: false });
   }
 
-  setLocalEnabled(localEnabled: boolean): void {
-    this.localEnabled = localEnabled;
+  setEgoEnabled(egoEnabled: boolean): void {
+    this.egoEnabled = egoEnabled;
     this.notifyStateChanged();
     this.sendGraphFromSource();
   }
 
-  setLocalDepth(localDepth: unknown): void {
-    this.localDepth = normalizeLocalDepth(localDepth);
+  setEgoDepth(egoDepth: unknown): void {
+    this.egoDepth = normalizeEgoDepth(egoDepth);
     this.notifyStateChanged();
-    if (this.localEnabled) {
+    if (this.egoEnabled) {
       this.sendGraphFromSource();
     }
   }
 
-  setLocalNeighborLinksEnabled(localNeighborLinksEnabled: boolean): void {
-    this.localNeighborLinksEnabled = localNeighborLinksEnabled;
+  setEgoNeighborLinksEnabled(egoNeighborLinksEnabled: boolean): void {
+    this.egoNeighborLinksEnabled = egoNeighborLinksEnabled;
     this.notifyStateChanged();
-    if (this.localEnabled) {
+    if (this.egoEnabled) {
       this.sendGraphFromSource();
     }
   }
@@ -333,9 +333,9 @@ export class MapSession {
       renderScale: this.renderScale,
       renderScaleRestartRequired: this.renderScale !== this.appliedRenderScale,
       frameRateMode: this.frameRateMode,
-      localEnabled: this.localEnabled,
-      localDepth: this.localDepth,
-      localNeighborLinksEnabled: this.localNeighborLinksEnabled,
+      egoEnabled: this.egoEnabled,
+      egoDepth: this.egoDepth,
+      egoNeighborLinksEnabled: this.egoNeighborLinksEnabled,
       filterParseValid: this.filterParseValid,
       filterMessage: this.filterMessage
     };
@@ -479,18 +479,18 @@ export class MapSession {
       return false;
     }
 
-    return this.localEnabled
-      ? this.acceptLocalFocusPath(path, options)
+    return this.egoEnabled
+      ? this.acceptEgoFocusPath(path, options)
       : this.tryAcceptGlobalFocusPath(path, options);
   }
 
-  private acceptLocalFocusPath(path: string, options?: FocusRequestOptions): boolean {
-    const isSameLocalCenter = this.focusPath === path;
+  private acceptEgoFocusPath(path: string, options?: FocusRequestOptions): boolean {
+    const isSameEgoCenter = this.focusPath === path;
     this.focusPath = path;
     // Rename focus intentionally skips this rebuild: the vault rename event
     // schedules a fresh source graph rebuild, while the current source graph
     // can still contain the old path.
-    if (!isSameLocalCenter && !options?.skipLocalGraphRebuild) {
+    if (!isSameEgoCenter && !options?.skipEgoGraphRebuild) {
       if (!this.sourceGraphPayload) {
         this.rebuildSourceGraph();
       }
@@ -538,10 +538,10 @@ export class MapSession {
   recordRuntimeFocusPath(pathValue: unknown): void {
     const path = this.normalizeVaultPath(pathValue);
     if (this.isGraphRelevantPath(path)) {
-      const isSameLocalCenter = this.focusPath === path;
+      const isSameEgoCenter = this.focusPath === path;
       this.focusPath = path;
-      if (this.localEnabled && this.bridgeReady && !isSameLocalCenter) {
-        // Local graph rebuild changes the rendered neighborhood; re-send focus so Unity restores the new center.
+      if (this.egoEnabled && this.bridgeReady && !isSameEgoCenter) {
+        // Ego graph rebuild changes the rendered neighborhood; re-send focus so Unity restores the new center.
         this.sendGraphFromSource();
         this.sendAcceptedFocusPath(path);
       }
@@ -717,19 +717,19 @@ export class MapSession {
   }
 
   private applyActiveFilters(payload: GraphPayload): GraphPayload {
-    const localScope = this.localEnabled
-      ? this.buildLocalGraphScope(payload)
+    const egoScope = this.egoEnabled
+      ? this.buildEgoGraphScope(payload)
       : { payload, centerNoteId: undefined, distanceByNoteId: new Map() };
 
     const queryFiltered = GraphQueryFilter.applyFilter(
-      localScope.payload,
+      egoScope.payload,
       this.activeQueryFilter,
-      { alwaysIncludeNoteId: localScope.centerNoteId }
+      { alwaysIncludeNoteId: egoScope.centerNoteId }
     );
 
     const tagsFiltered = this.applyTagsVisibilityFilter(
       queryFiltered,
-      localScope.distanceByNoteId
+      egoScope.distanceByNoteId
     );
 
     return {
@@ -738,7 +738,7 @@ export class MapSession {
     };
   }
 
-  private buildLocalGraphScope(payload: GraphPayload): LocalGraphScope {
+  private buildEgoGraphScope(payload: GraphPayload): EgoGraphScope {
     const centerPath = this.normalizeVaultPath(this.focusPath);
     if (!this.isGraphRelevantPath(centerPath)) {
       return {
@@ -789,7 +789,7 @@ export class MapSession {
     for (let index = 0; index < queue.length; index++) {
       const currentId = queue[index];
       const currentDistance = distanceByNoteId.get(currentId) ?? 0;
-      if (currentDistance >= this.localDepth) {
+      if (currentDistance >= this.egoDepth) {
         continue;
       }
 
@@ -809,7 +809,7 @@ export class MapSession {
       if (!includedIds.has(link.sourceId) || !includedIds.has(link.targetId)) {
         return false;
       }
-      if (this.localNeighborLinksEnabled) {
+      if (this.egoNeighborLinksEnabled) {
         return true;
       }
       const sourceDistance = distanceByNoteId.get(link.sourceId);
@@ -817,7 +817,7 @@ export class MapSession {
       return (
         typeof sourceDistance === "number" &&
         typeof targetDistance === "number" &&
-        Math.min(sourceDistance, targetDistance) < this.localDepth &&
+        Math.min(sourceDistance, targetDistance) < this.egoDepth &&
         sourceDistance !== targetDistance
       );
     });
@@ -878,11 +878,11 @@ export class MapSession {
       return [];
     }
 
-    if (distance < this.localDepth) {
+    if (distance < this.egoDepth) {
       return note.tags;
     }
 
-    return note.tags.filter((tag) => visibleInnerTags.has(this.normalizeLocalTagKey(tag)));
+    return note.tags.filter((tag) => visibleInnerTags.has(this.normalizeEgoTagKey(tag)));
   }
 
   private buildVisibleInnerTagSet(
@@ -892,18 +892,18 @@ export class MapSession {
     const visibleTags = new Set<string>();
     for (const note of payload.notes) {
       const distance = distanceByNoteId.get(note.id);
-      if (typeof distance !== "number" || distance >= this.localDepth) {
+      if (typeof distance !== "number" || distance >= this.egoDepth) {
         continue;
       }
 
       for (const tag of note.tags) {
-        visibleTags.add(this.normalizeLocalTagKey(tag));
+        visibleTags.add(this.normalizeEgoTagKey(tag));
       }
     }
     return visibleTags;
   }
 
-  private normalizeLocalTagKey(tag: string): string {
+  private normalizeEgoTagKey(tag: string): string {
     return tag.trim().toLowerCase();
   }
 
@@ -1204,18 +1204,18 @@ export function normalizeRenderScale(value: unknown): number {
   return rounded;
 }
 
-export function normalizeLocalDepth(value: unknown): number {
+export function normalizeEgoDepth(value: unknown): number {
   const numericValue = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(numericValue)) {
-    return DEFAULT_LOCAL_DEPTH;
+    return DEFAULT_EGO_DEPTH;
   }
 
   if (
     !Number.isInteger(numericValue) ||
-    numericValue < MIN_LOCAL_DEPTH ||
-    numericValue > MAX_LOCAL_DEPTH
+    numericValue < MIN_EGO_DEPTH ||
+    numericValue > MAX_EGO_DEPTH
   ) {
-    return DEFAULT_LOCAL_DEPTH;
+    return DEFAULT_EGO_DEPTH;
   }
   return numericValue;
 }
