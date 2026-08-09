@@ -491,6 +491,54 @@ public class ObsidianBridgeEditModeTests
   }
 
   [Test]
+  public void RequestTagActivate_KnownTag_EmitsBridgeTagName()
+  {
+    var activatedTags = new List<string>();
+    void HandleTagActivate(string tag) => activatedTags.Add(tag);
+
+    MapRuntimeContext.OnTagActivateRequested += HandleTagActivate;
+    try
+    {
+      InvokeObsidianBridgeLifecycle("OnEnable");
+
+      LogAssert.Expect(LogType.Log, new Regex("\\[MapRuntimeContext\\] Tag activate requested: tag=project"));
+      LogAssert.Expect(LogType.Log, new Regex("\\[ObsidianBridge\\] tag:activate requested \\(Editor/Non-WebGL\\): tag=project"));
+
+      MapRuntimeContext.SetTagNames(new Dictionary<int, string> { { 7, "project" } });
+      MapRuntimeContext.RequestTagActivate(7);
+
+      Assert.That(activatedTags, Is.EqualTo(new List<string> { "project" }));
+    }
+    finally
+    {
+      InvokeObsidianBridgeLifecycle("OnDisable");
+      MapRuntimeContext.OnTagActivateRequested -= HandleTagActivate;
+    }
+  }
+
+  [Test]
+  public void RequestTagActivate_UnknownOrEmptyTag_DoesNotEmit()
+  {
+    var activatedTags = new List<string>();
+    void HandleTagActivate(string tag) => activatedTags.Add(tag);
+
+    MapRuntimeContext.OnTagActivateRequested += HandleTagActivate;
+    try
+    {
+      MapRuntimeContext.SetTagNames(new Dictionary<int, string> { { 7, "   " } });
+
+      MapRuntimeContext.RequestTagActivate(7);
+      MapRuntimeContext.RequestTagActivate(8);
+
+      Assert.That(activatedTags, Is.Empty);
+    }
+    finally
+    {
+      MapRuntimeContext.OnTagActivateRequested -= HandleTagActivate;
+    }
+  }
+
+  [Test]
   public void RebuildGraphAfterClear_ReadyScopeUsesCoroutineRequestId()
   {
     var readyRequestIds = new List<string>();
@@ -883,6 +931,13 @@ public class ObsidianBridgeEditModeTests
     FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
     Assert.That(field, Is.Not.Null, $"Missing field {fieldName}.");
     field.SetValue(target, value);
+  }
+
+  private void InvokeObsidianBridgeLifecycle(string methodName)
+  {
+    MethodInfo method = typeof(ObsidianBridge).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(method, Is.Not.Null, $"Missing lifecycle method {methodName}.");
+    method.Invoke(bridge, null);
   }
 
   private static IEnumerator InvokeCartographerRebuildGraphAfterClear(

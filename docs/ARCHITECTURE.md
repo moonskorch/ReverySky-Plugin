@@ -143,9 +143,9 @@ The reverse path for runtime events is:
 The bridge is implemented across several runtime boundaries:
 
 - `src/view/MapView.ts` - creates the iframe and attaches the bridge to `iframe.contentWindow`.
-- `src/bridge/UnityIframeBridge.ts` - sends plugin-to-runtime messages and receives runtime-to-plugin messages, including the best-effort screenshot request/response flow used by the settings-panel button.
+- `src/bridge/UnityIframeBridge.ts` - sends plugin-to-runtime messages and receives runtime-to-plugin messages, including note-open, tag-activate, and the best-effort screenshot request/response flow used by the settings-panel button.
 - `unity-webgl/index.template.html` and `unity-webgl/index.disk-runtime.template.html` - contain the iframe JavaScript wrapper. This wrapper listens for `postMessage` events, applies wrapper-only status updates, calls `unityInstance.SendMessage(...)` for Unity-bound messages, captures screenshot requests by reading the Unity canvas, and posts runtime events back to `window.parent`.
-- `unity/ReverySkyMap/Assets/Scripts/Bridge/ObsidianBridge.cs` - Unity-side bridge component. It receives graph and focus messages from JavaScript, normalizes payloads, updates `MapRuntimeContext`, and forwards note-open events back to the iframe JavaScript wrapper.
+- `unity/ReverySkyMap/Assets/Scripts/Bridge/ObsidianBridge.cs` - Unity-side bridge component. It receives graph and focus messages from JavaScript, normalizes payloads, updates `MapRuntimeContext`, and forwards note-open and tag-activate events back to the iframe JavaScript wrapper.
 
 ### ObsidianBridge lifetime
 
@@ -526,7 +526,7 @@ Important current contract facts:
 - protocol version is `2.0.0`;
 - successful startup order is `bridge:ready` first, then `graph:set`;
 - Unity WebGL boot failure is terminal inside the iframe wrapper and does not emit `bridge:ready`;
-- runtime-to-plugin messages are `bridge:ready`, `graph:ready`, `note:open`, and `runtime:shutdown-complete`;
+- runtime-to-plugin messages are `bridge:ready`, `graph:ready`, `note:open`, `tag:activate`, and `runtime:shutdown-complete`;
 - plugin-to-runtime messages are `graph:set`, `runtime:settings`, `runtime:status`, `note:focus`, and `runtime:shutdown`;
 - `path` values must stay vault-relative and use `/` separators;
 - `notes[].size` is a non-negative byte count produced from Obsidian file metadata and mapped to Unity `NoteData.Length`;

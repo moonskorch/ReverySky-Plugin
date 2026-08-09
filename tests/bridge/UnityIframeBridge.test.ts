@@ -404,6 +404,30 @@ describe("UnityIframeBridge", () => {
     bridge.detach();
   });
 
+  it("invokes onTagActivate for valid tag:activate from attached iframe source", () => {
+    const bridge = new UnityIframeBridge();
+    const onTagActivate = vi.fn();
+    const iframeWindow = { postMessage: vi.fn() } as unknown as Window;
+
+    bridge.attach(iframeWindow, { onTagActivate });
+    dispatchMessage(
+      {
+        type: "tag:activate",
+        protocolVersion: BRIDGE_PROTOCOL_VERSION,
+        payload: {
+          tag: "project"
+        }
+      },
+      iframeWindow
+    );
+
+    expect(onTagActivate).toHaveBeenCalledTimes(1);
+    expect(onTagActivate).toHaveBeenCalledWith({
+      tag: "project"
+    });
+    bridge.detach();
+  });
+
   it("invokes onGraphReady for valid graph:ready from attached iframe source", () => {
     const bridge = new UnityIframeBridge();
     const onGraphReady = vi.fn();

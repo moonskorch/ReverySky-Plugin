@@ -27,7 +27,7 @@ Obsidian plugin
 - Bridge and runtime state
   - Responsibility: validates inbound bridge envelopes, converts graph payloads into runtime models, applies runtime settings, stores the normalized source graph, derives direct note-neighbor counts, and raises outbound events for parent bridge messages.
   - Main code location: `Assets/Scripts/Bridge/ObsidianBridge.cs`, `Assets/Scripts/Bridge/MapRuntimeContext.cs`, `Assets/Scripts/Models/BridgeEnvelopeModels.cs`, `Assets/Scripts/Models/BridgePayloadModels.cs`, `Assets/Scripts/Models/MapFrameRateMode.cs`, `Assets/Scripts/Models/NoteData.cs`
-  - Important dependencies: `Cartographer`, `MapRuntimeContext.OnNotesChanged`, `MapRuntimeContext.OnOpenNoteRequested`, `MapRuntimeContext.OnGraphReady`
+  - Important dependencies: `Cartographer`, `MapRuntimeContext.OnNotesChanged`, `MapRuntimeContext.OnOpenNoteRequested`, `MapRuntimeContext.OnTagActivateRequested`, `MapRuntimeContext.OnGraphReady`
 - Graph orchestration
   - Responsibility: chooses the active layout engine, rebuilds the graph when runtime notes change, creates the shared visual graph index, forwards that index to consumers, and reconciles pending or restored focus after real index publications.
   - Main code location: `Assets/Scripts/StarScape/Cartographer.cs`
@@ -91,10 +91,12 @@ Obsidian plugin
 2. Selecting a `Star` resolves the node through `MapGraphIndex`, focuses the camera, and calls `MapRuntimeContext.RequestOpenNote(star.Data)`. If RecursiveHubs stars are clickable before the final index exists, the current code ignores the click instead of logging an error.
 3. `MapRuntimeContext.OnOpenNoteRequested` reaches `ObsidianBridge.HandleOpenNoteRequested`.
 4. In WebGL builds, `ObsidianBridge` forwards the event to JavaScript via `ReverySkyBridgePostNoteOpen(noteId, notePath)`.
-5. Incoming `note:focus` messages call `ObsidianBridge.OnNoteFocus()`, which reaches `Cartographer.FocusRuntimeNote()`.
-6. `Cartographer.FocusRuntimeNote()` resolves the star through `GraphIndex.TryGetStar(noteId, out star)` and stores `noteId` in `MapRuntimeContext.PendingFocusNoteId` when the current visual graph has not materialized that star.
-7. The next non-transient `HandleEngineNodesChanged(...)` call rebuilds `GraphIndex` and lets `ApplyGraphFocus()` consume pending focus before falling back to restore focus.
-8. `FocusHighlighter.SetFocus(...)` reads `MapGraphIndex.GetNeighborIds(...)`, marks the focused node as `Focused`, marks adjacent nodes as `Linked`, and calls `LineBuilder.ApplyHighlight(...)` so incident edges restyle together with the labels.
+5. Selecting a `TagNode` resolves the node through `MapGraphIndex`, focuses the camera locally, and calls `MapRuntimeContext.RequestTagActivate(tagNode.UserTagId)`.
+6. `MapRuntimeContext.OnTagActivateRequested` reaches `ObsidianBridge.HandleTagActivateRequested`; WebGL builds forward the event to JavaScript as `tag:activate` with payload `{ tag: string }`.
+7. Incoming `note:focus` messages call `ObsidianBridge.OnNoteFocus()`, which reaches `Cartographer.FocusRuntimeNote()`.
+8. `Cartographer.FocusRuntimeNote()` resolves the star through `GraphIndex.TryGetStar(noteId, out star)` and stores `noteId` in `MapRuntimeContext.PendingFocusNoteId` when the current visual graph has not materialized that star.
+9. The next non-transient `HandleEngineNodesChanged(...)` call rebuilds `GraphIndex` and lets `ApplyGraphFocus()` consume pending focus before falling back to restore focus.
+10. `FocusHighlighter.SetFocus(...)` reads `MapGraphIndex.GetNeighborIds(...)`, marks the focused node as `Focused`, marks adjacent nodes as `Linked`, and calls `LineBuilder.ApplyHighlight(...)` so incident edges restyle together with the labels.
 
 ### 4. Runtime frame-rate settings
 
@@ -109,8 +111,8 @@ Obsidian plugin
 ### 5. Runtime shutdown guard
 
 1. Before the parent plugin detaches the iframe, the WebGL wrapper receives `runtime:shutdown` and forwards it to `ObsidianBridge.OnRuntimeShutdown(string json)` when the Unity instance can receive messages.
-2. `ObsidianBridge` marks the bridge as shutting down and unsubscribes from `MapRuntimeContext.OnOpenNoteRequested` and `MapRuntimeContext.OnGraphReady`.
-3. After shutdown starts, `OnGraphSet`, `OnNoteFocus`, `OnRuntimeSettings`, and `HandleOpenNoteRequested` return without processing so the closing runtime cannot ingest new graph state, focus notes, apply late frame-rate changes, or send late `note:open` callbacks.
+2. `ObsidianBridge` marks the bridge as shutting down and unsubscribes from `MapRuntimeContext.OnOpenNoteRequested`, `MapRuntimeContext.OnTagActivateRequested`, and `MapRuntimeContext.OnGraphReady`.
+3. After shutdown starts, `OnGraphSet`, `OnNoteFocus`, `OnRuntimeSettings`, `HandleOpenNoteRequested`, and `HandleTagActivateRequested` return without processing so the closing runtime cannot ingest new graph state, focus notes, apply late frame-rate changes, or send late activate/open callbacks.
 4. `HandleGraphReadyRequested` also returns during shutdown so late engine completion cannot send `graph:ready`.
 5. This is a bridge lifecycle guard only; parent hosting, iframe detachment, and full Unity engine teardown remain outside the Unity project boundary.
 
@@ -293,6 +295,7 @@ Obsidian plugin
 - Bridge contract rules that matter locally:
   - `protocolVersion` must match `2.0.0`.
   - Accepted parent-to-Unity message types are `graph:set`, `note:focus`, `runtime:settings`, and `runtime:shutdown`.
+  - Accepted Unity-to-parent interaction events include `note:open` and `tag:activate`; `tag:activate` carries `{ tag: string }`.
   - `graph:set` payloads are already filtered by the parent plugin; Unity does not own vault query logic.
   - `graph:set` carries only the filtered graph payload; focus is handled separately through `note:focus`, and frame-rate settings are handled separately through `runtime:settings`.
   - `graph:set.requestId` is echoed in `graph:ready` after active engine readiness; empty ids suppress outbound `graph:ready`.

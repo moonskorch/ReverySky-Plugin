@@ -241,6 +241,25 @@
           );
         }
 
+        function postTagActivate(tag) {
+          if (isShuttingDown || !window.parent) {
+            return;
+          }
+
+          const tagName = typeof tag === "string" ? tag : "";
+          window.parent.postMessage(
+            {
+              protocolVersion: protocolVersion,
+              type: "tag:activate",
+              requestId: "evt_" + Date.now(),
+              payload: {
+                tag: tagName
+              }
+            },
+            "*"
+          );
+        }
+
         function postGraphReady(requestId) {
           if (isShuttingDown || !window.parent) {
             return;
@@ -631,6 +650,7 @@
             resizeTimerId = 0;
           }
           window.ReverySkyBridgePostNoteOpen = function () {};
+          window.ReverySkyBridgePostTagActivate = function () {};
           window.ReverySkyBridgePostGraphReady = function () {};
           window.removeEventListener("resize", onWindowResize);
           canvas.removeEventListener("webglcontextlost", onWebglContextLost);
@@ -757,6 +777,9 @@
         async function boot() {
           window.ReverySkyBridgePostNoteOpen = function (noteId, notePath) {
             postNoteOpen(noteId, notePath);
+          };
+          window.ReverySkyBridgePostTagActivate = function (tag) {
+            postTagActivate(tag);
           };
           window.ReverySkyBridgePostGraphReady = function (requestId) {
             postGraphReady(requestId);

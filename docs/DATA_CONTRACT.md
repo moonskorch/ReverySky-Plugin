@@ -34,6 +34,7 @@ Runtime -> plugin:
 - `bridge:ready`: runtime is initialized and ready to receive payloads after successful Unity WebGL boot.
 - `graph:ready`: runtime has finished the current graph build or stabilization phase for a matching `graph:set` request.
 - `note:open`: request for Obsidian to open a note by required `id` and `path`.
+- `tag:activate`: notification that the runtime activated a tag node, with required string `tag`.
 - `runtime:screenshot-response`: response to a screenshot request. `payload.ok: true` carries a PNG `Blob`; `payload.ok: false` reports capture failure without a bridge error string.
 - `runtime:shutdown-complete`: acknowledgement for a matching `runtime:shutdown` request.
 

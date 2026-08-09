@@ -32,6 +32,7 @@ public static class MapRuntimeContext
   private static string buildingGraphRequestId = string.Empty;
 
   public static event Action<string, string> OnOpenNoteRequested;
+  public static event Action<string> OnTagActivateRequested;
   public static event Action<string> OnGraphReady;
   public static event Action<string> OnNotesChanged;
 
@@ -98,6 +99,16 @@ public static class MapRuntimeContext
 
     Debug.Log($"[MapRuntimeContext] Open note requested: id={note.Id}, path={note.Path}");
     OnOpenNoteRequested?.Invoke(note.Id ?? string.Empty, note.Path ?? string.Empty);
+  }
+
+  public static void RequestTagActivate(int tagId)
+  {
+    var tag = GetTagName(tagId) ?? string.Empty;
+    if (string.IsNullOrWhiteSpace(tag))
+      return;
+
+    Debug.Log($"[MapRuntimeContext] Tag activate requested: tag={tag}");
+    OnTagActivateRequested?.Invoke(tag);
   }
 
   public static void RequestGraphReady()

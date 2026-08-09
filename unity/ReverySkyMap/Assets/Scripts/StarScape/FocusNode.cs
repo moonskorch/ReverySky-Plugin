@@ -50,8 +50,11 @@ public class FocusNode : MonoBehaviour
 
     else if (tappedObj.TryGetComponent(out TagNode tagNode))
     {
-      if (SelectGraphNode(tagNode))
-        FocusSelectedNode();
+      if (!SelectGraphNode(tagNode))
+        return;
+
+      FocusSelectedNode();
+      MapRuntimeContext.RequestTagActivate(tagNode.UserTagId);
     }
   }
 
