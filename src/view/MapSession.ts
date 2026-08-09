@@ -97,6 +97,11 @@ type EgoGraphScope = {
   distanceByNoteId: Map<string, number>;
 };
 
+type AcceptedFocus = {
+  path: string;
+  centerChanged: boolean;
+};
+
 export type MapSessionDependencies = {
   app: App;
   buildGraph: (app: App) => GraphPayload;
@@ -128,6 +133,7 @@ export class MapSession {
   // Last effective graph snapshot prepared for Unity, focus checks, and note-open id resolution.
   private outgoingGraphPayload: GraphPayload | null = null;
   private semanticRefreshPending = false;
+  // Allows one metadataCache.resolved after startup to refresh cached vault graph data from settled links.
   private startupRefreshPending = false;
   private noteSignatureByPath = new Map<string, string>();
   // Plugin-side graph focus, updated from both TS focus dispatch and Unity note-open.
@@ -166,7 +172,7 @@ export class MapSession {
     this.focus = new MapFocusController({
       app: this.app,
       now: this.now,
-      requestFocus: (path, options) => this.trySendFocusForPath(path, options),
+      requestFocus: (path, options) => this.handleEditorFocusRequest(path, options),
       getFocusPath: () => this.focusPath
     });
     this.sendFocus = deps.sendFocus;
@@ -235,8 +241,49 @@ export class MapSession {
   handleRuntimeReady(): void {
     this.bridgeReady = true;
     this.sendCurrentRuntimeSettings();
-    this.sendInitialRuntimeGraph();
-    this.trySendFocusForPath(this.getActiveFilePath());
+    const activeFilePath = this.getActiveFilePath();
+
+    if (this.egoEnabled) {
+      this.handleEgoRuntimeReady(activeFilePath);
+    } else {
+      this.handleGlobalRuntimeReady(activeFilePath);
+    }
+
+    this.startupRefreshPending = true;
+  }
+
+  private handleEgoRuntimeReady(activeFilePath: string): void {
+    // Ego accepts focus first because the initial graph is scoped around it
+    const acceptedStartupFocus = this.tryAcceptFocusPath(activeFilePath);
+
+    this.prepareStartupGraph(acceptedStartupFocus?.centerChanged === true);
+    this.sendOutgoingGraph();
+      
+    if (acceptedStartupFocus) {
+      this.sendFocusForPath(acceptedStartupFocus.path);
+    }
+  }
+
+  private handleGlobalRuntimeReady(activeFilePath: string): void {
+    this.prepareStartupGraph(false);
+    this.sendOutgoingGraph();
+
+    // Global focus must be validated against the emitted graph
+    const acceptedStartupFocus = this.tryAcceptFocusPath(activeFilePath);
+    if (acceptedStartupFocus) {
+      this.sendFocusForPath(acceptedStartupFocus.path);
+    }
+  }
+
+  private prepareStartupGraph(forceRebuild: boolean): void {
+    if (!forceRebuild && this.outgoingGraphPayload) {
+      return;
+    }
+
+    if (!this.sourceGraphPayload) {
+      this.rebuildSourceGraph();
+    }
+    this.rebuildOutgoingGraph();
   }
 
   handleRuntimeUnavailable(): void {
@@ -265,13 +312,15 @@ export class MapSession {
   setShowTags(showTags: boolean): void {
     this.showTags = showTags;
     this.notifyStateChanged();
-    this.sendGraphFromSource();
+    this.rebuildOutgoingGraph();
+    this.sendOutgoingGraph();
   }
 
   setMapLayoutPreference(mapLayout: unknown): void {
     this.mapLayout = normalizeMapLayoutPreference(mapLayout);
     this.notifyStateChanged();
-    this.sendGraphFromSource();
+    this.rebuildOutgoingGraph();
+    this.sendOutgoingGraph();
   }
 
   setFrameRateMode(frameRateMode: unknown): void {
@@ -288,14 +337,16 @@ export class MapSession {
   setEgoEnabled(egoEnabled: boolean): void {
     this.egoEnabled = egoEnabled;
     this.notifyStateChanged();
-    this.sendGraphFromSource();
+    this.rebuildOutgoingGraph();
+    this.sendOutgoingGraph();
   }
 
   setEgoDepth(egoDepth: unknown): void {
     this.egoDepth = normalizeEgoDepth(egoDepth);
     this.notifyStateChanged();
     if (this.egoEnabled) {
-      this.sendGraphFromSource();
+      this.rebuildOutgoingGraph();
+      this.sendOutgoingGraph();
     }
   }
 
@@ -303,7 +354,8 @@ export class MapSession {
     this.egoNeighborLinksEnabled = egoNeighborLinksEnabled;
     this.notifyStateChanged();
     if (this.egoEnabled) {
-      this.sendGraphFromSource();
+      this.rebuildOutgoingGraph();
+      this.sendOutgoingGraph();
     }
   }
 
@@ -422,19 +474,6 @@ export class MapSession {
     ];
   }
 
-  private sendInitialRuntimeGraph(): void {
-    if (this.outgoingGraphPayload) {
-      this.sendGraph(this.outgoingGraphPayload);
-    } else {
-      if (!this.sourceGraphPayload) {
-        this.rebuildSourceGraph();
-      }
-      this.sendGraphFromSource();
-    }
-
-    this.startupRefreshPending = true;
-  }
-
   private getActiveFilePath(): string {
     const activeFile = this.app.workspace.getActiveFile?.() ?? null;
     return activeFile instanceof TFile ? this.normalizeVaultPath(activeFile.path) : "";
@@ -467,56 +506,52 @@ export class MapSession {
     this.focus.onMarkdownFocus(path);
   }
 
-  private trySendFocusForPath(
-    pathValue: unknown,
-    options?: FocusRequestOptions
-  ): boolean {
-    const path = this.normalizeVaultPath(pathValue);
-    if (!this.isGraphRelevantPath(path)) {
-      return false;
-    }
+  private handleEditorFocusRequest(pathValue: unknown, options?: FocusRequestOptions): boolean {
     if (!this.bridgeReady) {
       return false;
     }
 
-    return this.egoEnabled
-      ? this.acceptEgoFocusPath(path, options)
-      : this.tryAcceptGlobalFocusPath(path, options);
-  }
-
-  private acceptEgoFocusPath(path: string, options?: FocusRequestOptions): boolean {
-    const isSameEgoCenter = this.focusPath === path;
-    this.focusPath = path;
-    // Rename focus intentionally skips this rebuild: the vault rename event
-    // schedules a fresh source graph rebuild, while the current source graph
-    // can still contain the old path.
-    if (!isSameEgoCenter && !options?.skipEgoGraphRebuild) {
-      if (!this.sourceGraphPayload) {
-        this.rebuildSourceGraph();
-      }
-      this.sendGraphFromSource();
-    }
-    this.sendAcceptedFocusPath(path);
-    return true;
-  }
-
-  private tryAcceptGlobalFocusPath(path: string, options?: FocusRequestOptions): boolean {
-    // Global focus may only target a note Unity is already rendering.
-    // Rename is the exception because the path-derived id can change before the renamed graph arrives.
-    if (!options?.skipGraphCheck && !this.isPathInOutgoingGraph(path)) {
+    const skipGraphCheck = options?.skipGraphCheck === true;
+    const acceptedFocus = this.tryAcceptFocusPath(pathValue, skipGraphCheck);
+    if (!acceptedFocus) {
       return false;
     }
 
-    this.focusPath = path;
-    this.sendAcceptedFocusPath(path);
+    // Rename focus intentionally skips this rebuild: the vault rename event
+    // schedules a fresh source graph rebuild, while the current source graph
+    // can still contain the old path.
+    if (this.egoEnabled && acceptedFocus.centerChanged && !options?.skipEgoGraphRebuild) {
+      if (!this.sourceGraphPayload) {
+        this.rebuildSourceGraph();
+      }
+      this.rebuildOutgoingGraph();
+      this.sendOutgoingGraph();
+    }
+
+    this.sendFocusForPath(acceptedFocus.path);
     return true;
   }
 
-  private sendAcceptedFocusPath(path: string): void {
-    this.sendFocus({
-      id: makeStableNoteId(path),
-      path
-    });
+  private tryAcceptFocusPath(pathValue: unknown, skipGraphCheck = false): AcceptedFocus | null {
+    const path = this.normalizeVaultPath(pathValue);
+    if (!this.isGraphRelevantPath(path)) {
+      return null;
+    }
+
+    if (!this.egoEnabled) {
+      // Global focus may only target a note Unity is already rendering.
+      // Rename is the exception because the path-derived id can change before the renamed graph arrives.
+      if (!skipGraphCheck && !this.isPathInOutgoingGraph(path)) {
+        return null;
+      }
+    }
+
+    const centerChanged = this.focusPath !== path;
+    this.focusPath = path;
+    return {
+      path,
+      centerChanged
+    };
   }
 
   private isPathInOutgoingGraph(path: string): boolean {
@@ -535,16 +570,16 @@ export class MapSession {
     this.focus.expectFocusEchoForPath(path);
   }
 
-  recordRuntimeFocusPath(pathValue: unknown): void {
-    const path = this.normalizeVaultPath(pathValue);
-    if (this.isGraphRelevantPath(path)) {
-      const isSameEgoCenter = this.focusPath === path;
-      this.focusPath = path;
-      if (this.egoEnabled && this.bridgeReady && !isSameEgoCenter) {
-        // Ego graph rebuild changes the rendered neighborhood; re-send focus so Unity restores the new center.
-        this.sendGraphFromSource();
-        this.sendAcceptedFocusPath(path);
-      }
+  handleRuntimeFocusChange(pathValue: unknown): void {
+    const acceptedFocus = this.tryAcceptFocusPath(pathValue, true);
+    if (
+      this.egoEnabled &&
+      acceptedFocus?.centerChanged
+    ) {
+      // Ego graph rebuild changes the rendered neighborhood; re-send focus so Unity restores the new center.
+      this.rebuildOutgoingGraph();
+      this.sendOutgoingGraph();
+      this.sendFocusForPath(acceptedFocus.path);
     }
   }
 
@@ -589,9 +624,9 @@ export class MapSession {
           }
 
           if (this.startupRefreshPending) {
-            // Keep startup correction one-shot and unconditional: a late plugin enable can
-            // spend it on the next resolved event, but avoiding that would require a graph
-            // equality pass for a narrow edge case.
+            // Treat the first post-startup resolved event as possible vault metadata settling.
+            // This is unconditional and one-shot; distinguishing it from an irrelevant text edit
+            // would require comparing rebuilt graph payloads for a narrow startup edge case.
             this.startupRefreshPending = false;
             this.scheduleSourceGraphRebuild();
           }
@@ -663,7 +698,8 @@ export class MapSession {
 
   private handleVaultGraphChanged(): void {
     this.rebuildSourceGraph();
-    this.sendGraphFromSource();
+    this.rebuildOutgoingGraph();
+    this.sendOutgoingGraph();
   }
 
   private rebuildSourceGraph(): void {
@@ -695,7 +731,8 @@ export class MapSession {
       if (shouldSendGraph) {
         // Apply the parsed candidate at the same moment the graph is rebuilt.
         this.activeQueryFilter = nextActiveQueryFilter;
-        this.sendGraphFromSource();
+        this.rebuildOutgoingGraph();
+        this.sendOutgoingGraph();
       }
     }, FILTER_INPUT_DEBOUNCE_MS);
   }
@@ -704,16 +741,31 @@ export class MapSession {
    * Turn the cached source graph into the effective outgoing payload by applying filters and layout.
    * The source graph stays untouched here; only the transport-ready snapshot is produced and cached.
    */
-  private sendGraphFromSource(): void {
+  private rebuildOutgoingGraph(): void {
     if (!this.sourceGraphPayload) {
       return;
     }
 
     this.outgoingGraphPayload = this.applyActiveFilters(this.sourceGraphPayload);
+  }
 
-    if (this.bridgeReady) {
-      this.sendGraph(this.outgoingGraphPayload);
+  private sendFocusForPath(path: string): void {
+    if (!this.bridgeReady) {
+      return;
     }
+
+    this.sendFocus({
+      id: makeStableNoteId(path),
+      path
+    });
+  }
+
+  private sendOutgoingGraph(): void {
+    if (!this.bridgeReady || !this.outgoingGraphPayload) {
+      return;
+    }
+
+    this.sendGraph(this.outgoingGraphPayload);
   }
 
   private applyActiveFilters(payload: GraphPayload): GraphPayload {

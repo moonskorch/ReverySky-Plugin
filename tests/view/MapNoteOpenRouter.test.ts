@@ -71,7 +71,7 @@ describe("MapNoteOpenRouter", () => {
     const notify = vi.fn();
     const router = new MapNoteOpenRouter(app as never, session, notify);
 
-    await router.openRequestedNote({ id: "note_1", path: "Fallback/Other.md" });
+    await router.handleNoteOpenRequest({ id: "note_1", path: "Fallback/Other.md" });
     expect(openLinkText).toHaveBeenCalledWith("Folder/Note.md", "", false, {
       active: true
     });
@@ -113,7 +113,7 @@ describe("MapNoteOpenRouter", () => {
     const session = createSession(app, makePayload());
     const router = new MapNoteOpenRouter(app as never, session, vi.fn());
 
-    await router.openRequestedNote({ id: "note_1", path: "Folder/Note.md" });
+    await router.handleNoteOpenRequest({ id: "note_1", path: "Folder/Note.md" });
     expect(openLinkText).toHaveBeenCalledWith("Folder/Note.md", "Folder/Context.md", false, {
       active: true
     });
@@ -142,8 +142,8 @@ describe("MapNoteOpenRouter", () => {
     const notify = vi.fn();
     const router = new MapNoteOpenRouter(app as never, session, notify);
 
-    await router.openRequestedNote({} as never);
-    await router.openRequestedNote({ id: "missing", path: "Missing.md" });
+    await router.handleNoteOpenRequest({} as never);
+    await router.handleNoteOpenRequest({ id: "missing", path: "Missing.md" });
 
     expect(notify).toHaveBeenNthCalledWith(
       1,

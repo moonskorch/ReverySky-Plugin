@@ -12,7 +12,7 @@ export class MapNoteOpenRouter {
     private readonly notify: (message: string) => void
   ) {}
 
-  async openRequestedNote(payload: NoteOpenPayload): Promise<void> {
+  async handleNoteOpenRequest(payload: NoteOpenPayload): Promise<void> {
     const resolvedPath = this.session.resolveRequestedPath(payload);
     if (!resolvedPath) {
       this.notify("Unable to open note: bridge payload did not include a valid note id and path.");
@@ -27,7 +27,7 @@ export class MapNoteOpenRouter {
 
     const sourcePath = this.session.resolveOpenLinkSourcePath();
     try {
-      this.session.recordRuntimeFocusPath(noteFile.path);
+      this.session.handleRuntimeFocusChange(noteFile.path);
       this.session.expectFocusEchoForPath(noteFile.path);
       await this.app.workspace.openLinkText(
         noteFile.path,

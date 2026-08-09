@@ -1248,15 +1248,79 @@ describe("MapSession", () => {
     session.start(() => undefined);
     session.handleRuntimeReady();
 
-    expect(sendGraph).toHaveBeenCalledTimes(2);
-    expect((sendGraph.mock.calls[0]?.[0] as GraphPayload).notes).toEqual([]);
-    const sentPayload = sendGraph.mock.calls[1]?.[0] as GraphPayload;
+    expect(sendGraph).toHaveBeenCalledTimes(1);
+    const sentPayload = sendGraph.mock.calls[0]?.[0] as GraphPayload;
     expect(sentPayload.vault.noteCount).toBe(3);
     expect(sentPayload.notes.map((note) => note.id)).toEqual(["daily", "project", "archive"]);
     expect(sentPayload.links).toEqual([
       { sourceId: "daily", targetId: "project", kind: "resolved" },
       { sourceId: "project", targetId: "archive", kind: "resolved" }
     ]);
+    expect(sendFocus).toHaveBeenCalledTimes(1);
+    expect(sendFocus).toHaveBeenLastCalledWith({
+      id: makeStableNoteId("Projects/ReverySky/Spec.md"),
+      path: "Projects/ReverySky/Spec.md"
+    });
+  });
+
+  it("rebuilds a queued startup Ego graph around the active note", async () => {
+    vi.useFakeTimers();
+
+    const metadataCallbacks: {
+      changed?: (file: { path?: string }, data: string, cache: { links?: Array<{ link: string }>; tags?: Array<{ tag: string }> }) => void;
+      resolved?: () => void;
+    } = {};
+    const activeFile = makeTestTFile("Projects/ReverySky/Spec.md");
+    const payload = makeEgoPayload();
+    const sendGraph = vi.fn();
+    const sendFocus = vi.fn();
+    const session = new MapSession({
+      app: {
+        metadataCache: {
+          getFileCache: vi.fn().mockReturnValue(null),
+          on: vi.fn((name: "changed" | "resolved", callback: (...args: never[]) => void) => {
+            if (name === "changed") {
+              metadataCallbacks.changed = callback as typeof metadataCallbacks.changed;
+            } else {
+              metadataCallbacks.resolved = callback as typeof metadataCallbacks.resolved;
+            }
+            return { id: `metadata-${name}` };
+          })
+        },
+        vault: {
+          getAbstractFileByPath: vi.fn((path: string) => makeTestTFile(path)),
+          on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+        },
+        workspace: {
+          activeLeaf: null,
+          getActiveFile: vi.fn().mockReturnValue(activeFile),
+          getLeavesOfType: vi.fn().mockReturnValue([]),
+          iterateAllLeaves: vi.fn(),
+          on: vi.fn().mockReturnValue({ id: "event-ref" })
+        }
+      } as never,
+      buildGraph: makeBuildGraphMock(payload),
+      now: () => 1700000000000,
+      sendGraph,
+      sendFocus
+    });
+
+    await session.setState({ egoEnabled: true });
+    session.start(() => undefined);
+    metadataCallbacks.changed?.({ path: "Projects/ReverySky/Spec.md" }, "content", {
+      links: [{ link: "Archive/Old.md" }]
+    });
+    metadataCallbacks.resolved?.();
+    vi.advanceTimersByTime(250);
+
+    expect(sendGraph).not.toHaveBeenCalled();
+
+    session.handleRuntimeReady();
+
+    expect(sendGraph).toHaveBeenCalledTimes(1);
+    const sentPayload = sendGraph.mock.calls[0]?.[0] as GraphPayload;
+    expect(sentPayload.vault.noteCount).toBe(3);
+    expect(sentPayload.notes.map((note) => note.id)).toEqual(["daily", "project", "archive"]);
     expect(sendFocus).toHaveBeenCalledTimes(1);
     expect(sendFocus).toHaveBeenLastCalledWith({
       id: makeStableNoteId("Projects/ReverySky/Spec.md"),
@@ -1755,7 +1819,7 @@ describe("MapSession", () => {
     session.start(() => undefined);
     session.handleRuntimeReady();
 
-    session.recordRuntimeFocusPath("Archive/Old.md");
+    session.handleRuntimeFocusChange("Archive/Old.md");
     session.expectFocusEchoForPath("Archive/Old.md");
 
     expect(sendGraph).toHaveBeenCalledTimes(2);
@@ -1804,12 +1868,12 @@ describe("MapSession", () => {
     await session.setState({ egoEnabled: true });
     session.start(() => undefined);
     session.handleRuntimeReady();
-    session.recordRuntimeFocusPath("Archive/Old.md");
+    session.handleRuntimeFocusChange("Archive/Old.md");
 
     expect(sendGraph).toHaveBeenCalledTimes(2);
     expect(sendFocus).toHaveBeenCalledTimes(1);
 
-    session.recordRuntimeFocusPath("Archive/Old.md");
+    session.handleRuntimeFocusChange("Archive/Old.md");
 
     expect(sendGraph).toHaveBeenCalledTimes(2);
     expect(sendFocus).toHaveBeenCalledTimes(1);
@@ -1948,7 +2012,7 @@ describe("MapSession", () => {
 
     session.start(() => undefined);
     session.handleRuntimeReady();
-    session.recordRuntimeFocusPath("Folder/Old.md");
+    session.handleRuntimeFocusChange("Folder/Old.md");
 
     vaultCallbacks.rename?.({ path: "Folder/New.md" }, "Folder/Old.md");
     vi.advanceTimersByTime(250);

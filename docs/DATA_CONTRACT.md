@@ -211,10 +211,10 @@ type GraphLink = {
 ## Current Producer Semantics
 - `graph:set` is the effective payload emitted by the plugin view, not the raw vault snapshot. The effective payload may be narrowed by Ego scope before query and tag filters run.
 - Each emitted `graph:set` gets a unique `requestId` so stale `graph:ready` messages cannot complete a newer graph status.
-- After startup graph emission, `MapSession` accepts the first Obsidian `metadataCache.resolved` event as a one-time correction refresh for the initial `resolvedLinks` snapshot.
+- After startup graph emission, `MapSession` lets the first Obsidian `metadataCache.resolved` event refresh cached vault graph data from settled `resolvedLinks`.
 - After graph-relevant metadata changes, `MapSession` waits for Obsidian `metadataCache.resolved` before rebuilding from `metadataCache.resolvedLinks`; while waiting, it may send `runtime:status` instead of `graph:set`.
 - Filter-only changes reuse the latest source graph snapshot and emit only a newly narrowed payload.
-- Ego focus changes update the plugin-side focus path and rebuild the effective payload around that center before dispatch. Active-note rename can skip the immediate Ego rebuild because the rename event already schedules a fresh source graph rebuild.
+- Ego focus acceptance updates the plugin-side focus path independently from bridge dispatch. Ordinary Ego focus rebuilds the effective payload around a changed center before sending `note:focus`; startup accepts the active center before the initial `graph:set`; active-note rename can skip the immediate Ego rebuild because the rename event already schedules a fresh source graph rebuild.
 - `notes[].date` uses `frontmatter.date`, then `frontmatter.created`, then `frontmatter.created_at`, then file creation time. Missing, blank, or invalid candidates are skipped, and the field is omitted when no valid source exists.
 - `notes[].tags` are produced by merging inline tags and frontmatter tags, then normalizing and deduplicating the result.
 - `notes[].size` is emitted as file size in bytes.

@@ -269,7 +269,7 @@ export class MapView extends ItemView {
           if (lifecycleGeneration !== this.lifecycleGeneration) {
             return;
           }
-          void this.noteOpenRouter.openRequestedNote(payload);
+          void this.noteOpenRouter.handleNoteOpenRequest(payload);
         },
         onError: (message: string) => {
           if (lifecycleGeneration !== this.lifecycleGeneration) {
