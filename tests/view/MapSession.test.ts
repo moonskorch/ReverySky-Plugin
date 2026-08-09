@@ -1731,7 +1731,7 @@ describe("MapSession", () => {
     ]);
   });
 
-  it("keeps boundary links to tags that are already visible from inner Ego rings", async () => {
+  it("keeps Ego tag lines only on the ring that first exposes each tag when neighbor links are off", async () => {
     const payload = makeDepthPayload();
     const center = payload.notes.find((note) => note.id === "center");
     const outerLeft = payload.notes.find((note) => note.id === "outer-left");
@@ -1753,7 +1753,34 @@ describe("MapSession", () => {
       ["center", ["center", "shared"]],
       ["left", ["left"]],
       ["right", ["right"]],
-      ["outer-left", ["shared"]],
+      ["outer-left", []],
+      ["outer-right", []]
+    ]);
+  });
+
+  it("keeps Ego tag lines for same-ring owners that first expose the same tag", async () => {
+    const payload = makeDepthPayload();
+    const left = payload.notes.find((note) => note.id === "left");
+    const right = payload.notes.find((note) => note.id === "right");
+    expect(left).toBeDefined();
+    expect(right).toBeDefined();
+    left!.tags = ["shared-ring"];
+    right!.tags = ["shared-ring"];
+    const sendGraph = vi.fn();
+    const session = createEgoGraphSession(payload, { sendGraph });
+
+    await session.setState({ egoEnabled: true, egoDepth: 2 });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    session.requestFocusFromEditor("Depth/Center.md");
+
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+    const sentPayload = sendGraph.mock.calls[1]?.[0] as GraphPayload;
+    expect(sentPayload.notes.map((note) => [note.id, note.tags])).toEqual([
+      ["center", ["center"]],
+      ["left", ["shared-ring"]],
+      ["right", ["shared-ring"]],
+      ["outer-left", []],
       ["outer-right", []]
     ]);
   });

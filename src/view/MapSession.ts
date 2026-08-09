@@ -903,43 +903,44 @@ export class MapSession {
     payload: GraphPayload,
     distanceByNoteId: Map<string, number>
   ): GraphPayload {
-    if (this.showTags && distanceByNoteId.size === 0) {
+    if (!this.showTags) {
+      return this.withoutTags(payload);
+    }
+
+    const isEgoScope = distanceByNoteId.size > 0;
+    if (!isEgoScope) {
       return payload;
     }
 
+    if (this.egoNeighborLinksEnabled) {
+      return this.applyEgoNeighborTagVisibility(payload, distanceByNoteId);
+    }
+
+    return this.applyEgoOwnerTagVisibility(payload, distanceByNoteId);
+  }
+
+  private withoutTags(payload: GraphPayload): GraphPayload {
+    return {
+      ...payload,
+      notes: payload.notes.map((note) => ({
+        ...note,
+        tags: []
+      }))
+    };
+  }
+
+  private applyEgoNeighborTagVisibility(
+    payload: GraphPayload,
+    distanceByNoteId: Map<string, number>
+  ): GraphPayload {
     const visibleInnerTags = this.buildVisibleInnerTagSet(payload, distanceByNoteId);
     return {
       ...payload,
       notes: payload.notes.map((note) => ({
         ...note,
-        tags: this.getVisibleNoteTags(note, distanceByNoteId, visibleInnerTags)
+        tags: this.getVisibleEgoNoteTags(note, distanceByNoteId, visibleInnerTags)
       }))
     };
-  }
-
-  private getVisibleNoteTags(
-    note: GraphNoteNode,
-    distanceByNoteId: Map<string, number>,
-    visibleInnerTags: Set<string>
-  ): string[] {
-    if (!this.showTags) {
-      return [];
-    }
-
-    if (distanceByNoteId.size === 0) {
-      return note.tags;
-    }
-
-    const distance = distanceByNoteId.get(note.id);
-    if (typeof distance !== "number") {
-      return [];
-    }
-
-    if (distance < this.egoDepth) {
-      return note.tags;
-    }
-
-    return note.tags.filter((tag) => visibleInnerTags.has(this.normalizeEgoTagKey(tag)));
   }
 
   private buildVisibleInnerTagSet(
@@ -958,6 +959,78 @@ export class MapSession {
       }
     }
     return visibleTags;
+  }
+
+  private getVisibleEgoNoteTags(
+    note: GraphNoteNode,
+    distanceByNoteId: Map<string, number>,
+    visibleInnerTags: Set<string>
+  ): string[] {
+    const distance = distanceByNoteId.get(note.id);
+    if (typeof distance !== "number") {
+      return [];
+    }
+
+    if (distance < this.egoDepth) {
+      return note.tags;
+    }
+
+    return note.tags.filter((tag) => visibleInnerTags.has(this.normalizeEgoTagKey(tag)));
+  }
+
+  private applyEgoOwnerTagVisibility(
+    payload: GraphPayload,
+    distanceByNoteId: Map<string, number>
+  ): GraphPayload {
+    const ownerTagKeysByNoteId = this.buildEgoTagOwners(payload, distanceByNoteId);
+    return {
+      ...payload,
+      notes: payload.notes.map((note) => {
+        const ownerTagKeys = ownerTagKeysByNoteId.get(note.id) ?? new Set<string>();
+        return {
+          ...note,
+          tags: note.tags.filter((tag) => ownerTagKeys.has(this.normalizeEgoTagKey(tag)))
+        };
+      })
+    };
+  }
+
+  private buildEgoTagOwners(
+    payload: GraphPayload,
+    distanceByNoteId: Map<string, number>
+  ): Map<string, Set<string>> {
+    const firstVisibleDepthByTagKey = new Map<string, number>();
+    for (const note of payload.notes) {
+      const distance = distanceByNoteId.get(note.id);
+      if (typeof distance !== "number" || distance >= this.egoDepth) {
+        continue;
+      }
+
+      for (const tag of note.tags) {
+        const tagKey = this.normalizeEgoTagKey(tag);
+        const firstVisibleDepth = firstVisibleDepthByTagKey.get(tagKey);
+        if (firstVisibleDepth === undefined || distance < firstVisibleDepth) {
+          firstVisibleDepthByTagKey.set(tagKey, distance);
+        }
+      }
+    }
+
+    const ownerTagKeysByNoteId = new Map<string, Set<string>>();
+    for (const note of payload.notes) {
+      const distance = distanceByNoteId.get(note.id);
+      if (typeof distance !== "number" || distance >= this.egoDepth) {
+        continue;
+      }
+
+      const ownerTagKeys = note.tags
+        .map((tag) => this.normalizeEgoTagKey(tag))
+        .filter((tagKey) => firstVisibleDepthByTagKey.get(tagKey) === distance);
+      if (ownerTagKeys.length > 0) {
+        ownerTagKeysByNoteId.set(note.id, new Set(ownerTagKeys));
+      }
+    }
+
+    return ownerTagKeysByNoteId;
   }
 
   private normalizeEgoTagKey(tag: string): string {

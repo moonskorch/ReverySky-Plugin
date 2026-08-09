@@ -231,7 +231,7 @@ For graph-relevant Obsidian metadata changes, `MapSession` first marks semantic 
 
 Ego scope is a complete effective-graph transform, not a placeholder setting. `MapSession.buildEgoGraphScope(...)` builds an undirected adjacency view from resolved note links, runs breadth-first search from the current `focusPath` up to `egoDepth`, and records each included note's shortest distance from the center. The resulting payload includes only notes at distances `0..egoDepth`. With `egoNeighborLinksEnabled` disabled, Ego keeps only links that connect different ego-depth rings and reach inward from a non-boundary ring; with it enabled, Ego keeps every note-note link whose endpoints are both inside the included scope.
 
-Tag visibility is applied after query filtering and Ego scope, so `tag:` filters still match the real note metadata before boundary-ring tag trimming. When `showTags` is disabled, all emitted note tags are cleared. When Ego scope and `showTags` are both enabled, notes inside the last depth ring do not introduce new tag nodes; they keep only tags that are already visible from an inner ring so Unity can still draw note-tag links to existing shared tag nodes.
+Tag visibility is applied after query filtering and Ego scope, so `tag:` filters still match the real note metadata before Ego tag-line trimming. When `showTags` is disabled, all emitted note tags are cleared. With Ego scope, `showTags`, and `egoNeighborLinksEnabled` enabled, notes inside the last depth ring keep only tags that are already visible from an inner ring. With Ego scope, `showTags`, and `egoNeighborLinksEnabled` disabled, emitted note tags represent owner/discovery tag lines: each tag is kept only on the depth ring that first exposes it, and boundary-ring notes do not introduce or reconnect tag lines.
 It does not rebuild from `metadataCache.resolvedLinks` until Obsidian emits `metadataCache.resolved`.
 This prevents an intermediate `resolvedLinks` snapshot from being cached and then reused by later filters.
 Startup metadata settling is intentionally different: after the runtime receives the initial graph, the first `metadataCache.resolved` event may trigger one extra graph rebuild without showing the metadata update status.
@@ -531,7 +531,7 @@ Important current contract facts:
 - `path` values must stay vault-relative and use `/` separators;
 - `notes[].size` is a non-negative byte count produced from Obsidian file metadata and mapped to Unity `NoteData.Length`;
 - `graph:set` carries the effective graph after Ego scope and filters; focus changes are sent separately via `note:focus`, which must include both `id` and `path`;
-- Ego `graph:set` payloads use `egoDepth` for note inclusion, `egoNeighborLinksEnabled` for included-link selection, and boundary-tag trimming for tag-node visibility;
+- Ego `graph:set` payloads use `egoDepth` for note inclusion, `egoNeighborLinksEnabled` for link selection, and two-mode tag-line visibility;
 - ordinary Global `note:focus` dispatch is gated by the latest effective graph on the TypeScript side; Ego focus rebuilds only when the center changes; active-note rename can bypass the Global gate to cover bridge ordering around path-derived ids;
 - `graph:ready` must echo the latest `graph:set` `requestId` before the iframe clears the loading status;
 - `runtime:status` updates iframe wrapper status text only and is not forwarded into Unity;

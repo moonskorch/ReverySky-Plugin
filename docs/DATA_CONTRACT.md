@@ -216,9 +216,76 @@ type GraphLink = {
 - Filter-only changes reuse the latest source graph snapshot and emit only a newly narrowed payload.
 - Ego focus acceptance updates the plugin-side focus path independently from bridge dispatch. Ordinary Ego focus rebuilds the effective payload around a changed center before sending `note:focus`; startup accepts the active center before the initial `graph:set`; active-note rename can skip the immediate Ego rebuild because the rename event already schedules a fresh source graph rebuild.
 - `notes[].date` uses `frontmatter.date`, then `frontmatter.created`, then `frontmatter.created_at`, then file creation time. Missing, blank, or invalid candidates are skipped, and the field is omitted when no valid source exists.
-- `notes[].tags` are produced by merging inline tags and frontmatter tags, then normalizing and deduplicating the result.
+- Source `notes[].tags` are merged, normalized, and deduplicated; effective `graph:set` payloads may clear or trim them for tag visibility.
 - `notes[].size` is emitted as file size in bytes.
 - `mapLayout`, when present, is a plugin-owned runtime hint and travels with the effective graph payload.
 - `note:focus` carries the current note identity separately; `graph:set` stays focused on the graph payload itself.
 - `runtime:settings` carries frame-rate mode separately; `graph:set` stays focused on graph payload data.
 - `vault.noteCount` reflects the emitted `notes.length` for the effective payload.
+
+## Graph Payload Examples
+`links[]` carries note-to-note edges only. Unity derives tag nodes and note-to-tag edges from `notes[].tags`.
+
+Base graph before Ego scoping:
+
+```json
+{
+  "notes": [
+    { "id": "A", "path": "A.md", "title": "Center", "tags": ["x"], "size": 10 },
+    { "id": "B", "path": "B.md", "title": "Neighbor", "tags": ["x", "y"], "size": 10 },
+    { "id": "C", "path": "C.md", "title": "Outer", "tags": ["y", "z"], "size": 10 }
+  ],
+  "links": [
+    { "sourceId": "A", "targetId": "B", "kind": "resolved" },
+    { "sourceId": "B", "targetId": "C", "kind": "resolved" }
+  ]
+}
+```
+
+This lets Unity render note nodes `A`, `B`, `C`; note-to-note edges `A-B`, `B-C`; tag nodes `x`, `y`, `z`; and note-to-tag edges `A-x`, `B-x`, `B-y`, `C-y`, `C-z`.
+
+For Ego center `A`, depth `1`, and neighbor links disabled, the effective payload keeps only the center-owned tag edge:
+
+```json
+{
+  "notes": [
+    { "id": "A", "path": "A.md", "title": "Center", "tags": ["x"], "size": 10 },
+    { "id": "B", "path": "B.md", "title": "Neighbor", "tags": [], "size": 10 }
+  ],
+  "links": [
+    { "sourceId": "A", "targetId": "B", "kind": "resolved" }
+  ]
+}
+```
+
+For Ego center `A`, depth `2`, and neighbor links disabled, depth `1` notes may introduce new tag edges, while boundary depth `2` notes do not introduce or reconnect tag edges:
+
+```json
+{
+  "notes": [
+    { "id": "A", "path": "A.md", "title": "Center", "tags": ["x"], "size": 10 },
+    { "id": "B", "path": "B.md", "title": "Neighbor", "tags": ["y"], "size": 10 },
+    { "id": "C", "path": "C.md", "title": "Outer", "tags": [], "size": 10 }
+  ],
+  "links": [
+    { "sourceId": "A", "targetId": "B", "kind": "resolved" },
+    { "sourceId": "B", "targetId": "C", "kind": "resolved" }
+  ]
+}
+```
+
+For Ego center `A`, depth `2`, and neighbor links enabled, visible notes keep tag memberships to already visible tag nodes:
+
+```json
+{
+  "notes": [
+    { "id": "A", "path": "A.md", "title": "Center", "tags": ["x"], "size": 10 },
+    { "id": "B", "path": "B.md", "title": "Neighbor", "tags": ["x", "y"], "size": 10 },
+    { "id": "C", "path": "C.md", "title": "Outer", "tags": ["y"], "size": 10 }
+  ],
+  "links": [
+    { "sourceId": "A", "targetId": "B", "kind": "resolved" },
+    { "sourceId": "B", "targetId": "C", "kind": "resolved" }
+  ]
+}
+```
