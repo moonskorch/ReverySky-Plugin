@@ -186,6 +186,24 @@ function makeDepthPayload(): GraphPayload {
   };
 }
 
+function withStableNoteIds(payload: GraphPayload): GraphPayload {
+  const stableIdByOriginalId = new Map(
+    payload.notes.map((note) => [note.id, makeStableNoteId(note.path)])
+  );
+  return {
+    ...payload,
+    notes: payload.notes.map((note) => ({
+      ...note,
+      id: stableIdByOriginalId.get(note.id) ?? note.id
+    })),
+    links: payload.links.map((link) => ({
+      ...link,
+      sourceId: stableIdByOriginalId.get(link.sourceId) ?? link.sourceId,
+      targetId: stableIdByOriginalId.get(link.targetId) ?? link.targetId
+    }))
+  };
+}
+
 function createSessionForStateTests(options?: {
   sendGraph?: (payload: GraphPayload) => void;
   sendRuntimeSettings?: (payload: { frameRateMode: "auto" | "fps60" | "fps30" | "fps24" }) => void;
@@ -1530,10 +1548,10 @@ describe("MapSession", () => {
     });
   });
 
-  it("applies query filters inside the Ego graph while keeping the center", async () => {
+  it("applies query filters before the Ego graph while keeping the center", async () => {
     vi.useFakeTimers();
 
-    const payload = makeEgoPayload();
+    const payload = withStableNoteIds(makeEgoPayload());
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
     const session = new MapSession({
@@ -1565,10 +1583,10 @@ describe("MapSession", () => {
     session.requestFocusFromEditor("Archive/Old.md");
 
     expect(sendGraph).toHaveBeenCalledTimes(2);
-    expect((sendGraph.mock.calls[1]?.[0] as GraphPayload).notes.map((note) => note.id)).toEqual([
-      "project",
-      "archive",
-      "neighbor-note"
+    expect((sendGraph.mock.calls[1]?.[0] as GraphPayload).notes.map((note) => note.path)).toEqual([
+      "Projects/ReverySky/Spec.md",
+      "Archive/Old.md",
+      "Projects/ReverySky/Neighbor.md"
     ]);
 
     session.setFilterQuery("path:Spec");
@@ -1577,9 +1595,16 @@ describe("MapSession", () => {
     expect(sendGraph).toHaveBeenCalledTimes(3);
     const sentPayload = sendGraph.mock.calls[2]?.[0] as GraphPayload;
     expect(sentPayload.vault.noteCount).toBe(2);
-    expect(sentPayload.notes.map((note) => note.id)).toEqual(["project", "archive"]);
+    expect(sentPayload.notes.map((note) => note.path)).toEqual([
+      "Projects/ReverySky/Spec.md",
+      "Archive/Old.md"
+    ]);
     expect(sentPayload.links).toEqual([
-      { sourceId: "project", targetId: "archive", kind: "resolved" }
+      {
+        sourceId: makeStableNoteId("Projects/ReverySky/Spec.md"),
+        targetId: makeStableNoteId("Archive/Old.md"),
+        kind: "resolved"
+      }
     ]);
   });
 
@@ -1733,10 +1758,10 @@ describe("MapSession", () => {
     ]);
   });
 
-  it("matches an Ego boundary note by tag without sending that boundary tag to Unity", async () => {
+  it("drops a query-matched Ego boundary note when its path to the center is filtered out", async () => {
     vi.useFakeTimers();
 
-    const payload = makeDepthPayload();
+    const payload = withStableNoteIds(makeDepthPayload());
     const sendGraph = vi.fn();
     const session = createEgoGraphSession(payload, { sendGraph });
 
@@ -1750,10 +1775,9 @@ describe("MapSession", () => {
 
     expect(sendGraph).toHaveBeenCalledTimes(3);
     const sentPayload = sendGraph.mock.calls[2]?.[0] as GraphPayload;
-    expect(sentPayload.notes.map((note) => note.id)).toEqual(["center", "outer-left"]);
+    expect(sentPayload.notes.map((note) => note.path)).toEqual(["Depth/Center.md"]);
     expect(sentPayload.notes.map((note) => [note.id, note.tags])).toEqual([
-      ["center", ["center"]],
-      ["outer-left", []]
+      [makeStableNoteId("Depth/Center.md"), ["center"]]
     ]);
   });
 

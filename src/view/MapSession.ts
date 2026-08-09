@@ -93,7 +93,6 @@ export type TagSuggestion = {
 
 type EgoGraphScope = {
   payload: GraphPayload;
-  centerNoteId?: string;
   distanceByNoteId: Map<string, number>;
 };
 
@@ -769,18 +768,20 @@ export class MapSession {
   }
 
   private applyActiveFilters(payload: GraphPayload): GraphPayload {
-    const egoScope = this.egoEnabled
-      ? this.buildEgoGraphScope(payload)
-      : { payload, centerNoteId: undefined, distanceByNoteId: new Map() };
+    const centerNoteId = this.egoEnabled ? this.getCurrentEgoCenterNoteId() : undefined;
 
     const queryFiltered = GraphQueryFilter.applyFilter(
-      egoScope.payload,
+      payload,
       this.activeQueryFilter,
-      { alwaysIncludeNoteId: egoScope.centerNoteId }
+      { alwaysIncludeNoteId: centerNoteId }
     );
 
+    const egoScope = this.egoEnabled
+      ? this.buildEgoGraphScope(queryFiltered)
+      : { payload: queryFiltered, distanceByNoteId: new Map() };
+
     const tagsFiltered = this.applyTagsVisibilityFilter(
-      queryFiltered,
+      egoScope.payload,
       egoScope.distanceByNoteId
     );
 
@@ -788,6 +789,11 @@ export class MapSession {
       ...tagsFiltered,
       mapLayout: this.mapLayout
     };
+  }
+
+  private getCurrentEgoCenterNoteId(): string | undefined {
+    const centerPath = this.normalizeVaultPath(this.focusPath);
+    return this.isGraphRelevantPath(centerPath) ? makeStableNoteId(centerPath) : undefined;
   }
 
   private buildEgoGraphScope(payload: GraphPayload): EgoGraphScope {
@@ -876,7 +882,6 @@ export class MapSession {
 
     return {
       payload: this.toGraphSubset(payload, includedIds, links),
-      centerNoteId: centerId,
       distanceByNoteId
     };
   }

@@ -209,7 +209,7 @@ type GraphLink = {
 - Unity-side field-to-behavior mapping, runtime defaults, and ingestion-specific fallbacks are documented in `unity/ReverySkyMap/docs/DATA_CONTRACT.md` under `Runtime Field Usage (Unity)`.
 
 ## Current Producer Semantics
-- `graph:set` is the effective payload emitted by the plugin view, not the raw vault snapshot. The effective payload may be narrowed by Ego scope before query and tag filters run.
+- `graph:set` is the effective payload emitted by the plugin view, not the raw vault snapshot. The effective payload applies the query filter first while retaining the Ego center when needed, then narrows by Ego scope before tag visibility filtering runs.
 - Each emitted `graph:set` gets a unique `requestId` so stale `graph:ready` messages cannot complete a newer graph status.
 - After startup graph emission, `MapSession` lets the first Obsidian `metadataCache.resolved` event refresh cached vault graph data from settled `resolvedLinks`.
 - After graph-relevant metadata changes, `MapSession` waits for Obsidian `metadataCache.resolved` before rebuilding from `metadataCache.resolvedLinks`; while waiting, it may send `runtime:status` instead of `graph:set`.

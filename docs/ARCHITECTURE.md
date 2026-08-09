@@ -222,7 +222,7 @@ Graph emission timing is grouped by event intent:
 3. `src/view/MapFilterPanelController.ts` updates session-owned state through `MapSession.setFilterQuery()`, `setShowTags()`, or `MapSession.setMapLayoutPreference()`.
 4. For valid filter, tag-visibility, Ego, and layout changes, `src/view/MapSession.ts` rebuilds the outgoing graph from the latest source graph snapshot, then sends it when the bridge is ready. Filter input is debounced before graph emission; invalid filter input updates UI and persistence state but does not emit `graph:set`.
 5. `src/graph/GraphQueryFilter.ts`
-   Parses the query and returns the filtered `GraphPayload` subset. When Ego scope is enabled, `MapSession` has already narrowed the source graph to the focused center and notes reachable within the configured ego depth; the query filter still runs inside that scope, while the Ego center is always retained.
+   Parses the query and returns the filtered `GraphPayload` subset. When Ego scope is enabled, `MapSession` first applies the query to the source graph while retaining the Ego center, then builds the Ego scope inside that query-visible subset.
 6. `src/view/MapView.ts` receives the `sendGraph` callback from `MapSession`, forwards the payload through `UnityIframeBridge`, and asks `MapFilterPanelController` to refresh visible suggestions when needed.
 7. `src/bridge/UnityIframeBridge.ts` -> `sendGraphSet()`
    Sends the effective graph that Unity should render now.
@@ -231,7 +231,7 @@ For graph-relevant Obsidian metadata changes, `MapSession` first marks semantic 
 
 Ego scope is a complete effective-graph transform, not a placeholder setting. `MapSession.buildEgoGraphScope(...)` builds an undirected adjacency view from resolved note links, runs breadth-first search from the current `focusPath` up to `egoDepth`, and records each included note's shortest distance from the center. The resulting payload includes only notes at distances `0..egoDepth`. With `egoNeighborLinksEnabled` disabled, Ego keeps only links that connect different ego-depth rings and reach inward from a non-boundary ring; with it enabled, Ego keeps every note-note link whose endpoints are both inside the included scope.
 
-Tag visibility is applied after Ego scope and query filtering, so `tag:` filters still match the real note metadata inside the scoped graph. When `showTags` is disabled, all emitted note tags are cleared. When Ego scope and `showTags` are both enabled, notes inside the last depth ring do not introduce new tag nodes; they keep only tags that are already visible from an inner ring so Unity can still draw note-tag links to existing shared tag nodes.
+Tag visibility is applied after query filtering and Ego scope, so `tag:` filters still match the real note metadata before boundary-ring tag trimming. When `showTags` is disabled, all emitted note tags are cleared. When Ego scope and `showTags` are both enabled, notes inside the last depth ring do not introduce new tag nodes; they keep only tags that are already visible from an inner ring so Unity can still draw note-tag links to existing shared tag nodes.
 It does not rebuild from `metadataCache.resolvedLinks` until Obsidian emits `metadataCache.resolved`.
 This prevents an intermediate `resolvedLinks` snapshot from being cached and then reused by later filters.
 Startup metadata settling is intentionally different: after the runtime receives the initial graph, the first `metadataCache.resolved` event may trigger one extra graph rebuild without showing the metadata update status.
@@ -347,7 +347,7 @@ For rename, `MapFocusController.onRename(...)` preserves focus only when the old
   Current code:
   `setFilterQuery(...)` parses the filter and ignores invalid input ->
   valid input schedules a debounced outgoing graph rebuild and send ->
-  `rebuildOutgoingGraph()` applies Ego scope when enabled, applies active filters, and prepares the effective payload ->
+  `rebuildOutgoingGraph()` applies the active query filter, applies Ego scope when enabled, and prepares the effective payload ->
   `sendOutgoingGraph()` sends effective `graph:set` ->
   Unity `ApplyGraphFocus()` tries pending focus if one exists, otherwise restores visible `FocusRestoreNoteId`; `ResetFocus()` resets the camera but keeps `FocusRestoreNoteId`.
 
@@ -475,7 +475,7 @@ Open graph leaves do not share live filter state. Each leaf's `MapSession` owns 
 
 - The source graph and effective graph are both owned by `MapSession`.
   `sourceGraphPayload` is the latest full vault snapshot built from Obsidian state.
-  `outgoingGraphPayload` is the effective payload Unity should render now: optional Ego depth scope and neighbor-link selection, then query filter, then tag visibility, then layout hint.
+  `outgoingGraphPayload` is the effective payload Unity should render now: query filter with the Ego center retained when needed, optional Ego depth scope and neighbor-link selection, then tag visibility, then layout hint.
   If more than one graph leaf is open, each leaf has its own effective graph and can rebuild or re-emit independently.
 
 - `filterQuery`, `showTags`, `mapLayout`, `renderScale`, and Ego settings are owned by `MapSession`.
