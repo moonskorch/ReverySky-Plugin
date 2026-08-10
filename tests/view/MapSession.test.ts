@@ -1701,6 +1701,81 @@ describe("MapSession", () => {
     ]);
   });
 
+  it("clears Global note focus when Unity activates a tag", async () => {
+    const payload = makeDepthPayload();
+    const sendGraph = vi.fn();
+    const sendFocus = vi.fn();
+    const session = createEgoGraphSession(payload, { sendGraph, sendFocus });
+
+    await session.setState({ egoEnabled: false });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    session.handleRuntimeFocusChange("Depth/Center.md");
+
+    session.handleRuntimeTagActivate();
+    session.setEgoEnabled(true);
+
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+    expect((sendGraph.mock.calls[1]?.[0] as GraphPayload).notes).toEqual([]);
+    expect(sendFocus).not.toHaveBeenCalled();
+  });
+
+  it("restores Ego center focus after Unity activates a tag and the Ego graph rebuilds", async () => {
+    const payload = makeDepthPayload();
+    const sendGraph = vi.fn();
+    const sendFocus = vi.fn();
+    const session = createEgoGraphSession(payload, { sendGraph, sendFocus });
+
+    await session.setState({ egoEnabled: true });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    session.requestFocusFromEditor("Depth/Center.md");
+
+    session.handleRuntimeTagActivate();
+    session.setEgoDepth(2);
+
+    expect(sendGraph).toHaveBeenCalledTimes(3);
+    expect((sendGraph.mock.calls[2]?.[0] as GraphPayload).notes.map((note) => note.id)).toEqual([
+      "center",
+      "left",
+      "right",
+      "outer-left",
+      "outer-right"
+    ]);
+    expect(sendFocus).toHaveBeenCalledTimes(2);
+    expect(sendFocus).toHaveBeenLastCalledWith({
+      id: makeStableNoteId("Depth/Center.md"),
+      path: "Depth/Center.md"
+    });
+  });
+
+  it("clears a tag-suspended Ego center when switching to Global before focus restore", async () => {
+    const payload = makeDepthPayload();
+    const sendGraph = vi.fn();
+    const sendFocus = vi.fn();
+    const session = createEgoGraphSession(payload, { sendGraph, sendFocus });
+
+    await session.setState({ egoEnabled: true });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    session.requestFocusFromEditor("Depth/Center.md");
+
+    session.handleRuntimeTagActivate();
+    session.setEgoEnabled(false);
+    session.setEgoEnabled(true);
+
+    expect(sendGraph).toHaveBeenCalledTimes(4);
+    expect((sendGraph.mock.calls[2]?.[0] as GraphPayload).notes.map((note) => note.id)).toEqual(
+      payload.notes.map((note) => note.id)
+    );
+    expect((sendGraph.mock.calls[3]?.[0] as GraphPayload).notes).toEqual([]);
+    expect(sendFocus).toHaveBeenCalledTimes(1);
+    expect(sendFocus).toHaveBeenLastCalledWith({
+      id: makeStableNoteId("Depth/Center.md"),
+      path: "Depth/Center.md"
+    });
+  });
+
   it("keeps neighbor links out unless the Ego neighbor-links option is enabled", async () => {
     const payload = makeDepthPayload();
     const sendGraph = vi.fn();

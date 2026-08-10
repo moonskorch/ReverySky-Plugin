@@ -499,8 +499,6 @@ public class ObsidianBridgeEditModeTests
     MapRuntimeContext.OnTagActivateRequested += HandleTagActivate;
     try
     {
-      InvokeObsidianBridgeLifecycle("OnEnable");
-
       LogAssert.Expect(LogType.Log, new Regex("\\[MapRuntimeContext\\] Tag activate requested: tag=project"));
       LogAssert.Expect(LogType.Log, new Regex("\\[ObsidianBridge\\] tag:activate requested \\(Editor/Non-WebGL\\): tag=project"));
 
@@ -511,7 +509,6 @@ public class ObsidianBridgeEditModeTests
     }
     finally
     {
-      InvokeObsidianBridgeLifecycle("OnDisable");
       MapRuntimeContext.OnTagActivateRequested -= HandleTagActivate;
     }
   }
@@ -931,13 +928,6 @@ public class ObsidianBridgeEditModeTests
     FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
     Assert.That(field, Is.Not.Null, $"Missing field {fieldName}.");
     field.SetValue(target, value);
-  }
-
-  private void InvokeObsidianBridgeLifecycle(string methodName)
-  {
-    MethodInfo method = typeof(ObsidianBridge).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
-    Assert.That(method, Is.Not.Null, $"Missing lifecycle method {methodName}.");
-    method.Invoke(bridge, null);
   }
 
   private static IEnumerator InvokeCartographerRebuildGraphAfterClear(

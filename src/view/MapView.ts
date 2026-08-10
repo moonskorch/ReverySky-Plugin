@@ -1,6 +1,6 @@
 import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
 import type { App } from "obsidian";
-import type { GraphPayload, NoteOpenPayload, TagActivatePayload } from "../bridge/BridgeTypes";
+import type { GraphPayload, NoteOpenPayload } from "../bridge/BridgeTypes";
 import { UnityIframeBridge } from "../bridge/UnityIframeBridge";
 import { VaultGraphBuilder } from "../graph/VaultGraphBuilder";
 import type ReverySkyMapPlugin from "../main";
@@ -271,11 +271,11 @@ export class MapView extends ItemView {
           }
           void this.noteOpenRouter.handleNoteOpenRequest(payload);
         },
-        onTagActivate: (payload: TagActivatePayload) => {
+        onTagActivate: () => {
           if (lifecycleGeneration !== this.lifecycleGeneration) {
             return;
           }
-          console.debug("[ReverySky] tag:activate", payload);
+          this.session.handleRuntimeTagActivate();
         },
         onError: (message: string) => {
           if (lifecycleGeneration !== this.lifecycleGeneration) {

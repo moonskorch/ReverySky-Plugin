@@ -286,6 +286,7 @@ These scenarios define the intended focus behavior for the current focus work an
 Focus before bridge readiness is out of scope. Plugin-side focus requests pass through the `bridgeReady` guard in `MapSession.handleEditorFocusRequest(...)`; Unity pending focus starts only after `note:focus` reaches `ObsidianBridge.OnNoteFocus(...)`.
 In Global mode, ordinary focus also requires the note to belong to the latest effective graph payload.
 In Ego mode, ordinary focus makes the note the `focusPath`; it rebuilds the Ego scope only when that center changes, then sends `note:focus`.
+Unity tag activation is mode-specific: Global mode treats it as leaving note focus, while Ego mode marks note focus as suspended without replacing the Ego center. Tag focus has no restore path after a graph rebuild, so an in-Ego rebuild falls back to the Ego center note.
 For rename, `MapFocusController.onRename(...)` preserves focus only when the old path matches `focusPath`, then requests focus with `skipGraphCheck` and `skipEgoGraphRebuild`.
 
 - Startup / graph open:
@@ -395,6 +396,15 @@ For rename, `MapFocusController.onRename(...)` preserves focus only when the old
   `ObsidianBridge.HandleOpenNoteRequested(...)` emits `note:open` ->
   iframe `onNoteOpen` callback passes the payload to `MapNoteOpenRouter.handleNoteOpenRequest(payload)`.
 
+- Unity tag activate:
+  Expected: in Global mode, selecting a tag clears the note focus target. In Ego mode, selecting a tag suspends visible note focus while keeping the current Ego center for in-Ego graph rebuilds. Because tag focus has no restore mechanism after rebuild, the next in-Ego rebuild restores focus to the Ego center note. If the view leaves Ego first, the suspended Ego center is cleared.
+  Current code:
+  `FocusNode.HandleSelect(...)` selects the tapped tag and clears Unity note restore state ->
+  `MapRuntimeContext.RequestTagActivate(...)` emits `tag:activate` through `ObsidianBridge` ->
+  iframe `onTagActivate` callback calls `MapSession.handleRuntimeTagActivate()` ->
+  Global mode clears `focusPath`, while Ego mode keeps `focusPath` and sets `isEgoNoteFocusSuspended` ->
+  the next in-Ego `sendOutgoingGraph()` sends `graph:set`, then `restoreEgoFocus()` sends `note:focus` for the Ego center note. If Ego is disabled first, `MapSession` clears the suspended `focusPath` so returning to Ego starts from no center.
+
 ### Path 6. Settings persistence -> next open restore
 1. `src/main.ts` -> `ReverySkyMapPlugin.onload()` reads plugin data with `loadData()` and stores `mapViewState` in the plugin-owned `mapViewState` snapshot.
 2. New `MapView` instances receive that snapshot as `initialState`.
@@ -492,11 +502,13 @@ Open graph leaves do not share live filter state. Each leaf's `MapSession` owns 
   In Global mode, ordinary focus is sent only when the requested note is part of the latest effective graph payload.
   In Ego mode, accepted focus rebuilds the effective graph only when the center changes.
   `MapSession` stores the current plugin-side graph `focusPath` after successful TypeScript focus dispatch and after Unity-originated `note:open` requests.
+  `focusPath` also acts as the Ego center; when Unity activates a tag, Global mode clears it, while Ego mode keeps it and marks note focus as suspended. Since tag focus cannot be restored after graph rebuild, the next in-Ego rebuild restores the center note instead; leaving Ego first clears that suspended center.
   Rename may bypass the Global membership check only when the renamed old path matches that `focusPath`, because the new path can legitimately arrive before the renamed graph payload reaches Unity.
   Rename also skips immediate Ego graph rebuild; the vault rename listener already schedules a fresh source rebuild, and rebuilding before that would scope around the new path in stale source data.
 
 - Focus responsibility is split across the bridge boundary.
-  TypeScript decides whether a focus request belongs to the graph Unity should be rendering now. Unity does not decide vault/filter membership; its pending focus exists only for the short gap between receiving a valid `note:focus` and exposing the target star in `MapGraphIndex`.
+  TypeScript decides whether ordinary focus belongs to the graph Unity should be rendering now. After tag selection forces an in-Ego graph rebuild, the fallback from suspended note focus to the Ego center note is an explicit center intent and is allowed to reach Unity without an outgoing membership check so Unity pending focus can cover graph-index timing.
+  Unity does not decide vault/filter membership; its pending focus exists only for the short gap between receiving a valid `note:focus` and exposing the target star in `MapGraphIndex`.
 
 - `renderScale` is applied at iframe startup, not through the bridge.
   `MapSession` tracks the selected value and whether it differs from the currently applied iframe value so the UI can ask the user to reopen the graph.
@@ -532,7 +544,7 @@ Important current contract facts:
 - `notes[].size` is a non-negative byte count produced from Obsidian file metadata and mapped to Unity `NoteData.Length`;
 - `graph:set` carries the effective graph after Ego scope and filters; focus changes are sent separately via `note:focus`, which must include both `id` and `path`;
 - Ego `graph:set` payloads use `egoDepth` for note inclusion, `egoNeighborLinksEnabled` for link selection, and two-mode tag-line visibility;
-- ordinary Global `note:focus` dispatch is gated by the latest effective graph on the TypeScript side; Ego focus rebuilds only when the center changes; active-note rename can bypass the Global gate to cover bridge ordering around path-derived ids;
+- ordinary Global `note:focus` dispatch is gated by the latest effective graph on the TypeScript side; Global `tag:activate` clears the note focus target; Ego `tag:activate` suspends note focus, keeps the Ego center only while the view remains in Ego, restores the center note after the next in-Ego `graph:set` because tag focus has no restore path, and clears that suspended center if Ego is disabled first; Ego focus rebuilds only when the center changes; active-note rename can bypass the Global gate to cover bridge ordering around path-derived ids;
 - `graph:ready` must echo the latest `graph:set` `requestId` before the iframe clears the loading status;
 - `runtime:status` updates iframe wrapper status text only and is not forwarded into Unity;
 - `runtime:settings` applies Unity runtime frame-rate mode live and does not rebuild graph state;

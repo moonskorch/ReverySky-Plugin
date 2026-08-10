@@ -137,6 +137,8 @@ export class MapSession {
   private noteSignatureByPath = new Map<string, string>();
   // Plugin-side graph focus, updated from both TS focus dispatch and Unity note-open.
   private focusPath = "";
+  // Tag selection can keep the Ego center while suspending visible note focus.
+  private isEgoNoteFocusSuspended = false;
   private bridgeReady = false;
   private refreshTimer: number | null = null;
   private refreshTimerWindow: Window | null = null;
@@ -218,6 +220,7 @@ export class MapSession {
     this.semanticRefreshPending = false;
     this.startupRefreshPending = false;
     this.focusPath = "";
+    this.isEgoNoteFocusSuspended = false;
     this.clearRefreshTimer();
     this.ensureRefreshSubscriptions(registerEvent);
   }
@@ -235,6 +238,7 @@ export class MapSession {
     this.startupRefreshPending = false;
     this.outgoingGraphPayload = null;
     this.focusPath = "";
+    this.isEgoNoteFocusSuspended = false;
   }
 
   handleRuntimeReady(): void {
@@ -334,6 +338,10 @@ export class MapSession {
   }
 
   setEgoEnabled(egoEnabled: boolean): void {
+    if (!egoEnabled && this.isEgoNoteFocusSuspended) {
+      this.focusPath = "";
+      this.isEgoNoteFocusSuspended = false;
+    }
     this.egoEnabled = egoEnabled;
     this.notifyStateChanged();
     this.rebuildOutgoingGraph();
@@ -547,6 +555,7 @@ export class MapSession {
 
     const centerChanged = this.focusPath !== path;
     this.focusPath = path;
+    this.isEgoNoteFocusSuspended = false;
     return {
       path,
       centerChanged
@@ -579,6 +588,18 @@ export class MapSession {
       this.rebuildOutgoingGraph();
       this.sendOutgoingGraph();
       this.sendFocusForPath(acceptedFocus.path);
+    }
+  }
+
+  handleRuntimeTagActivate(): void {
+    if (this.egoEnabled) {
+      // Tag selection is transient in Ego mode; the note center still owns graph scope continuity.
+      this.isEgoNoteFocusSuspended = this.isGraphRelevantPath(this.focusPath);
+    }
+    else {
+      // Global tag selection is a real move away from note focus.
+      this.focusPath = "";
+      this.isEgoNoteFocusSuspended = false;
     }
   }
 
@@ -651,6 +672,7 @@ export class MapSession {
           this.noteSignatureByPath.delete(normalizedPath);
           if (this.focusPath === normalizedPath) {
             this.focusPath = "";
+            this.isEgoNoteFocusSuspended = false;
           }
           this.scheduleSourceGraphRebuild();
         })
@@ -765,6 +787,19 @@ export class MapSession {
     }
 
     this.sendGraph(this.outgoingGraphPayload);
+    if (this.egoEnabled && this.isEgoNoteFocusSuspended) {
+      this.restoreEgoFocus();
+    }
+  }
+
+  private restoreEgoFocus(): void {
+    this.isEgoNoteFocusSuspended = false;
+    const centerPath = this.normalizeVaultPath(this.focusPath);
+    if (!centerPath) {
+      return;
+    }
+
+    this.sendFocusForPath(centerPath);
   }
 
   private applyActiveFilters(payload: GraphPayload): GraphPayload {
