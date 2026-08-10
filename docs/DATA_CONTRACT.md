@@ -216,6 +216,7 @@ type GraphLink = {
 - After graph-relevant metadata changes, `MapSession` waits for Obsidian `metadataCache.resolved` before rebuilding from `metadataCache.resolvedLinks`; while waiting, it may send `runtime:status` instead of `graph:set`.
 - Filter-only changes reuse the latest source graph snapshot and emit only a newly narrowed payload after the filter debounce.
 - Graph-setting changes such as tag visibility, layout, Ego mode, Ego depth, and Ego neighbor links reuse the latest source graph snapshot and coalesce live `graph:set` emission through the graph-settings debounce.
+- Runtime unavailable during iframe restart or window migration flushes pending source-refresh, filter, and graph-settings debounce work so the next `bridge:ready` emits the latest effective payload.
 - Ego focus acceptance updates the plugin-side focus path independently from bridge dispatch. Ordinary Ego focus rebuilds the effective payload around a changed center before sending `note:focus`; startup accepts the active center before the initial `graph:set`; active-note rename can skip the immediate Ego rebuild because the rename event already schedules a fresh source graph rebuild.
 - `notes[].date` uses `frontmatter.date`, then `frontmatter.created`, then `frontmatter.created_at`, then file creation time. Missing, blank, or invalid candidates are skipped, and the field is omitted when no valid source exists.
 - Source `notes[].tags` are merged, normalized, and deduplicated; effective `graph:set` payloads may clear or trim them for tag visibility.

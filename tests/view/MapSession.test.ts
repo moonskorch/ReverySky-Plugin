@@ -2389,7 +2389,7 @@ describe("MapSession", () => {
     expect(updatedPayload.notes.map((note) => note.id)).toEqual(["archive"]);
   });
 
-  it("replays the cached graph on runtime ready before a pending settings update is sent", () => {
+  it("flushes pending settings graph work before runtime ready replays the graph", () => {
     vi.useFakeTimers();
 
     const buildGraph = vi.fn().mockReturnValue(makePathPayload());
@@ -2429,13 +2429,108 @@ describe("MapSession", () => {
     expect(sendGraph).toHaveBeenCalledTimes(3);
     const replayedPayload = sendGraph.mock.calls[2]?.[0] as GraphPayload;
     expect(replayedPayload.notes.map((note) => note.id)).toEqual(["archive"]);
-    expect(replayedPayload.mapLayout).toBe("auto");
+    expect(replayedPayload.mapLayout).toBe("dates");
 
     vi.advanceTimersByTime(250);
-    expect(sendGraph).toHaveBeenCalledTimes(4);
-    const settingsPayload = sendGraph.mock.calls[3]?.[0] as GraphPayload;
-    expect(settingsPayload.notes.map((note) => note.id)).toEqual(["archive"]);
-    expect(settingsPayload.mapLayout).toBe("dates");
+    expect(sendGraph).toHaveBeenCalledTimes(3);
+  });
+
+  it("flushes pending filter graph work before runtime ready replays the graph", () => {
+    vi.useFakeTimers();
+
+    const buildGraph = vi.fn().mockReturnValue(makePathPayload());
+    const sendGraph = vi.fn();
+    const session = new MapSession({
+      app: {
+        metadataCache: {
+          on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+        },
+        vault: {
+          on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+        },
+        workspace: {
+          activeLeaf: null,
+          getLeavesOfType: vi.fn().mockReturnValue([]),
+          iterateAllLeaves: vi.fn(),
+          on: vi.fn().mockReturnValue({ id: "event-ref" })
+        }
+      } as never,
+      buildGraph,
+      now: () => 1700000000000,
+      sendGraph,
+      sendFocus: vi.fn()
+    });
+
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+
+    session.setFilterQuery("path:archive");
+    session.handleRuntimeUnavailable();
+    session.handleRuntimeReady();
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+    const replayedPayload = sendGraph.mock.calls[1]?.[0] as GraphPayload;
+    expect(replayedPayload.notes.map((note) => note.id)).toEqual(["archive"]);
+
+    vi.advanceTimersByTime(500);
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+  });
+
+  it("flushes pending source graph work before runtime ready replays the graph", () => {
+    vi.useFakeTimers();
+
+    const metadataCallbacks: {
+      resolved?: () => void;
+    } = {};
+
+    const initialPayload = makePayload();
+    const refreshedPayload = makePayload();
+    refreshedPayload.notes[0].id = "refreshed";
+    const buildGraph = vi.fn()
+      .mockReturnValueOnce(initialPayload)
+      .mockReturnValue(refreshedPayload);
+    const sendGraph = vi.fn();
+    const session = new MapSession({
+      app: {
+        metadataCache: {
+          on: vi.fn((name: "changed" | "resolved", callback: (...args: never[]) => void) => {
+            if (name === "resolved") {
+              metadataCallbacks.resolved = callback as () => void;
+            }
+            return { id: `metadata-${name}` };
+          })
+        },
+        vault: {
+          on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+        },
+        workspace: {
+          activeLeaf: null,
+          getLeavesOfType: vi.fn().mockReturnValue([]),
+          iterateAllLeaves: vi.fn(),
+          on: vi.fn().mockReturnValue({ id: "event-ref" })
+        }
+      } as never,
+      buildGraph,
+      now: () => 1700000000000,
+      sendGraph,
+      sendFocus: vi.fn()
+    });
+
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+
+    metadataCallbacks.resolved?.();
+    session.handleRuntimeUnavailable();
+    session.handleRuntimeReady();
+
+    expect(buildGraph).toHaveBeenCalledTimes(2);
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+    expect((sendGraph.mock.calls[1]?.[0] as GraphPayload).notes[0]?.id).toBe("refreshed");
+
+    vi.advanceTimersByTime(250);
+    expect(buildGraph).toHaveBeenCalledTimes(2);
+    expect(sendGraph).toHaveBeenCalledTimes(2);
   });
 
   it("registers refresh subscriptions only once across reopen cycles", () => {

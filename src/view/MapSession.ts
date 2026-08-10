@@ -302,6 +302,7 @@ export class MapSession {
 
   handleRuntimeUnavailable(): void {
     this.bridgeReady = false;
+    this.flushPendingGraphWork();
   }
 
   setFilterQuery(query: string): void {
@@ -778,6 +779,40 @@ export class MapSession {
       this.rebuildOutgoingGraph();
       this.sendOutgoingGraph();
     }, GRAPH_SETTINGS_DEBOUNCE_MS);
+  }
+
+  private flushPendingGraphWork(): void {
+    let shouldInvalidateOutgoingGraph = false;
+
+    if (this.sourceRefreshTimer) {
+      this.clearSourceRefreshTimer();
+      this.rebuildSourceGraph();
+      shouldInvalidateOutgoingGraph = true;
+    }
+
+    if (this.filterInputDebounceTimer) {
+      this.clearFilterInputDebounceTimer();
+      this.notifyStateChanged();
+
+      const parseResult = GraphQueryFilter.parseQuery(this.filterQuery);
+      const nextActiveQueryFilter = this.resolveActiveQueryFilter(parseResult);
+      if (
+        parseResult.isValid &&
+        !areQueryFiltersEqual(this.activeQueryFilter, nextActiveQueryFilter)
+      ) {
+        this.activeQueryFilter = nextActiveQueryFilter;
+        shouldInvalidateOutgoingGraph = true;
+      }
+    }
+
+    if (this.graphSettingsDebounceTimer) {
+      this.clearGraphSettingsDebounceTimer();
+      shouldInvalidateOutgoingGraph = true;
+    }
+
+    if (shouldInvalidateOutgoingGraph) {
+      this.outgoingGraphPayload = null;
+    }
   }
 
   /**

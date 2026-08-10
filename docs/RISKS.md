@@ -118,7 +118,7 @@ Risk:
 - Workspace state, saved layouts, plugin reload timing, or manual workspace changes can still create more than one leaf.
 - Multiple leaves are tolerated as a recovery case, but they are not the primary workflow.
 - Runtime server startup and shutdown are owned by the plugin and shared across open graph leaves.
-- Each leaf owns its own `MapSession`, graph snapshot, filter state, bridge lifecycle, focus gate, source-refresh and settings debounce timers, and Obsidian event listeners.
+- Each leaf owns its own `MapSession`, graph snapshot, filter state, bridge lifecycle, focus gate, source-refresh, filter, and settings debounce timers, and Obsidian event listeners.
 - If several graph leaves are open, graph or metadata events can trigger one refresh path per leaf.
 - Persistence restores only the most recently reported state on later opens.
 

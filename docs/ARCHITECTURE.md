@@ -196,6 +196,7 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 `graph:set` and `note:focus` are latest-intent messages, not durable queues.
 Before `bridge:ready`, `MapSession` keeps only the latest pending graph payload.
 After a graph has been emitted, `MapSession` keeps the latest effective `GraphPayload`.
+When the runtime becomes unavailable during iframe restart or window migration, `MapSession` flushes pending source-refresh, filter, and graph-settings debounce work before the next `bridge:ready` can replay a graph.
 Global focus requires membership in that payload; Ego focus can change the effective graph center instead.
 Active-note rename is the intentional Global gate exception: the new path can arrive before Unity ingests the renamed graph.
 Startup focus uses a dedicated ordering path: Ego mode accepts the active note before the initial `graph:set`, while Global mode keeps the membership check against the emitted effective graph before sending `note:focus`.

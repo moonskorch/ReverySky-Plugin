@@ -671,6 +671,104 @@ describe("MapView bridge integration", () => {
     expect(cleanupWindowMigration).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps a pending filter when Obsidian migrates the view before the filter debounce fires", async () => {
+    vi.useFakeTimers();
+    const app = {
+      marker: "app",
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks[] = [];
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.push(received);
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn(),
+      sendRuntimeSettings: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
+    };
+    const buildGraph = vi.fn().mockReturnValue(makePathPayload());
+    let onWindowMigrated: ((win: Window) => void) | null = null;
+
+    const view = new MapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => makeBridgeForTest(bridge),
+        buildGraph: buildGraph as BuildGraphForTest,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+    document.body.appendChild(view.contentEl);
+    (
+      view.contentEl as HTMLElement & {
+        onWindowMigrated?: (listener: (win: Window) => void) => () => void;
+      }
+    ).onWindowMigrated = vi.fn((listener) => {
+      onWindowMigrated = listener;
+      return vi.fn();
+    });
+
+    await view.onOpen();
+    const firstIframe = view.contentEl.querySelector("iframe");
+    expect(firstIframe).not.toBeNull();
+    Object.defineProperty(firstIframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    firstIframe!.dispatchEvent(new Event("load"));
+    callbacks[0]?.onReady?.();
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+    expect((bridge.sendGraphSet.mock.calls[0]?.[0] as GraphPayload).notes.map((note) => note.id)).toEqual([
+      "daily",
+      "project",
+      "archive"
+    ]);
+
+    const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
+    searchInput.value = "path:archive";
+    searchInput.dispatchEvent(new Event("input"));
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+
+    callMaybe(onWindowMigrated, window);
+    await vi.advanceTimersByTimeAsync(0);
+
+    const secondIframe = view.contentEl.querySelector("iframe");
+    expect(secondIframe).not.toBeNull();
+    expect(secondIframe).not.toBe(firstIframe);
+    Object.defineProperty(secondIframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    secondIframe!.dispatchEvent(new Event("load"));
+    callbacks[1]?.onReady?.();
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+    expect((bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload).notes.map((note) => note.id)).toEqual([
+      "archive"
+    ]);
+
+    vi.advanceTimersByTime(500);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+
+    await view.onClose();
+  });
+
   it("ignores a stale deferred iframe restart when a newer window migration arrives first", async () => {
     vi.useFakeTimers();
     const app = {
