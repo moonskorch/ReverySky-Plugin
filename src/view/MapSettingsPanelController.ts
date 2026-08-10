@@ -119,7 +119,7 @@ export class MapSettingsPanelController {
       this.filterSuggestionsController?.position();
     });
 
-    const settingsSection = createCollapsibleSection(settingsScrollArea as ObsidianHTMLElement, {
+    const settingsSection = createCollapsibleSection(settingsScrollArea, {
       className: "reverysky-map-selection-section",
       label: "Selection",
       onToggle: () => {
@@ -187,7 +187,7 @@ export class MapSettingsPanelController {
       this.session.setShowTags(!uiState.showTags);
       this.refreshTagsToggleUi();
     };
-    const tagsToggle = createToggleControl(selectionSectionContent as ObsidianHTMLElement, {
+    const tagsToggle = createToggleControl(selectionSectionContent, {
       rowClassName: "reverysky-map-tags-toggle-row",
       buttonClassName: "reverysky-map-tags-toggle",
       thumbClassName: "reverysky-map-tags-toggle-thumb",
@@ -197,7 +197,7 @@ export class MapSettingsPanelController {
     });
     this.tagsToggleButtonEl = tagsToggle.button;
 
-    const layoutControl = createSelectControl(selectionSectionContent as ObsidianHTMLElement, {
+    const layoutControl = createSelectControl(selectionSectionContent, {
       label: "Layout",
       ariaLabel: "Select layout",
       options: MAP_LAYOUT_PREFERENCE_OPTIONS,
@@ -208,7 +208,7 @@ export class MapSettingsPanelController {
     });
     this.layoutDropdownEl = layoutControl.select;
 
-    const egoSection = createCollapsibleSection(settingsScrollArea as ObsidianHTMLElement, {
+    const egoSection = createCollapsibleSection(settingsScrollArea, {
       className: "reverysky-map-ego-section",
       label: "Ego Graph",
       onToggle: () => {
@@ -226,7 +226,7 @@ export class MapSettingsPanelController {
       this.session.setEgoEnabled(!uiState.egoEnabled);
       this.refreshEgoControlsUi();
     };
-    const egoToggle = createToggleControl(egoSectionContent as ObsidianHTMLElement, {
+    const egoToggle = createToggleControl(egoSectionContent, {
       rowClassName: "reverysky-map-ego-toggle-row",
       buttonClassName: "reverysky-map-ego-toggle",
       thumbClassName: "reverysky-map-ego-toggle-thumb",
@@ -236,7 +236,7 @@ export class MapSettingsPanelController {
     });
     this.egoMainToggleButtonEl = egoToggle.button;
 
-    const egoDepth = createRangeControl(egoSectionContent as ObsidianHTMLElement, {
+    const egoDepth = createRangeControl(egoSectionContent, {
       sectionClassName: "reverysky-map-ego-depth-section",
       inputClassName: "reverysky-map-ego-depth-input",
       valueClassName: "reverysky-map-ego-depth-value",
@@ -260,7 +260,7 @@ export class MapSettingsPanelController {
       this.session.setEgoNeighborLinksEnabled(!uiState.egoNeighborLinksEnabled);
       this.refreshEgoControlsUi();
     };
-    const neighborLinksToggle = createToggleControl(egoSectionContent as ObsidianHTMLElement, {
+    const neighborLinksToggle = createToggleControl(egoSectionContent, {
       rowClassName: "reverysky-map-ego-neighbor-links-toggle-row",
       buttonClassName: "reverysky-map-ego-neighbor-links-toggle",
       thumbClassName: "reverysky-map-ego-neighbor-links-toggle-thumb",
@@ -270,7 +270,7 @@ export class MapSettingsPanelController {
     });
     this.egoNeighborLinksToggleButtonEl = neighborLinksToggle.button;
 
-    const graphicsSection = createCollapsibleSection(settingsScrollArea as ObsidianHTMLElement, {
+    const graphicsSection = createCollapsibleSection(settingsScrollArea, {
       className: "reverysky-map-graphics-section",
       label: "Graphics",
       onToggle: () => {
@@ -282,7 +282,7 @@ export class MapSettingsPanelController {
     this.graphicsSectionContentEl = graphicsSection.content;
     const graphicsSectionContent = graphicsSection.content;
 
-    const renderScale = createRangeControl(graphicsSectionContent as ObsidianHTMLElement, {
+    const renderScale = createRangeControl(graphicsSectionContent, {
       sectionClassName: "reverysky-map-render-scale-section",
       inputClassName: "reverysky-map-render-scale-input",
       valueClassName: "reverysky-map-render-scale-value",
@@ -304,7 +304,7 @@ export class MapSettingsPanelController {
     this.renderScaleValueEl = renderScale.value;
     this.renderScaleMessageEl = renderScale.message;
 
-    const frameRateModeControl = createSelectControl(graphicsSectionContent as ObsidianHTMLElement, {
+    const frameRateModeControl = createSelectControl(graphicsSectionContent, {
       selectClassName: "reverysky-map-frame-rate-mode-select",
       label: "Frame rate",
       ariaLabel: "Select frame rate",
@@ -316,7 +316,7 @@ export class MapSettingsPanelController {
     });
     this.frameRateModeDropdownEl = frameRateModeControl.select;
 
-    const screenshotSection = createCollapsibleSection(settingsScrollArea as ObsidianHTMLElement, {
+    const screenshotSection = createCollapsibleSection(settingsScrollArea, {
       className: "reverysky-map-screenshot-section",
       label: "Screenshot",
       onToggle: () => {
@@ -328,7 +328,7 @@ export class MapSettingsPanelController {
     this.screenshotSectionContentEl = screenshotSection.content;
     const screenshotSectionContent = screenshotSection.content;
 
-    this.screenshotButtonEl = createActionButton(screenshotSectionContent as ObsidianHTMLElement, {
+    this.screenshotButtonEl = createActionButton(screenshotSectionContent, {
       className: "reverysky-map-screenshot-button",
       label: "Copy screenshot",
       ariaLabel: "Copy graph screenshot",

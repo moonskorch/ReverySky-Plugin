@@ -868,7 +868,7 @@ export class MapSession {
       { alwaysIncludeNoteId: centerNoteId }
     );
 
-    const egoScope = this.egoEnabled
+    const egoScope: EgoGraphScope = this.egoEnabled
       ? this.buildEgoGraphScope(queryFiltered)
       : { payload: queryFiltered, distanceByNoteId: new Map() };
 
