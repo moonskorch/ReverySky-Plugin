@@ -23,6 +23,7 @@ public class ObsidianBridgeEditModeTests
     SetCartographerSingleton(null);
     bridgeObject = new GameObject("ObsidianBridgeEditModeTests");
     bridge = bridgeObject.AddComponent<ObsidianBridge>();
+    ResetBridgeSubscriptions();
   }
 
   [TearDown]
@@ -907,6 +908,27 @@ public class ObsidianBridgeEditModeTests
     MapRuntimeContext.SetTagNames(new Dictionary<int, string>());
     MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>());
     MapRuntimeContext.SetNotes(new List<NoteData>(), string.Empty);
+    ResetBridgeShutdownState();
+  }
+
+  private static void ResetBridgeShutdownState()
+  {
+    FieldInfo shutdownField = typeof(ObsidianBridge).GetField("IsRuntimeShuttingDown", BindingFlags.Static | BindingFlags.NonPublic);
+    Assert.That(shutdownField, Is.Not.Null, "Missing ObsidianBridge shutdown field.");
+    shutdownField.SetValue(null, false);
+  }
+
+  private void ResetBridgeSubscriptions()
+  {
+    InvokeBridgeLifecycleMethod("OnDisable");
+    InvokeBridgeLifecycleMethod("OnEnable");
+  }
+
+  private void InvokeBridgeLifecycleMethod(string methodName)
+  {
+    MethodInfo method = typeof(ObsidianBridge).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(method, Is.Not.Null, $"Missing ObsidianBridge lifecycle method {methodName}.");
+    method.Invoke(bridge, null);
   }
 
   private void EnsureCartographerSingleton()

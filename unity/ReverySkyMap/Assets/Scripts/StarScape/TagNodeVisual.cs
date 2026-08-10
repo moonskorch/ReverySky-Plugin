@@ -12,13 +12,22 @@ public class TagNodeVisual : MonoBehaviour
     if (tagText != null && tagNode != null)
     {
       var runtimeName = MapRuntimeContext.GetTagName(tagNode.UserTagId);
-      tagText.text = string.IsNullOrWhiteSpace(runtimeName) ? $"Tag {tagNode.UserTagId}" : runtimeName;
+      tagText.text = string.IsNullOrWhiteSpace(runtimeName) ? $"Tag {tagNode.UserTagId}" : GetDisplayName(runtimeName);
     }
   }
 
   public void ResetVisual()
   {
     tagText.text = string.Empty;
+  }
+
+  private static string GetDisplayName(string runtimeName)
+  {
+    int separatorIndex = runtimeName.LastIndexOf('/');
+    if (separatorIndex < 0 || separatorIndex == runtimeName.Length - 1)
+      return runtimeName;
+
+    return runtimeName[(separatorIndex + 1)..];
   }
 
 }
