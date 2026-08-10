@@ -34,6 +34,7 @@ import { makeStableNoteId } from "../graph/VaultGraphBuilder";
 import { MapFocusController, type FocusRequestOptions } from "./MapFocusController";
 
 const GRAPH_REFRESH_DEBOUNCE_MS = 250;
+const GRAPH_SETTINGS_DEBOUNCE_MS = 250;
 const FILTER_INPUT_DEBOUNCE_MS = 500;
 const METADATA_RESOLVE_STATUS = "Updating graph data...";
 const MAX_FOLDER_SUGGESTIONS = 80;
@@ -118,6 +119,7 @@ export type MapSessionDependencies = {
  */
 export class MapSession {
   private readonly app: App;
+  private readonly focus: MapFocusController;
   private readonly buildGraph: (app: App) => GraphPayload;
   private readonly now: () => number;
   private readonly sendGraph: (payload: GraphPayload) => void;
@@ -125,25 +127,33 @@ export class MapSession {
   private readonly sendFocus: (payload: NoteFocusPayload) => void;
   private readonly sendRuntimeSettings?: (payload: RuntimeSettingsPayload) => void;
   private readonly onStateChanged?: (state: Record<string, unknown>, options?: { persist?: boolean }) => void;
-  private readonly focus: MapFocusController;
+
+  private bridgeReady = false;
+  private isLive = false;
+  private refreshSubscriptionsRegistered = false;
 
   // Full vault graph snapshot used as the source for filters and suggestions.
   private sourceGraphPayload: GraphPayload | null = null;
   // Last effective graph snapshot prepared for Unity, focus checks, and note-open id resolution.
   private outgoingGraphPayload: GraphPayload | null = null;
+  private noteSignatureByPath = new Map<string, string>();
+
   private semanticRefreshPending = false;
   // Allows one metadataCache.resolved after startup to refresh cached vault graph data from settled links.
   private startupRefreshPending = false;
-  private noteSignatureByPath = new Map<string, string>();
+
   // Plugin-side graph focus, updated from both TS focus dispatch and Unity note-open.
   private focusPath = "";
   // Tag selection can keep the Ego center while suspending visible note focus.
   private isEgoNoteFocusSuspended = false;
-  private bridgeReady = false;
-  private refreshTimer: number | null = null;
-  private refreshTimerWindow: Window | null = null;
-  private refreshSubscriptionsRegistered = false;
-  private isLive = false;
+
+  private sourceRefreshTimer: number | null = null;
+  private sourceRefreshTimerWindow: Window | null = null;
+  private filterInputDebounceTimer: number | null = null;
+  private filterInputDebounceTimerWindow: Window | null = null;
+  private graphSettingsDebounceTimer: number | null = null;
+  private graphSettingsDebounceTimerWindow: Window | null = null;
+
   private filterQuery = "";
   private showTags = true;
   private mapLayout: MapLayoutPreference = DEFAULT_MAP_LAYOUT_PREFERENCE;
@@ -153,12 +163,12 @@ export class MapSession {
   private egoEnabled = DEFAULT_EGO_ENABLED;
   private egoDepth = DEFAULT_EGO_DEPTH;
   private egoNeighborLinksEnabled = DEFAULT_EGO_NEIGHBOR_LINKS_ENABLED;
+
   // Parsed filter currently applied to the outgoing graph; live input commits it only after debounce.
   private activeQueryFilter: ParsedQueryFilter | null = null;
   private filterParseValid = true;
   private filterMessage = "";
-  private filterInputDebounceTimer: number | null = null;
-  private filterInputDebounceTimerWindow: Window | null = null;
+
   private folderPathSuggestions: FolderPathSuggestion[] = [];
   private tagSuggestions: TagSuggestion[] = [];
 
@@ -221,14 +231,15 @@ export class MapSession {
     this.startupRefreshPending = false;
     this.focusPath = "";
     this.isEgoNoteFocusSuspended = false;
-    this.clearRefreshTimer();
+    this.clearSourceRefreshTimer();
     this.ensureRefreshSubscriptions(registerEvent);
   }
 
   stop(): void {
     this.isLive = false;
-    this.clearRefreshTimer();
+    this.clearSourceRefreshTimer();
     this.clearFilterInputDebounceTimer();
+    this.clearGraphSettingsDebounceTimer();
     this.bridgeReady = false;
     this.sourceGraphPayload = null;
     this.folderPathSuggestions = [];
@@ -261,7 +272,7 @@ export class MapSession {
 
     this.prepareStartupGraph(acceptedStartupFocus?.centerChanged === true);
     this.sendOutgoingGraph();
-      
+
     if (acceptedStartupFocus) {
       this.sendFocusForPath(acceptedStartupFocus.path);
     }
@@ -315,15 +326,13 @@ export class MapSession {
   setShowTags(showTags: boolean): void {
     this.showTags = showTags;
     this.notifyStateChanged();
-    this.rebuildOutgoingGraph();
-    this.sendOutgoingGraph();
+    this.scheduleGraphSettingsUpdate();
   }
 
   setMapLayoutPreference(mapLayout: unknown): void {
     this.mapLayout = normalizeMapLayoutPreference(mapLayout);
     this.notifyStateChanged();
-    this.rebuildOutgoingGraph();
-    this.sendOutgoingGraph();
+    this.scheduleGraphSettingsUpdate();
   }
 
   setFrameRateMode(frameRateMode: unknown): void {
@@ -344,16 +353,14 @@ export class MapSession {
     }
     this.egoEnabled = egoEnabled;
     this.notifyStateChanged();
-    this.rebuildOutgoingGraph();
-    this.sendOutgoingGraph();
+    this.scheduleGraphSettingsUpdate();
   }
 
   setEgoDepth(egoDepth: unknown): void {
     this.egoDepth = normalizeEgoDepth(egoDepth);
     this.notifyStateChanged();
     if (this.egoEnabled) {
-      this.rebuildOutgoingGraph();
-      this.sendOutgoingGraph();
+      this.scheduleGraphSettingsUpdate();
     }
   }
 
@@ -361,8 +368,7 @@ export class MapSession {
     this.egoNeighborLinksEnabled = egoNeighborLinksEnabled;
     this.notifyStateChanged();
     if (this.egoEnabled) {
-      this.rebuildOutgoingGraph();
-      this.sendOutgoingGraph();
+      this.scheduleGraphSettingsUpdate();
     }
   }
 
@@ -707,12 +713,12 @@ export class MapSession {
     if (!this.isLive) {
       return;
     }
-    this.clearRefreshTimer();
+    this.clearSourceRefreshTimer();
     const timerWindow = this.getTimerWindow();
-    this.refreshTimerWindow = timerWindow;
-    this.refreshTimer = timerWindow.setTimeout(() => {
-      this.refreshTimer = null;
-      this.refreshTimerWindow = null;
+    this.sourceRefreshTimerWindow = timerWindow;
+    this.sourceRefreshTimer = timerWindow.setTimeout(() => {
+      this.sourceRefreshTimer = null;
+      this.sourceRefreshTimerWindow = null;
       this.handleVaultGraphChanged();
     }, GRAPH_REFRESH_DEBOUNCE_MS);
   }
@@ -756,6 +762,22 @@ export class MapSession {
         this.sendOutgoingGraph();
       }
     }, FILTER_INPUT_DEBOUNCE_MS);
+  }
+
+  private scheduleGraphSettingsUpdate(): void {
+    if (!this.isLive) {
+      return;
+    }
+
+    this.clearGraphSettingsDebounceTimer();
+    const timerWindow = this.getTimerWindow();
+    this.graphSettingsDebounceTimerWindow = timerWindow;
+    this.graphSettingsDebounceTimer = timerWindow.setTimeout(() => {
+      this.graphSettingsDebounceTimer = null;
+      this.graphSettingsDebounceTimerWindow = null;
+      this.rebuildOutgoingGraph();
+      this.sendOutgoingGraph();
+    }, GRAPH_SETTINGS_DEBOUNCE_MS);
   }
 
   /**
@@ -1335,14 +1357,14 @@ export class MapSession {
     return window.activeWindow ?? window;
   }
 
-  private clearRefreshTimer(): void {
-    if (!this.refreshTimer) {
+  private clearSourceRefreshTimer(): void {
+    if (!this.sourceRefreshTimer) {
       return;
     }
 
-    (this.refreshTimerWindow ?? this.getTimerWindow()).clearTimeout(this.refreshTimer);
-    this.refreshTimer = null;
-    this.refreshTimerWindow = null;
+    (this.sourceRefreshTimerWindow ?? this.getTimerWindow()).clearTimeout(this.sourceRefreshTimer);
+    this.sourceRefreshTimer = null;
+    this.sourceRefreshTimerWindow = null;
   }
 
   private clearFilterInputDebounceTimer(): void {
@@ -1353,6 +1375,16 @@ export class MapSession {
     (this.filterInputDebounceTimerWindow ?? this.getTimerWindow()).clearTimeout(this.filterInputDebounceTimer);
     this.filterInputDebounceTimer = null;
     this.filterInputDebounceTimerWindow = null;
+  }
+
+  private clearGraphSettingsDebounceTimer(): void {
+    if (!this.graphSettingsDebounceTimer) {
+      return;
+    }
+
+    (this.graphSettingsDebounceTimerWindow ?? this.getTimerWindow()).clearTimeout(this.graphSettingsDebounceTimer);
+    this.graphSettingsDebounceTimer = null;
+    this.graphSettingsDebounceTimerWindow = null;
   }
 }
 

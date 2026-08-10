@@ -209,18 +209,18 @@ The next non-transient graph-index publication applies pending focus once, then 
 Graph emission timing is grouped by event intent:
 
 - Immediate `graph:set`:
-  runtime `bridge:ready`, Ego focus changes, Ego option changes, tag visibility changes, and layout changes.
+  runtime `bridge:ready` and Ego focus changes.
 - Debounced `graph:set`:
-  text filter input waits 500 ms; vault create/delete/rename and metadata-resolved refreshes wait 250 ms.
+  text filter input waits 500 ms; vault create/delete/rename and metadata-resolved source refreshes wait 250 ms; graph-setting changes wait 250 ms before rebuilding and sending the latest effective graph.
 - No immediate `graph:set`:
   Global focus sends only `note:focus`; active-note rename sends only `note:focus` immediately and lets the scheduled rename rebuild send the fresh graph; render scale waits for iframe reopen; frame-rate mode sends `runtime:settings`.
 
 ### Path 3. Vault or UI change -> effective graph refresh
 1. `MapSession` registers vault and workspace listeners during startup, and `MapFilterPanelController` registers filter-panel DOM listeners when the view renders.
 2. A graph-significant change happens:
-   vault metadata changes, path filter input changes, tag visibility toggles, or layout changes.
-3. `src/view/MapFilterPanelController.ts` updates session-owned state through `MapSession.setFilterQuery()`, `setShowTags()`, or `MapSession.setMapLayoutPreference()`.
-4. For valid filter, tag-visibility, Ego, and layout changes, `src/view/MapSession.ts` rebuilds the outgoing graph from the latest source graph snapshot, then sends it when the bridge is ready. Filter input is debounced before graph emission; invalid filter input updates UI and persistence state but does not emit `graph:set`.
+   vault metadata changes, path filter input changes, tag visibility toggles, Ego option changes, or layout changes.
+3. `src/view/MapFilterPanelController.ts` updates session-owned state through `MapSession.setFilterQuery()`, `setShowTags()`, `setMapLayoutPreference()`, or Ego setting setters.
+4. For valid filter, tag-visibility, Ego, and layout changes, `src/view/MapSession.ts` rebuilds the outgoing graph from the latest source graph snapshot, then sends it when the bridge is ready. Filter input keeps its own 500 ms debounce and parse/valid pipeline. Graph settings use a separate 250 ms debounce before rebuilding and sending the latest effective graph. Invalid filter input updates UI and persistence state but does not emit `graph:set`.
 5. `src/graph/GraphQueryFilter.ts`
    Parses the query and returns the filtered `GraphPayload` subset. When Ego scope is enabled, `MapSession` first applies the query to the source graph while retaining the Ego center, then builds the Ego scope inside that query-visible subset.
 6. `src/view/MapView.ts` receives the `sendGraph` callback from `MapSession`, forwards the payload through `UnityIframeBridge`, and asks `MapFilterPanelController` to refresh visible suggestions when needed.
@@ -410,13 +410,13 @@ For rename, `MapFocusController.onRename(...)` preserves focus only when the old
 2. New `MapView` instances receive that snapshot as `initialState`.
 3. `src/view/MapView.ts` -> `MapView.onOpen()` applies `initialState` to `MapSession`.
 4. `src/view/MapSession.ts` reports user setting changes through `onStateChanged(...)`.
-5. Filter text changes update the in-memory snapshot immediately and reuse the existing filter debounce before requesting `saveData(...)`.
+5. Filter text changes update the in-memory snapshot immediately and reuse the filter debounce before requesting `saveData(...)`.
 6. Render-scale slider input updates the in-memory snapshot immediately and requests `saveData(...)` on slider commit.
-7. Other graph setting changes request `saveData(...)` directly because they are low-frequency actions.
+7. Other graph setting changes update the in-memory snapshot immediately and request `saveData(...)` directly, while live `graph:set` emission is coalesced by the graph-settings debounce.
 8. `toggleMapView()` close, `onunload()`, and workspace `quit` flush the latest in-memory snapshot before shutdown paths continue.
 9. Obsidian workspace view state is intentionally not used as a persistence source for `filterQuery`, `showTags`, `mapLayout`, or `renderScale`.
 
-Open graph leaves do not share live filter state. Each leaf's `MapSession` owns its own current filter, effective graph, bridge readiness, and refresh timers. Persistence remains one plugin-level snapshot, so later opens restore the most recently reported settings rather than per-window settings.
+Open graph leaves do not share live filter state. Each leaf's `MapSession` owns its own current filter, effective graph, bridge readiness, source-refresh timer, filter debounce timer, and graph-settings debounce timer. Persistence remains one plugin-level snapshot, so later opens restore the most recently reported settings rather than per-window settings.
 
 ### Path 7. View close -> bridge shutdown -> runtime lease release
 1. `src/view/MapView.ts` -> `MapView.onClose()`
@@ -443,7 +443,7 @@ Open graph leaves do not share live filter state. Each leaf's `MapSession` owns 
   Owns the shell execution paths after the view exists: iframe startup, bridge wiring, and collaborator orchestration.
 
 - `src/view/MapSession.ts` -> `MapSession`
-  Owns per-view live graph state, graph refresh timing, metadata-resolution waiting, Ego depth and neighbor-link scope derivation, graph emission, render-scale restart tracking, and the bridge-facing focus policy.
+  Owns per-view live graph state, source-refresh timing, graph-settings emission debounce, metadata-resolution waiting, Ego depth and neighbor-link scope derivation, graph emission, render-scale restart tracking, and the bridge-facing focus policy.
 
 - `src/view/MapFocusController.ts` -> `MapFocusController`
   Owns plugin-side focus event routing for workspace `file-open`, markdown editor focus, active-note rename, and short-lived suppression of expected focus echoes after Unity note-open or rename focus. It emits focus intents to `MapSession` instead of sending bridge payloads directly.

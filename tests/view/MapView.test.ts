@@ -1638,6 +1638,7 @@ describe("MapView bridge integration", () => {
   });
 
   it("routes runtime tag activation through MapView and restores Ego focus after the next graph", async () => {
+    vi.useFakeTimers();
     const app = {
       metadataCache: {
         on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
@@ -1698,6 +1699,9 @@ describe("MapView bridge integration", () => {
     egoDepthInput.value = "2";
     egoDepthInput.dispatchEvent(new Event("input"));
 
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+
+    vi.advanceTimersByTime(250);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(3);
     expect((bridge.sendGraphSet.mock.calls[2]?.[0] as GraphPayload).notes.map((note) => note.id)).toEqual([
       "center",
@@ -2028,6 +2032,7 @@ describe("MapView bridge integration", () => {
   });
 
   it("toggles tags visibility in outgoing graph payload without rebuilding source graph", async () => {
+    vi.useFakeTimers();
     const app = {
       metadataCache: {
         on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
@@ -2101,6 +2106,9 @@ describe("MapView bridge integration", () => {
 
     tagsToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(250);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
     const tagsHiddenPayload = bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload;
     expect(tagsHiddenPayload.notes.every((note) => note.tags.length === 0)).toBe(true);
@@ -2110,6 +2118,9 @@ describe("MapView bridge integration", () => {
 
     tagsToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+
+    vi.advanceTimersByTime(250);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(3);
     const tagsVisibleAgainPayload = bridge.sendGraphSet.mock.calls[2]?.[0] as GraphPayload;
     expect(tagsVisibleAgainPayload.notes.map((note) => note.tags)).toEqual([
@@ -2121,6 +2132,7 @@ describe("MapView bridge integration", () => {
   });
 
   it("updates engine preference in outgoing graph payload without rebuilding source graph", async () => {
+    vi.useFakeTimers();
     const app = {
       metadataCache: {
         on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
@@ -2187,6 +2199,9 @@ describe("MapView bridge integration", () => {
     engineSelect.value = "dynamicLinks";
     engineSelect.dispatchEvent(new Event("change"));
     expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(250);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
     const linksPayload = bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload;
     expect(linksPayload.mapLayout).toBe("dynamicLinks");
@@ -2195,6 +2210,9 @@ describe("MapView bridge integration", () => {
     engineSelect.value = "dates";
     engineSelect.dispatchEvent(new Event("change"));
     expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+
+    vi.advanceTimersByTime(250);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(3);
     const datesPayload = bridge.sendGraphSet.mock.calls[2]?.[0] as GraphPayload;
     expect(datesPayload.mapLayout).toBe("dates");
@@ -2203,6 +2221,9 @@ describe("MapView bridge integration", () => {
     engineSelect.value = "scalableLinks";
     engineSelect.dispatchEvent(new Event("change"));
     expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(3);
+
+    vi.advanceTimersByTime(250);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(4);
     const scalableLinksPayload = bridge.sendGraphSet.mock.calls[3]?.[0] as GraphPayload;
     expect(scalableLinksPayload.mapLayout).toBe("scalableLinks");

@@ -1669,6 +1669,7 @@ describe("MapSession", () => {
   });
 
   it("expands and contracts the Ego graph when Ego depth changes", async () => {
+    vi.useFakeTimers();
     const payload = makeDepthPayload();
     const sendGraph = vi.fn();
     const session = createEgoGraphSession(payload, { sendGraph });
@@ -1679,14 +1680,16 @@ describe("MapSession", () => {
     session.requestFocusFromEditor("Depth/Center.md");
 
     session.setEgoDepth(2);
-    session.setEgoDepth(1);
 
-    expect(sendGraph).toHaveBeenCalledTimes(4);
+    expect(sendGraph).toHaveBeenCalledTimes(2);
     expect((sendGraph.mock.calls[1]?.[0] as GraphPayload).notes.map((note) => note.id)).toEqual([
       "center",
       "left",
       "right"
     ]);
+
+    vi.advanceTimersByTime(250);
+    expect(sendGraph).toHaveBeenCalledTimes(3);
     expect((sendGraph.mock.calls[2]?.[0] as GraphPayload).notes.map((note) => note.id)).toEqual([
       "center",
       "left",
@@ -1694,6 +1697,11 @@ describe("MapSession", () => {
       "outer-left",
       "outer-right"
     ]);
+
+    session.setEgoDepth(1);
+
+    vi.advanceTimersByTime(250);
+    expect(sendGraph).toHaveBeenCalledTimes(4);
     expect((sendGraph.mock.calls[3]?.[0] as GraphPayload).notes.map((note) => note.id)).toEqual([
       "center",
       "left",
@@ -1701,7 +1709,37 @@ describe("MapSession", () => {
     ]);
   });
 
+  it("coalesces rapid Ego depth changes into one graph send", async () => {
+    vi.useFakeTimers();
+    const payload = makeDepthPayload();
+    const sendGraph = vi.fn();
+    const session = createEgoGraphSession(payload, { sendGraph });
+
+    await session.setState({ egoEnabled: true });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    session.requestFocusFromEditor("Depth/Center.md");
+
+    session.setEgoDepth(2);
+    session.setEgoDepth(3);
+    session.setEgoDepth(1);
+
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+
+    vi.advanceTimersByTime(249);
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+
+    vi.advanceTimersByTime(1);
+    expect(sendGraph).toHaveBeenCalledTimes(3);
+    expect((sendGraph.mock.calls[2]?.[0] as GraphPayload).notes.map((note) => note.id)).toEqual([
+      "center",
+      "left",
+      "right"
+    ]);
+  });
+
   it("clears Global note focus when Unity activates a tag", async () => {
+    vi.useFakeTimers();
     const payload = makeDepthPayload();
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
@@ -1715,12 +1753,16 @@ describe("MapSession", () => {
     session.handleRuntimeTagActivate();
     session.setEgoEnabled(true);
 
+    expect(sendGraph).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(250);
     expect(sendGraph).toHaveBeenCalledTimes(2);
     expect((sendGraph.mock.calls[1]?.[0] as GraphPayload).notes).toEqual([]);
     expect(sendFocus).not.toHaveBeenCalled();
   });
 
   it("restores Ego center focus after Unity activates a tag and the Ego graph rebuilds", async () => {
+    vi.useFakeTimers();
     const payload = makeDepthPayload();
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
@@ -1734,6 +1776,9 @@ describe("MapSession", () => {
     session.handleRuntimeTagActivate();
     session.setEgoDepth(2);
 
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+
+    vi.advanceTimersByTime(250);
     expect(sendGraph).toHaveBeenCalledTimes(3);
     expect((sendGraph.mock.calls[2]?.[0] as GraphPayload).notes.map((note) => note.id)).toEqual([
       "center",
@@ -1750,6 +1795,7 @@ describe("MapSession", () => {
   });
 
   it("clears a tag-suspended Ego center when switching to Global before focus restore", async () => {
+    vi.useFakeTimers();
     const payload = makeDepthPayload();
     const sendGraph = vi.fn();
     const sendFocus = vi.fn();
@@ -1764,11 +1810,11 @@ describe("MapSession", () => {
     session.setEgoEnabled(false);
     session.setEgoEnabled(true);
 
-    expect(sendGraph).toHaveBeenCalledTimes(4);
-    expect((sendGraph.mock.calls[2]?.[0] as GraphPayload).notes.map((note) => note.id)).toEqual(
-      payload.notes.map((note) => note.id)
-    );
-    expect((sendGraph.mock.calls[3]?.[0] as GraphPayload).notes).toEqual([]);
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+
+    vi.advanceTimersByTime(250);
+    expect(sendGraph).toHaveBeenCalledTimes(3);
+    expect((sendGraph.mock.calls[2]?.[0] as GraphPayload).notes).toEqual([]);
     expect(sendFocus).toHaveBeenCalledTimes(1);
     expect(sendFocus).toHaveBeenLastCalledWith({
       id: makeStableNoteId("Depth/Center.md"),
@@ -1777,6 +1823,7 @@ describe("MapSession", () => {
   });
 
   it("keeps neighbor links out unless the Ego neighbor-links option is enabled", async () => {
+    vi.useFakeTimers();
     const payload = makeDepthPayload();
     const sendGraph = vi.fn();
     const session = createEgoGraphSession(payload, { sendGraph });
@@ -1796,6 +1843,9 @@ describe("MapSession", () => {
 
     session.setEgoNeighborLinksEnabled(true);
 
+    expect(sendGraph).toHaveBeenCalledTimes(2);
+
+    vi.advanceTimersByTime(250);
     expect(sendGraph).toHaveBeenCalledTimes(3);
     expect((sendGraph.mock.calls[2]?.[0] as GraphPayload).links).toEqual([
       { sourceId: "center", targetId: "left", kind: "resolved" },
@@ -2339,7 +2389,7 @@ describe("MapSession", () => {
     expect(updatedPayload.notes.map((note) => note.id)).toEqual(["archive"]);
   });
 
-  it("replays the latest effective graph after the runtime becomes ready again", () => {
+  it("replays the cached graph on runtime ready before a pending settings update is sent", () => {
     vi.useFakeTimers();
 
     const buildGraph = vi.fn().mockReturnValue(makePathPayload());
@@ -2376,10 +2426,16 @@ describe("MapSession", () => {
     session.handleRuntimeReady();
 
     expect(buildGraph).toHaveBeenCalledTimes(1);
-    expect(sendGraph).toHaveBeenCalledTimes(4);
-    const replayedPayload = sendGraph.mock.calls[3]?.[0] as GraphPayload;
+    expect(sendGraph).toHaveBeenCalledTimes(3);
+    const replayedPayload = sendGraph.mock.calls[2]?.[0] as GraphPayload;
     expect(replayedPayload.notes.map((note) => note.id)).toEqual(["archive"]);
-    expect(replayedPayload.mapLayout).toBe("dates");
+    expect(replayedPayload.mapLayout).toBe("auto");
+
+    vi.advanceTimersByTime(250);
+    expect(sendGraph).toHaveBeenCalledTimes(4);
+    const settingsPayload = sendGraph.mock.calls[3]?.[0] as GraphPayload;
+    expect(settingsPayload.notes.map((note) => note.id)).toEqual(["archive"]);
+    expect(settingsPayload.mapLayout).toBe("dates");
   });
 
   it("registers refresh subscriptions only once across reopen cycles", () => {
