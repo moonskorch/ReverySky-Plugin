@@ -138,12 +138,11 @@
         let unityInstance = null;
         let readySent = false;
         let isShuttingDown = false;
-        let latestGraphSetMessage = null;
         let latestGraphSetRequestId = "";
         let latestGraphNoteCount = 0;
         let latestGraphLinkCount = 0;
         let graphSetDispatchToken = 0;
-        let latestNoteFocusMessage = null;
+        let noteFocusDispatchToken = 0;
         let frameworkBlobUrl = null;
         let dataBlobUrl = null;
         let codeBlobUrl = null;
@@ -489,20 +488,7 @@
           }
         }
 
-        function scheduleGraphSetDispatch(message) {
-          const dispatchToken = ++graphSetDispatchToken;
-          const dispatch = () => {
-            if (
-              isShuttingDown ||
-              dispatchToken !== graphSetDispatchToken ||
-              latestGraphSetMessage !== message ||
-              runtimeMode !== "unity"
-            ) {
-              return;
-            }
-
-            tryDispatchGraphSetToUnity(message);
-          };
+        function scheduleUnityDispatch(dispatch) {
           const scheduleDispatch = () => {
             window.setTimeout(dispatch, 0);
           };
@@ -515,6 +501,36 @@
           scheduleDispatch();
         }
 
+        function scheduleGraphSetDispatch(message) {
+          const dispatchToken = ++graphSetDispatchToken;
+          scheduleUnityDispatch(() => {
+            if (
+              isShuttingDown ||
+              dispatchToken !== graphSetDispatchToken ||
+              runtimeMode !== "unity"
+            ) {
+              return;
+            }
+
+            tryDispatchGraphSetToUnity(message);
+          });
+        }
+
+        function scheduleNoteFocusDispatch(message) {
+          const dispatchToken = ++noteFocusDispatchToken;
+          scheduleUnityDispatch(() => {
+            if (
+              isShuttingDown ||
+              dispatchToken !== noteFocusDispatchToken ||
+              runtimeMode !== "unity"
+            ) {
+              return;
+            }
+
+            tryDispatchNoteFocusToUnity(message);
+          });
+        }
+
         function applyGraphSet(message) {
           if (isShuttingDown) {
             return;
@@ -523,7 +539,6 @@
             return;
           }
 
-          latestGraphSetMessage = message;
           const payload = message.payload || { notes: [], links: [] };
           const noteCount = payload && payload.vault ? payload.vault.noteCount : (payload.notes || []).length;
           const linkCount = Array.isArray(payload.links) ? payload.links.length : 0;
@@ -570,13 +585,8 @@
             return;
           }
 
-          latestNoteFocusMessage = message;
-          const payload = message && message.payload ? message.payload : {};
-          const id = typeof payload.id === "string" ? payload.id : "";
-          const path = typeof payload.path === "string" ? payload.path : "";
-
-          if (runtimeMode === "unity" && tryDispatchNoteFocusToUnity(message)) {
-            return;
+          if (runtimeMode === "unity") {
+            scheduleNoteFocusDispatch(message);
           }
         }
 
@@ -639,12 +649,11 @@
 
           isShuttingDown = true;
           runtimeMode = "closing";
-          latestGraphSetMessage = null;
           latestGraphSetRequestId = "";
           latestGraphNoteCount = 0;
           latestGraphLinkCount = 0;
           graphSetDispatchToken++;
-          latestNoteFocusMessage = null;
+          noteFocusDispatchToken++;
           if (resizeTimerId) {
             window.clearTimeout(resizeTimerId);
             resizeTimerId = 0;
@@ -764,14 +773,6 @@
             scheduleResizeCanvas();
           }
           sendReady();
-
-          if (latestGraphSetMessage) {
-            setStatus(formatGraphStatus(latestGraphNoteCount, latestGraphLinkCount, true));
-            scheduleGraphSetDispatch(latestGraphSetMessage);
-          }
-          if (latestNoteFocusMessage) {
-            tryDispatchNoteFocusToUnity(latestNoteFocusMessage);
-          }
         }
 
         async function boot() {
