@@ -228,6 +228,9 @@ public class Cartographer : MonoBehaviour
     if (string.IsNullOrWhiteSpace(noteId) || !GraphIndex.TryGetStar(noteId, out var star))
       return false;
 
+    // Focus is intentionally deferred one frame so graph publication settles before camera focus.
+    // An unrelated graph rebuild during that frame can invalidate this Star and drop the focus.
+    // This narrow race is accepted to keep pending-focus semantics and lifecycle simple.
     StartCoroutine(SetFocusNextFrame(star));
     if (string.Equals(MapRuntimeContext.PendingFocusNoteId, noteId, StringComparison.Ordinal))
       MapRuntimeContext.PendingFocusNoteId = string.Empty;

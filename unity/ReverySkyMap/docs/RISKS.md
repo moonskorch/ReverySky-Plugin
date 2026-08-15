@@ -119,3 +119,18 @@ Expected result:
 2048x2048 RGBA Compressed DXT5|BC3 sRGB
 RGBM encoded
 approximately 24 MB
+
+## R8. Deferred focus can overlap a graph rebuild
+
+Risk:
+- `Cartographer` resolves a `Star` from the current `GraphIndex`, then applies focus one frame later.
+- An unrelated `graph:set` during that frame can rebuild the graph and invalidate the captured `Star`, causing that focus request to be dropped.
+
+Current decision:
+- Keep the one-frame focus delay so graph publication settles before camera focus.
+- Keep `PendingFocusNoteId` limited to focus requests whose star is not yet materialized.
+- Accept this narrow race rather than add focus-generation or broader pending-focus state.
+
+Mitigation:
+- Plugin/iframe dispatch keeps related `graph:set` and `note:focus` timing aligned.
+- Revisit if lost focus is reproduced after the dispatch timing fix.
