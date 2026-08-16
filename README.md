@@ -165,11 +165,6 @@ development.
 
 See [Third-Party Notices](unity/ReverySkyMap/Assets/ThirdPartyNotices.txt) and [Unity setup instructions](unity/ReverySkyMap/Assets/README.txt).
 
-## Feedback and support
-
-- Bug reports and technical problems: [GitHub Issues](https://github.com/moonskorch/ReverySky-Plugin/issues)
-- Feedback, ideas, questions, feature suggestions, and general discussion: [GitHub Discussions](https://github.com/moonskorch/ReverySky-Plugin/discussions)
-
 ## Future development
 
 ReverySky is built around the idea that every experience and every piece of information is a world of its own. Through their connections, these worlds form a living universe that can be explored, expanded, and shaped.
