@@ -8,7 +8,8 @@
   "authorUrl": "https://github.com/moonskorch",
   "helpUrl": "https://github.com/moonskorch/ReverySky-Plugin",
   "fundingUrl": {
-    "Boosty": "https://boosty.to/reverysky/donate"
+    "Boosty": "https://boosty.to/reverysky/donate",
+    "Crypto": "https://moonskorch.github.io/reverysky/support.html#crypto"
   },
   "isDesktopOnly": true
 }
