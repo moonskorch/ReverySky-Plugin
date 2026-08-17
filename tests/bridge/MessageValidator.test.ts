@@ -107,6 +107,28 @@ describe("MessageValidator", () => {
     expect(errors).toContain("incoming note:open payload.path must be a non-empty string");
   });
 
+  it("accepts incoming tag:activate with tag", () => {
+    const errors = MessageValidator.validateIncomingTagActivateMessage({
+      type: "tag:activate",
+      protocolVersion: BRIDGE_PROTOCOL_VERSION,
+      payload: {
+        tag: "project"
+      }
+    });
+
+    expect(errors).toEqual([]);
+  });
+
+  it("rejects incoming tag:activate when tag is missing", () => {
+    const errors = MessageValidator.validateIncomingTagActivateMessage({
+      type: "tag:activate",
+      protocolVersion: BRIDGE_PROTOCOL_VERSION,
+      payload: {} as never
+    });
+
+    expect(errors).toContain("incoming tag:activate payload.tag must be a non-empty string");
+  });
+
   it("accepts incoming graph:ready with requestId", () => {
     const errors = MessageValidator.validateIncomingGraphReadyMessage({
       type: "graph:ready",

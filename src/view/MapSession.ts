@@ -7,6 +7,8 @@ import {
 } from "obsidian";
 import type {
   MapLayoutPreference,
+  GraphLink,
+  GraphNoteNode,
   GraphPayload,
   NoteFocusPayload,
   NoteOpenPayload,
@@ -29,9 +31,10 @@ import {
 } from "../graph/GraphQueryFilter";
 import { extractActiveFilterTermValue } from "../graph/GraphQuerySyntax";
 import { makeStableNoteId } from "../graph/VaultGraphBuilder";
-import { MapFocusController } from "./MapFocusController";
+import { MapFocusController, type FocusRequestOptions } from "./MapFocusController";
 
 const GRAPH_REFRESH_DEBOUNCE_MS = 250;
+const GRAPH_SETTINGS_DEBOUNCE_MS = 250;
 const FILTER_INPUT_DEBOUNCE_MS = 500;
 const METADATA_RESOLVE_STATUS = "Updating graph data...";
 const MAX_FOLDER_SUGGESTIONS = 80;
@@ -40,12 +43,20 @@ export const DEFAULT_RENDER_SCALE = 1;
 export const MIN_RENDER_SCALE = 0.5;
 export const MAX_RENDER_SCALE = 1.5;
 export const RENDER_SCALE_STEP = 0.1;
+export const DEFAULT_EGO_ENABLED = false;
+export const DEFAULT_EGO_DEPTH = 1;
+export const MIN_EGO_DEPTH = 1;
+export const MAX_EGO_DEPTH = 5;
+export const DEFAULT_EGO_NEIGHBOR_LINKS_ENABLED = false;
 export type MapViewState = {
   filterQuery?: unknown;
   showTags?: unknown;
   mapLayout?: unknown;
   renderScale?: unknown;
   frameRateMode?: unknown;
+  egoEnabled?: unknown;
+  egoDepth?: unknown;
+  egoNeighborLinksEnabled?: unknown;
 };
 
 export type MapFilterUiState = {
@@ -55,6 +66,9 @@ export type MapFilterUiState = {
   renderScale: number;
   renderScaleRestartRequired: boolean;
   frameRateMode: FrameRateMode;
+  egoEnabled: boolean;
+  egoDepth: number;
+  egoNeighborLinksEnabled: boolean;
   filterParseValid: boolean;
   filterMessage: string;
 };
@@ -78,6 +92,16 @@ export type TagSuggestion = {
   displayTag: string;
 };
 
+type EgoGraphScope = {
+  payload: GraphPayload;
+  distanceByNoteId: Map<string, number>;
+};
+
+type AcceptedFocus = {
+  path: string;
+  centerChanged: boolean;
+};
+
 export type MapSessionDependencies = {
   app: App;
   buildGraph: (app: App) => GraphPayload;
@@ -95,6 +119,7 @@ export type MapSessionDependencies = {
  */
 export class MapSession {
   private readonly app: App;
+  private readonly focus: MapFocusController;
   private readonly buildGraph: (app: App) => GraphPayload;
   private readonly now: () => number;
   private readonly sendGraph: (payload: GraphPayload) => void;
@@ -102,34 +127,48 @@ export class MapSession {
   private readonly sendFocus: (payload: NoteFocusPayload) => void;
   private readonly sendRuntimeSettings?: (payload: RuntimeSettingsPayload) => void;
   private readonly onStateChanged?: (state: Record<string, unknown>, options?: { persist?: boolean }) => void;
-  private readonly focus: MapFocusController;
+
+  private bridgeReady = false;
+  private isLive = false;
+  private refreshSubscriptionsRegistered = false;
 
   // Full vault graph snapshot used as the source for filters and suggestions.
   private sourceGraphPayload: GraphPayload | null = null;
   // Last effective graph snapshot prepared for Unity, focus checks, and note-open id resolution.
   private outgoingGraphPayload: GraphPayload | null = null;
-  private semanticRefreshPending = false;
-  private startupRefreshPending = false;
   private noteSignatureByPath = new Map<string, string>();
+
+  private semanticRefreshPending = false;
+  // Allows one metadataCache.resolved after startup to refresh cached vault graph data from settled links.
+  private startupRefreshPending = false;
+
   // Plugin-side graph focus, updated from both TS focus dispatch and Unity note-open.
   private focusPath = "";
-  private bridgeReady = false;
-  private refreshTimer: number | null = null;
-  private refreshTimerWindow: Window | null = null;
-  private refreshSubscriptionsRegistered = false;
-  private isLive = false;
+  // Tag selection can keep the Ego center while suspending visible note focus.
+  private isEgoNoteFocusSuspended = false;
+
+  private sourceRefreshTimer: number | null = null;
+  private sourceRefreshTimerWindow: Window | null = null;
+  private filterInputDebounceTimer: number | null = null;
+  private filterInputDebounceTimerWindow: Window | null = null;
+  private graphSettingsDebounceTimer: number | null = null;
+  private graphSettingsDebounceTimerWindow: Window | null = null;
+
   private filterQuery = "";
   private showTags = true;
   private mapLayout: MapLayoutPreference = DEFAULT_MAP_LAYOUT_PREFERENCE;
   private renderScale = DEFAULT_RENDER_SCALE;
   private appliedRenderScale = DEFAULT_RENDER_SCALE;
   private frameRateMode: FrameRateMode = DEFAULT_FRAME_RATE_MODE;
+  private egoEnabled = DEFAULT_EGO_ENABLED;
+  private egoDepth = DEFAULT_EGO_DEPTH;
+  private egoNeighborLinksEnabled = DEFAULT_EGO_NEIGHBOR_LINKS_ENABLED;
+
   // Parsed filter currently applied to the outgoing graph; live input commits it only after debounce.
   private activeQueryFilter: ParsedQueryFilter | null = null;
   private filterParseValid = true;
   private filterMessage = "";
-  private filterInputDebounceTimer: number | null = null;
-  private filterInputDebounceTimerWindow: Window | null = null;
+
   private folderPathSuggestions: FolderPathSuggestion[] = [];
   private tagSuggestions: TagSuggestion[] = [];
 
@@ -144,7 +183,7 @@ export class MapSession {
     this.focus = new MapFocusController({
       app: this.app,
       now: this.now,
-      requestFocus: (path, options) => this.trySendFocusForPath(path, options),
+      requestFocus: (path, options) => this.handleEditorFocusRequest(path, options),
       getFocusPath: () => this.focusPath
     });
     this.sendFocus = deps.sendFocus;
@@ -156,7 +195,10 @@ export class MapSession {
       showTags: this.showTags,
       mapLayout: this.mapLayout,
       renderScale: this.renderScale,
-      frameRateMode: this.frameRateMode
+      frameRateMode: this.frameRateMode,
+      egoEnabled: this.egoEnabled,
+      egoDepth: this.egoDepth,
+      egoNeighborLinksEnabled: this.egoNeighborLinksEnabled
     };
   }
 
@@ -170,6 +212,13 @@ export class MapSession {
     this.mapLayout = nextLayoutPreference;
     this.renderScale = normalizeRenderScale(nextState.renderScale);
     this.frameRateMode = normalizeFrameRateMode(nextState.frameRateMode);
+    this.egoEnabled = typeof nextState.egoEnabled === "boolean"
+      ? nextState.egoEnabled
+      : DEFAULT_EGO_ENABLED;
+    this.egoDepth = normalizeEgoDepth(nextState.egoDepth);
+    this.egoNeighborLinksEnabled = typeof nextState.egoNeighborLinksEnabled === "boolean"
+      ? nextState.egoNeighborLinksEnabled
+      : DEFAULT_EGO_NEIGHBOR_LINKS_ENABLED;
     this.applyParsedQueryResult(GraphQueryFilter.parseQuery(nextQuery));
   }
 
@@ -181,14 +230,16 @@ export class MapSession {
     this.semanticRefreshPending = false;
     this.startupRefreshPending = false;
     this.focusPath = "";
-    this.clearRefreshTimer();
+    this.isEgoNoteFocusSuspended = false;
+    this.clearSourceRefreshTimer();
     this.ensureRefreshSubscriptions(registerEvent);
   }
 
   stop(): void {
     this.isLive = false;
-    this.clearRefreshTimer();
+    this.clearSourceRefreshTimer();
     this.clearFilterInputDebounceTimer();
+    this.clearGraphSettingsDebounceTimer();
     this.bridgeReady = false;
     this.sourceGraphPayload = null;
     this.folderPathSuggestions = [];
@@ -198,16 +249,60 @@ export class MapSession {
     this.startupRefreshPending = false;
     this.outgoingGraphPayload = null;
     this.focusPath = "";
+    this.isEgoNoteFocusSuspended = false;
   }
 
   handleRuntimeReady(): void {
     this.bridgeReady = true;
     this.sendCurrentRuntimeSettings();
-    this.sendInitialRuntimeGraph();
+    const activeFilePath = this.getActiveFilePath();
+
+    if (this.egoEnabled) {
+      this.handleEgoRuntimeReady(activeFilePath);
+    } else {
+      this.handleGlobalRuntimeReady(activeFilePath);
+    }
+
+    this.startupRefreshPending = true;
+  }
+
+  private handleEgoRuntimeReady(activeFilePath: string): void {
+    // Ego accepts focus first because the initial graph is scoped around it
+    const acceptedStartupFocus = this.tryAcceptFocusPath(activeFilePath);
+
+    this.prepareStartupGraph(acceptedStartupFocus?.centerChanged === true);
+    this.sendOutgoingGraph();
+
+    if (acceptedStartupFocus) {
+      this.sendFocusForPath(acceptedStartupFocus.path);
+    }
+  }
+
+  private handleGlobalRuntimeReady(activeFilePath: string): void {
+    this.prepareStartupGraph(false);
+    this.sendOutgoingGraph();
+
+    // Global focus must be validated against the emitted graph
+    const acceptedStartupFocus = this.tryAcceptFocusPath(activeFilePath);
+    if (acceptedStartupFocus) {
+      this.sendFocusForPath(acceptedStartupFocus.path);
+    }
+  }
+
+  private prepareStartupGraph(forceRebuild: boolean): void {
+    if (!forceRebuild && this.outgoingGraphPayload) {
+      return;
+    }
+
+    if (!this.sourceGraphPayload) {
+      this.rebuildSourceGraph();
+    }
+    this.rebuildOutgoingGraph();
   }
 
   handleRuntimeUnavailable(): void {
     this.bridgeReady = false;
+    this.flushPendingGraphWork();
   }
 
   setFilterQuery(query: string): void {
@@ -232,13 +327,13 @@ export class MapSession {
   setShowTags(showTags: boolean): void {
     this.showTags = showTags;
     this.notifyStateChanged();
-    this.sendGraphFromSource();
+    this.scheduleGraphSettingsUpdate();
   }
 
   setMapLayoutPreference(mapLayout: unknown): void {
     this.mapLayout = normalizeMapLayoutPreference(mapLayout);
     this.notifyStateChanged();
-    this.sendGraphFromSource();
+    this.scheduleGraphSettingsUpdate();
   }
 
   setFrameRateMode(frameRateMode: unknown): void {
@@ -250,6 +345,32 @@ export class MapSession {
   setRenderScale(renderScale: unknown): void {
     this.renderScale = normalizeRenderScale(renderScale);
     this.notifyStateChanged({ persist: false });
+  }
+
+  setEgoEnabled(egoEnabled: boolean): void {
+    if (!egoEnabled && this.isEgoNoteFocusSuspended) {
+      this.focusPath = "";
+      this.isEgoNoteFocusSuspended = false;
+    }
+    this.egoEnabled = egoEnabled;
+    this.notifyStateChanged();
+    this.scheduleGraphSettingsUpdate();
+  }
+
+  setEgoDepth(egoDepth: unknown): void {
+    this.egoDepth = normalizeEgoDepth(egoDepth);
+    this.notifyStateChanged();
+    if (this.egoEnabled) {
+      this.scheduleGraphSettingsUpdate();
+    }
+  }
+
+  setEgoNeighborLinksEnabled(egoNeighborLinksEnabled: boolean): void {
+    this.egoNeighborLinksEnabled = egoNeighborLinksEnabled;
+    this.notifyStateChanged();
+    if (this.egoEnabled) {
+      this.scheduleGraphSettingsUpdate();
+    }
   }
 
   persistRenderScale(): void {
@@ -278,6 +399,9 @@ export class MapSession {
       renderScale: this.renderScale,
       renderScaleRestartRequired: this.renderScale !== this.appliedRenderScale,
       frameRateMode: this.frameRateMode,
+      egoEnabled: this.egoEnabled,
+      egoDepth: this.egoDepth,
+      egoNeighborLinksEnabled: this.egoNeighborLinksEnabled,
       filterParseValid: this.filterParseValid,
       filterMessage: this.filterMessage
     };
@@ -364,17 +488,9 @@ export class MapSession {
     ];
   }
 
-  private sendInitialRuntimeGraph(): void {
-    if (this.outgoingGraphPayload) {
-      this.sendGraph(this.outgoingGraphPayload);
-    } else {
-      if (!this.sourceGraphPayload) {
-        this.rebuildSourceGraph();
-      }
-      this.sendGraphFromSource();
-    }
-
-    this.startupRefreshPending = true;
+  private getActiveFilePath(): string {
+    const activeFile = this.app.workspace.getActiveFile?.() ?? null;
+    return activeFile instanceof TFile ? this.normalizeVaultPath(activeFile.path) : "";
   }
 
   resolveRequestedPath(payload: NoteOpenPayload): string | null {
@@ -404,27 +520,53 @@ export class MapSession {
     this.focus.onMarkdownFocus(path);
   }
 
-  private trySendFocusForPath(
-    pathValue: unknown,
-    options?: { skipGraphCheck?: boolean }
-  ): boolean {
-    const path = this.normalizeVaultPath(pathValue);
-    // TypeScript owns graph membership: ordinary focus is sent only for notes
-    // that belong to the effective graph Unity is rendering now.
-    // Rename bypasses this because the path-derived id can change before the
-    // renamed graph payload reaches Unity.
-    if (!this.bridgeReady ||
-        !this.isGraphRelevantPath(path) ||
-        (!options?.skipGraphCheck && !this.isPathInOutgoingGraph(path))) {
+  private handleEditorFocusRequest(pathValue: unknown, options?: FocusRequestOptions): boolean {
+    if (!this.bridgeReady) {
       return false;
     }
 
-    this.sendFocus({
-      id: makeStableNoteId(path),
-      path
-    });
-    this.focusPath = path;
+    const skipGraphCheck = options?.skipGraphCheck === true;
+    const acceptedFocus = this.tryAcceptFocusPath(pathValue, skipGraphCheck);
+    if (!acceptedFocus) {
+      return false;
+    }
+
+    // Rename focus intentionally skips this rebuild: the vault rename event
+    // schedules a fresh source graph rebuild, while the current source graph
+    // can still contain the old path.
+    if (this.egoEnabled && acceptedFocus.centerChanged && !options?.skipEgoGraphRebuild) {
+      if (!this.sourceGraphPayload) {
+        this.rebuildSourceGraph();
+      }
+      this.rebuildOutgoingGraph();
+      this.sendOutgoingGraph();
+    }
+
+    this.sendFocusForPath(acceptedFocus.path);
     return true;
+  }
+
+  private tryAcceptFocusPath(pathValue: unknown, skipGraphCheck = false): AcceptedFocus | null {
+    const path = this.normalizeVaultPath(pathValue);
+    if (!this.isGraphRelevantPath(path)) {
+      return null;
+    }
+
+    if (!this.egoEnabled) {
+      // Global focus may only target a note Unity is already rendering.
+      // Rename is the exception because the path-derived id can change before the renamed graph arrives.
+      if (!skipGraphCheck && !this.isPathInOutgoingGraph(path)) {
+        return null;
+      }
+    }
+
+    const centerChanged = this.focusPath !== path;
+    this.focusPath = path;
+    this.isEgoNoteFocusSuspended = false;
+    return {
+      path,
+      centerChanged
+    };
   }
 
   private isPathInOutgoingGraph(path: string): boolean {
@@ -443,10 +585,28 @@ export class MapSession {
     this.focus.expectFocusEchoForPath(path);
   }
 
-  recordRuntimeFocusPath(pathValue: unknown): void {
-    const path = this.normalizeVaultPath(pathValue);
-    if (this.isGraphRelevantPath(path)) {
-      this.focusPath = path;
+  handleRuntimeFocusChange(pathValue: unknown): void {
+    const acceptedFocus = this.tryAcceptFocusPath(pathValue, true);
+    if (
+      this.egoEnabled &&
+      acceptedFocus?.centerChanged
+    ) {
+      // Ego graph rebuild changes the rendered neighborhood; re-send focus so Unity restores the new center.
+      this.rebuildOutgoingGraph();
+      this.sendOutgoingGraph();
+      this.sendFocusForPath(acceptedFocus.path);
+    }
+  }
+
+  handleRuntimeTagActivate(): void {
+    if (this.egoEnabled) {
+      // Tag selection is transient in Ego mode; the note center still owns graph scope continuity.
+      this.isEgoNoteFocusSuspended = this.isGraphRelevantPath(this.focusPath);
+    }
+    else {
+      // Global tag selection is a real move away from note focus.
+      this.focusPath = "";
+      this.isEgoNoteFocusSuspended = false;
     }
   }
 
@@ -491,9 +651,9 @@ export class MapSession {
           }
 
           if (this.startupRefreshPending) {
-            // Keep startup correction one-shot and unconditional: a late plugin enable can
-            // spend it on the next resolved event, but avoiding that would require a graph
-            // equality pass for a narrow edge case.
+            // Treat the first post-startup resolved event as possible vault metadata settling.
+            // This is unconditional and one-shot; distinguishing it from an irrelevant text edit
+            // would require comparing rebuilt graph payloads for a narrow startup edge case.
             this.startupRefreshPending = false;
             this.scheduleSourceGraphRebuild();
           }
@@ -519,6 +679,7 @@ export class MapSession {
           this.noteSignatureByPath.delete(normalizedPath);
           if (this.focusPath === normalizedPath) {
             this.focusPath = "";
+            this.isEgoNoteFocusSuspended = false;
           }
           this.scheduleSourceGraphRebuild();
         })
@@ -553,19 +714,20 @@ export class MapSession {
     if (!this.isLive) {
       return;
     }
-    this.clearRefreshTimer();
+    this.clearSourceRefreshTimer();
     const timerWindow = this.getTimerWindow();
-    this.refreshTimerWindow = timerWindow;
-    this.refreshTimer = timerWindow.setTimeout(() => {
-      this.refreshTimer = null;
-      this.refreshTimerWindow = null;
+    this.sourceRefreshTimerWindow = timerWindow;
+    this.sourceRefreshTimer = timerWindow.setTimeout(() => {
+      this.sourceRefreshTimer = null;
+      this.sourceRefreshTimerWindow = null;
       this.handleVaultGraphChanged();
     }, GRAPH_REFRESH_DEBOUNCE_MS);
   }
 
   private handleVaultGraphChanged(): void {
     this.rebuildSourceGraph();
-    this.sendGraphFromSource();
+    this.rebuildOutgoingGraph();
+    this.sendOutgoingGraph();
   }
 
   private rebuildSourceGraph(): void {
@@ -597,41 +759,259 @@ export class MapSession {
       if (shouldSendGraph) {
         // Apply the parsed candidate at the same moment the graph is rebuilt.
         this.activeQueryFilter = nextActiveQueryFilter;
-        this.sendGraphFromSource();
+        this.rebuildOutgoingGraph();
+        this.sendOutgoingGraph();
       }
     }, FILTER_INPUT_DEBOUNCE_MS);
+  }
+
+  private scheduleGraphSettingsUpdate(): void {
+    if (!this.isLive) {
+      return;
+    }
+
+    this.clearGraphSettingsDebounceTimer();
+    const timerWindow = this.getTimerWindow();
+    this.graphSettingsDebounceTimerWindow = timerWindow;
+    this.graphSettingsDebounceTimer = timerWindow.setTimeout(() => {
+      this.graphSettingsDebounceTimer = null;
+      this.graphSettingsDebounceTimerWindow = null;
+      this.rebuildOutgoingGraph();
+      this.sendOutgoingGraph();
+    }, GRAPH_SETTINGS_DEBOUNCE_MS);
+  }
+
+  private flushPendingGraphWork(): void {
+    let shouldInvalidateOutgoingGraph = false;
+
+    if (this.sourceRefreshTimer) {
+      this.clearSourceRefreshTimer();
+      this.rebuildSourceGraph();
+      shouldInvalidateOutgoingGraph = true;
+    }
+
+    if (this.filterInputDebounceTimer) {
+      this.clearFilterInputDebounceTimer();
+      this.notifyStateChanged();
+
+      const parseResult = GraphQueryFilter.parseQuery(this.filterQuery);
+      const nextActiveQueryFilter = this.resolveActiveQueryFilter(parseResult);
+      if (
+        parseResult.isValid &&
+        !areQueryFiltersEqual(this.activeQueryFilter, nextActiveQueryFilter)
+      ) {
+        this.activeQueryFilter = nextActiveQueryFilter;
+        shouldInvalidateOutgoingGraph = true;
+      }
+    }
+
+    if (this.graphSettingsDebounceTimer) {
+      this.clearGraphSettingsDebounceTimer();
+      shouldInvalidateOutgoingGraph = true;
+    }
+
+    if (shouldInvalidateOutgoingGraph) {
+      this.outgoingGraphPayload = null;
+    }
   }
 
   /**
    * Turn the cached source graph into the effective outgoing payload by applying filters and layout.
    * The source graph stays untouched here; only the transport-ready snapshot is produced and cached.
    */
-  private sendGraphFromSource(): void {
+  private rebuildOutgoingGraph(): void {
     if (!this.sourceGraphPayload) {
       return;
     }
 
     this.outgoingGraphPayload = this.applyActiveFilters(this.sourceGraphPayload);
+  }
 
-    if (this.bridgeReady) {
-      this.sendGraph(this.outgoingGraphPayload);
+  private sendFocusForPath(path: string): void {
+    if (!this.bridgeReady) {
+      return;
+    }
+
+    this.sendFocus({
+      id: makeStableNoteId(path),
+      path
+    });
+  }
+
+  private sendOutgoingGraph(): void {
+    if (!this.bridgeReady || !this.outgoingGraphPayload) {
+      return;
+    }
+
+    this.sendGraph(this.outgoingGraphPayload);
+    if (this.egoEnabled && this.isEgoNoteFocusSuspended) {
+      this.restoreEgoFocus();
     }
   }
 
+  private restoreEgoFocus(): void {
+    this.isEgoNoteFocusSuspended = false;
+    const centerPath = this.normalizeVaultPath(this.focusPath);
+    if (!centerPath) {
+      return;
+    }
+
+    this.sendFocusForPath(centerPath);
+  }
+
   private applyActiveFilters(payload: GraphPayload): GraphPayload {
-    const queryFiltered = GraphQueryFilter.applyFilter(payload, this.activeQueryFilter);
-    const tagsFiltered = this.applyTagsVisibilityFilter(queryFiltered);
+    const centerNoteId = this.egoEnabled ? this.getCurrentEgoCenterNoteId() : undefined;
+
+    const queryFiltered = GraphQueryFilter.applyFilter(
+      payload,
+      this.activeQueryFilter,
+      { alwaysIncludeNoteId: centerNoteId }
+    );
+
+    const egoScope: EgoGraphScope = this.egoEnabled
+      ? this.buildEgoGraphScope(queryFiltered)
+      : { payload: queryFiltered, distanceByNoteId: new Map() };
+
+    const tagsFiltered = this.applyTagsVisibilityFilter(
+      egoScope.payload,
+      egoScope.distanceByNoteId
+    );
+
     return {
       ...tagsFiltered,
       mapLayout: this.mapLayout
     };
   }
 
-  private applyTagsVisibilityFilter(payload: GraphPayload): GraphPayload {
-    if (this.showTags) {
+  private getCurrentEgoCenterNoteId(): string | undefined {
+    const centerPath = this.normalizeVaultPath(this.focusPath);
+    return this.isGraphRelevantPath(centerPath) ? makeStableNoteId(centerPath) : undefined;
+  }
+
+  private buildEgoGraphScope(payload: GraphPayload): EgoGraphScope {
+    const centerPath = this.normalizeVaultPath(this.focusPath);
+    if (!this.isGraphRelevantPath(centerPath)) {
+      return {
+        payload: this.toGraphSubset(payload, new Set(), []),
+        distanceByNoteId: new Map()
+      };
+    }
+
+    const noteById = new Map<string, GraphNoteNode>();
+    const noteIdByPath = new Map<string, string>();
+    for (const note of payload.notes) {
+      const normalizedPath = this.normalizeVaultPath(note.path);
+      noteById.set(note.id, note);
+      noteIdByPath.set(normalizedPath, note.id);
+    }
+
+    const centerId = noteIdByPath.get(centerPath);
+    if (!centerId) {
+      return {
+        payload: this.toGraphSubset(payload, new Set(), []),
+        distanceByNoteId: new Map()
+      };
+    }
+
+    const adjacentNoteIds = new Map<string, Set<string>>();
+    for (const link of payload.links) {
+      if (!noteById.has(link.sourceId) || !noteById.has(link.targetId)) {
+        continue;
+      }
+
+      let sourceNeighbors = adjacentNoteIds.get(link.sourceId);
+      if (!sourceNeighbors) {
+        sourceNeighbors = new Set();
+        adjacentNoteIds.set(link.sourceId, sourceNeighbors);
+      }
+      sourceNeighbors.add(link.targetId);
+
+      let targetNeighbors = adjacentNoteIds.get(link.targetId);
+      if (!targetNeighbors) {
+        targetNeighbors = new Set();
+        adjacentNoteIds.set(link.targetId, targetNeighbors);
+      }
+      targetNeighbors.add(link.sourceId);
+    }
+
+    const distanceByNoteId = new Map<string, number>([[centerId, 0]]);
+    const queue = [centerId];
+    for (let index = 0; index < queue.length; index++) {
+      const currentId = queue[index];
+      const currentDistance = distanceByNoteId.get(currentId) ?? 0;
+      if (currentDistance >= this.egoDepth) {
+        continue;
+      }
+
+      for (const neighborId of adjacentNoteIds.get(currentId) ?? []) {
+        if (distanceByNoteId.has(neighborId)) {
+          continue;
+        }
+
+        distanceByNoteId.set(neighborId, currentDistance + 1);
+        queue.push(neighborId);
+      }
+    }
+
+    const includedIds = new Set(distanceByNoteId.keys());
+
+    const links = payload.links.filter((link) => {
+      if (!includedIds.has(link.sourceId) || !includedIds.has(link.targetId)) {
+        return false;
+      }
+      if (this.egoNeighborLinksEnabled) {
+        return true;
+      }
+      const sourceDistance = distanceByNoteId.get(link.sourceId);
+      const targetDistance = distanceByNoteId.get(link.targetId);
+      return (
+        typeof sourceDistance === "number" &&
+        typeof targetDistance === "number" &&
+        Math.min(sourceDistance, targetDistance) < this.egoDepth &&
+        sourceDistance !== targetDistance
+      );
+    });
+
+    return {
+      payload: this.toGraphSubset(payload, includedIds, links),
+      distanceByNoteId
+    };
+  }
+
+  private toGraphSubset(payload: GraphPayload, includedIds: Set<string>, links: GraphLink[]): GraphPayload {
+    const notes = payload.notes.filter((note) => includedIds.has(note.id));
+    return {
+      ...payload,
+      vault: {
+        ...payload.vault,
+        noteCount: notes.length
+      },
+      notes,
+      links
+    };
+  }
+
+  private applyTagsVisibilityFilter(
+    payload: GraphPayload,
+    distanceByNoteId: Map<string, number>
+  ): GraphPayload {
+    if (!this.showTags) {
+      return this.withoutTags(payload);
+    }
+
+    const isEgoScope = distanceByNoteId.size > 0;
+    if (!isEgoScope) {
       return payload;
     }
 
+    if (this.egoNeighborLinksEnabled) {
+      return this.applyEgoNeighborTagVisibility(payload, distanceByNoteId);
+    }
+
+    return this.applyEgoOwnerTagVisibility(payload, distanceByNoteId);
+  }
+
+  private withoutTags(payload: GraphPayload): GraphPayload {
     return {
       ...payload,
       notes: payload.notes.map((note) => ({
@@ -639,6 +1019,114 @@ export class MapSession {
         tags: []
       }))
     };
+  }
+
+  private applyEgoNeighborTagVisibility(
+    payload: GraphPayload,
+    distanceByNoteId: Map<string, number>
+  ): GraphPayload {
+    const visibleInnerTags = this.buildVisibleInnerTagSet(payload, distanceByNoteId);
+    return {
+      ...payload,
+      notes: payload.notes.map((note) => ({
+        ...note,
+        tags: this.getVisibleEgoNoteTags(note, distanceByNoteId, visibleInnerTags)
+      }))
+    };
+  }
+
+  private buildVisibleInnerTagSet(
+    payload: GraphPayload,
+    distanceByNoteId: Map<string, number>
+  ): Set<string> {
+    const visibleTags = new Set<string>();
+    for (const note of payload.notes) {
+      const distance = distanceByNoteId.get(note.id);
+      if (typeof distance !== "number" || distance >= this.egoDepth) {
+        continue;
+      }
+
+      for (const tag of note.tags) {
+        visibleTags.add(this.normalizeEgoTagKey(tag));
+      }
+    }
+    return visibleTags;
+  }
+
+  private getVisibleEgoNoteTags(
+    note: GraphNoteNode,
+    distanceByNoteId: Map<string, number>,
+    visibleInnerTags: Set<string>
+  ): string[] {
+    const distance = distanceByNoteId.get(note.id);
+    if (typeof distance !== "number") {
+      return [];
+    }
+
+    if (distance < this.egoDepth) {
+      return note.tags;
+    }
+
+    return note.tags.filter((tag) => visibleInnerTags.has(this.normalizeEgoTagKey(tag)));
+  }
+
+  private applyEgoOwnerTagVisibility(
+    payload: GraphPayload,
+    distanceByNoteId: Map<string, number>
+  ): GraphPayload {
+    const ownerTagKeysByNoteId = this.buildEgoTagOwners(payload, distanceByNoteId);
+    return {
+      ...payload,
+      notes: payload.notes.map((note) => {
+        const ownerTagKeys = ownerTagKeysByNoteId.get(note.id) ?? new Set<string>();
+        return {
+          ...note,
+          tags: note.tags.filter((tag) => ownerTagKeys.has(this.normalizeEgoTagKey(tag)))
+        };
+      })
+    };
+  }
+
+  private buildEgoTagOwners(
+    payload: GraphPayload,
+    distanceByNoteId: Map<string, number>
+  ): Map<string, Set<string>> {
+    const firstVisibleDepthByTagKey = new Map<string, number>();
+    for (const note of payload.notes) {
+      const distance = distanceByNoteId.get(note.id);
+      if (typeof distance !== "number" || distance >= this.egoDepth) {
+        continue;
+      }
+
+      for (const tag of note.tags) {
+        const tagKey = this.normalizeEgoTagKey(tag);
+        const firstVisibleDepth = firstVisibleDepthByTagKey.get(tagKey);
+        if (firstVisibleDepth === undefined || distance < firstVisibleDepth) {
+          firstVisibleDepthByTagKey.set(tagKey, distance);
+        }
+      }
+    }
+
+    const ownerTagKeysByNoteId = new Map<string, Set<string>>();
+    for (const note of payload.notes) {
+      const distance = distanceByNoteId.get(note.id);
+      if (typeof distance !== "number" || distance >= this.egoDepth) {
+        continue;
+      }
+
+      const ownerTagKeys = note.tags
+        .map((tag) => this.normalizeEgoTagKey(tag))
+        .filter((tagKey) => firstVisibleDepthByTagKey.get(tagKey) === distance);
+      if (ownerTagKeys.length > 0) {
+        ownerTagKeysByNoteId.set(note.id, new Set(ownerTagKeys));
+      }
+    }
+
+    return ownerTagKeysByNoteId;
+  }
+
+  private normalizeEgoTagKey(tag: string): string {
+    return tag.trim().toLowerCase();
   }
 
   private buildGraphRelevantSignature(cache: CachedMetadata | null): string {
@@ -904,14 +1392,14 @@ export class MapSession {
     return window.activeWindow ?? window;
   }
 
-  private clearRefreshTimer(): void {
-    if (!this.refreshTimer) {
+  private clearSourceRefreshTimer(): void {
+    if (!this.sourceRefreshTimer) {
       return;
     }
 
-    (this.refreshTimerWindow ?? this.getTimerWindow()).clearTimeout(this.refreshTimer);
-    this.refreshTimer = null;
-    this.refreshTimerWindow = null;
+    (this.sourceRefreshTimerWindow ?? this.getTimerWindow()).clearTimeout(this.sourceRefreshTimer);
+    this.sourceRefreshTimer = null;
+    this.sourceRefreshTimerWindow = null;
   }
 
   private clearFilterInputDebounceTimer(): void {
@@ -922,6 +1410,16 @@ export class MapSession {
     (this.filterInputDebounceTimerWindow ?? this.getTimerWindow()).clearTimeout(this.filterInputDebounceTimer);
     this.filterInputDebounceTimer = null;
     this.filterInputDebounceTimerWindow = null;
+  }
+
+  private clearGraphSettingsDebounceTimer(): void {
+    if (!this.graphSettingsDebounceTimer) {
+      return;
+    }
+
+    (this.graphSettingsDebounceTimerWindow ?? this.getTimerWindow()).clearTimeout(this.graphSettingsDebounceTimer);
+    this.graphSettingsDebounceTimer = null;
+    this.graphSettingsDebounceTimerWindow = null;
   }
 }
 
@@ -936,4 +1434,20 @@ export function normalizeRenderScale(value: unknown): number {
     return DEFAULT_RENDER_SCALE;
   }
   return rounded;
+}
+
+export function normalizeEgoDepth(value: unknown): number {
+  const numericValue = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return DEFAULT_EGO_DEPTH;
+  }
+
+  if (
+    !Number.isInteger(numericValue) ||
+    numericValue < MIN_EGO_DEPTH ||
+    numericValue > MAX_EGO_DEPTH
+  ) {
+    return DEFAULT_EGO_DEPTH;
+  }
+  return numericValue;
 }

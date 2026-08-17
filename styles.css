@@ -11,7 +11,6 @@
   --reverysky-panel-border: 1px solid var(--background-modifier-border);
   --reverysky-panel-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.14);
   --reverysky-filter-panel-width: 18rem;
-  --reverysky-filter-panel-max-height: 32rem;
   --reverysky-overlay-offset-x: 0.875rem;
   --reverysky-overlay-offset-y: 0.875rem;
   --reverysky-filter-section-gap: 0.5rem;
@@ -140,10 +139,7 @@
     var(--reverysky-filter-panel-width),
     calc(100% - var(--reverysky-overlay-offset-x) - var(--reverysky-overlay-offset-x))
   );
-  max-height: min(
-    var(--reverysky-filter-panel-max-height),
-    calc(100% - var(--reverysky-overlay-offset-y) - var(--reverysky-overlay-offset-y))
-  );
+  max-height: calc(100% - var(--reverysky-overlay-offset-y) - var(--reverysky-overlay-offset-y));
   overflow-x: hidden;
   overflow-y: hidden;
   background: var(--background-secondary);
@@ -201,31 +197,32 @@
 
 .reverysky-map-selection-section > .reverysky-map-settings-section-content,
 .reverysky-map-graphics-section > .reverysky-map-settings-section-content,
-.reverysky-map-local-section > .reverysky-map-settings-section-content {
+.reverysky-map-ego-section > .reverysky-map-settings-section-content {
   padding: 0 var(--size-4-3) var(--reverysky-filter-section-padding-y);
 }
 
 .reverysky-map-selection-section,
 .reverysky-map-graphics-section,
-.reverysky-map-local-section {
+.reverysky-map-ego-section {
   box-sizing: border-box;
   gap: var(--reverysky-filter-section-gap);
 }
 
 .reverysky-map-selection-section.reverysky-map-settings-section--collapsed,
 .reverysky-map-graphics-section.reverysky-map-settings-section--collapsed,
-.reverysky-map-local-section.reverysky-map-settings-section--collapsed,
+.reverysky-map-ego-section.reverysky-map-settings-section--collapsed,
 .reverysky-map-screenshot-section.reverysky-map-settings-section--collapsed {
   padding-bottom: var(--reverysky-filter-header-padding-edge);
 }
 
 .reverysky-map-graphics-section,
-.reverysky-map-local-section {
+.reverysky-map-ego-section {
   border-top: 1px solid var(--background-modifier-border);
 }
 
+.reverysky-map-selection-section:not(.reverysky-map-settings-section--collapsed),
 .reverysky-map-graphics-section:not(.reverysky-map-settings-section--collapsed),
-.reverysky-map-local-section:not(.reverysky-map-settings-section--collapsed) {
+.reverysky-map-ego-section:not(.reverysky-map-settings-section--collapsed) {
   padding-bottom: var(--reverysky-filter-header-padding-edge);
 }
 
@@ -542,6 +539,7 @@ button.reverysky-map-settings-close svg {
   line-height: 1.25;
 }
 
+.reverysky-map-range-control-message--hidden,
 .reverysky-map-render-scale-message--hidden {
   display: none;
 }

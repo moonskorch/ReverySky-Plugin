@@ -2488,7 +2488,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FocusNode
   layoutParent: {fileID: 1327961058}
   cameraController: {fileID: 330585549}
-  selectedDistance: 10
+  selectedDistance: 14
   highlighter: {fileID: 1780593171}
   FocusRestoreNoteId: 
 --- !u!114 &1780593168
@@ -2551,7 +2551,7 @@ MonoBehaviour:
   injectSampleData: 0
   connectionModel: 2
   islands: 2
-  noteCount: 2500
+  noteCount: 250
   tagPoolSize: 50
   dateSpanDays: 365
   maxTagsPerNote: 4

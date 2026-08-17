@@ -82,6 +82,14 @@
 - Keep edits small and targeted.
 - Optionally check `.local-notes/` for relevant local documentation before making implementation decisions.
 
+## Method Responsibility And Naming
+* Keep orchestration steps explicit. Helpers should perform one focused operation.
+* Use handle... for event/request handling and its scenario-specific branches.
+* Name methods by their responsibility, not by the sequence of internal calls.
+* Do not hide major scenario steps such as acceptance, rebuilds, or sends behind vaguely named helpers.
+* If a helper naturally requires a multi-action name such as `rebuildIfNeededAndSend`, prefer keeping those steps explicit in the parent orchestrator instead of inventing a shorter but less accurate name.
+* Keep names concise. Add qualifiers only when they distinguish meaningful behavior.
+
 ## Context Discipline
 - Avoid loading or pasting large generated artifacts unless necessary.
 - For `unity-webgl/index.html`, inspect only targeted fragments or metadata unless full content is explicitly required.

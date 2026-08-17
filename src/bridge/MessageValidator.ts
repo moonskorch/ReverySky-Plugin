@@ -6,7 +6,8 @@ import {
   NoteFocusPayload,
   NoteOpenMessage,
   RuntimeScreenshotResponseMessage,
-  RuntimeShutdownCompleteMessage
+  RuntimeShutdownCompleteMessage,
+  TagActivateMessage
 } from "./BridgeTypes";
 import {
   formatMapLayoutPreferenceValues,
@@ -170,6 +171,35 @@ export class MessageValidator {
     }
     if (!this.isNonEmptyString(data.payload.path)) {
       errors.push("incoming note:open payload.path must be a non-empty string");
+    }
+
+    return errors;
+  }
+
+  static validateIncomingTagActivateMessage(data: TagActivateMessage): string[] {
+    const errors: string[] = [];
+
+    if (!data || typeof data !== "object") {
+      return ["incoming message must be an object"];
+    }
+
+    if (data.type !== "tag:activate") {
+      errors.push("incoming message type must be tag:activate");
+    }
+
+    if (data.protocolVersion !== BRIDGE_PROTOCOL_VERSION) {
+      errors.push(
+        `incoming protocolVersion mismatch: expected ${BRIDGE_PROTOCOL_VERSION}, got ${String(data.protocolVersion)}`
+      );
+    }
+
+    if (!data.payload || typeof data.payload !== "object") {
+      errors.push("incoming tag:activate payload must be an object");
+      return errors;
+    }
+
+    if (!this.isNonEmptyString(data.payload.tag)) {
+      errors.push("incoming tag:activate payload.tag must be a non-empty string");
     }
 
     return errors;

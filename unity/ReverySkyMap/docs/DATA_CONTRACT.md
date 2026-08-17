@@ -13,6 +13,7 @@ If this file conflicts with canonical contract, canonical contract wins.
 - Runtime ingestion message is `graph:set`.
 - Runtime settings message is `runtime:settings`.
 - Runtime graph completion signal is `graph:ready`.
+- Runtime tag activation signal is `tag:activate`.
 - Runtime shutdown message is `runtime:shutdown`.
 
 ## Envelope Shape
@@ -85,6 +86,29 @@ Unity-side behavior:
 - `RecursiveHubs` signals ready after an empty graph, after instant/endless construction completion, or after timed visual smoothing settles following the final finite refinement pass.
 - Parent iframe status owns the visible loading text and only clears `N notes, M links (loading...)` when `graph:ready.requestId` matches the latest `graph:set`.
 
+## Tag Activate Handling
+`tag:activate` notifies the parent plugin that the user activated a runtime tag node.
+
+Runtime -> parent:
+
+```json
+{
+  "protocolVersion": "2.0.0",
+  "type": "tag:activate",
+  "requestId": "evt_...",
+  "payload": {
+    "tag": "project"
+  }
+}
+```
+
+Unity-side behavior:
+- `FocusNode` emits tag activation only after a `TagNode` resolves through the current `MapGraphIndex` and receives local camera focus.
+- `MapRuntimeContext.RequestTagActivate(tagId)` converts Unity's runtime tag id back to the original bridge tag string via the current tag-name dictionary.
+- Empty or unknown runtime tag ids do not emit `tag:activate`.
+- WebGL builds forward the event to JavaScript via `ReverySkyBridgePostTagActivate(tag)`.
+- The event is notification-only in Unity; parent-side focus policy owns any later note-focus or tag-search behavior.
+
 ## Runtime Shutdown Handling
 Unity WebGL shutdown is a bridge/runtime-wrapper lifecycle guard, not a full Unity engine shutdown.
 
@@ -101,10 +125,10 @@ Expected shutdown envelope:
 Unity-side behavior:
 - The iframe JS wrapper receives `runtime:shutdown`, enters `isShuttingDown`, removes its own bridge listeners, and replies to the parent with `runtime:shutdown-complete`.
 - The iframe JS wrapper forwards shutdown to `ObsidianBridge.OnRuntimeShutdown(string json)` when the Unity instance can receive messages.
-- `ObsidianBridge.OnRuntimeShutdown` marks the bridge as shutting down and unsubscribes from `MapRuntimeContext.OnOpenNoteRequested` and `MapRuntimeContext.OnGraphReady`.
+- `ObsidianBridge.OnRuntimeShutdown` marks the bridge as shutting down and unsubscribes from `MapRuntimeContext.OnOpenNoteRequested`, `MapRuntimeContext.OnTagActivateRequested`, and `MapRuntimeContext.OnGraphReady`.
 - After shutdown, `ObsidianBridge.OnGraphSet` and `ObsidianBridge.OnNoteFocus` return without processing.
 - After shutdown, `ObsidianBridge.OnRuntimeSettings` returns without changing frame-rate state.
-- After shutdown, `HandleOpenNoteRequested` and `HandleGraphReadyRequested` return without sending outbound bridge events.
+- After shutdown, `HandleOpenNoteRequested`, `HandleTagActivateRequested`, and `HandleGraphReadyRequested` return without sending outbound bridge events.
 
 Non-goals:
 - Do not call `Application.Quit()`.

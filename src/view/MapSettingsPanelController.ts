@@ -36,6 +36,13 @@ export class MapSettingsPanelController {
   private settingsSectionEl: HTMLElement | null = null;
   private settingsSectionToggleButtonEl: HTMLButtonElement | null = null;
   private settingsSectionContentEl: HTMLElement | null = null;
+  private egoSectionEl: HTMLElement | null = null;
+  private egoSectionToggleButtonEl: HTMLButtonElement | null = null;
+  private egoSectionContentEl: HTMLElement | null = null;
+  private egoMainToggleButtonEl: HTMLButtonElement | null = null;
+  private egoDepthInputEl: HTMLInputElement | null = null;
+  private egoDepthValueEl: HTMLElement | null = null;
+  private egoNeighborLinksToggleButtonEl: HTMLButtonElement | null = null;
   private graphicsSectionEl: HTMLElement | null = null;
   private graphicsSectionToggleButtonEl: HTMLButtonElement | null = null;
   private graphicsSectionContentEl: HTMLElement | null = null;
@@ -53,6 +60,7 @@ export class MapSettingsPanelController {
   private screenshotButtonEl: HTMLButtonElement | null = null;
   private settingsPanelOpen = false;
   private settingsSectionCollapsed = true;
+  private egoSectionCollapsed = true;
   private graphicsSectionCollapsed = true;
   private screenshotSectionCollapsed = true;
 
@@ -111,7 +119,7 @@ export class MapSettingsPanelController {
       this.filterSuggestionsController?.position();
     });
 
-    const settingsSection = createCollapsibleSection(settingsScrollArea as ObsidianHTMLElement, {
+    const settingsSection = createCollapsibleSection(settingsScrollArea, {
       className: "reverysky-map-selection-section",
       label: "Selection",
       onToggle: () => {
@@ -179,7 +187,7 @@ export class MapSettingsPanelController {
       this.session.setShowTags(!uiState.showTags);
       this.refreshTagsToggleUi();
     };
-    const tagsToggle = createToggleControl(selectionSectionContent as ObsidianHTMLElement, {
+    const tagsToggle = createToggleControl(selectionSectionContent, {
       rowClassName: "reverysky-map-tags-toggle-row",
       buttonClassName: "reverysky-map-tags-toggle",
       thumbClassName: "reverysky-map-tags-toggle-thumb",
@@ -189,7 +197,7 @@ export class MapSettingsPanelController {
     });
     this.tagsToggleButtonEl = tagsToggle.button;
 
-    const layoutControl = createSelectControl(selectionSectionContent as ObsidianHTMLElement, {
+    const layoutControl = createSelectControl(selectionSectionContent, {
       label: "Layout",
       ariaLabel: "Select layout",
       options: MAP_LAYOUT_PREFERENCE_OPTIONS,
@@ -200,7 +208,69 @@ export class MapSettingsPanelController {
     });
     this.layoutDropdownEl = layoutControl.select;
 
-    const graphicsSection = createCollapsibleSection(settingsScrollArea as ObsidianHTMLElement, {
+    const egoSection = createCollapsibleSection(settingsScrollArea, {
+      className: "reverysky-map-ego-section",
+      label: "Ego Graph",
+      onToggle: () => {
+        this.setEgoSectionCollapsed(!this.egoSectionCollapsed);
+      }
+    });
+    this.egoSectionEl = egoSection.section;
+    this.egoSectionToggleButtonEl = egoSection.toggleButton;
+    this.egoSectionContentEl = egoSection.content;
+    const egoSectionContent = egoSection.content;
+
+    const toggleEgo = (event: Event) => {
+      event.preventDefault();
+      const uiState = this.session.getFilterUiState();
+      this.session.setEgoEnabled(!uiState.egoEnabled);
+      this.refreshEgoControlsUi();
+    };
+    const egoToggle = createToggleControl(egoSectionContent, {
+      rowClassName: "reverysky-map-ego-toggle-row",
+      buttonClassName: "reverysky-map-ego-toggle",
+      thumbClassName: "reverysky-map-ego-toggle-thumb",
+      label: "Ego mode",
+      ariaLabel: "Toggle Ego mode",
+      onToggle: toggleEgo
+    });
+    this.egoMainToggleButtonEl = egoToggle.button;
+
+    const egoDepth = createRangeControl(egoSectionContent, {
+      sectionClassName: "reverysky-map-ego-depth-section",
+      inputClassName: "reverysky-map-ego-depth-input",
+      valueClassName: "reverysky-map-ego-depth-value",
+      messageClassName: "reverysky-map-ego-depth-message reverysky-map-range-control-message--hidden",
+      label: "Depth",
+      ariaLabel: "Ego Graph depth",
+      min: "1",
+      max: "5",
+      step: "1",
+      onInput: (input) => {
+        this.session.setEgoDepth(input.value);
+        this.refreshEgoControlsUi();
+      }
+    });
+    this.egoDepthInputEl = egoDepth.input;
+    this.egoDepthValueEl = egoDepth.value;
+
+    const toggleEgoNeighborLinks = (event: Event) => {
+      event.preventDefault();
+      const uiState = this.session.getFilterUiState();
+      this.session.setEgoNeighborLinksEnabled(!uiState.egoNeighborLinksEnabled);
+      this.refreshEgoControlsUi();
+    };
+    const neighborLinksToggle = createToggleControl(egoSectionContent, {
+      rowClassName: "reverysky-map-ego-neighbor-links-toggle-row",
+      buttonClassName: "reverysky-map-ego-neighbor-links-toggle",
+      thumbClassName: "reverysky-map-ego-neighbor-links-toggle-thumb",
+      label: "Neighbor links",
+      ariaLabel: "Toggle neighbor links",
+      onToggle: toggleEgoNeighborLinks
+    });
+    this.egoNeighborLinksToggleButtonEl = neighborLinksToggle.button;
+
+    const graphicsSection = createCollapsibleSection(settingsScrollArea, {
       className: "reverysky-map-graphics-section",
       label: "Graphics",
       onToggle: () => {
@@ -212,7 +282,7 @@ export class MapSettingsPanelController {
     this.graphicsSectionContentEl = graphicsSection.content;
     const graphicsSectionContent = graphicsSection.content;
 
-    const renderScale = createRangeControl(graphicsSectionContent as ObsidianHTMLElement, {
+    const renderScale = createRangeControl(graphicsSectionContent, {
       sectionClassName: "reverysky-map-render-scale-section",
       inputClassName: "reverysky-map-render-scale-input",
       valueClassName: "reverysky-map-render-scale-value",
@@ -234,7 +304,7 @@ export class MapSettingsPanelController {
     this.renderScaleValueEl = renderScale.value;
     this.renderScaleMessageEl = renderScale.message;
 
-    const frameRateModeControl = createSelectControl(graphicsSectionContent as ObsidianHTMLElement, {
+    const frameRateModeControl = createSelectControl(graphicsSectionContent, {
       selectClassName: "reverysky-map-frame-rate-mode-select",
       label: "Frame rate",
       ariaLabel: "Select frame rate",
@@ -246,7 +316,7 @@ export class MapSettingsPanelController {
     });
     this.frameRateModeDropdownEl = frameRateModeControl.select;
 
-    const screenshotSection = createCollapsibleSection(settingsScrollArea as ObsidianHTMLElement, {
+    const screenshotSection = createCollapsibleSection(settingsScrollArea, {
       className: "reverysky-map-screenshot-section",
       label: "Screenshot",
       onToggle: () => {
@@ -258,7 +328,7 @@ export class MapSettingsPanelController {
     this.screenshotSectionContentEl = screenshotSection.content;
     const screenshotSectionContent = screenshotSection.content;
 
-    this.screenshotButtonEl = createActionButton(screenshotSectionContent as ObsidianHTMLElement, {
+    this.screenshotButtonEl = createActionButton(screenshotSectionContent, {
       className: "reverysky-map-screenshot-button",
       label: "Copy screenshot",
       ariaLabel: "Copy graph screenshot",
@@ -278,6 +348,7 @@ export class MapSettingsPanelController {
     this.refreshFilterMessage();
     this.refreshTagsToggleUi();
     this.refreshLayoutDropdownUi();
+    this.refreshEgoControlsUi();
     this.refreshRenderScaleUi();
     this.refreshFrameRateModeDropdownUi();
   }
@@ -297,6 +368,13 @@ export class MapSettingsPanelController {
     this.settingsSectionEl = null;
     this.settingsSectionToggleButtonEl = null;
     this.settingsSectionContentEl = null;
+    this.egoSectionEl = null;
+    this.egoSectionToggleButtonEl = null;
+    this.egoSectionContentEl = null;
+    this.egoMainToggleButtonEl = null;
+    this.egoDepthInputEl = null;
+    this.egoDepthValueEl = null;
+    this.egoNeighborLinksToggleButtonEl = null;
     this.graphicsSectionEl = null;
     this.graphicsSectionToggleButtonEl = null;
     this.graphicsSectionContentEl = null;
@@ -312,6 +390,7 @@ export class MapSettingsPanelController {
     this.screenshotButtonEl = null;
     this.settingsPanelOpen = false;
     this.settingsSectionCollapsed = true;
+    this.egoSectionCollapsed = true;
     this.graphicsSectionCollapsed = true;
     this.screenshotSectionCollapsed = true;
   }
@@ -342,6 +421,11 @@ export class MapSettingsPanelController {
     this.refreshCollapsibleSections();
   }
 
+  private setEgoSectionCollapsed(isCollapsed: boolean): void {
+    this.egoSectionCollapsed = isCollapsed;
+    this.refreshCollapsibleSections();
+  }
+
   private setScreenshotSectionCollapsed(isCollapsed: boolean): void {
     this.screenshotSectionCollapsed = isCollapsed;
     this.refreshCollapsibleSections();
@@ -354,6 +438,13 @@ export class MapSettingsPanelController {
       this.settingsSectionContentEl,
       this.settingsSectionCollapsed,
       "Selection"
+    );
+    this.refreshCollapsibleSection(
+      this.egoSectionEl,
+      this.egoSectionToggleButtonEl,
+      this.egoSectionContentEl,
+      this.egoSectionCollapsed,
+      "Ego Graph"
     );
     this.refreshCollapsibleSection(
       this.graphicsSectionEl,
@@ -438,6 +529,23 @@ export class MapSettingsPanelController {
     }
 
     this.layoutDropdownEl.value = uiState.mapLayout;
+  }
+
+  private refreshEgoControlsUi(): void {
+    const uiState = this.session.getFilterUiState();
+    this.egoMainToggleButtonEl?.setAttribute("role", "switch");
+    this.egoMainToggleButtonEl?.setAttribute("aria-checked", uiState.egoEnabled ? "true" : "false");
+    if (this.egoDepthInputEl) {
+      this.egoDepthInputEl.value = String(uiState.egoDepth);
+    }
+    if (this.egoDepthValueEl) {
+      this.egoDepthValueEl.textContent = String(uiState.egoDepth);
+    }
+    this.egoNeighborLinksToggleButtonEl?.setAttribute("role", "switch");
+    this.egoNeighborLinksToggleButtonEl?.setAttribute(
+      "aria-checked",
+      uiState.egoNeighborLinksEnabled ? "true" : "false"
+    );
   }
 
   private refreshRenderScaleUi(): void {

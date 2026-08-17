@@ -147,7 +147,7 @@ describe("MapFocusController", () => {
     expect(requestFocus).toHaveBeenCalledTimes(1);
     expectFocusPath(requestFocus, "Folder/Current.md");
 
-    currentTime += 251;
+    currentTime += 301;
     controller.onMarkdownFocus("Folder/Current.md");
 
     expect(requestFocus).toHaveBeenCalledTimes(2);
@@ -182,7 +182,7 @@ describe("MapFocusController", () => {
 
     expect(requestFocus).not.toHaveBeenCalled();
 
-    currentTime += 251;
+    currentTime += 301;
     controller.onMarkdownFocus("Folder/Current.md");
 
     expect(requestFocus).toHaveBeenCalledTimes(1);
@@ -203,7 +203,7 @@ describe("MapFocusController", () => {
 
     expect(requestFocus).not.toHaveBeenCalled();
 
-    currentTime += 251;
+    currentTime += 301;
     controller.onMarkdownFocus("Folder/Current.md");
 
     expect(requestFocus).toHaveBeenCalledTimes(1);
@@ -217,7 +217,7 @@ describe("MapFocusController", () => {
     });
 
     controller.expectFocusEchoForPath("Folder/Current.md");
-    currentTime += 251;
+    currentTime += 301;
     controller.onMarkdownFocus("Folder/Current.md");
 
     expect(requestFocus).toHaveBeenCalledTimes(1);
@@ -249,7 +249,33 @@ describe("MapFocusController", () => {
     controller.onRename("Folder/Old.md", "Folder/New.md");
 
     expect(requestFocus).toHaveBeenCalledTimes(1);
-    expect(requestFocus).toHaveBeenLastCalledWith("Folder/New.md", { skipGraphCheck: true });
+    expect(requestFocus).toHaveBeenLastCalledWith("Folder/New.md", {
+      skipGraphCheck: true,
+      skipEgoGraphRebuild: true
+    });
+  });
+
+  it("consumes focus echo after rename focus is accepted", () => {
+    let currentTime = 1000;
+    const { controller, requestFocus } = createController({
+      getFocusPath: () => "Folder/Old.md",
+      now: () => currentTime
+    });
+
+    controller.onRename("Folder/Old.md", "Folder/New.md");
+    controller.onMarkdownFocus("Folder/New.md");
+
+    expect(requestFocus).toHaveBeenCalledTimes(1);
+    expect(requestFocus).toHaveBeenLastCalledWith("Folder/New.md", {
+      skipGraphCheck: true,
+      skipEgoGraphRebuild: true
+    });
+
+    currentTime += 301;
+    controller.onMarkdownFocus("Folder/New.md");
+
+    expect(requestFocus).toHaveBeenCalledTimes(2);
+    expectFocusPath(requestFocus, "Folder/New.md");
   });
 
   it("preserves rename focus for the last focused map note when markdown is not active", () => {
@@ -266,7 +292,10 @@ describe("MapFocusController", () => {
     controller.onRename("Folder/Old.md", "Moved/New.md");
 
     expect(requestFocus).toHaveBeenCalledTimes(1);
-    expect(requestFocus).toHaveBeenLastCalledWith("Moved/New.md", { skipGraphCheck: true });
+    expect(requestFocus).toHaveBeenLastCalledWith("Moved/New.md", {
+      skipGraphCheck: true,
+      skipEgoGraphRebuild: true
+    });
   });
 
   it("resolves open-link source from current workspace without cached history", () => {

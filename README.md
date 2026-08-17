@@ -78,6 +78,16 @@ The layout control changes how the same vault data is arranged:
 - `Dates`: a chronological layout that arranges notes by date and enables the date slider.
 - `Auto`: chooses `Dynamic links` for smaller datasets and switches to `Scalable links` above 500 notes.
 
+## Ego Graph
+
+Ego Graph limits the graph to the active note and its connected neighborhood. The center follows the current focus: activating a note in Obsidian or clicking a node in the 3D graph rebuilds the neighborhood around that note.
+
+- `Ego mode`: turns Ego Graph on or off.
+- `Depth`: controls how many link steps from the center are included, from 1 to 5. Both incoming and outgoing note links count toward the neighborhood.
+- `Neighbor links`: shows all links between notes included in the Ego Graph. When disabled, only links connecting one layer of the neighborhood to the next remain visible.
+
+The current filters, tag visibility, and layout settings continue to apply to the resulting graph.
+
 ## Screenshot
 
 The optional `Copy screenshot` action captures the current graph view and places it in the system clipboard as a PNG image. This uses clipboard write access only for the screenshot action. ReverySky 3D Graph does not read existing clipboard contents.

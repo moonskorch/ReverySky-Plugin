@@ -16,6 +16,9 @@ public class ObsidianBridge : MonoBehaviour
   private static extern void ReverySkyBridgePostNoteOpen(string noteId, string notePath);
 
   [DllImport("__Internal")]
+  private static extern void ReverySkyBridgePostTagActivate(string tag);
+
+  [DllImport("__Internal")]
   private static extern void ReverySkyBridgePostGraphReady(string requestId);
 #endif
 
@@ -33,12 +36,14 @@ public class ObsidianBridge : MonoBehaviour
   private void OnEnable()
   {
     MapRuntimeContext.OnOpenNoteRequested += HandleOpenNoteRequested;
+    MapRuntimeContext.OnTagActivateRequested += HandleTagActivateRequested;
     MapRuntimeContext.OnGraphReady += HandleGraphReadyRequested;
   }
 
   private void OnDisable()
   {
     MapRuntimeContext.OnOpenNoteRequested -= HandleOpenNoteRequested;
+    MapRuntimeContext.OnTagActivateRequested -= HandleTagActivateRequested;
     MapRuntimeContext.OnGraphReady -= HandleGraphReadyRequested;
   }
 
@@ -262,6 +267,20 @@ public class ObsidianBridge : MonoBehaviour
 #endif
   }
 
+  private static void HandleTagActivateRequested(string tag)
+  {
+    if (IsRuntimeShuttingDown)
+      return;
+
+    var safeTag = tag ?? string.Empty;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+    ReverySkyBridgePostTagActivate(safeTag);
+#else
+    Debug.Log($"[ObsidianBridge] tag:activate requested (Editor/Non-WebGL): tag={safeTag}");
+#endif
+  }
+
   private static void HandleGraphReadyRequested(string requestId)
   {
     if (IsRuntimeShuttingDown)
@@ -282,6 +301,7 @@ public class ObsidianBridge : MonoBehaviour
   {
     IsRuntimeShuttingDown = true;
     MapRuntimeContext.OnOpenNoteRequested -= HandleOpenNoteRequested;
+    MapRuntimeContext.OnTagActivateRequested -= HandleTagActivateRequested;
     MapRuntimeContext.OnGraphReady -= HandleGraphReadyRequested;
     Debug.Log("[ObsidianBridge] runtime shutdown requested.");
   }

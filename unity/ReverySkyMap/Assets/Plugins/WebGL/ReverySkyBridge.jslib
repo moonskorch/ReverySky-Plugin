@@ -24,6 +24,29 @@ mergeInto(LibraryManager.library, {
     }
   },
 
+  ReverySkyBridgePostTagActivate: function (tagPtr) {
+    var tag = tagPtr ? UTF8ToString(tagPtr) : "";
+
+    if (typeof window !== "undefined" && typeof window.ReverySkyBridgePostTagActivate === "function") {
+      window.ReverySkyBridgePostTagActivate(tag);
+      return;
+    }
+
+    if (typeof window !== "undefined" && window.parent && typeof window.parent.postMessage === "function") {
+      window.parent.postMessage(
+        {
+          protocolVersion: "2.0.0",
+          type: "tag:activate",
+          requestId: "evt_" + Date.now(),
+          payload: {
+            tag: tag
+          }
+        },
+        "*"
+      );
+    }
+  },
+
   ReverySkyBridgePostGraphReady: function (requestIdPtr) {
     var requestId = requestIdPtr ? UTF8ToString(requestIdPtr) : "";
 

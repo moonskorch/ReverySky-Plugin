@@ -23,6 +23,7 @@ public class ObsidianBridgeEditModeTests
     SetCartographerSingleton(null);
     bridgeObject = new GameObject("ObsidianBridgeEditModeTests");
     bridge = bridgeObject.AddComponent<ObsidianBridge>();
+    ResetBridgeSubscriptions();
   }
 
   [TearDown]
@@ -491,6 +492,51 @@ public class ObsidianBridgeEditModeTests
   }
 
   [Test]
+  public void RequestTagActivate_KnownTag_EmitsBridgeTagName()
+  {
+    var activatedTags = new List<string>();
+    void HandleTagActivate(string tag) => activatedTags.Add(tag);
+
+    MapRuntimeContext.OnTagActivateRequested += HandleTagActivate;
+    try
+    {
+      LogAssert.Expect(LogType.Log, new Regex("\\[MapRuntimeContext\\] Tag activate requested: tag=project"));
+      LogAssert.Expect(LogType.Log, new Regex("\\[ObsidianBridge\\] tag:activate requested \\(Editor/Non-WebGL\\): tag=project"));
+
+      MapRuntimeContext.SetTagNames(new Dictionary<int, string> { { 7, "project" } });
+      MapRuntimeContext.RequestTagActivate(7);
+
+      Assert.That(activatedTags, Is.EqualTo(new List<string> { "project" }));
+    }
+    finally
+    {
+      MapRuntimeContext.OnTagActivateRequested -= HandleTagActivate;
+    }
+  }
+
+  [Test]
+  public void RequestTagActivate_UnknownOrEmptyTag_DoesNotEmit()
+  {
+    var activatedTags = new List<string>();
+    void HandleTagActivate(string tag) => activatedTags.Add(tag);
+
+    MapRuntimeContext.OnTagActivateRequested += HandleTagActivate;
+    try
+    {
+      MapRuntimeContext.SetTagNames(new Dictionary<int, string> { { 7, "   " } });
+
+      MapRuntimeContext.RequestTagActivate(7);
+      MapRuntimeContext.RequestTagActivate(8);
+
+      Assert.That(activatedTags, Is.Empty);
+    }
+    finally
+    {
+      MapRuntimeContext.OnTagActivateRequested -= HandleTagActivate;
+    }
+  }
+
+  [Test]
   public void RebuildGraphAfterClear_ReadyScopeUsesCoroutineRequestId()
   {
     var readyRequestIds = new List<string>();
@@ -862,6 +908,27 @@ public class ObsidianBridgeEditModeTests
     MapRuntimeContext.SetTagNames(new Dictionary<int, string>());
     MapRuntimeContext.SetLinks(new List<MapRuntimeContext.RuntimeNoteLink>());
     MapRuntimeContext.SetNotes(new List<NoteData>(), string.Empty);
+    ResetBridgeShutdownState();
+  }
+
+  private static void ResetBridgeShutdownState()
+  {
+    FieldInfo shutdownField = typeof(ObsidianBridge).GetField("IsRuntimeShuttingDown", BindingFlags.Static | BindingFlags.NonPublic);
+    Assert.That(shutdownField, Is.Not.Null, "Missing ObsidianBridge shutdown field.");
+    shutdownField.SetValue(null, false);
+  }
+
+  private void ResetBridgeSubscriptions()
+  {
+    InvokeBridgeLifecycleMethod("OnDisable");
+    InvokeBridgeLifecycleMethod("OnEnable");
+  }
+
+  private void InvokeBridgeLifecycleMethod(string methodName)
+  {
+    MethodInfo method = typeof(ObsidianBridge).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(method, Is.Not.Null, $"Missing ObsidianBridge lifecycle method {methodName}.");
+    method.Invoke(bridge, null);
   }
 
   private void EnsureCartographerSingleton()

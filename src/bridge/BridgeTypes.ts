@@ -25,6 +25,10 @@ export type NoteOpenPayload = NoteIdentityPayload;
 
 export type NoteFocusPayload = NoteIdentityPayload;
 
+export type TagActivatePayload = {
+  tag: string;
+};
+
 export type NoteOpenMessage = {
   protocolVersion: string;
   type: "note:open";
@@ -37,6 +41,13 @@ export type NoteFocusMessage = {
   type: "note:focus";
   requestId?: string;
   payload: NoteFocusPayload;
+};
+
+export type TagActivateMessage = {
+  protocolVersion: string;
+  type: "tag:activate";
+  requestId?: string;
+  payload: TagActivatePayload;
 };
 
 export type GraphReadyMessage = {
@@ -133,6 +144,7 @@ export type IncomingBridgeMessage =
   | BridgeReadyMessage
   | GraphReadyMessage
   | NoteOpenMessage
+  | TagActivateMessage
   | RuntimeScreenshotResponseMessage
   | RuntimeShutdownCompleteMessage;
 export type OutgoingBridgeMessage =

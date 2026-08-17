@@ -12,7 +12,8 @@ import {
   RuntimeSettingsPayload,
   RuntimeShutdownMessage,
   RuntimeStatusMessage,
-  ShutdownResult
+  ShutdownResult,
+  TagActivatePayload
 } from "./BridgeTypes";
 import { MessageValidator } from "./MessageValidator";
 
@@ -20,6 +21,7 @@ type BridgeCallbacks = {
   onReady?: () => void;
   onGraphReady?: (requestId: string) => void;
   onNoteOpen?: (payload: NoteOpenPayload) => void;
+  onTagActivate?: (payload: TagActivatePayload) => void;
   onError?: (message: string) => void;
 };
 
@@ -268,6 +270,16 @@ export class UnityIframeBridge {
         return;
       }
       this.callbacks.onNoteOpen?.(data.payload);
+      return;
+    }
+
+    if (data.type === "tag:activate") {
+      const incomingErrors = MessageValidator.validateIncomingTagActivateMessage(data);
+      if (incomingErrors.length > 0) {
+        this.callbacks.onError?.(`Invalid incoming bridge message: ${incomingErrors.join("; ")}`);
+        return;
+      }
+      this.callbacks.onTagActivate?.(data.payload);
       return;
     }
 

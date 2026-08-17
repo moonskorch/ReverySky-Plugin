@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { GraphPayload } from "../../src/bridge/BridgeTypes";
+import type { GraphPayload, TagActivatePayload } from "../../src/bridge/BridgeTypes";
 import { makeStableNoteId } from "../../src/graph/VaultGraphBuilder";
 import type { MapViewDependencies } from "../../src/view/MapView";
 
@@ -12,6 +12,7 @@ type BridgeForTest = ReturnType<NonNullable<MapViewDependencies["createBridge"]>
 type BridgeCallbacks = {
   onReady?: () => void;
   onNoteOpen?: (payload: { id: string; path: string }) => void;
+  onTagActivate?: (payload: TagActivatePayload) => void;
   onError?: (message: string) => void;
 };
 
@@ -84,6 +85,28 @@ function makePathPayload(): GraphPayload {
     links: [
       { sourceId: "daily", targetId: "project", kind: "resolved" },
       { sourceId: "project", targetId: "archive", kind: "resolved" }
+    ],
+    mapLayout: "auto"
+  };
+}
+
+function makeDepthPayload(): GraphPayload {
+  return {
+    graphVersion: "0.0.1",
+    generatedAt: "2026-01-01T00:00:00.000Z",
+    vault: { noteCount: 5 },
+    notes: [
+      { id: "center", path: "Depth/Center.md", title: "Center", tags: ["center"], size: 20 },
+      { id: "left", path: "Depth/Left.md", title: "Left", tags: [], size: 21 },
+      { id: "right", path: "Depth/Right.md", title: "Right", tags: [], size: 22 },
+      { id: "outer-left", path: "Depth/OuterLeft.md", title: "Outer Left", tags: [], size: 23 },
+      { id: "outer-right", path: "Depth/OuterRight.md", title: "Outer Right", tags: [], size: 24 }
+    ],
+    links: [
+      { sourceId: "center", targetId: "left", kind: "resolved" },
+      { sourceId: "right", targetId: "center", kind: "resolved" },
+      { sourceId: "left", targetId: "outer-left", kind: "resolved" },
+      { sourceId: "outer-right", targetId: "right", kind: "resolved" }
     ],
     mapLayout: "auto"
   };
@@ -646,6 +669,104 @@ describe("MapView bridge integration", () => {
     await view.onClose();
 
     expect(cleanupWindowMigration).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a pending filter when Obsidian migrates the view before the filter debounce fires", async () => {
+    vi.useFakeTimers();
+    const app = {
+      marker: "app",
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks[] = [];
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.push(received);
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn(),
+      sendRuntimeSettings: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
+    };
+    const buildGraph = vi.fn().mockReturnValue(makePathPayload());
+    let onWindowMigrated: ((win: Window) => void) | null = null;
+
+    const view = new MapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => makeBridgeForTest(bridge),
+        buildGraph: buildGraph as BuildGraphForTest,
+        notify: vi.fn(),
+        now: () => 1700000000000
+      }
+    );
+    document.body.appendChild(view.contentEl);
+    (
+      view.contentEl as HTMLElement & {
+        onWindowMigrated?: (listener: (win: Window) => void) => () => void;
+      }
+    ).onWindowMigrated = vi.fn((listener) => {
+      onWindowMigrated = listener;
+      return vi.fn();
+    });
+
+    await view.onOpen();
+    const firstIframe = view.contentEl.querySelector("iframe");
+    expect(firstIframe).not.toBeNull();
+    Object.defineProperty(firstIframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    firstIframe!.dispatchEvent(new Event("load"));
+    callbacks[0]?.onReady?.();
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+    expect((bridge.sendGraphSet.mock.calls[0]?.[0] as GraphPayload).notes.map((note) => note.id)).toEqual([
+      "daily",
+      "project",
+      "archive"
+    ]);
+
+    const searchInput = view.contentEl.querySelector("input.search-input") as HTMLInputElement;
+    searchInput.value = "path:archive";
+    searchInput.dispatchEvent(new Event("input"));
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+
+    callMaybe(onWindowMigrated, window);
+    await vi.advanceTimersByTimeAsync(0);
+
+    const secondIframe = view.contentEl.querySelector("iframe");
+    expect(secondIframe).not.toBeNull();
+    expect(secondIframe).not.toBe(firstIframe);
+    Object.defineProperty(secondIframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    secondIframe!.dispatchEvent(new Event("load"));
+    callbacks[1]?.onReady?.();
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+    expect((bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload).notes.map((note) => note.id)).toEqual([
+      "archive"
+    ]);
+
+    vi.advanceTimersByTime(500);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+
+    await view.onClose();
   });
 
   it("ignores a stale deferred iframe restart when a newer window migration arrives first", async () => {
@@ -1614,6 +1735,86 @@ describe("MapView bridge integration", () => {
     expect(bridge.sendGraphSet).toHaveBeenCalledWith(queuedPayload);
   });
 
+  it("routes runtime tag activation through MapView and restores Ego focus after the next graph", async () => {
+    vi.useFakeTimers();
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = {
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+        callbacks.onTagActivate = received.onTagActivate;
+      }),
+      detach: vi.fn(),
+      sendGraphSet: vi.fn(),
+      sendNoteFocus: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue("complete")
+    };
+
+    const view = new MapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => makeBridgeForTest(bridge),
+        buildGraph: vi.fn().mockReturnValue(makeDepthPayload()) as BuildGraphForTest,
+        notify: vi.fn(),
+        now: () => 1700000000000,
+        initialState: { egoEnabled: true }
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    view.requestFocusFromEditor("Depth/Center.md");
+    callbacks.onTagActivate?.({ tag: "center" });
+
+    const egoDepthInput = view.contentEl.querySelector(".reverysky-map-ego-depth-input") as HTMLInputElement;
+    egoDepthInput.value = "2";
+    egoDepthInput.dispatchEvent(new Event("input"));
+
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+
+    vi.advanceTimersByTime(250);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(3);
+    expect((bridge.sendGraphSet.mock.calls[2]?.[0] as GraphPayload).notes.map((note) => note.id)).toEqual([
+      "center",
+      "left",
+      "right",
+      "outer-left",
+      "outer-right"
+    ]);
+    expect(bridge.sendNoteFocus).toHaveBeenCalledTimes(2);
+    expect(bridge.sendNoteFocus).toHaveBeenLastCalledWith({
+      id: makeStableNoteId("Depth/Center.md"),
+      path: "Depth/Center.md"
+    });
+  });
+
   it("keeps create focus-free and follows the active file opened by Obsidian", async () => {
     vi.useFakeTimers();
 
@@ -1929,6 +2130,7 @@ describe("MapView bridge integration", () => {
   });
 
   it("toggles tags visibility in outgoing graph payload without rebuilding source graph", async () => {
+    vi.useFakeTimers();
     const app = {
       metadataCache: {
         on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
@@ -2002,6 +2204,9 @@ describe("MapView bridge integration", () => {
 
     tagsToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(250);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
     const tagsHiddenPayload = bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload;
     expect(tagsHiddenPayload.notes.every((note) => note.tags.length === 0)).toBe(true);
@@ -2011,6 +2216,9 @@ describe("MapView bridge integration", () => {
 
     tagsToggle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+
+    vi.advanceTimersByTime(250);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(3);
     const tagsVisibleAgainPayload = bridge.sendGraphSet.mock.calls[2]?.[0] as GraphPayload;
     expect(tagsVisibleAgainPayload.notes.map((note) => note.tags)).toEqual([
@@ -2022,6 +2230,7 @@ describe("MapView bridge integration", () => {
   });
 
   it("updates engine preference in outgoing graph payload without rebuilding source graph", async () => {
+    vi.useFakeTimers();
     const app = {
       metadataCache: {
         on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
@@ -2088,6 +2297,9 @@ describe("MapView bridge integration", () => {
     engineSelect.value = "dynamicLinks";
     engineSelect.dispatchEvent(new Event("change"));
     expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(250);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
     const linksPayload = bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload;
     expect(linksPayload.mapLayout).toBe("dynamicLinks");
@@ -2096,6 +2308,9 @@ describe("MapView bridge integration", () => {
     engineSelect.value = "dates";
     engineSelect.dispatchEvent(new Event("change"));
     expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
+
+    vi.advanceTimersByTime(250);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(3);
     const datesPayload = bridge.sendGraphSet.mock.calls[2]?.[0] as GraphPayload;
     expect(datesPayload.mapLayout).toBe("dates");
@@ -2104,6 +2319,9 @@ describe("MapView bridge integration", () => {
     engineSelect.value = "scalableLinks";
     engineSelect.dispatchEvent(new Event("change"));
     expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(3);
+
+    vi.advanceTimersByTime(250);
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(4);
     const scalableLinksPayload = bridge.sendGraphSet.mock.calls[3]?.[0] as GraphPayload;
     expect(scalableLinksPayload.mapLayout).toBe("scalableLinks");

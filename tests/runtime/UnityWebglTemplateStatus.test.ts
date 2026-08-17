@@ -87,4 +87,35 @@ describe("Unity WebGL runtime templates", () => {
     expect(html).not.toContain("activeUnityInstance.Quit()");
     expect(html).not.toContain("Promise.race");
   });
+
+  it.each(templatePaths)("defers Unity dispatches through cancelable latest-intent tokens in %s", (templatePath) => {
+    const html = readFileSync(path.join(repoRoot, templatePath), "utf8");
+
+    const schedulerBlock = html.match(/function scheduleUnityDispatch\(dispatch\) \{[\s\S]*?scheduleDispatch\(\);\s*\}/)?.[0] ?? "";
+    expect(schedulerBlock).toContain("window.setTimeout(dispatch, 0);");
+    expect(schedulerBlock).toContain('if (typeof window.requestAnimationFrame === "function")');
+    expect(schedulerBlock).toContain("window.requestAnimationFrame(scheduleDispatch);");
+
+    const graphSetBlock = html.match(/function scheduleGraphSetDispatch\(message\) \{[\s\S]*?tryDispatchGraphSetToUnity\(message\);[\s\S]*?\}\);\s*\}/)?.[0] ?? "";
+    expect(graphSetBlock).toContain("const dispatchToken = ++graphSetDispatchToken;");
+    expect(graphSetBlock).toContain("scheduleUnityDispatch(() => {");
+    expect(graphSetBlock).toContain("dispatchToken !== graphSetDispatchToken");
+    expect(graphSetBlock).toContain('runtimeMode !== "unity"');
+
+    const noteFocusBlock = html.match(/function scheduleNoteFocusDispatch\(message\) \{[\s\S]*?tryDispatchNoteFocusToUnity\(message\);[\s\S]*?\}\);\s*\}/)?.[0] ?? "";
+    expect(noteFocusBlock).toContain("const dispatchToken = ++noteFocusDispatchToken;");
+    expect(noteFocusBlock).toContain("scheduleUnityDispatch(() => {");
+    expect(noteFocusBlock).toContain("dispatchToken !== noteFocusDispatchToken");
+    expect(noteFocusBlock).toContain('runtimeMode !== "unity"');
+
+    const applyGraphSetBlock = html.match(/function applyGraphSet\(message\) \{[\s\S]*?if \(runtimeMode === "unity"\) \{[\s\S]*?scheduleGraphSetDispatch\(message\);[\s\S]*?\}\s*\}/)?.[0] ?? "";
+    expect(applyGraphSetBlock).not.toBe("");
+
+    const applyNoteFocusBlock = html.match(/function applyNoteFocus\(message\) \{[\s\S]*?if \(runtimeMode === "unity"\) \{[\s\S]*?scheduleNoteFocusDispatch\(message\);[\s\S]*?\}\s*\}/)?.[0] ?? "";
+    expect(applyNoteFocusBlock).not.toBe("");
+
+    const shutdownBlock = html.match(/function beginShutdown\(message\) \{[\s\S]*?window\.removeEventListener\("message", onBridgeMessage\);[\s\S]*?\}/)?.[0] ?? "";
+    expect(shutdownBlock).toContain("graphSetDispatchToken++;");
+    expect(shutdownBlock).toContain("noteFocusDispatchToken++;");
+  });
 });
