@@ -247,6 +247,17 @@ Mitigation:
 - Treat a black or empty screenshot as an expected edge case for this feature, not as a full runtime failure.
 - Avoid background capture or automatic retry logic unless real usage data shows the one-shot approach is too fragile.
 
+## 20. Obsidian Plugin Enabled State May Not Persist
+
+Risk:
+- On Obsidian 1.13.7, re-enabling a community plugin and closing Settings immediately may restore the plugin for the current session without writing its ID back to `.obsidian/community-plugins.json`.
+- After restart, the plugin can come back disabled and a restored leaf may show `The plugin that created that tab has gone away`.
+- Reproduced with other plugins, so this does not appear to be a ReverySky-specific bug and is not something to fix in plugin code.
+
+Mitigation:
+- Do not add a ReverySky persistence workaround for this case.
+- Do not change plugin lifecycle code unless the behavior becomes ReverySky-specific or survives an Obsidian fix.
+
 ## Architecture Risks and Hardening Plan
 
 The core architecture is intentional: ReverySky 3D Graph embeds a Unity WebGL runtime inside an Obsidian plugin and sends live graph data across several runtime boundaries.
