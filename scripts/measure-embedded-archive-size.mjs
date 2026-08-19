@@ -20,6 +20,16 @@ const rootManifestPath = path.join(repoRoot, "manifest.json");
 const rootStylesPath = path.join(repoRoot, "styles.css");
 const buildDir = path.join(repoRoot, "unity-webgl", "Build");
 const streamingAssetsDir = path.join(repoRoot, "unity-webgl", "StreamingAssets");
+const droidSansFallbackLicensePath = path.join(
+  repoRoot,
+  "unity",
+  "ReverySkyMap",
+  "Assets",
+  "Fonts",
+  "DroidSans",
+  "Apache-2.0.txt"
+);
+const droidSansFallbackRuntimeLicenseName = "DroidSansFallback-LICENSE.txt";
 
 const wrapperTemplate = [
   "/* ReverySky package mode: embedded-archive */",
@@ -215,6 +225,7 @@ async function stageCompactRuntime(tempRoot) {
   for (const relativeBuildFile of requiredBuildFiles) {
     await ensureFile(path.join(buildDir, relativeBuildFile), `unity-webgl/Build/${relativeBuildFile}`);
   }
+  await ensureFile(droidSansFallbackLicensePath, "Droid Sans Fallback license");
 
   await mkdir(path.join(runtimeRoot, "Build"), { recursive: true });
   await writeFile(path.join(runtimeRoot, "index.html"), createPlaceholderIndexHtml(), "utf8");
@@ -231,6 +242,10 @@ async function stageCompactRuntime(tempRoot) {
       path.join(runtimeRoot, "Build", relativeBuildFile)
     );
   }
+  await copyFile(
+    droidSansFallbackLicensePath,
+    path.join(runtimeRoot, droidSansFallbackRuntimeLicenseName)
+  );
 
   const hasStreamingAssets = await pathExists(streamingAssetsDir);
   if (hasStreamingAssets) {

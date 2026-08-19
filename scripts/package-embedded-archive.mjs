@@ -34,6 +34,16 @@ const rootStylesPath = path.join(repoRoot, "styles.css");
 const runtimeTemplatePath = path.join(repoRoot, "unity-webgl", "index.disk-runtime.template.html");
 const buildDir = path.join(repoRoot, "unity-webgl", "Build");
 const streamingAssetsDir = path.join(repoRoot, "unity-webgl", "StreamingAssets");
+const droidSansFallbackLicensePath = path.join(
+  repoRoot,
+  "unity",
+  "ReverySkyMap",
+  "Assets",
+  "Fonts",
+  "DroidSans",
+  "Apache-2.0.txt"
+);
+const droidSansFallbackRuntimeLicenseName = "DroidSansFallback-LICENSE.txt";
 
 function fail(message) {
   throw new Error(message);
@@ -147,7 +157,8 @@ async function stageCompactRuntime(tempRoot) {
     [path.join(buildDir, "runtime-entry.js"), "unity-webgl/Build/runtime-entry.js"],
     [path.join(buildDir, "runtime-core.js"), "unity-webgl/Build/runtime-core.js"],
     [path.join(buildDir, runtimeDataFile), `unity-webgl/Build/${runtimeDataFile}`],
-    [path.join(buildDir, runtimeCodeFile), `unity-webgl/Build/${runtimeCodeFile}`]
+    [path.join(buildDir, runtimeCodeFile), `unity-webgl/Build/${runtimeCodeFile}`],
+    [droidSansFallbackLicensePath, "Droid Sans Fallback license"]
   ]) {
     await ensureFile(relativePath, label);
   }
@@ -166,6 +177,10 @@ async function stageCompactRuntime(tempRoot) {
   await copyFile(path.join(buildDir, "runtime-core.js"), path.join(runtimeRoot, "Build", "runtime-core.js"));
   await copyFile(path.join(buildDir, runtimeDataFile), path.join(runtimeRoot, "Build", runtimeDataFile));
   await copyFile(path.join(buildDir, runtimeCodeFile), path.join(runtimeRoot, "Build", runtimeCodeFile));
+  await copyFile(
+    droidSansFallbackLicensePath,
+    path.join(runtimeRoot, droidSansFallbackRuntimeLicenseName)
+  );
 
   if (await pathExists(streamingAssetsDir)) {
     await copyDirectoryRecursive(streamingAssetsDir, path.join(runtimeRoot, "StreamingAssets"));

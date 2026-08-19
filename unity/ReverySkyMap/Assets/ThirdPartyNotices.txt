@@ -37,9 +37,19 @@ Bundled fonts:
    License:
    SIL Open Font License, Version 1.1.
 
+3. Droid Sans Fallback
+   Copyright (c) 2005-2008, The Android Open Source Project.
+
+   Used as a TextMesh Pro fallback font for Simplified Chinese / CJK
+   character rendering in map labels.
+
+   License:
+   Apache License, Version 2.0.
+
 Included notices:
 
 * Assets/TextMesh Pro/Fonts/OFL-1.1.txt
+* Assets/Fonts/DroidSans/Apache-2.0.txt
 
 These resources remain subject to their respective terms.
 

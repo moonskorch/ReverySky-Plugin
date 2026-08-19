@@ -43,7 +43,7 @@ The graph settings panel includes two visual controls:
 
 ### Character support
 
-Graph note titles support Latin text with accents, Cyrillic text, common symbols, and monochrome emoji.
+Graph note titles support Latin text with accents, Cyrillic text, Simplified Chinese, common symbols, and monochrome emoji.
 
 ![starscape-demo](docs/assets/reverysky-map-starscape-demo.webp)
 
