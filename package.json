@@ -1,6 +1,6 @@
 {
   "name": "reverysky-obsidian-plugin",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "private": true,
   "description": "ReverySky 3D Graph Obsidian plugin",
   "engines": {
