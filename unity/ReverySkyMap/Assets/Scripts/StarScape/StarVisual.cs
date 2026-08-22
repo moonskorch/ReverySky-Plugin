@@ -16,6 +16,9 @@ public class StarVisual : MonoBehaviour
   [SerializeField] private GameObject crystal;
 
   private Vector3 crystalCoreBaseScale = Vector3.one;
+  private bool titlePrepared;
+  private bool spherePrepared;
+  private bool crystalPrepared;
 
   private void Start()
   {
@@ -49,40 +52,64 @@ public class StarVisual : MonoBehaviour
 
   private void SetPlanetView()
   {
-    UpdateTitle();
+    PrepareTitle();
     ShowSphere(true);
     ShowCrystal(true);
   }
 
   private void SetPlainView()
   {
-    UpdateTitle();
+    PrepareTitle();
     ShowSphere(true);
     ShowCrystal(false);
   }
 
-  private void UpdateTitle()
+  private void PrepareTitle()
   {
+    if (titlePrepared)
+      return;
+
     nameText.text = star.Data.Name;
+    titlePrepared = true;
   }
 
   private void ShowSphere(bool show)
   {
-    sphere.SetActive(show);
-    if (!show) return;
+    if (show)
+      PrepareSphere();
 
-    var sphereMap = ResolveRandomSphereMaterial();
-    sphereRenderer.sharedMaterial = sphereMap?.material ?? sphereMaterialCatalog.defaultMaterial;
+    if (sphere.activeSelf != show)
+      sphere.SetActive(show);
   }
 
   private void ShowCrystal(bool show)
   {
-    crystal.SetActive(show);
-    if (!show) return;
+    if (show)
+      PrepareCrystal();
+
+    if (crystal.activeSelf != show)
+      crystal.SetActive(show);
+  }
+
+  private void PrepareSphere()
+  {
+    if (spherePrepared)
+      return;
+
+    var sphereMap = ResolveRandomSphereMaterial();
+    sphereRenderer.sharedMaterial = sphereMap?.material ?? sphereMaterialCatalog.defaultMaterial;
+    spherePrepared = true;
+  }
+
+  private void PrepareCrystal()
+  {
+    if (crystalPrepared)
+      return;
 
     var selectedCore = ResolveCrystalTypeByDirectLinkCount(star.Data.DirectLinkCount);
     var scaleMultiplier = ResolveCrystalScaleMultiplier(selectedCore);
     crystalCore.localScale = crystalCoreBaseScale * scaleMultiplier;
+    crystalPrepared = true;
   }
 
   private SphereType_Material ResolveRandomSphereMaterial()
