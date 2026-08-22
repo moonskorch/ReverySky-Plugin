@@ -670,8 +670,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
       var node = _nodes[i];
       if (node.TagNode != null)
         node.TagNode.gameObject.SetActive(showDetails);
-      if (node.Star != null)
-        node.Star.SetView(view);
     }
   }
 
@@ -1782,7 +1780,6 @@ public class CartographerEngineRecursiveHubsEngine : MonoBehaviour, ICartographe
 
       if (node.Star != null)
       {
-        node.Star.SetView(_currentView);
         _stars.Add(node.Star);
       }
 

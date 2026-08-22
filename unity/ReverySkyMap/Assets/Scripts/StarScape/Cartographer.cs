@@ -53,6 +53,7 @@ public class Cartographer : MonoBehaviour
   public MapGraphIndex GraphIndex { get; private set; } = MapGraphIndex.Empty;
 
   public event Action<MapLayoutMode> OnEngineChanged;
+  public event Action<ScapeView> OnViewChanged;
 
   private void Awake()
   {
@@ -77,7 +78,6 @@ public class Cartographer : MonoBehaviour
       changeViewControl.OnChangeScapeView += CycleView;
 
     UpdateViewButtonIcon();
-    ApplyLineVisibility();
     focusNode.CameraController.UpdateDateSlider();
   }
 
@@ -137,7 +137,6 @@ public class Cartographer : MonoBehaviour
     }
 
     SetCurrentView(CurrentView);
-    ApplyLineVisibility();
     MapRuntimeContext.ClearBuildingGraphRequestId();
 
     var engine = ResolveModeByNotesCount(noteCount, layoutPreference);
@@ -150,7 +149,7 @@ public class Cartographer : MonoBehaviour
     MapRuntimeContext.SetBuildingGraphRequestId(requestId);
     var stopwatch = System.Diagnostics.Stopwatch.StartNew();
     _activeEngine.BuildGraph(notes);
-    _activeEngine.ApplyView(CurrentView);
+    ApplyCurrentView();
 
     var warper = _activeEngine.ScapeWarper;
     warper?.ApplyEngineProfile(_activeEngine.EngineType);
@@ -211,8 +210,7 @@ public class Cartographer : MonoBehaviour
   {
     currentView = ScapeViewHelper.CycleView(CurrentView);
     UpdateViewButtonIcon();
-    _activeEngine?.ApplyView(CurrentView);
-    ApplyLineVisibility();
+    ApplyCurrentView();
   }
 
   public void FocusRuntimeNote(string noteId)
@@ -267,8 +265,10 @@ public class Cartographer : MonoBehaviour
     };
   }
 
-  private void ApplyLineVisibility()
+  private void ApplyCurrentView()
   {
+    _activeEngine?.ApplyView(CurrentView);
+    OnViewChanged?.Invoke(CurrentView);
     lineBuilder?.SetLinesVisible(CurrentView == ScapeView.Planets);
   }
 

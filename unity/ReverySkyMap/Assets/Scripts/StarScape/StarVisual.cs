@@ -16,6 +16,8 @@ public class StarVisual : MonoBehaviour
   [SerializeField] private GameObject crystal;
 
   private Vector3 crystalCoreBaseScale = Vector3.one;
+
+  // TODO Real laziness: do not set before visible
   private bool titlePrepared;
   private bool spherePrepared;
   private bool crystalPrepared;
@@ -23,18 +25,17 @@ public class StarVisual : MonoBehaviour
   private void Start()
   {
     crystalCoreBaseScale = crystalCore.localScale;
-    star.OnDataChanged += UpdateVisual;
-    UpdateVisual();
+    Cartographer.I.OnViewChanged += ApplyView;
+    ApplyView(Cartographer.I.CurrentView);
   }
 
-  private void OnDisable()
+  private void OnDestroy()
   {
-    star.OnDataChanged -= UpdateVisual;
+    Cartographer.I.OnViewChanged -= ApplyView;
   }
 
-  private void UpdateVisual()
+  private void ApplyView(ScapeView view)
   {
-    var view = star.Data.ScapeView;
     switch (view)
     {
       case ScapeView.Planets:

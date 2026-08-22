@@ -317,8 +317,6 @@ public class CartographerForcesEngine : MonoBehaviour, ICartographerEngine
     {
       if (_nodes[i].tagNode != null)
         _nodes[i].tagNode.gameObject.SetActive(showTags);
-      if (_nodes[i].star != null)
-        _nodes[i].star.SetView(view);
     }
   }
 
