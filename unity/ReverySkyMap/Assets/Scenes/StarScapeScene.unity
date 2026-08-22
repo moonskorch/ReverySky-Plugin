@@ -2552,10 +2552,11 @@ MonoBehaviour:
   injectSampleData: 0
   connectionModel: 2
   islands: 2
-  noteCount: 250
+  noteCount: 2500
   tagPoolSize: 50
   dateSpanDays: 365
   maxTagsPerNote: 4
+  maxBuildingsPerNote: 2
   linkDensity: 32
 --- !u!114 &1780593171
 MonoBehaviour:

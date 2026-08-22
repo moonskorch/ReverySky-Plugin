@@ -27,6 +27,7 @@ public struct SampleGraphSettings
   public int TagPoolSize;
   public int DateSpanDays;
   public int MaxTagsPerNote;
+  public int MaxBuildingsPerNote;
   public int LinkDensity;
 }
 
@@ -65,6 +66,8 @@ public class SampleDataGenerator : MonoBehaviour
   [SerializeField] private int dateSpanDays = 720;
   [Range(0, 32)]
   [SerializeField] private int maxTagsPerNote = 3;
+  [Range(0, 32)]
+  [SerializeField] private int maxBuildingsPerNote = 0;
   [Range(0, 100)]
   [SerializeField] private int linkDensity = 1;
 
@@ -81,6 +84,7 @@ public class SampleDataGenerator : MonoBehaviour
       TagPoolSize = tagPoolSize,
       DateSpanDays = dateSpanDays,
       MaxTagsPerNote = maxTagsPerNote,
+      MaxBuildingsPerNote = maxBuildingsPerNote,
       LinkDensity = linkDensity
     };
 
@@ -113,6 +117,7 @@ public class SampleDataGenerator : MonoBehaviour
     settings.TagPoolSize = Mathf.Clamp(settings.TagPoolSize, 0, 256);
     settings.DateSpanDays = Mathf.Clamp(settings.DateSpanDays, 1, 3650);
     settings.MaxTagsPerNote = Mathf.Clamp(settings.MaxTagsPerNote, 0, 32);
+    settings.MaxBuildingsPerNote = Mathf.Clamp(settings.MaxBuildingsPerNote, 0, 32);
     settings.LinkDensity = Mathf.Clamp(settings.LinkDensity, 0, 100);
     return settings;
   }
@@ -128,6 +133,7 @@ public class SampleDataGenerator : MonoBehaviour
 
     var baseRng = new System.Random(ComputeSeed(anchorDate, settings.NoteCount, settings.DateSpanDays, 17));
     var tagRng = new System.Random(ComputeSeed(anchorDate, settings.NoteCount, settings.TagPoolSize, settings.MaxTagsPerNote, 31));
+    var buildingRng = new System.Random(ComputeSeed(anchorDate, settings.NoteCount, settings.MaxBuildingsPerNote, 47));
     int clusterCount = GetClusterCount(settings);
     int[] clusterStarts = null;
     int[] clusterSizes = null;
@@ -156,7 +162,8 @@ public class SampleDataGenerator : MonoBehaviour
         Length = BuildNoteLength(anchorDate, i, settings),
         CrystalType = CrystalType.Unknown,
         SphereType = SphereType.Unknown,
-        TagIds = new List<int>()
+        TagIds = new List<int>(),
+        Buildings = new List<BuildingData>()
       };
 
       IReadOnlyList<int> tagPool = tagIds;
@@ -167,6 +174,7 @@ public class SampleDataGenerator : MonoBehaviour
       }
 
       AssignTags(note, tagPool, GetEffectiveMaxTagsPerNote(settings), tagRng);
+      AssignBuildings(note, settings.MaxBuildingsPerNote, buildingRng);
       notes.Add(note);
     }
 
@@ -226,6 +234,28 @@ public class SampleDataGenerator : MonoBehaviour
     }
 
     note.TagIds = orderedSelections;
+  }
+
+  private static void AssignBuildings(
+    NoteData note,
+    int maxBuildingsPerNote,
+    System.Random rng)
+  {
+    note.Buildings = new List<BuildingData>();
+    if (maxBuildingsPerNote <= 0)
+      return;
+
+    int buildingCount = rng.Next(1, maxBuildingsPerNote + 1);
+    var buildings = new List<BuildingData>(buildingCount);
+    for (int i = 0; i < buildingCount; i++)
+    {
+      buildings.Add(new BuildingData
+      {
+        Name = $"Building {i + 1}"
+      });
+    }
+
+    note.Buildings = buildings;
   }
 
   private static List<MapRuntimeContext.RuntimeNoteLink> BuildLinks(

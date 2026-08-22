@@ -17,6 +17,7 @@ public class SampleDataGeneratorEditModeTests
       TagPoolSize = 8,
       DateSpanDays = 720,
       MaxTagsPerNote = 3,
+      MaxBuildingsPerNote = 4,
       LinkDensity = 5
     };
 
@@ -135,6 +136,31 @@ public class SampleDataGeneratorEditModeTests
   }
 
   [Test]
+  public void GenerateGraph_WithBuildingsEnabled_CreatesPlaceholderBuildings()
+  {
+    var settings = new SampleGraphSettings
+    {
+      ConnectionModel = SampleConnectionModel.Random,
+      NoteCount = 25,
+      TagPoolSize = 0,
+      DateSpanDays = 720,
+      MaxTagsPerNote = 0,
+      MaxBuildingsPerNote = 4,
+      LinkDensity = 0
+    };
+
+    SampleGraphData result = SampleDataGenerator.GenerateGraph(settings, AnchorDate);
+
+    foreach (NoteData note in result.Notes)
+    {
+      Assert.That(note.Buildings.Count, Is.GreaterThanOrEqualTo(1));
+      Assert.That(note.Buildings.Count, Is.LessThanOrEqualTo(4));
+      Assert.That(note.Buildings.All(building => !string.IsNullOrWhiteSpace(building.Name)), Is.True);
+      Assert.That(note.Buildings.All(building => building.Name.StartsWith("Building ", StringComparison.Ordinal)), Is.True);
+    }
+  }
+
+  [Test]
   public void GenerateGraph_ClustersScenario_KeepsLinksAndTagsLocal()
   {
     var settings = new SampleGraphSettings
@@ -204,6 +230,15 @@ public class SampleDataGeneratorEditModeTests
       Assert.That(actualTags[i].Value, Is.EqualTo(expectedTags[i].Value), $"Tag name mismatch at index {i}");
     }
 
+    for (int i = 0; i < expected.Notes.Count; i++)
+    {
+      NoteData left = expected.Notes[i];
+      NoteData right = actual.Notes[i];
+      Assert.That(right.Buildings.Count, Is.EqualTo(left.Buildings.Count), $"Building count mismatch at index {i}");
+      for (int j = 0; j < left.Buildings.Count; j++)
+        Assert.That(right.Buildings[j].Name, Is.EqualTo(left.Buildings[j].Name), $"Building name mismatch at note {i}, building {j}");
+    }
+
     Assert.That(actual.Links.Count, Is.EqualTo(expected.Links.Count));
     for (int i = 0; i < expected.Links.Count; i++)
     {
@@ -230,6 +265,8 @@ public class SampleDataGeneratorEditModeTests
       Assert.That(note.Length, Is.GreaterThan(0), $"Note length must be positive: {note.Id}");
       foreach (int tagId in note.TagIds)
         Assert.That(tagIds.Contains(tagId), Is.True, $"Unknown tag id: {tagId}");
+      foreach (BuildingData building in note.Buildings)
+        Assert.That(string.IsNullOrWhiteSpace(building?.Name), Is.False, $"Building name must be set for note {note.Id}");
     }
 
     foreach (MapRuntimeContext.RuntimeNoteLink link in result.Links)
