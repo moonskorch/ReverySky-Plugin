@@ -16,6 +16,7 @@ public class NoteData
   public CrystalType CrystalType { get; set; } = CrystalType.Unknown;
   public SphereType SphereType { get; set; } = SphereType.Unknown;
   public List<int> TagIds { get; set; } = new();
+  public List<BuildingData> Buildings { get; set; } = new();
 
   public ScapeView ScapeView { get; set; } = ScapeView.Planets;
 }

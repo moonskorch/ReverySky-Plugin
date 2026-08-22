@@ -10,10 +10,12 @@ public class StarVisual : MonoBehaviour
   [SerializeField] private Transform crystalCore;
   [SerializeField] private SphereMaterialCatalogSO sphereMaterialCatalog;
   [SerializeField] private CrystalTypeScaleMapperSO crystalScaleMapper;
+  [SerializeField] private BuildingCallout buildingPrefab;
 
   [Header("Switched sections")]
   [SerializeField] private GameObject sphere;
   [SerializeField] private GameObject crystal;
+  [SerializeField] private GameObject buildings;
 
   private Vector3 crystalCoreBaseScale = Vector3.one;
 
@@ -40,6 +42,9 @@ public class StarVisual : MonoBehaviour
       case ScapeView.Plain:
         SetPlainView();
         break;
+      case ScapeView.Buildings:
+        SetBuildingsView();
+        break;
       default:
         SetPlanetView();
         Debug.LogWarning($"[StarVisual] Unknown view {view}, fallback to Planets.");
@@ -52,6 +57,7 @@ public class StarVisual : MonoBehaviour
     UpdateTitle();
     ShowSphere(true);
     ShowCrystal(true);
+    ShowBuildings(false);
   }
 
   private void SetPlainView()
@@ -59,6 +65,15 @@ public class StarVisual : MonoBehaviour
     UpdateTitle();
     ShowSphere(true);
     ShowCrystal(false);
+    ShowBuildings(false);
+  }
+
+  private void SetBuildingsView()
+  {
+    UpdateTitle();
+    ShowSphere(true);
+    ShowCrystal(false);
+    ShowBuildings(true);
   }
 
   private void UpdateTitle()
@@ -169,5 +184,55 @@ public class StarVisual : MonoBehaviour
     }
 
     return crystalScaleMapper.defaultScale;
+  }
+
+  private void ShowBuildings(bool show)
+  {
+    ClearBuildingCallouts();
+
+    if (!show)
+    {
+      buildings.SetActive(false);
+      return;
+    }
+
+    var activeBuildings = star.Data.Buildings;
+
+    if (activeBuildings.Count == 0)
+    {
+      buildings.SetActive(false);
+      return;
+    }
+
+    buildings.SetActive(true);
+
+    float angleStep = Mathf.PI * 2f / activeBuildings.Count;
+    float sphereRadius = 0.5f * sphereRenderer.transform.localScale.x;
+
+    for (int i = 0; i < activeBuildings.Count; i++)
+    {
+      float baseAngle = angleStep * i;
+      float offset = Rng.Range(-angleStep * 0.25f, angleStep * 0.25f);
+      float angle = baseAngle + offset;
+
+      var callout = Instantiate(
+          buildingPrefab,
+          buildings.transform.position,   // center of the sphere
+          Quaternion.identity,
+          buildings.transform);           // all the buildings' container
+
+      callout.transform.localPosition = Vector3.zero; // root remains at the parent's center
+      callout.Init(activeBuildings[i], sphereRadius, angle);
+    }
+  }
+
+  private void ClearBuildingCallouts()
+  {
+    var parent = buildings.transform;
+    for (int i = parent.childCount - 1; i >= 0; i--)
+    {
+      var child = parent.GetChild(i);
+      Destroy(child.gameObject);
+    }
   }
 }

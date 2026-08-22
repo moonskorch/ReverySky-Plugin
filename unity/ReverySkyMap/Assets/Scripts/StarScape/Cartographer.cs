@@ -25,6 +25,7 @@ public class Cartographer : MonoBehaviour
   [SerializeField] private Image viewButtonImage;
   [SerializeField] private Sprite viewIconPlanets;
   [SerializeField] private Sprite viewIconSimple;
+  [SerializeField] private Sprite viewIconBuildings;
 
   [Header("Notification")]
   [SerializeField] private Notification notification;
@@ -263,6 +264,7 @@ public class Cartographer : MonoBehaviour
     {
       ScapeView.Planets => viewIconPlanets,
       ScapeView.Plain => viewIconSimple,
+      ScapeView.Buildings => viewIconBuildings,
       _ => viewButtonImage.sprite
     };
   }

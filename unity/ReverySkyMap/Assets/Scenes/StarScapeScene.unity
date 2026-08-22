@@ -2513,6 +2513,7 @@ MonoBehaviour:
   viewButtonImage: {fileID: 1542272346}
   viewIconPlanets: {fileID: 21300000, guid: a23efd95330d88e4aba3ca87f60ffd5f, type: 3}
   viewIconSimple: {fileID: 21300000, guid: e619271fbe5ff854fa1c4e701befe7c5, type: 3}
+  viewIconBuildings: {fileID: 21300000, guid: 04b501d1d3a427c4f99954a24c43def1, type: 3}
   notification: {fileID: 1893426638}
   sampleDataGenerator: {fileID: 1780593170}
   lineBuilder: {fileID: 1217411434}
