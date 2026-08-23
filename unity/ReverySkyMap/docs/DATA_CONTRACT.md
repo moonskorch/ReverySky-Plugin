@@ -62,7 +62,7 @@ Unity-side behavior:
 - Applying `runtime:settings` must not call `MapRuntimeContext.SetNotes`, rebuild graph data, reset focus, or recreate the iframe.
 
 ## Note Update Handling
-`note:update` carries a single note identity and its full current building list. Current Unity behavior only logs the request; later runtime slices may update the rendered note object.
+`note:update` carries a single note identity and its full current building list. Unity applies it as a targeted update to the existing runtime note and its rendered star.
 
 Parent -> runtime:
 
@@ -82,7 +82,9 @@ Unity-side behavior:
 - The iframe JavaScript wrapper forwards `note:update` to `ObsidianBridge.OnNoteUpdate(string json)` after Unity is ready.
 - `ObsidianBridge.OnNoteUpdate` rejects wrong `protocolVersion` and wrong `type`.
 - `payload.buildings` is the full current list; an empty array means all buildings were removed.
-- Current behavior logs the request and does not call `MapRuntimeContext.SetNotes`, rebuild graph data, reset focus, or mutate rendered objects.
+- `payload.id` and `payload.path` must match an existing runtime note. Unknown notes or path mismatches are logged and ignored.
+- Accepted updates replace only `NoteData.Buildings`, then refresh the current star's building callouts when that star exists in the active `MapGraphIndex`.
+- Accepted updates must not call `MapRuntimeContext.SetNotes`, rebuild graph data, reset focus, change links, or change note placement.
 
 ## Graph Ready Handling
 `graph:ready` is Unity's completion acknowledgement for one parent `graph:set`.

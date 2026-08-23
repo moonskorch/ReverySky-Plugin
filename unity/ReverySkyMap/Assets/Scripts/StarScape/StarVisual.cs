@@ -251,6 +251,26 @@ public class StarVisual : MonoBehaviour
       buildings.SetActive(show);
   }
 
+  public void RefreshBuildings()
+  {
+    ClearBuildings();
+    buildingsPrepared = false;
+
+    if (currentView == ScapeView.Buildings)
+      ShowBuildings(visibilitySource.IsVisible);
+  }
+
+  private void ClearBuildings()
+  {
+    for (int i = 0; i < buildingCallouts.Count; i++)
+    {
+      if (buildingCallouts[i] != null)
+        Destroy(buildingCallouts[i].gameObject);
+    }
+
+    buildingCallouts.Clear();
+  }
+
   private void SetBuildingLabels(bool visible)
   {
     for (int i = 0; i < buildingCallouts.Count; i++)

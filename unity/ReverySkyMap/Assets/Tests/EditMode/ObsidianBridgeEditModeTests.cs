@@ -103,6 +103,80 @@ public class ObsidianBridgeEditModeTests
   }
 
   [Test]
+  public void OnNoteUpdate_ExistingNote_ReplacesBuildingsWithoutGraphChange()
+  {
+    bridge.OnGraphSet(TestPayloads.BuildingsPayload);
+    int notesVersion = MapRuntimeContext.NotesVersion;
+    var changedNoteIds = new List<string>();
+    int notesChangedCount = 0;
+
+    void HandleNoteBuildingsChanged(string noteId) => changedNoteIds.Add(noteId);
+    void HandleNotesChanged(string requestId) => notesChangedCount++;
+
+    MapRuntimeContext.OnNoteBuildingsChanged += HandleNoteBuildingsChanged;
+    MapRuntimeContext.OnNotesChanged += HandleNotesChanged;
+    try
+    {
+      bridge.OnNoteUpdate(TestPayloads.NoteUpdateBuildingsPayload);
+
+      NoteData noteWithBuildings = MapRuntimeContext.FindNoteById("b1");
+      Assert.That(noteWithBuildings.Buildings, Has.Count.EqualTo(2));
+      Assert.That(noteWithBuildings.Buildings[0].Name, Is.EqualTo("Tower"));
+      Assert.That(noteWithBuildings.Buildings[1].Name, Is.EqualTo("Library"));
+      Assert.That(changedNoteIds, Is.EqualTo(new List<string> { "b1" }));
+      Assert.That(notesChangedCount, Is.EqualTo(0));
+      Assert.That(MapRuntimeContext.NotesVersion, Is.EqualTo(notesVersion));
+    }
+    finally
+    {
+      MapRuntimeContext.OnNoteBuildingsChanged -= HandleNoteBuildingsChanged;
+      MapRuntimeContext.OnNotesChanged -= HandleNotesChanged;
+    }
+  }
+
+  [Test]
+  public void OnNoteUpdate_EmptyBuildings_ClearsBuildings()
+  {
+    bridge.OnGraphSet(TestPayloads.BuildingsPayload);
+
+    bridge.OnNoteUpdate(TestPayloads.NoteUpdateEmptyBuildingsPayload);
+
+    Assert.That(MapRuntimeContext.FindNoteById("b1")?.Buildings, Is.Empty);
+  }
+
+  [Test]
+  public void OnNoteUpdate_UnknownNoteOrPathMismatch_DoesNotMutate()
+  {
+    bridge.OnGraphSet(TestPayloads.BuildingsPayload);
+    var changedNoteIds = new List<string>();
+    void HandleNoteBuildingsChanged(string noteId) => changedNoteIds.Add(noteId);
+
+    MapRuntimeContext.OnNoteBuildingsChanged += HandleNoteBuildingsChanged;
+    try
+    {
+      LogAssert.Expect(
+        LogType.Log,
+        new Regex("\\[MapRuntimeContext\\] Ignoring note buildings update due to path mismatch\\. id=b1, expectedPath=buildings/b1\\.md, receivedPath=other/b1\\.md"));
+      bridge.OnNoteUpdate(TestPayloads.NoteUpdatePathMismatchPayload);
+
+      LogAssert.Expect(
+        LogType.Log,
+        new Regex("\\[MapRuntimeContext\\] Ignoring note buildings update for unknown note\\. id=missing, path=buildings/missing\\.md"));
+      bridge.OnNoteUpdate(TestPayloads.NoteUpdateUnknownNotePayload);
+
+      NoteData noteWithBuildings = MapRuntimeContext.FindNoteById("b1");
+      Assert.That(noteWithBuildings.Buildings, Has.Count.EqualTo(2));
+      Assert.That(noteWithBuildings.Buildings[0].Name, Is.EqualTo("Observatory"));
+      Assert.That(noteWithBuildings.Buildings[1].Name, Is.EqualTo("Archive"));
+      Assert.That(changedNoteIds, Is.Empty);
+    }
+    finally
+    {
+      MapRuntimeContext.OnNoteBuildingsChanged -= HandleNoteBuildingsChanged;
+    }
+  }
+
+  [Test]
   public void OnGraphSet_TitleAndDateFallbacks_AreMappedPredictably()
   {
     bridge.OnGraphSet(TestPayloads.FallbacksPayload);
@@ -1109,6 +1183,18 @@ public class ObsidianBridgeEditModeTests
       "{\"id\":\"b1\",\"path\":\"buildings/b1.md\",\"title\":\"B1\",\"tags\":[],\"size\":1,\"buildings\":[\" Observatory \",\"\",\"Archive\"]}," +
       "{\"id\":\"b2\",\"path\":\"buildings/b2.md\",\"title\":\"B2\",\"tags\":[],\"size\":1}" +
       "],\"links\":[]}}";
+
+    public const string NoteUpdateBuildingsPayload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"note:update\",\"payload\":{\"id\":\"b1\",\"path\":\"buildings/b1.md\",\"buildings\":[\" Tower \",\"\",\"Library\"]}}";
+
+    public const string NoteUpdateEmptyBuildingsPayload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"note:update\",\"payload\":{\"id\":\"b1\",\"path\":\"buildings/b1.md\",\"buildings\":[]}}";
+
+    public const string NoteUpdatePathMismatchPayload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"note:update\",\"payload\":{\"id\":\"b1\",\"path\":\"other/b1.md\",\"buildings\":[\"Tower\"]}}";
+
+    public const string NoteUpdateUnknownNotePayload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"note:update\",\"payload\":{\"id\":\"missing\",\"path\":\"buildings/missing.md\",\"buildings\":[\"Tower\"]}}";
 
     public const string RepeatApplyPayloadB =
       "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"notes\":[" +

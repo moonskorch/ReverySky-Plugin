@@ -35,6 +35,7 @@ public static class MapRuntimeContext
   public static event Action<string> OnTagActivateRequested;
   public static event Action<string> OnGraphReady;
   public static event Action<string> OnNotesChanged;
+  public static event Action<string> OnNoteBuildingsChanged;
 
   public static bool HasRuntimeNotes => Notes != null && Notes.Count > 0;
 
@@ -90,6 +91,32 @@ public static class MapRuntimeContext
         return note;
     }
     return null;
+  }
+
+  public static bool TryUpdateNoteBuildings(
+    string noteId,
+    string notePath,
+    List<BuildingData> buildings)
+  {
+    if (string.IsNullOrWhiteSpace(noteId) || string.IsNullOrWhiteSpace(notePath))
+      return false;
+
+    NoteData note = FindNoteById(noteId);
+    if (note == null)
+    {
+      Debug.Log($"[MapRuntimeContext] Ignoring note buildings update for unknown note. id={noteId}, path={notePath}");
+      return false;
+    }
+
+    if (!string.Equals(note.Path ?? string.Empty, notePath, StringComparison.Ordinal))
+    {
+      Debug.Log($"[MapRuntimeContext] Ignoring note buildings update due to path mismatch. id={noteId}, expectedPath={note.Path ?? string.Empty}, receivedPath={notePath}");
+      return false;
+    }
+
+    note.Buildings = buildings ?? new List<BuildingData>();
+    OnNoteBuildingsChanged?.Invoke(note.Id ?? string.Empty);
+    return true;
   }
 
   public static void RequestOpenNote(NoteData note)

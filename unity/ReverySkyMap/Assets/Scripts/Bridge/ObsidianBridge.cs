@@ -249,9 +249,13 @@ public class ObsidianBridge : MonoBehaviour
       return;
     }
 
-    var buildings = envelope.payload.buildings ?? Array.Empty<string>();
-    Debug.Log(
-      $"[ObsidianBridge] note:update requested. id={envelope.payload.id ?? string.Empty}, path={envelope.payload.path ?? string.Empty}, buildings=[{string.Join(", ", buildings)}]");
+    var payload = envelope.payload;
+    var noteId = payload.id ?? string.Empty;
+    var notePath = payload.path ?? string.Empty;
+    if (string.IsNullOrWhiteSpace(noteId) || string.IsNullOrWhiteSpace(notePath))
+      return;
+
+    MapRuntimeContext.TryUpdateNoteBuildings(noteId, notePath, MapBuildings(payload.buildings));
   }
 
   public void OnRuntimeSettings(string json)

@@ -25,7 +25,7 @@ Obsidian plugin
   - Main code location: `Assets/Scenes/StarScapeScene.unity`
   - Important dependencies: `GameInput`, `CameraOrbitalController`, `FocusNode`, `Cartographer`, `CartographerForcesEngine`, `Cartographer25DEngine`, `CartographerEngineRecursiveHubsEngine`, `ScapeCameraWarper`, `LineBuilder`, `CullingManager`, `FocusHighlighter`, `ChangeViewControl`, `RotateCameraUI`, `RotateHoldButton`, `Notification`
 - Bridge and runtime state
-  - Responsibility: validates inbound bridge envelopes, converts graph payloads into runtime models, applies runtime settings, stores the normalized source graph, derives direct note-neighbor counts, and raises outbound events for parent bridge messages.
+  - Responsibility: validates inbound bridge envelopes, converts graph payloads into runtime models, applies targeted note building updates and runtime settings, stores the normalized source graph, derives direct note-neighbor counts, and raises outbound events for parent bridge messages.
   - Main code location: `Assets/Scripts/Bridge/ObsidianBridge.cs`, `Assets/Scripts/Bridge/MapRuntimeContext.cs`, `Assets/Scripts/Models/BridgeEnvelopeModels.cs`, `Assets/Scripts/Models/BridgePayloadModels.cs`, `Assets/Scripts/Models/MapFrameRateMode.cs`, `Assets/Scripts/Models/NoteData.cs`
   - Important dependencies: `Cartographer`, `MapRuntimeContext.OnNotesChanged`, `MapRuntimeContext.OnOpenNoteRequested`, `MapRuntimeContext.OnTagActivateRequested`, `MapRuntimeContext.OnGraphReady`
 - Graph orchestration
@@ -97,6 +97,8 @@ Obsidian plugin
 8. `Cartographer.FocusRuntimeNote()` resolves the star through `GraphIndex.TryGetStar(noteId, out star)` and stores `noteId` in `MapRuntimeContext.PendingFocusNoteId` when the current visual graph has not materialized that star.
 9. The next non-transient `HandleEngineNodesChanged(...)` call rebuilds `GraphIndex` and lets `ApplyGraphFocus()` consume pending focus before falling back to restore focus.
 10. `FocusHighlighter.SetFocus(...)` reads `MapGraphIndex.GetNeighborIds(...)`, marks the focused node as `Focused`, marks adjacent nodes as `Linked`, and calls `LineBuilder.ApplyHighlight(...)` so incident edges restyle together with the labels.
+11. Incoming `note:update` messages call `ObsidianBridge.OnNoteUpdate()`, which replaces the matching runtime note's building list through `MapRuntimeContext.TryUpdateNoteBuildings(...)`.
+12. `Cartographer.HandleNoteBuildingsChanged(...)` resolves the current star through `GraphIndex.TryGetStar(...)` and asks `StarVisual.RefreshBuildings()` to recreate only that star's building callouts.
 
 ### 4. Runtime frame-rate settings
 
@@ -141,7 +143,7 @@ Obsidian plugin
 
 - `ObsidianBridge`
   - Responsibility: owns bridge validation, graph payload normalization, runtime settings application, the shutdown guard, and WebGL callbacks back into the parent plugin.
-  - Code anchor: `Assets/Scripts/Bridge/ObsidianBridge.cs::OnGraphSet`, `OnNoteFocus`, `OnRuntimeSettings`, `OnRuntimeShutdown`, `HandleOpenNoteRequested`, `HandleGraphReadyRequested`
+  - Code anchor: `Assets/Scripts/Bridge/ObsidianBridge.cs::OnGraphSet`, `OnNoteFocus`, `OnNoteUpdate`, `OnRuntimeSettings`, `OnRuntimeShutdown`, `HandleOpenNoteRequested`, `HandleGraphReadyRequested`
   - Entry point: bridge messages from the parent runtime
   - Calls / sends to: `MapRuntimeContext`, `Cartographer`, `ReverySkyBridgePostNoteOpen`, `ReverySkyBridgePostGraphReady`
 - `MapRuntimeContext`
@@ -295,7 +297,7 @@ Obsidian plugin
 - `GameInput` treats UI hits as blocked input and only forwards gestures that originate on the map.
 - Bridge contract rules that matter locally:
   - `protocolVersion` must match `2.0.0`.
-  - Accepted parent-to-Unity message types are `graph:set`, `note:focus`, `runtime:settings`, and `runtime:shutdown`.
+  - Accepted parent-to-Unity message types are `graph:set`, `note:focus`, `note:update`, `runtime:settings`, and `runtime:shutdown`.
   - Accepted Unity-to-parent interaction events include `note:open` and `tag:activate`; `tag:activate` carries `{ tag: string }`.
   - `graph:set` payloads are already filtered by the parent plugin; Unity does not own vault query logic.
   - `graph:set` carries only the filtered graph payload; focus is handled separately through `note:focus`, and frame-rate settings are handled separately through `runtime:settings`.

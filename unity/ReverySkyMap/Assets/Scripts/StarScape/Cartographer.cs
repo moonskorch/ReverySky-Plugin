@@ -75,6 +75,7 @@ public class Cartographer : MonoBehaviour
     RebuildGraph(MapRuntimeContext.MapLayoutPreference, MapRuntimeContext.LatestGraphRequestId);
 
     MapRuntimeContext.OnNotesChanged += HandleRuntimeNotesChanged;
+    MapRuntimeContext.OnNoteBuildingsChanged += HandleNoteBuildingsChanged;
     if (changeViewControl != null)
       changeViewControl.OnChangeScapeView += CycleView;
 
@@ -85,6 +86,7 @@ public class Cartographer : MonoBehaviour
   private void OnDestroy()
   {
     MapRuntimeContext.OnNotesChanged -= HandleRuntimeNotesChanged;
+    MapRuntimeContext.OnNoteBuildingsChanged -= HandleNoteBuildingsChanged;
     if (changeViewControl != null)
       changeViewControl.OnChangeScapeView -= CycleView;
 
@@ -277,6 +279,15 @@ public class Cartographer : MonoBehaviour
   private void HandleRuntimeNotesChanged(string requestId)
   {
     RebuildGraph(MapRuntimeContext.MapLayoutPreference, requestId);
+  }
+
+  private void HandleNoteBuildingsChanged(string noteId)
+  {
+    if (string.IsNullOrWhiteSpace(noteId) || !GraphIndex.TryGetStar(noteId, out var star))
+      return;
+
+    var visual = star.GetComponentInChildren<StarVisual>(true);
+    visual?.RefreshBuildings();
   }
 
   private void BindActiveWarper(ScapeCameraWarper warper)

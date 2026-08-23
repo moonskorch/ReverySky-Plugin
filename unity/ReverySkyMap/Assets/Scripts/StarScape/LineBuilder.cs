@@ -695,12 +695,7 @@ public sealed class LineBuilder : MonoBehaviour, ICullingConsumer
     if (line == null)
       return;
 
-    if (Application.isPlaying)
-      Destroy(line.gameObject);
-    else
-      // EditMode tests exercise pool disposal outside Play Mode, where Destroy
-      // would only log and defer cleanup.
-      DestroyImmediate(line.gameObject);
+    Destroy(line.gameObject);
   }
 
   private void DisposeLinePool()
