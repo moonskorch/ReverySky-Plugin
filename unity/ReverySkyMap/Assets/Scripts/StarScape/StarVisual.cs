@@ -19,10 +19,10 @@ public class StarVisual : MonoBehaviour
 
   private Vector3 crystalCoreBaseScale = Vector3.one;
 
-  // TODO Real laziness: do not set before visible
   private bool titlePrepared;
   private bool spherePrepared;
   private bool crystalPrepared;
+  private bool buildingsPrepared;
 
   private void Start()
   {
@@ -216,23 +216,24 @@ public class StarVisual : MonoBehaviour
 
   private void ShowBuildings(bool show)
   {
-    ClearBuildingCallouts();
+    if (show)
+      PrepareBuildings();
 
-    if (!show)
-    {
-      buildings.SetActive(false);
+    if (buildings.activeSelf != show)
+      buildings.SetActive(show);
+  }
+
+  private void PrepareBuildings()
+  {
+    if (buildingsPrepared)
       return;
-    }
 
     var activeBuildings = star.Data.Buildings;
-
     if (activeBuildings.Count == 0)
     {
-      buildings.SetActive(false);
+      buildingsPrepared = true;
       return;
     }
-
-    buildings.SetActive(true);
 
     float angleStep = Mathf.PI * 2f / activeBuildings.Count;
     float sphereRadius = 0.5f * sphereRenderer.transform.localScale.x;
@@ -252,15 +253,7 @@ public class StarVisual : MonoBehaviour
       callout.transform.localPosition = Vector3.zero; // root remains at the parent's center
       callout.Init(activeBuildings[i], sphereRadius, angle);
     }
-  }
 
-  private void ClearBuildingCallouts()
-  {
-    var parent = buildings.transform;
-    for (int i = parent.childCount - 1; i >= 0; i--)
-    {
-      var child = parent.GetChild(i);
-      Destroy(child.gameObject);
-    }
+    buildingsPrepared = true;
   }
 }
