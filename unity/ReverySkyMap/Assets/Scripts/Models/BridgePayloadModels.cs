@@ -15,6 +15,7 @@ public class BridgeGraphNote
   public string path;
   public string title;
   public string[] tags;
+  public string[] buildings;
   public string date;
   public int size;
 }

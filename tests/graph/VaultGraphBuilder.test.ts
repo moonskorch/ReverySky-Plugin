@@ -83,6 +83,77 @@ describe("VaultGraphBuilder", () => {
     });
   });
 
+  it("maps string frontmatter landmarks to optional building names", () => {
+    const file = makeFile("Folder/Landmarks.md", {
+      ctime: Date.UTC(2026, 0, 1),
+      mtime: Date.UTC(2026, 0, 2),
+      size: 64
+    });
+
+    const app = {
+      vault: {
+        getMarkdownFiles: () => [file]
+      },
+      metadataCache: {
+        getFileCache: () => ({
+          frontmatter: {
+            landmarks: [" Observatory ", 42, "", "Archive", null]
+          }
+        }),
+        resolvedLinks: {}
+      }
+    };
+
+    const payload = VaultGraphBuilder.build(app as never);
+    expect(payload.notes[0]?.buildings).toEqual(["Observatory", "Archive"]);
+  });
+
+  it.each([
+    {
+      name: "missing landmarks",
+      frontmatter: {}
+    },
+    {
+      name: "non-array landmarks",
+      frontmatter: {
+        landmarks: "Observatory"
+      }
+    },
+    {
+      name: "empty landmarks array",
+      frontmatter: {
+        landmarks: []
+      }
+    },
+    {
+      name: "landmarks without strings",
+      frontmatter: {
+        landmarks: [1, null, false]
+      }
+    }
+  ])("omits buildings for $name", ({ frontmatter }) => {
+    const file = makeFile("Folder/NoBuildings.md", {
+      ctime: Date.UTC(2026, 0, 1),
+      mtime: Date.UTC(2026, 0, 2),
+      size: 64
+    });
+
+    const app = {
+      vault: {
+        getMarkdownFiles: () => [file]
+      },
+      metadataCache: {
+        getFileCache: () => ({
+          frontmatter
+        }),
+        resolvedLinks: {}
+      }
+    };
+
+    const payload = VaultGraphBuilder.build(app as never);
+    expect(payload.notes[0]).not.toHaveProperty("buildings");
+  });
+
   it("filters files with empty normalized paths instead of emitting invalid notes", () => {
     const validFile = makeFile("Folder/Valid.md", {
       ctime: Date.UTC(2026, 0, 1),

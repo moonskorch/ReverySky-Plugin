@@ -111,6 +111,7 @@ export type GraphNoteNode = {
   path: string;
   title: string;
   tags: string[];
+  buildings?: string[];
   date?: string;
   size: number;
 };

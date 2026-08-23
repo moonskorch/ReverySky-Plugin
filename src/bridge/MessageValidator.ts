@@ -58,6 +58,20 @@ export class MessageValidator {
         if (!this.isNonEmptyString(note.path)) errors.push(`payload.notes[${i}].path must be a non-empty string`);
         if (!this.isNonEmptyString(note.title)) errors.push(`payload.notes[${i}].title must be a non-empty string`);
         if (!Array.isArray(note.tags)) errors.push(`payload.notes[${i}].tags must be an array`);
+        if (note.buildings !== undefined) {
+          if (!Array.isArray(note.buildings)) {
+            errors.push(`payload.notes[${i}].buildings must be an array when defined`);
+          } else {
+            if (note.buildings.length === 0) {
+              errors.push(`payload.notes[${i}].buildings must not be empty when defined`);
+            }
+            for (let j = 0; j < note.buildings.length; j++) {
+              if (!this.isNonEmptyString(note.buildings[j])) {
+                errors.push(`payload.notes[${i}].buildings[${j}] must be a non-empty string`);
+              }
+            }
+          }
+        }
         if (!Number.isInteger(note.size) || note.size < 0) {
           errors.push(`payload.notes[${i}].size must be a non-negative integer`);
         }

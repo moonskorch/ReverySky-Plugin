@@ -103,6 +103,7 @@ export class VaultGraphBuilder {
     ]);
 
     const date = VaultGraphBuilder.getCanonicalNoteDate(frontmatter, file);
+    const buildings = VaultGraphBuilder.getFrontmatterLandmarks(frontmatter?.landmarks);
 
     return {
       id: makeStableNoteId(path),
@@ -110,6 +111,7 @@ export class VaultGraphBuilder {
       title: file.basename,
       tags,
       size: VaultGraphBuilder.getNoteSizeBytes(file),
+      ...(buildings.length > 0 ? { buildings } : {}),
       ...(date ? { date } : {})
     };
   }
@@ -132,6 +134,17 @@ export class VaultGraphBuilder {
         .filter(Boolean);
     }
     return [];
+  }
+
+  private static getFrontmatterLandmarks(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .filter((x): x is string => typeof x === "string")
+      .map((x) => x.trim())
+      .filter(Boolean);
   }
 
   private static getFrontmatterDate(value: unknown): string | undefined {

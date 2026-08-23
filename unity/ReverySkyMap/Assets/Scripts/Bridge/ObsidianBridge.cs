@@ -135,7 +135,8 @@ public class ObsidianBridge : MonoBehaviour
         Length = Mathf.Max(0, note.size),
         CrystalType = CrystalType.Unknown,
         SphereType = SphereType.Unknown,
-        TagIds = tagIds
+        TagIds = tagIds,
+        Buildings = MapBuildings(note.buildings)
       });
     }
 
@@ -308,6 +309,23 @@ public class ObsidianBridge : MonoBehaviour
   private static DateTime ParseDate(string value)
   {
     return TryParseIso(value, out var dt) ? dt : DateTime.MinValue;
+  }
+
+  private static List<BuildingData> MapBuildings(string[] buildingNames)
+  {
+    var buildings = new List<BuildingData>();
+    if (buildingNames == null)
+      return buildings;
+
+    foreach (var rawName in buildingNames)
+    {
+      if (string.IsNullOrWhiteSpace(rawName))
+        continue;
+
+      buildings.Add(new BuildingData { Name = rawName.Trim() });
+    }
+
+    return buildings;
   }
 
   private static MapLayoutMode ParseMapLayoutPreference(string value)

@@ -87,6 +87,22 @@ public class ObsidianBridgeEditModeTests
   }
 
   [Test]
+  public void OnGraphSet_Buildings_MapsOptionalBuildingNames()
+  {
+    bridge.OnGraphSet(TestPayloads.BuildingsPayload);
+
+    NoteData noteWithBuildings = MapRuntimeContext.FindNoteById("b1");
+    NoteData noteWithoutBuildings = MapRuntimeContext.FindNoteById("b2");
+
+    Assert.That(noteWithBuildings, Is.Not.Null);
+    Assert.That(noteWithoutBuildings, Is.Not.Null);
+    Assert.That(noteWithBuildings.Buildings, Has.Count.EqualTo(2));
+    Assert.That(noteWithBuildings.Buildings[0].Name, Is.EqualTo("Observatory"));
+    Assert.That(noteWithBuildings.Buildings[1].Name, Is.EqualTo("Archive"));
+    Assert.That(noteWithoutBuildings.Buildings, Is.Empty);
+  }
+
+  [Test]
   public void OnGraphSet_TitleAndDateFallbacks_AreMappedPredictably()
   {
     bridge.OnGraphSet(TestPayloads.FallbacksPayload);
@@ -1087,6 +1103,12 @@ public class ObsidianBridgeEditModeTests
       "{\"sourceId\":\"n1\",\"targetId\":\"missing\",\"weight\":1}," +
       "{\"sourceId\":\"n3\",\"targetId\":\"n3\",\"weight\":1}" +
       "]}}";
+
+    public const string BuildingsPayload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"notes\":[" +
+      "{\"id\":\"b1\",\"path\":\"buildings/b1.md\",\"title\":\"B1\",\"tags\":[],\"size\":1,\"buildings\":[\" Observatory \",\"\",\"Archive\"]}," +
+      "{\"id\":\"b2\",\"path\":\"buildings/b2.md\",\"title\":\"B2\",\"tags\":[],\"size\":1}" +
+      "],\"links\":[]}}";
 
     public const string RepeatApplyPayloadB =
       "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"notes\":[" +

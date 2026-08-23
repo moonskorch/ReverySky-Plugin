@@ -1149,10 +1149,12 @@ export class MapSession {
           .filter((link) => link.length > 0)
       )
     ).sort();
+    const landmarks = this.extractFrontmatterLandmarks(cache?.frontmatter);
 
     return JSON.stringify({
       tags,
-      links
+      links,
+      landmarks
     });
   }
 
@@ -1200,6 +1202,22 @@ export class MapSession {
       return tagsRaw.filter((tag): tag is string => typeof tag === "string");
     }
     return [];
+  }
+
+  private extractFrontmatterLandmarks(frontmatter: unknown): string[] {
+    if (!frontmatter || typeof frontmatter !== "object") {
+      return [];
+    }
+
+    const landmarksRaw = (frontmatter as { landmarks?: unknown }).landmarks;
+    if (!Array.isArray(landmarksRaw)) {
+      return [];
+    }
+
+    return landmarksRaw
+      .filter((landmark): landmark is string => typeof landmark === "string")
+      .map((landmark) => landmark.trim())
+      .filter((landmark) => landmark.length > 0);
   }
 
   private isGraphRelevantPath(pathValue: unknown): boolean {

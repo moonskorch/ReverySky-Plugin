@@ -163,6 +163,7 @@ type GraphNoteNode = {
   path: string;
   title: string;
   tags: string[];
+  buildings?: string[];
   date?: string;
   size: number;
 };
@@ -194,6 +195,9 @@ Current runtime behavior snapshot for Unity ingestion and map interaction:
   - fallback: empty/whitespace title maps to `GameSettings.DefaultTitle` (`"Untitled"`).
 - `notes[].tags[]` -> trimmed runtime tag-id mapping; per-note deduplication is applied later by Forces engine.
   - derivation: trimmed tag string -> shared integer id mapping.
+- `notes[].buildings[]` -> `NoteData.Buildings`; each string maps to one `BuildingData.Name`.
+  - producer source: `frontmatter.landmarks` when it is an array; non-string and blank items are ignored, and the field is omitted when no names remain.
+  - fallback: missing field maps to an empty `NoteData.Buildings` list.
 - `notes[].date` -> static-25D date depth placement.
   - fallback: parse failure or missing date maps to `DateTime.MinValue`.
   - `DateTime.MinValue` is a technical sentinel: it is excluded from the normal date range and clamped to the oldest map edge.

@@ -34,6 +34,7 @@ describe("MessageValidator", () => {
   it("accepts a valid graph payload", () => {
     const payload = makeValidPayload();
     payload.mapLayout = "auto";
+    payload.notes[0].buildings = ["Observatory", "Archive"];
     const errors = MessageValidator.validateGraphPayload(payload);
     expect(errors).toEqual([]);
   });
@@ -44,6 +45,7 @@ describe("MessageValidator", () => {
     payload.vault.noteCount = 2;
     payload.links[0].weight = 0;
     payload.notes[0].id = "  ";
+    payload.notes[0].buildings = ["Observatory", ""];
     payload.notes[0].size = -1;
     payload.mapLayout = "invalid" as GraphPayload["mapLayout"];
 
@@ -52,8 +54,17 @@ describe("MessageValidator", () => {
     expect(errors).toContain("payload.vault.noteCount must equal payload.notes.length");
     expect(errors).toContain("payload.links[0].weight must be a positive number when defined");
     expect(errors).toContain("payload.notes[0].id must be a non-empty string");
+    expect(errors).toContain("payload.notes[0].buildings[1] must be a non-empty string");
     expect(errors).toContain("payload.notes[0].size must be a non-negative integer");
     expect(errors).toContain("payload.mapLayout must be one of: auto, dynamicLinks, dates, scalableLinks");
+  });
+
+  it("rejects empty graph note buildings when the field is defined", () => {
+    const payload = makeValidPayload();
+    payload.notes[0].buildings = [];
+
+    const errors = MessageValidator.validateGraphPayload(payload);
+    expect(errors).toContain("payload.notes[0].buildings must not be empty when defined");
   });
 
   it("accepts runtime settings payload with a valid frame-rate mode", () => {
