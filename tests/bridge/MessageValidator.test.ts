@@ -67,6 +67,26 @@ describe("MessageValidator", () => {
     expect(errors).toContain("payload.notes[0].buildings must not be empty when defined");
   });
 
+  it("accepts note:update with an empty buildings list", () => {
+    const errors = MessageValidator.validateNoteUpdatePayload({
+      id: "note_1",
+      path: "Folder/Note.md",
+      buildings: []
+    });
+
+    expect(errors).toEqual([]);
+  });
+
+  it("rejects invalid note:update buildings", () => {
+    const errors = MessageValidator.validateNoteUpdatePayload({
+      id: "note_1",
+      path: "Folder/Note.md",
+      buildings: ["Observatory", ""]
+    });
+
+    expect(errors).toContain("payload.buildings[1] must be a non-empty string");
+  });
+
   it("accepts runtime settings payload with a valid frame-rate mode", () => {
     const errors = MessageValidator.validateRuntimeSettingsPayload({
       frameRateMode: "fps60"

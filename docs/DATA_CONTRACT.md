@@ -25,6 +25,7 @@ Fields:
 Plugin -> runtime:
 - `graph:set`: effective graph payload after plugin-side scoping and filters.
 - `note:focus`: current-note focus hint with required `id` and `path`.
+- `note:update`: current note building update with required `id`, `path`, and `buildings`.
 - `runtime:status`: iframe-wrapper status text update that does not change Unity graph state.
 - `runtime:settings`: Unity runtime frame-rate settings that apply without rebuilding graph state.
 - `runtime:screenshot-request`: best-effort request to capture the current Unity canvas as PNG and return it to the parent.
@@ -181,6 +182,12 @@ type GraphLink = {
   weight?: number;
   kind?: "resolved";
 };
+
+type NoteUpdatePayload = {
+  id: string;
+  path: string;
+  buildings: string[];
+};
 ```
 
 ## Normalization Rules
@@ -188,13 +195,15 @@ type GraphLink = {
 - `id` must be stable for the same note across sessions.
 - `date` must be a single canonical note date in ISO 8601 format when provided.
 - `size` must be a non-negative integer measured in bytes.
-- `buildings`, when provided, must be a non-empty array of non-empty strings.
+- `graph:set` `buildings`, when provided, must be a non-empty array of non-empty strings.
+- `note:update` `buildings` must be an array of non-empty strings; an empty array is valid and means all buildings were removed.
 - `mapLayout`, when provided, must be one of: `auto`, `dynamicLinks`, `dates`, `scalableLinks`.
 - Producer rule: `vault.noteCount` should equal `notes.length` for every emitted payload.
 - Unknown fields must be safely ignored by consumers.
 
 ## Validation Requirements
 - Outgoing `graph:set` payloads are validated before postMessage dispatch.
+- Outgoing `note:update` payloads are validated before postMessage dispatch.
 - Outgoing `runtime:status` messages are skipped when the status text is empty after trimming.
 - Outgoing `runtime:settings` payloads are validated before postMessage dispatch.
 - Outgoing `runtime:screenshot-request` messages are validated before postMessage dispatch.
@@ -216,6 +225,7 @@ type GraphLink = {
 - Each emitted `graph:set` gets a unique `requestId` so stale `graph:ready` messages cannot complete a newer graph status.
 - After startup graph emission, `MapSession` lets the first Obsidian `metadataCache.resolved` event refresh cached vault graph data from settled `resolvedLinks`.
 - After graph-relevant metadata changes, `MapSession` waits for Obsidian `metadataCache.resolved` before rebuilding from `metadataCache.resolvedLinks`; while waiting, it may send `runtime:status` instead of `graph:set`.
+- `frontmatter.landmarks` metadata changes are not graph-rebuild signals by themselves; when tags and links stay stable and the normalized landmarks list changes, `MapSession` emits `note:update` immediately from `metadataCache.changed`.
 - Filter-only changes reuse the latest source graph snapshot and emit only a newly narrowed payload after the filter debounce.
 - Graph-setting changes such as tag visibility, layout, Ego mode, Ego depth, and Ego neighbor links reuse the latest source graph snapshot and coalesce live `graph:set` emission through the graph-settings debounce.
 - Runtime unavailable during iframe restart or window migration flushes pending source-refresh, filter, and graph-settings debounce work so the next `bridge:ready` emits the latest effective payload.
@@ -226,6 +236,7 @@ type GraphLink = {
 - `notes[].size` is emitted as file size in bytes.
 - `mapLayout`, when present, is a plugin-owned runtime hint and travels with the effective graph payload.
 - `note:focus` carries the current note identity separately; `graph:set` stays focused on the graph payload itself.
+- `note:update` carries the current note identity and full normalized `buildings` list separately; `graph:set` stays focused on full graph replacement.
 - `runtime:settings` carries frame-rate mode separately; `graph:set` stays focused on graph payload data.
 - `vault.noteCount` reflects the emitted `notes.length` for the effective payload.
 

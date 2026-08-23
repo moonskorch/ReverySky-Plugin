@@ -11,6 +11,7 @@ If this file conflicts with canonical contract, canonical contract wins.
 - `protocolVersion` must match expected version exactly.
 - Runtime-ready signal is `bridge:ready`.
 - Runtime ingestion message is `graph:set`.
+- Runtime note building update message is `note:update`.
 - Runtime settings message is `runtime:settings`.
 - Runtime graph completion signal is `graph:ready`.
 - Runtime tag activation signal is `tag:activate`.
@@ -59,6 +60,29 @@ Unity-side behavior:
 - Fixed modes set `QualitySettings.vSyncCount = 0` and `Application.targetFrameRate` to `60`, `30`, or `24`.
 - Unknown runtime-side mode values fall back to `auto` with a warning; the parent TypeScript bridge validates and should not send them.
 - Applying `runtime:settings` must not call `MapRuntimeContext.SetNotes`, rebuild graph data, reset focus, or recreate the iframe.
+
+## Note Update Handling
+`note:update` carries a single note identity and its full current building list. Current Unity behavior only logs the request; later runtime slices may update the rendered note object.
+
+Parent -> runtime:
+
+```json
+{
+  "protocolVersion": "2.0.0",
+  "type": "note:update",
+  "payload": {
+    "id": "note_...",
+    "path": "Folder/Note.md",
+    "buildings": []
+  }
+}
+```
+
+Unity-side behavior:
+- The iframe JavaScript wrapper forwards `note:update` to `ObsidianBridge.OnNoteUpdate(string json)` after Unity is ready.
+- `ObsidianBridge.OnNoteUpdate` rejects wrong `protocolVersion` and wrong `type`.
+- `payload.buildings` is the full current list; an empty array means all buildings were removed.
+- Current behavior logs the request and does not call `MapRuntimeContext.SetNotes`, rebuild graph data, reset focus, or mutate rendered objects.
 
 ## Graph Ready Handling
 `graph:ready` is Unity's completion acknowledgement for one parent `graph:set`.
@@ -126,7 +150,7 @@ Unity-side behavior:
 - The iframe JS wrapper receives `runtime:shutdown`, enters `isShuttingDown`, removes its own bridge listeners, and replies to the parent with `runtime:shutdown-complete`.
 - The iframe JS wrapper forwards shutdown to `ObsidianBridge.OnRuntimeShutdown(string json)` when the Unity instance can receive messages.
 - `ObsidianBridge.OnRuntimeShutdown` marks the bridge as shutting down and unsubscribes from `MapRuntimeContext.OnOpenNoteRequested`, `MapRuntimeContext.OnTagActivateRequested`, and `MapRuntimeContext.OnGraphReady`.
-- After shutdown, `ObsidianBridge.OnGraphSet` and `ObsidianBridge.OnNoteFocus` return without processing.
+- After shutdown, `ObsidianBridge.OnGraphSet`, `ObsidianBridge.OnNoteFocus`, and `ObsidianBridge.OnNoteUpdate` return without processing.
 - After shutdown, `ObsidianBridge.OnRuntimeSettings` returns without changing frame-rate state.
 - After shutdown, `HandleOpenNoteRequested`, `HandleTagActivateRequested`, and `HandleGraphReadyRequested` return without sending outbound bridge events.
 
@@ -157,6 +181,12 @@ type RuntimeSettingsPayload = {
 };
 
 type FrameRateMode = "auto" | "fps60" | "fps30" | "fps24";
+
+type NoteUpdatePayload = {
+  id: string;
+  path: string;
+  buildings: string[];
+};
 
 type GraphNoteNode = {
   id: string;

@@ -2,6 +2,8 @@ import {
   BRIDGE_PROTOCOL_VERSION,
   NoteFocusMessage,
   NoteFocusPayload,
+  NoteUpdateMessage,
+  NoteUpdatePayload,
   GraphPayload,
   GraphSetMessage,
   IncomingBridgeMessage,
@@ -134,6 +136,27 @@ export class UnityIframeBridge {
     const message: GraphSetMessage = {
       protocolVersion: BRIDGE_PROTOCOL_VERSION,
       type: "graph:set",
+      requestId: this.createRequestId(),
+      payload
+    };
+
+    this.postOutgoingMessage(iframeWindow, message);
+  }
+
+  sendNoteUpdate(payload: NoteUpdatePayload): void {
+    const iframeWindow = this.getIframeWindowForSend();
+    if (!iframeWindow) {
+      return;
+    }
+
+    const payloadErrors = MessageValidator.validateNoteUpdatePayload(payload);
+    if (this.reportValidationErrors("Invalid note update payload", payloadErrors)) {
+      return;
+    }
+
+    const message: NoteUpdateMessage = {
+      protocolVersion: BRIDGE_PROTOCOL_VERSION,
+      type: "note:update",
       requestId: this.createRequestId(),
       payload
     };

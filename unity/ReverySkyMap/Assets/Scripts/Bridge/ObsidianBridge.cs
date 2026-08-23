@@ -8,6 +8,7 @@ public class ObsidianBridge : MonoBehaviour
   private const string ExpectedProtocolVersion = "2.0.0";
   private const string GraphSetMessageType = "graph:set";
   private const string NoteFocusMessageType = "note:focus";
+  private const string NoteUpdateMessageType = "note:update";
   private const string RuntimeSettingsMessageType = "runtime:settings";
   private static bool IsRuntimeShuttingDown;
 
@@ -210,6 +211,47 @@ public class ObsidianBridge : MonoBehaviour
       return;
 
     cartographer.FocusRuntimeNote(noteId);
+  }
+
+  public void OnNoteUpdate(string json)
+  {
+    if (IsRuntimeShuttingDown)
+      return;
+
+    if (string.IsNullOrWhiteSpace(json))
+      return;
+
+    BridgeNoteUpdateEnvelope envelope;
+    try
+    {
+      envelope = JsonUtility.FromJson<BridgeNoteUpdateEnvelope>(json);
+    }
+    catch (Exception ex)
+    {
+      Debug.LogWarning($"[ObsidianBridge] Invalid note:update payload: {ex.Message}");
+      return;
+    }
+
+    if (envelope?.payload == null)
+      return;
+
+    if (!string.Equals(envelope.protocolVersion, ExpectedProtocolVersion, StringComparison.Ordinal))
+    {
+      Debug.LogWarning(
+        $"[ObsidianBridge] Ignoring note:update due to protocolVersion mismatch. expected={ExpectedProtocolVersion}, got={envelope.protocolVersion ?? "<null>"}");
+      return;
+    }
+
+    if (!string.Equals(envelope.type, NoteUpdateMessageType, StringComparison.Ordinal))
+    {
+      Debug.LogWarning(
+        $"[ObsidianBridge] Ignoring note:update due to message type mismatch. expected={NoteUpdateMessageType}, got={envelope.type ?? "<null>"}");
+      return;
+    }
+
+    var buildings = envelope.payload.buildings ?? Array.Empty<string>();
+    Debug.Log(
+      $"[ObsidianBridge] note:update requested. id={envelope.payload.id ?? string.Empty}, path={envelope.payload.path ?? string.Empty}, buildings=[{string.Join(", ", buildings)}]");
   }
 
   public void OnRuntimeSettings(string json)

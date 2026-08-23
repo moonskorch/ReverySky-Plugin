@@ -36,6 +36,14 @@ public class BridgeNoteIdentityPayload
 }
 
 [Serializable]
+public class BridgeNoteUpdatePayload
+{
+  public string id;
+  public string path;
+  public string[] buildings;
+}
+
+[Serializable]
 public class BridgeRuntimeSettingsPayload
 {
   public string frameRateMode;

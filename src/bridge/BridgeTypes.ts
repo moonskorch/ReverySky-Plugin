@@ -25,6 +25,10 @@ export type NoteOpenPayload = NoteIdentityPayload;
 
 export type NoteFocusPayload = NoteIdentityPayload;
 
+export type NoteUpdatePayload = NoteIdentityPayload & {
+  buildings: string[];
+};
+
 export type TagActivatePayload = {
   tag: string;
 };
@@ -41,6 +45,13 @@ export type NoteFocusMessage = {
   type: "note:focus";
   requestId?: string;
   payload: NoteFocusPayload;
+};
+
+export type NoteUpdateMessage = {
+  protocolVersion: string;
+  type: "note:update";
+  requestId?: string;
+  payload: NoteUpdatePayload;
 };
 
 export type TagActivateMessage = {
@@ -151,6 +162,7 @@ export type IncomingBridgeMessage =
 export type OutgoingBridgeMessage =
   | GraphSetMessage
   | NoteFocusMessage
+  | NoteUpdateMessage
   | RuntimeScreenshotRequestMessage
   | RuntimeShutdownMessage
   | RuntimeStatusMessage

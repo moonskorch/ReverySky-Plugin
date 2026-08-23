@@ -640,6 +640,141 @@ describe("MapSession", () => {
     expect(sendGraph).toHaveBeenCalledTimes(2);
   });
 
+  it("sends note:update with an empty buildings list when landmarks are cleared", () => {
+    const metadataCallbacks: {
+      changed?: (file: { path?: string }, data: string, cache: { links?: Array<{ link: string }>; tags?: Array<{ tag: string }>; frontmatter?: unknown }) => void;
+      resolved?: () => void;
+    } = {};
+
+    const app = {
+      metadataCache: {
+        getFileCache: vi.fn().mockReturnValue({
+          links: [],
+          tags: [],
+          frontmatter: { landmarks: ["Observatory"] }
+        }),
+        on: vi.fn((name: "changed" | "resolved", callback: (...args: never[]) => void) => {
+          if (name === "changed") {
+            metadataCallbacks.changed = callback as typeof metadataCallbacks.changed;
+          } else {
+            metadataCallbacks.resolved = callback as () => void;
+          }
+          return { id: `metadata-${name}` };
+        })
+      },
+      vault: {
+        getAbstractFileByPath: vi.fn((path: string) => makeTestTFile(path)),
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+      },
+      workspace: {
+        activeLeaf: null,
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+
+    const buildGraph = makeBuildGraphMock(makePayload());
+    const sendGraph = vi.fn();
+    const sendNoteUpdate = vi.fn();
+    const session = new MapSession({
+      app: app as never,
+      buildGraph,
+      now: () => 1700000000000,
+      sendGraph,
+      sendFocus: vi.fn(),
+      sendNoteUpdate
+    });
+
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    session.requestFocusFromEditor("Note.md");
+    sendNoteUpdate.mockClear();
+
+    metadataCallbacks.changed?.(
+      { path: "Note.md" },
+      "content",
+      {
+        links: [],
+        tags: [],
+        frontmatter: { landmarks: [] }
+      }
+    );
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(sendGraph).toHaveBeenCalledTimes(1);
+    expect(sendNoteUpdate).toHaveBeenCalledWith({
+      id: makeStableNoteId("Note.md"),
+      path: "Note.md",
+      buildings: []
+    });
+  });
+
+  it("does not send note:update when non-landmark metadata changes", () => {
+    const metadataCallbacks: {
+      changed?: (file: { path?: string }, data: string, cache: { links?: Array<{ link: string }>; tags?: Array<{ tag: string }>; frontmatter?: unknown }) => void;
+    } = {};
+
+    const app = {
+      metadataCache: {
+        getFileCache: vi.fn().mockReturnValue({
+          links: [],
+          tags: [],
+          frontmatter: {
+            date: "2026-01-01",
+            landmarks: ["Observatory"]
+          }
+        }),
+        on: vi.fn((name: "changed" | "resolved", callback: (...args: never[]) => void) => {
+          if (name === "changed") {
+            metadataCallbacks.changed = callback as typeof metadataCallbacks.changed;
+          }
+          return { id: `metadata-${name}` };
+        })
+      },
+      vault: {
+        getAbstractFileByPath: vi.fn((path: string) => makeTestTFile(path)),
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+      },
+      workspace: {
+        activeLeaf: null,
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+
+    const buildGraph = makeBuildGraphMock(makePayload());
+    const sendNoteUpdate = vi.fn();
+    const session = new MapSession({
+      app: app as never,
+      buildGraph,
+      now: () => 1700000000000,
+      sendGraph: vi.fn(),
+      sendFocus: vi.fn(),
+      sendNoteUpdate
+    });
+
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    session.requestFocusFromEditor("Note.md");
+
+    metadataCallbacks.changed?.(
+      { path: "Note.md" },
+      "content",
+      {
+        links: [],
+        tags: [],
+        frontmatter: {
+          date: "2026-02-01",
+          landmarks: ["Observatory"]
+        }
+      }
+    );
+
+    expect(sendNoteUpdate).not.toHaveBeenCalled();
+  });
+
   it("queues latest graph before bridge ready and sends it on ready", () => {
     vi.useFakeTimers();
 

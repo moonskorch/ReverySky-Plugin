@@ -22,9 +22,13 @@ describe("Unity WebGL runtime templates", () => {
     expect(html).toContain("function setStatusText(text)");
     expect(html).toContain("function scheduleResizeCanvas()");
     expect(html).toContain("function tryDispatchRuntimeSettingsToUnity(message)");
+    expect(html).toContain("function tryDispatchNoteUpdateToUnity(message)");
     expect(html).toContain("function applyRuntimeSettings(message)");
+    expect(html).toContain("function applyNoteUpdate(message)");
     expect(html).toContain('data.type === "runtime:settings"');
+    expect(html).toContain('data.type === "note:update"');
     expect(html).toContain('unityInstance.SendMessage("ObsidianBridge", "OnRuntimeSettings", JSON.stringify(message));');
+    expect(html).toContain('unityInstance.SendMessage("ObsidianBridge", "OnNoteUpdate", JSON.stringify(message));');
     expect(html).toContain('if (runtimeMode === "failed")');
     expect(html).toContain("function setRuntimeFailed(statusText)");
     expect(html).toContain("graphSetDispatchToken++;");
@@ -108,11 +112,18 @@ describe("Unity WebGL runtime templates", () => {
     expect(noteFocusBlock).toContain("dispatchToken !== noteFocusDispatchToken");
     expect(noteFocusBlock).toContain('runtimeMode !== "unity"');
 
+    const noteUpdateBlock = html.match(/function scheduleNoteUpdateDispatch\(message\) \{[\s\S]*?tryDispatchNoteUpdateToUnity\(message\);[\s\S]*?\}\);\s*\}/)?.[0] ?? "";
+    expect(noteUpdateBlock).toContain("scheduleUnityDispatch(() => {");
+    expect(noteUpdateBlock).toContain('runtimeMode !== "unity"');
+
     const applyGraphSetBlock = html.match(/function applyGraphSet\(message\) \{[\s\S]*?if \(runtimeMode === "unity"\) \{[\s\S]*?scheduleGraphSetDispatch\(message\);[\s\S]*?\}\s*\}/)?.[0] ?? "";
     expect(applyGraphSetBlock).not.toBe("");
 
     const applyNoteFocusBlock = html.match(/function applyNoteFocus\(message\) \{[\s\S]*?if \(runtimeMode === "unity"\) \{[\s\S]*?scheduleNoteFocusDispatch\(message\);[\s\S]*?\}\s*\}/)?.[0] ?? "";
     expect(applyNoteFocusBlock).not.toBe("");
+
+    const applyNoteUpdateBlock = html.match(/function applyNoteUpdate\(message\) \{[\s\S]*?if \(runtimeMode === "unity"\) \{[\s\S]*?scheduleNoteUpdateDispatch\(message\);[\s\S]*?\}\s*\}/)?.[0] ?? "";
+    expect(applyNoteUpdateBlock).not.toBe("");
 
     const shutdownBlock = html.match(/function beginShutdown\(message\) \{[\s\S]*?window\.removeEventListener\("message", onBridgeMessage\);[\s\S]*?\}/)?.[0] ?? "";
     expect(shutdownBlock).toContain("graphSetDispatchToken++;");

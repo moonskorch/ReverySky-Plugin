@@ -4,6 +4,7 @@ import {
   GraphPayload,
   IncomingBridgeMessage,
   NoteFocusPayload,
+  NoteUpdatePayload,
   NoteOpenMessage,
   RuntimeScreenshotResponseMessage,
   RuntimeShutdownCompleteMessage,
@@ -133,6 +134,26 @@ export class MessageValidator {
     }
     if (!this.isNonEmptyString(payload.path)) {
       errors.push("payload.path must be a non-empty string");
+    }
+
+    return errors;
+  }
+
+  static validateNoteUpdatePayload(payload: NoteUpdatePayload): string[] {
+    const errors: string[] = this.validateNoteFocusPayload(payload);
+
+    if (!payload || typeof payload !== "object") {
+      return ["payload must be an object"];
+    }
+
+    if (!Array.isArray(payload.buildings)) {
+      errors.push("payload.buildings must be an array");
+    } else {
+      for (let i = 0; i < payload.buildings.length; i++) {
+        if (!this.isNonEmptyString(payload.buildings[i])) {
+          errors.push(`payload.buildings[${i}] must be a non-empty string`);
+        }
+      }
     }
 
     return errors;

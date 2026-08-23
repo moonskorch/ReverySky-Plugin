@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { TFile } from "obsidian";
 import type { GraphPayload, TagActivatePayload } from "../../src/bridge/BridgeTypes";
 import { makeStableNoteId } from "../../src/graph/VaultGraphBuilder";
 import type { MapViewDependencies } from "../../src/view/MapView";
@@ -20,6 +21,12 @@ const FILTER_MESSAGE_HIDDEN_CLASS = "reverysky-map-filter-message--hidden";
 const SETTINGS_PANEL_CLOSED_CLASS = "reverysky-map-settings-panel--closed";
 const SUGGESTIONS_HIDDEN_CLASS = "reverysky-map-filter-suggestions--hidden";
 
+function makeTestTFile(path: string): TFile {
+  const file = new TFile();
+  file.path = path;
+  return file;
+}
+
 function makeBridgeForTest(overrides: Partial<BridgeForTest>): BridgeForTest {
   return {
     attach: vi.fn(),
@@ -28,6 +35,7 @@ function makeBridgeForTest(overrides: Partial<BridgeForTest>): BridgeForTest {
     shutdown: vi.fn().mockResolvedValue("complete"),
     sendGraphSet: vi.fn(),
     sendNoteFocus: vi.fn(),
+    sendNoteUpdate: vi.fn(),
     sendRuntimeSettings: vi.fn(),
     sendStatus: vi.fn(),
     ...overrides
@@ -1416,7 +1424,7 @@ describe("MapView bridge integration", () => {
     expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
   });
 
-  it("refreshes graph payload when frontmatter landmarks change", async () => {
+  it("sends note:update when frontmatter landmarks change without graph semantic changes", async () => {
     vi.useFakeTimers();
 
     const metadataCallbacks: {
@@ -1434,6 +1442,11 @@ describe("MapView bridge integration", () => {
 
     const app = {
       metadataCache: {
+        getFileCache: vi.fn().mockReturnValue({
+          links: [],
+          tags: [],
+          frontmatter: {}
+        }),
         on: vi.fn((name: "changed" | "resolved", callback: (...args: never[]) => void) => {
           if (name === "changed") {
             metadataCallbacks.changed = callback as (
@@ -1453,7 +1466,7 @@ describe("MapView bridge integration", () => {
       },
       vault: {
         on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
-        getAbstractFileByPath: vi.fn()
+        getAbstractFileByPath: vi.fn((path: string) => makeTestTFile(path))
       },
       workspace: {
         activeLeaf: null,
@@ -1475,15 +1488,12 @@ describe("MapView bridge integration", () => {
       detach: vi.fn(),
       sendGraphSet: vi.fn(),
       sendNoteFocus: vi.fn(),
+      sendNoteUpdate: vi.fn(),
       shutdown: vi.fn().mockResolvedValue("complete")
     };
 
     const initialPayload = makePayload();
-    const updatedPayload = makePayload();
-    updatedPayload.notes[0].buildings = ["Level dimension", "Glue of eternity", "Link of research"];
-    const buildGraph = vi.fn()
-      .mockReturnValueOnce(initialPayload)
-      .mockReturnValue(updatedPayload);
+    const buildGraph = vi.fn().mockReturnValue(initialPayload);
     const view = new MapView(
       { app } as never,
       plugin as never,
@@ -1505,29 +1515,28 @@ describe("MapView bridge integration", () => {
     callbacks.onReady?.();
 
     expect(buildGraph).toHaveBeenCalledTimes(1);
+    view.requestFocusFromEditor("Note.md");
+    bridge.sendNoteUpdate.mockClear();
 
     metadataCallbacks.changed?.(
-      { path: "Folder/Note.md" },
+      { path: "Note.md" },
       "content",
       {
-        links: [{ link: "RefA" }],
-        tags: [{ tag: "#tag-a" }],
+        links: [],
+        tags: [],
         frontmatter: {
           landmarks: ["Level dimension", 7, "Glue of eternity", "Link of research"]
         }
       }
     );
-    metadataCallbacks.resolved?.();
-    vi.advanceTimersByTime(250);
 
-    expect(buildGraph).toHaveBeenCalledTimes(2);
-    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
-    const outgoingPayload = bridge.sendGraphSet.mock.calls[1]?.[0] as GraphPayload;
-    expect(outgoingPayload.notes[0]?.buildings).toEqual([
-      "Level dimension",
-      "Glue of eternity",
-      "Link of research"
-    ]);
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+    expect(bridge.sendNoteUpdate).toHaveBeenCalledWith({
+      id: makeStableNoteId("Note.md"),
+      path: "Note.md",
+      buildings: ["Level dimension", "Glue of eternity", "Link of research"]
+    });
   });
 
   it("does not refresh when only frontmatter date changes and tags/links stay stable", async () => {

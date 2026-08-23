@@ -474,6 +474,20 @@
           }
         }
 
+        function tryDispatchNoteUpdateToUnity(message) {
+          if (!unityInstance || typeof unityInstance.SendMessage !== "function") {
+            return false;
+          }
+
+          try {
+            unityInstance.SendMessage("ObsidianBridge", "OnNoteUpdate", JSON.stringify(message));
+            return true;
+          } catch (e) {
+            console.warn("[ReverySky] Failed to dispatch note:update to Unity:", e);
+            return false;
+          }
+        }
+
         function tryDispatchRuntimeSettingsToUnity(message) {
           if (!unityInstance || typeof unityInstance.SendMessage !== "function") {
             return false;
@@ -528,6 +542,16 @@
             }
 
             tryDispatchNoteFocusToUnity(message);
+          });
+        }
+
+        function scheduleNoteUpdateDispatch(message) {
+          scheduleUnityDispatch(() => {
+            if (isShuttingDown || runtimeMode !== "unity") {
+              return;
+            }
+
+            tryDispatchNoteUpdateToUnity(message);
           });
         }
 
@@ -587,6 +611,16 @@
 
           if (runtimeMode === "unity") {
             scheduleNoteFocusDispatch(message);
+          }
+        }
+
+        function applyNoteUpdate(message) {
+          if (isShuttingDown) {
+            return;
+          }
+
+          if (runtimeMode === "unity") {
+            scheduleNoteUpdateDispatch(message);
           }
         }
 
@@ -702,6 +736,11 @@
 
           if (data.type === "note:focus") {
             applyNoteFocus(data);
+            return;
+          }
+
+          if (data.type === "note:update") {
+            applyNoteUpdate(data);
             return;
           }
 

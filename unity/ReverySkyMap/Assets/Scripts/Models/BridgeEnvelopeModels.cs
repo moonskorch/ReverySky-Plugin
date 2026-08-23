@@ -18,6 +18,14 @@ public class BridgeNoteFocusEnvelope
 }
 
 [Serializable]
+public class BridgeNoteUpdateEnvelope
+{
+  public string protocolVersion;
+  public string type;
+  public BridgeNoteUpdatePayload payload;
+}
+
+[Serializable]
 public class BridgeRuntimeSettingsEnvelope
 {
   public string protocolVersion;

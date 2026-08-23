@@ -1,6 +1,6 @@
 import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
 import type { App } from "obsidian";
-import type { GraphPayload, NoteOpenPayload } from "../bridge/BridgeTypes";
+import type { GraphPayload, NoteOpenPayload, NoteUpdatePayload } from "../bridge/BridgeTypes";
 import { UnityIframeBridge } from "../bridge/UnityIframeBridge";
 import { VaultGraphBuilder } from "../graph/VaultGraphBuilder";
 import type ReverySkyMapPlugin from "../main";
@@ -19,6 +19,7 @@ type BridgePort = Pick<
   | "shutdown"
   | "sendGraphSet"
   | "sendNoteFocus"
+  | "sendNoteUpdate"
   | "sendRuntimeSettings"
   | "sendStatus"
 >;
@@ -97,6 +98,9 @@ export class MapView extends ItemView {
       },
       sendFocus: (payload) => {
         this.bridge.sendNoteFocus(payload);
+      },
+      sendNoteUpdate: (payload: NoteUpdatePayload) => {
+        this.bridge.sendNoteUpdate(payload);
       },
       sendRuntimeSettings: (payload) => {
         this.bridge.sendRuntimeSettings(payload);

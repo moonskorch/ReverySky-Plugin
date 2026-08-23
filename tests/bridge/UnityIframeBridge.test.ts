@@ -125,6 +125,32 @@ describe("UnityIframeBridge", () => {
     bridge.detach();
   });
 
+  it("sends note:update with current buildings", () => {
+    const bridge = new UnityIframeBridge();
+    const postMessage = vi.fn();
+    const iframeWindow = { postMessage } as unknown as Window;
+
+    bridge.attach(iframeWindow, {});
+    bridge.sendNoteUpdate({
+      id: "note_1",
+      path: "Folder/Note.md",
+      buildings: []
+    });
+
+    expect(postMessage).toHaveBeenCalledTimes(1);
+    const [message, targetOrigin] = postMessage.mock.calls[0] as [Record<string, unknown>, string];
+    expect(targetOrigin).toBe("*");
+    expect(message.type).toBe("note:update");
+    expect(message.protocolVersion).toBe(BRIDGE_PROTOCOL_VERSION);
+    expect(message.requestId).toEqual(expect.stringMatching(/^req_\d+_\d+$/));
+    expect(message.payload).toEqual({
+      id: "note_1",
+      path: "Folder/Note.md",
+      buildings: []
+    });
+    bridge.detach();
+  });
+
   it("sends runtime:status when status text is provided", () => {
     const bridge = new UnityIframeBridge();
     const postMessage = vi.fn();

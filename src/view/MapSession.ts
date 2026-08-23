@@ -5,12 +5,14 @@ import {
   type EventRef,
   type TAbstractFile
 } from "obsidian";
+import { createHash } from "node:crypto";
 import type {
   MapLayoutPreference,
   GraphLink,
   GraphNoteNode,
   GraphPayload,
   NoteFocusPayload,
+  NoteUpdatePayload,
   NoteOpenPayload,
   RuntimeSettingsPayload
 } from "../bridge/BridgeTypes";
@@ -102,6 +104,11 @@ type AcceptedFocus = {
   centerChanged: boolean;
 };
 
+type NoteMetadataSignature = {
+  graph: string;
+  landmarks: string;
+};
+
 export type MapSessionDependencies = {
   app: App;
   buildGraph: (app: App) => GraphPayload;
@@ -109,6 +116,7 @@ export type MapSessionDependencies = {
   sendGraph: (payload: GraphPayload) => void;
   sendStatus?: (message: string) => void;
   sendFocus: (payload: NoteFocusPayload) => void;
+  sendNoteUpdate?: (payload: NoteUpdatePayload) => void;
   sendRuntimeSettings?: (payload: RuntimeSettingsPayload) => void;
   onStateChanged?: (state: Record<string, unknown>, options?: { persist?: boolean }) => void;
 };
@@ -125,6 +133,7 @@ export class MapSession {
   private readonly sendGraph: (payload: GraphPayload) => void;
   private readonly sendStatus?: (message: string) => void;
   private readonly sendFocus: (payload: NoteFocusPayload) => void;
+  private readonly sendNoteUpdate: (payload: NoteUpdatePayload) => void;
   private readonly sendRuntimeSettings?: (payload: RuntimeSettingsPayload) => void;
   private readonly onStateChanged?: (state: Record<string, unknown>, options?: { persist?: boolean }) => void;
 
@@ -136,7 +145,7 @@ export class MapSession {
   private sourceGraphPayload: GraphPayload | null = null;
   // Last effective graph snapshot prepared for Unity, focus checks, and note-open id resolution.
   private outgoingGraphPayload: GraphPayload | null = null;
-  private noteSignatureByPath = new Map<string, string>();
+  private noteMetadataSignatureByPath = new Map<string, NoteMetadataSignature>();
 
   private semanticRefreshPending = false;
   // Allows one metadataCache.resolved after startup to refresh cached vault graph data from settled links.
@@ -179,6 +188,7 @@ export class MapSession {
     this.sendGraph = deps.sendGraph;
     this.sendStatus = deps.sendStatus;
     this.sendRuntimeSettings = deps.sendRuntimeSettings;
+    this.sendNoteUpdate = deps.sendNoteUpdate ?? (() => undefined);
     this.onStateChanged = deps.onStateChanged;
     this.focus = new MapFocusController({
       app: this.app,
@@ -631,14 +641,22 @@ export class MapSession {
           }
 
           const path = this.normalizeVaultPath(file.path);
-          const nextSignature = this.buildGraphRelevantSignature(cache);
-          const previousSignature = this.noteSignatureByPath.get(path) ?? "";
-          this.noteSignatureByPath.set(path, nextSignature);
-          if (nextSignature === previousSignature) {
+          const nextSignature = this.buildNoteMetadataSignature(cache);
+          const previousSignature = this.noteMetadataSignatureByPath.get(path) ?? null;
+          this.noteMetadataSignatureByPath.set(path, nextSignature);
+          if (!previousSignature) {
+            this.markSemanticRefreshPending();
             return;
           }
 
-          this.markSemanticRefreshPending();
+          if (nextSignature.graph !== previousSignature.graph) {
+            this.markSemanticRefreshPending();
+            return;
+          }
+
+          if (nextSignature.landmarks !== previousSignature.landmarks) {
+            this.sendNoteUpdateForPath(path, cache);
+          }
         })
       );
       registerEvent(
@@ -676,7 +694,7 @@ export class MapSession {
             return;
           }
           const normalizedPath = this.normalizeVaultPath(file.path);
-          this.noteSignatureByPath.delete(normalizedPath);
+          this.noteMetadataSignatureByPath.delete(normalizedPath);
           if (this.focusPath === normalizedPath) {
             this.focusPath = "";
             this.isEgoNoteFocusSuspended = false;
@@ -693,7 +711,7 @@ export class MapSession {
           this.focus.onRename(oldPath, file?.path);
 
           if (this.isGraphRelevantPath(oldPath)) {
-            this.noteSignatureByPath.delete(normalizedOldPath);
+            this.noteMetadataSignatureByPath.delete(normalizedOldPath);
           }
           this.scheduleSourceGraphRebuild();
         })
@@ -835,6 +853,18 @@ export class MapSession {
     this.sendFocus({
       id: makeStableNoteId(path),
       path
+    });
+  }
+
+  private sendNoteUpdateForPath(path: string, cache: CachedMetadata): void {
+    if (!this.bridgeReady) {
+      return;
+    }
+
+    this.sendNoteUpdate({
+      id: makeStableNoteId(path),
+      path,
+      buildings: this.extractFrontmatterLandmarks(cache?.frontmatter)
     });
   }
 
@@ -1129,6 +1159,13 @@ export class MapSession {
     return tag.trim().toLowerCase();
   }
 
+  private buildNoteMetadataSignature(cache: CachedMetadata | null): NoteMetadataSignature {
+    return {
+      graph: this.buildGraphRelevantSignature(cache),
+      landmarks: this.buildLandmarksSignature(cache?.frontmatter)
+    };
+  }
+
   private buildGraphRelevantSignature(cache: CachedMetadata | null): string {
     const inlineTags = (cache?.tags ?? [])
       .map((tagEntry) => (typeof tagEntry?.tag === "string" ? tagEntry.tag : ""))
@@ -1149,20 +1186,25 @@ export class MapSession {
           .filter((link) => link.length > 0)
       )
     ).sort();
-    const landmarks = this.extractFrontmatterLandmarks(cache?.frontmatter);
-
-    return JSON.stringify({
+    return this.hashSignature(JSON.stringify({
       tags,
-      links,
-      landmarks
-    });
+      links
+    }));
+  }
+
+  private buildLandmarksSignature(frontmatter: unknown): string {
+    return this.hashSignature(JSON.stringify(this.extractFrontmatterLandmarks(frontmatter)));
+  }
+
+  private hashSignature(value: string): string {
+    return createHash("sha256").update(value).digest().subarray(0, 4).toString("base64url");
   }
 
   private primeNoteSignatureForPath(pathValue: unknown): void {
     const path = this.normalizeVaultPath(pathValue);
     // Editor focus can repeat for the same note; only the first focus primes
     // the baseline, and metadataCache.changed owns later signature updates.
-    if (!this.isGraphRelevantPath(path) || this.noteSignatureByPath.has(path)) {
+    if (!this.isGraphRelevantPath(path) || this.noteMetadataSignatureByPath.has(path)) {
       return;
     }
 
@@ -1172,7 +1214,7 @@ export class MapSession {
     }
 
     const cache = this.app.metadataCache.getFileCache(file) ?? null;
-    this.noteSignatureByPath.set(path, this.buildGraphRelevantSignature(cache));
+    this.noteMetadataSignatureByPath.set(path, this.buildNoteMetadataSignature(cache));
   }
 
   private normalizeLinkValue(linkValue: unknown): string {
