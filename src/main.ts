@@ -13,6 +13,7 @@ import {
 } from "./runtime/EmbeddedUnityRuntimeInstaller";
 import { getEmbeddedUnityIndexHtml } from "./runtime/EmbeddedUnityIndexHtml";
 import {
+  registerEditorMenuCommands,
   registerCommands,
   forwardFocusToViews
 } from "./commands/MapCommands";
@@ -88,6 +89,7 @@ export default class ReverySkyMapPlugin extends Plugin {
     );
 
     registerCommands(this);
+    registerEditorMenuCommands(this);
 
     this.registerEditorExtension(
       createMarkdownEditorFocusListener((path) => {

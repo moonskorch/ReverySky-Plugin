@@ -1,6 +1,8 @@
-import type { WorkspaceLeaf } from "obsidian";
+import type { TFile, WorkspaceLeaf } from "obsidian";
 import { MAP_VIEW_TYPE, MapView } from "../view/MapView";
 import type ReverySkyMapPlugin from "../main";
+
+const MAX_LANDMARK_LENGTH = 50;
 
 export function registerCommands(plugin: ReverySkyMapPlugin): void {
   plugin.addRibbonIcon("sparkles", "Toggle ReverySky 3D Graph", async () => {
@@ -30,6 +32,56 @@ export function registerCommands(plugin: ReverySkyMapPlugin): void {
       await copyActiveMapViewScreenshot(plugin);
     }
   });
+}
+
+export function registerEditorMenuCommands(plugin: ReverySkyMapPlugin): void {
+  plugin.registerEvent(
+    plugin.app.workspace.on("editor-menu", (menu, editor, info) => {
+      const landmark = normalizeLandmarkSelection(editor.getSelection());
+      const file = info.file;
+      if (!file || !landmark) {
+        return;
+      }
+
+      menu.addItem((item) => {
+        item
+          .setTitle("Add landmark")
+          .setIcon("map-pin")
+          .onClick(async () => {
+            await addLandmarkToFile(plugin, file, landmark);
+          });
+      });
+    })
+  );
+}
+
+export function normalizeLandmarkSelection(selection: string): string {
+  return selection
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAX_LANDMARK_LENGTH)
+    .trim();
+}
+
+export function addLandmarkToFrontmatter(frontmatter: Record<string, unknown>, landmark: string): void {
+  const currentLandmarks = frontmatter.landmarks;
+  if (currentLandmarks == null) {
+    frontmatter.landmarks = [landmark];
+    return;
+  }
+
+  if (!Array.isArray(currentLandmarks)) {
+    return;
+  }
+
+  const hasDuplicate = currentLandmarks.some(
+    (currentLandmark) =>
+      typeof currentLandmark === "string" &&
+      normalizeLandmarkSelection(currentLandmark) === landmark
+  );
+  if (!hasDuplicate) {
+    currentLandmarks.push(landmark);
+  }
 }
 
 export async function activateMapView(plugin: ReverySkyMapPlugin): Promise<void> {
@@ -97,4 +149,14 @@ function getActiveMapView(plugin: ReverySkyMapPlugin): MapView | null {
   }
 
   return (workspace.getLeavesOfType(MAP_VIEW_TYPE)[0]?.view as MapView | undefined) ?? null;
+}
+
+async function addLandmarkToFile(
+  plugin: ReverySkyMapPlugin,
+  file: TFile,
+  landmark: string
+): Promise<void> {
+  await plugin.app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
+    addLandmarkToFrontmatter(frontmatter, landmark);
+  });
 }
