@@ -225,6 +225,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f6f2828d3a131304e8fa8e727f7b582e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LookAtCamera
+  mode: 0
 --- !u!1 &7720539063730227376
 GameObject:
   m_ObjectHideFlags: 0
@@ -237,6 +238,7 @@ GameObject:
   - component: {fileID: 5357984115519731449}
   - component: {fileID: 4500662623417313281}
   - component: {fileID: 253107240935385}
+  - component: {fileID: 880000000000000001}
   - component: {fileID: 6198472612096341012}
   m_Layer: 0
   m_Name: Star
@@ -308,15 +310,28 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9e4b69b9d9434bb189427b945c34f440, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  referenceTransform: {fileID: 4724834818725577822}
+  visibilitySource: {fileID: 880000000000000001}
   labelRoot: {fileID: 2774144331844689961}
   relatedBehaviours:
   - {fileID: 4709714922754719655}
-  radius: 1.5
-  visibleDistance: 35
   normalMaterialPreset: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   focusedMaterialPreset: {fileID: 2100000, guid: 627d0c7f87e9bc644b5e9448cd8b1e54, type: 2}
   linkedMaterialPreset: {fileID: 2100000, guid: 6b7ced4a5e025e84293d331734b88831, type: 2}
+--- !u!114 &880000000000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7720539063730227376}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b3146cbe0a8a4b9aa2c8e77df4fd2c91, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  referenceTransform: {fileID: 4724834818725577822}
+  radius: 1.5
+  visibleDistance: 35
 --- !u!114 &6198472612096341012
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -441,6 +456,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   star: {fileID: 5357984115519731449}
+  visibilitySource: {fileID: 880000000000000001}
+  titlePresenter: {fileID: 253107240935385}
   nameText: {fileID: 7247308075277404508}
   sphereRenderer: {fileID: 7364815335140535274}
   crystalCore: {fileID: 2835227251218209176}

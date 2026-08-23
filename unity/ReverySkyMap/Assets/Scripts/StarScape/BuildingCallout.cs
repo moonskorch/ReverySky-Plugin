@@ -7,7 +7,7 @@ public class BuildingCallout : MonoBehaviour
   [SerializeField] private Transform contentRoot;
   [SerializeField] private Transform buildingMarker;
   [SerializeField] private TextMeshPro nameText;
-
+  [SerializeField] private LabelPresenter labelPresenter;
   [SerializeField] private Vector2 elevationAngleDegRange = new Vector2(15f, 90f);
   [SerializeField] private float offset = 0.6f;
 
@@ -41,5 +41,10 @@ public class BuildingCallout : MonoBehaviour
     contentRoot.localPosition = endLocal;     // name at the end of the line
 
     nameText.text = $"<u>{building.Name}</u>";
+  }
+
+  public void SetLabel(bool visible)
+  {
+    labelPresenter.SetModeAllowed(visible);
   }
 }

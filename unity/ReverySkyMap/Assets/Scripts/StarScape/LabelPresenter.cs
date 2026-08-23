@@ -2,57 +2,71 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
-public enum LabelHighlightState
+public sealed class LabelPresenter : MonoBehaviour
 {
-  Normal,
-  Focused,
-  Linked
-}
-
-public sealed class LabelPresenter : MonoBehaviour, ICullingConsumer
-{
-  [SerializeField] private Transform referenceTransform;
+  [SerializeField] private NodeVisibility visibilitySource;
   [SerializeField] private GameObject labelRoot;
   [SerializeField] private Behaviour[] relatedBehaviours;
-  [SerializeField, Min(0.01f)] private float radius = 1f;
-  [SerializeField, Min(0.01f)] private float visibleDistance = 25f;
   [SerializeField] private Material normalMaterialPreset;
   [SerializeField] private Material focusedMaterialPreset;
   [SerializeField] private Material linkedMaterialPreset;
 
   private List<TMP_Text> texts;
-  private bool distanceVisible;
+  private bool modeAllowed = true;
   private LabelHighlightState highlightState;
 
-  public bool TryCreateDistanceEntry(Component node, out CullingManager.Entry entry)
+  private void Start()
   {
-    entry = null;
+    if (visibilitySource == null)
+      visibilitySource = GetComponentInParent<NodeVisibility>();
 
-    Transform reference = referenceTransform != null ? referenceTransform : transform;
-
-    entry = new CullingManager.Entry
-    {
-      node = node != null ? node : this,
-      referenceTransform = reference,
-      consumer = this,
-      radius = radius,
-      visibleDistance = visibleDistance
-    };
-
-    return true;
-  }
-
-  public void SetDistanceVisible(Component node, bool visible)
-  {
-    distanceVisible = visible;
+    SubscribeToVisibilitySource();
+    ApplyTextMaterial();
     ApplyVisibility();
   }
 
-  public void SetHighlightState(LabelHighlightState state)
+  private void OnDestroy()
   {
-    if (highlightState == state)
+    UnsubscribeFromVisibilitySource();
+  }
+
+  public void SetModeAllowed(bool allowed)
+  {
+    if (modeAllowed == allowed)
       return;
 
+    modeAllowed = allowed;
+    ApplyVisibility();
+  }
+
+  private void SubscribeToVisibilitySource()
+  {
+    highlightState = LabelHighlightState.Normal;
+
+    if (visibilitySource == null)
+      return;
+
+    highlightState = visibilitySource.HighlightState;
+    visibilitySource.OnVisibilityChanged += HandleVisibilityChanged;
+    visibilitySource.OnHighlightStateChanged += HandleHighlightStateChanged;
+  }
+
+  private void UnsubscribeFromVisibilitySource()
+  {
+    if (visibilitySource == null)
+      return;
+
+    visibilitySource.OnVisibilityChanged -= HandleVisibilityChanged;
+    visibilitySource.OnHighlightStateChanged -= HandleHighlightStateChanged;
+  }
+
+  private void HandleVisibilityChanged(bool visible)
+  {
+    ApplyVisibility();
+  }
+
+  private void HandleHighlightStateChanged(LabelHighlightState state)
+  {
     highlightState = state;
     ApplyTextMaterial();
     ApplyVisibility();
@@ -60,7 +74,7 @@ public sealed class LabelPresenter : MonoBehaviour, ICullingConsumer
 
   private void ApplyVisibility()
   {
-    bool visible = distanceVisible || highlightState != LabelHighlightState.Normal;
+    bool visible = modeAllowed && visibilitySource != null && visibilitySource.IsVisible;
     SetRelatedBehavioursVisible(visible);
 
     if (labelRoot.activeSelf != visible)

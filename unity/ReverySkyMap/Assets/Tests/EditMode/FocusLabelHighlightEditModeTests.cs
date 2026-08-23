@@ -30,23 +30,24 @@ public class FocusLabelHighlightEditModeTests
     SetPrivateField(label.Presenter, "normalMaterialPreset", normalMaterial);
     SetPrivateField(label.Presenter, "focusedMaterialPreset", focusMaterial);
     SetPrivateField(label.Presenter, "linkedMaterialPreset", linkedMaterial);
+    StartPresenter(label.Presenter);
 
-    label.Presenter.SetDistanceVisible(null, false);
+    label.VisibilitySource.SetDistanceVisible(null, false);
 
     Assert.That(label.LabelRoot.activeSelf, Is.False);
 
-    label.Presenter.SetHighlightState(LabelHighlightState.Focused);
+    label.VisibilitySource.SetHighlightState(LabelHighlightState.Focused);
 
     Assert.That(label.LabelRoot.activeSelf, Is.True);
     Assert.That(label.Text.fontSharedMaterial, Is.SameAs(focusMaterial));
 
-    label.Presenter.SetHighlightState(LabelHighlightState.Normal);
+    label.VisibilitySource.SetHighlightState(LabelHighlightState.Normal);
 
     Assert.That(label.LabelRoot.activeSelf, Is.False);
     Assert.That(label.Text.fontSharedMaterial, Is.SameAs(normalMaterial));
 
-    label.Presenter.SetHighlightState(LabelHighlightState.Linked);
-    label.Presenter.SetDistanceVisible(null, false);
+    label.VisibilitySource.SetHighlightState(LabelHighlightState.Linked);
+    label.VisibilitySource.SetDistanceVisible(null, false);
 
     Assert.That(label.LabelRoot.activeSelf, Is.True);
     Assert.That(label.Text.fontSharedMaterial, Is.SameAs(linkedMaterial));
@@ -69,16 +70,17 @@ public class FocusLabelHighlightEditModeTests
     SetPrivateField(label.Presenter, "normalMaterialPreset", normalMaterial);
     SetPrivateField(label.Presenter, "focusedMaterialPreset", focusMaterial);
     SetPrivateField(label.Presenter, "linkedMaterialPreset", linkedMaterial);
+    StartPresenter(label.Presenter);
 
-    label.Presenter.SetHighlightState(LabelHighlightState.Focused);
+    label.VisibilitySource.SetHighlightState(LabelHighlightState.Focused);
     Assert.That(label.Text.fontSharedMaterial, Is.SameAs(focusMaterial));
 
     label.ReplaceText(replacementMaterial);
-    label.Presenter.SetHighlightState(LabelHighlightState.Linked);
+    label.VisibilitySource.SetHighlightState(LabelHighlightState.Linked);
 
     Assert.That(label.Text.fontSharedMaterial, Is.SameAs(linkedMaterial));
 
-    label.Presenter.SetHighlightState(LabelHighlightState.Normal);
+    label.VisibilitySource.SetHighlightState(LabelHighlightState.Normal);
 
     Assert.That(label.Text.fontSharedMaterial, Is.SameAs(normalMaterial));
 
@@ -100,13 +102,14 @@ public class FocusLabelHighlightEditModeTests
     TMP_Text secondText = label.AddText(secondInitialMaterial);
     SetPrivateField(label.Presenter, "normalMaterialPreset", normalMaterial);
     SetPrivateField(label.Presenter, "focusedMaterialPreset", focusMaterial);
+    StartPresenter(label.Presenter);
 
-    label.Presenter.SetHighlightState(LabelHighlightState.Focused);
+    label.VisibilitySource.SetHighlightState(LabelHighlightState.Focused);
 
     Assert.That(label.Text.fontSharedMaterial, Is.SameAs(focusMaterial));
     Assert.That(secondText.fontSharedMaterial, Is.SameAs(focusMaterial));
 
-    label.Presenter.SetHighlightState(LabelHighlightState.Normal);
+    label.VisibilitySource.SetHighlightState(LabelHighlightState.Normal);
 
     Assert.That(label.Text.fontSharedMaterial, Is.SameAs(normalMaterial));
     Assert.That(secondText.fontSharedMaterial, Is.SameAs(normalMaterial));
@@ -134,9 +137,9 @@ public class FocusLabelHighlightEditModeTests
       new List<TagNode>(),
       MapRuntimeContext.Links);
 
-    graph.LabelA.Presenter.SetDistanceVisible(graph.NoteA, false);
-    graph.LabelB.Presenter.SetDistanceVisible(graph.NoteB, false);
-    graph.LabelC.Presenter.SetDistanceVisible(graph.NoteC, false);
+    graph.LabelA.VisibilitySource.SetDistanceVisible(graph.NoteA, false);
+    graph.LabelB.VisibilitySource.SetDistanceVisible(graph.NoteB, false);
+    graph.LabelC.VisibilitySource.SetDistanceVisible(graph.NoteC, false);
 
     graph.Highlighter.SetFocus(GetNode(index, graph.NoteA), index);
 
@@ -165,9 +168,9 @@ public class FocusLabelHighlightEditModeTests
       new List<TagNode>(),
       MapRuntimeContext.Links);
 
-    graph.LabelA.Presenter.SetDistanceVisible(graph.NoteA, false);
-    graph.LabelB.Presenter.SetDistanceVisible(graph.NoteB, false);
-    graph.LabelC.Presenter.SetDistanceVisible(graph.NoteC, false);
+    graph.LabelA.VisibilitySource.SetDistanceVisible(graph.NoteA, false);
+    graph.LabelB.VisibilitySource.SetDistanceVisible(graph.NoteB, false);
+    graph.LabelC.VisibilitySource.SetDistanceVisible(graph.NoteC, false);
 
     graph.Highlighter.SetFocus(GetNode(index, graph.NoteA), index);
     graph.Highlighter.SetFocus(GetNode(index, graph.NoteC), index);
@@ -197,8 +200,8 @@ public class FocusLabelHighlightEditModeTests
       new List<TagNode>(),
       MapRuntimeContext.Links);
 
-    graph.LabelA.Presenter.SetDistanceVisible(graph.NoteA, false);
-    graph.LabelB.Presenter.SetDistanceVisible(graph.NoteB, false);
+    graph.LabelA.VisibilitySource.SetDistanceVisible(graph.NoteA, false);
+    graph.LabelB.VisibilitySource.SetDistanceVisible(graph.NoteB, false);
 
     graph.Highlighter.SetFocus(GetNode(index, graph.NoteA), index);
     graph.Highlighter.SetFocus(GetNode(index, graph.NoteB), index);
@@ -263,6 +266,13 @@ public class FocusLabelHighlightEditModeTests
     field.SetValue(target, value);
   }
 
+  private static void StartPresenter(LabelPresenter presenter)
+  {
+    MethodInfo startMethod = typeof(LabelPresenter).GetMethod("Start", BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(startMethod, Is.Not.Null, "Missing LabelPresenter.Start.");
+    startMethod.Invoke(presenter, null);
+  }
+
   private static Material CreateMaterial(string name)
   {
     Shader shader = Shader.Find("TextMeshPro/Distance Field");
@@ -282,6 +292,7 @@ public class FocusLabelHighlightEditModeTests
     {
       rootObject = presenterHost == null ? new GameObject(name) : null;
       GameObject hostObject = presenterHost != null ? presenterHost : rootObject;
+      VisibilitySource = hostObject.AddComponent<NodeVisibility>();
       Presenter = hostObject.AddComponent<LabelPresenter>();
       LabelRoot = new GameObject($"{name}_Root");
       LabelRoot.transform.SetParent(hostObject.transform, false);
@@ -291,6 +302,7 @@ public class FocusLabelHighlightEditModeTests
     }
 
     public LabelPresenter Presenter { get; }
+    public NodeVisibility VisibilitySource { get; }
     public GameObject LabelRoot { get; }
     public TMP_Text Text { get; private set; }
 
@@ -369,6 +381,7 @@ public class FocusLabelHighlightEditModeTests
       SetPrivateField(label.Presenter, "normalMaterialPreset", NormalMaterial);
       SetPrivateField(label.Presenter, "focusedMaterialPreset", FocusMaterial);
       SetPrivateField(label.Presenter, "linkedMaterialPreset", LinkedMaterial);
+      StartPresenter(label.Presenter);
 
       return nodeObject;
     }

@@ -9,14 +9,24 @@ using UnityEngine;
 /// </remarks>
 public sealed class LookAtCamera : MonoBehaviour
 {
+  [SerializeField] private LookAtCameraMode mode = LookAtCameraMode.OnCameraChanged;
+
   private void OnEnable()
   {
-    CameraForwardWatcher.I.Register(this);
+    if (mode == LookAtCameraMode.OnCameraChanged)
+      CameraForwardWatcher.I.Register(this);
   }
 
   private void OnDisable()
   {
-    CameraForwardWatcher.I.Unregister(this);
+    if (mode == LookAtCameraMode.OnCameraChanged)
+      CameraForwardWatcher.I.Unregister(this);
+  }
+
+  private void LateUpdate()
+  {
+    if (mode == LookAtCameraMode.EveryFrame)
+      ApplyCameraForward(CameraForwardWatcher.I.CurrentForward);
   }
 
   public void ApplyCameraForward(Vector3 cameraForward)

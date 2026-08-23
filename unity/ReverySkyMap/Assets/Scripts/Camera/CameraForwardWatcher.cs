@@ -9,6 +9,7 @@ public sealed class CameraForwardWatcher : MonoBehaviour
 
   private readonly List<LookAtCamera> targets = new();
   private Vector3 lastForward;
+  public Vector3 CurrentForward => transform.forward;
 
   private void Awake()
   {
@@ -33,7 +34,7 @@ public sealed class CameraForwardWatcher : MonoBehaviour
     if (!targets.Contains(target))
       targets.Add(target);
 
-    target.ApplyCameraForward(lastForward);
+    target.ApplyCameraForward(CurrentForward);
   }
 
   public void Unregister(LookAtCamera target)

@@ -2552,8 +2552,8 @@ MonoBehaviour:
   injectSampleData: 0
   connectionModel: 2
   islands: 2
-  noteCount: 2500
-  tagPoolSize: 50
+  noteCount: 10
+  tagPoolSize: 5
   dateSpanDays: 365
   maxTagsPerNote: 4
   maxBuildingsPerNote: 2

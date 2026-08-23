@@ -80,6 +80,6 @@ public sealed class FocusHighlighter : MonoBehaviour
     if (!graphIndex.TryGetNode(nodeId, out var node))
       return;
 
-    node.Component.GetComponent<LabelPresenter>().SetHighlightState(state);
+    node.Component.GetComponent<NodeVisibility>().SetHighlightState(state);
   }
 }

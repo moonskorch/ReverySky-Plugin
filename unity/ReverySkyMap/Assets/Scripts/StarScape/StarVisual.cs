@@ -1,9 +1,12 @@
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
 public class StarVisual : MonoBehaviour
 {
   [SerializeField] private Star star;
+  [SerializeField] private NodeVisibility visibilitySource;
+  [SerializeField] private LabelPresenter titlePresenter;
 
   [SerializeField] private TextMeshPro nameText;
   [SerializeField] private Renderer sphereRenderer;
@@ -23,21 +26,29 @@ public class StarVisual : MonoBehaviour
   private bool spherePrepared;
   private bool crystalPrepared;
   private bool buildingsPrepared;
+  private readonly List<BuildingCallout> buildingCallouts = new();
+  private ScapeView currentView = ScapeView.Planets;
 
   private void Start()
   {
     crystalCoreBaseScale = crystalCore.localScale;
+
+    visibilitySource.OnVisibilityChanged += HandleVisibilityChanged;
+
     Cartographer.I.OnViewChanged += ApplyView;
     ApplyView(Cartographer.I.CurrentView);
   }
 
   private void OnDestroy()
   {
+    visibilitySource.OnVisibilityChanged -= HandleVisibilityChanged;
     Cartographer.I.OnViewChanged -= ApplyView;
   }
 
   private void ApplyView(ScapeView view)
   {
+    currentView = view;
+
     switch (view)
     {
       case ScapeView.Planets:
@@ -50,6 +61,7 @@ public class StarVisual : MonoBehaviour
         SetBuildingsView();
         break;
       default:
+        currentView = ScapeView.Planets;
         SetPlanetView();
         Debug.LogWarning($"[StarVisual] Unknown view {view}, fallback to Planets.");
         return;
@@ -58,7 +70,7 @@ public class StarVisual : MonoBehaviour
 
   private void SetPlanetView()
   {
-    PrepareTitle();
+    SetTitle(true);
     ShowSphere(true);
     ShowCrystal(true);
     ShowBuildings(false);
@@ -66,7 +78,7 @@ public class StarVisual : MonoBehaviour
 
   private void SetPlainView()
   {
-    PrepareTitle();
+    SetTitle(true);
     ShowSphere(true);
     ShowCrystal(false);
     ShowBuildings(false);
@@ -74,10 +86,24 @@ public class StarVisual : MonoBehaviour
 
   private void SetBuildingsView()
   {
-    PrepareTitle();
+    SetTitle(false);
     ShowSphere(true);
     ShowCrystal(false);
-    ShowBuildings(true);
+    ShowBuildings(visibilitySource.IsVisible);
+  }
+
+  private void SetTitle(bool visible)
+  {
+    if (visible)
+      PrepareTitle();
+
+    titlePresenter.SetModeAllowed(visible);
+  }
+
+  private void HandleVisibilityChanged(bool visible)
+  {
+    if (currentView == ScapeView.Buildings)
+      ShowBuildings(visible);
   }
 
   private void PrepareTitle()
@@ -219,8 +245,16 @@ public class StarVisual : MonoBehaviour
     if (show)
       PrepareBuildings();
 
+    SetBuildingLabels(show);
+
     if (buildings.activeSelf != show)
       buildings.SetActive(show);
+  }
+
+  private void SetBuildingLabels(bool visible)
+  {
+    for (int i = 0; i < buildingCallouts.Count; i++)
+      buildingCallouts[i].SetLabel(visible);
   }
 
   private void PrepareBuildings()
@@ -252,6 +286,7 @@ public class StarVisual : MonoBehaviour
 
       callout.transform.localPosition = Vector3.zero; // root remains at the parent's center
       callout.Init(activeBuildings[i], sphereRadius, angle);
+      buildingCallouts.Add(callout);
     }
 
     buildingsPrepared = true;
