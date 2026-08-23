@@ -135,8 +135,7 @@ public class ObsidianBridge : MonoBehaviour
         Length = Mathf.Max(0, note.size),
         CrystalType = CrystalType.Unknown,
         SphereType = SphereType.Unknown,
-        TagIds = tagIds,
-        ScapeView = ScapeView.Planets
+        TagIds = tagIds
       });
     }
 

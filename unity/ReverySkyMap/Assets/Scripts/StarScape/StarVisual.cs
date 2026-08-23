@@ -19,21 +19,25 @@ public class StarVisual : MonoBehaviour
 
   private Vector3 crystalCoreBaseScale = Vector3.one;
 
+  // TODO Real laziness: do not set before visible
+  private bool titlePrepared;
+  private bool spherePrepared;
+  private bool crystalPrepared;
+
   private void Start()
   {
     crystalCoreBaseScale = crystalCore.localScale;
-    star.OnDataChanged += UpdateVisual;
-    UpdateVisual();
+    Cartographer.I.OnViewChanged += ApplyView;
+    ApplyView(Cartographer.I.CurrentView);
   }
 
-  private void OnDisable()
+  private void OnDestroy()
   {
-    star.OnDataChanged -= UpdateVisual;
+    Cartographer.I.OnViewChanged -= ApplyView;
   }
 
-  private void UpdateVisual()
+  private void ApplyView(ScapeView view)
   {
-    var view = star.Data.ScapeView;
     switch (view)
     {
       case ScapeView.Planets:
@@ -54,7 +58,7 @@ public class StarVisual : MonoBehaviour
 
   private void SetPlanetView()
   {
-    UpdateTitle();
+    PrepareTitle();
     ShowSphere(true);
     ShowCrystal(true);
     ShowBuildings(false);
@@ -62,7 +66,7 @@ public class StarVisual : MonoBehaviour
 
   private void SetPlainView()
   {
-    UpdateTitle();
+    PrepareTitle();
     ShowSphere(true);
     ShowCrystal(false);
     ShowBuildings(false);
@@ -70,34 +74,58 @@ public class StarVisual : MonoBehaviour
 
   private void SetBuildingsView()
   {
-    UpdateTitle();
+    PrepareTitle();
     ShowSphere(true);
     ShowCrystal(false);
     ShowBuildings(true);
   }
 
-  private void UpdateTitle()
+  private void PrepareTitle()
   {
+    if (titlePrepared)
+      return;
+
     nameText.text = star.Data.Name;
+    titlePrepared = true;
   }
 
   private void ShowSphere(bool show)
   {
-    sphere.SetActive(show);
-    if (!show) return;
+    if (show)
+      PrepareSphere();
 
-    var sphereMap = ResolveRandomSphereMaterial();
-    sphereRenderer.sharedMaterial = sphereMap?.material ?? sphereMaterialCatalog.defaultMaterial;
+    if (sphere.activeSelf != show)
+      sphere.SetActive(show);
   }
 
   private void ShowCrystal(bool show)
   {
-    crystal.SetActive(show);
-    if (!show) return;
+    if (show)
+      PrepareCrystal();
+
+    if (crystal.activeSelf != show)
+      crystal.SetActive(show);
+  }
+
+  private void PrepareSphere()
+  {
+    if (spherePrepared)
+      return;
+
+    var sphereMap = ResolveRandomSphereMaterial();
+    sphereRenderer.sharedMaterial = sphereMap?.material ?? sphereMaterialCatalog.defaultMaterial;
+    spherePrepared = true;
+  }
+
+  private void PrepareCrystal()
+  {
+    if (crystalPrepared)
+      return;
 
     var selectedCore = ResolveCrystalTypeByDirectLinkCount(star.Data.DirectLinkCount);
     var scaleMultiplier = ResolveCrystalScaleMultiplier(selectedCore);
     crystalCore.localScale = crystalCoreBaseScale * scaleMultiplier;
+    crystalPrepared = true;
   }
 
   private SphereType_Material ResolveRandomSphereMaterial()

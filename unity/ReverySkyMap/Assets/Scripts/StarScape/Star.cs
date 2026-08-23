@@ -1,4 +1,3 @@
-﻿using System;
 using UnityEngine;
 
 public class Star : MonoBehaviour
@@ -10,17 +9,8 @@ public class Star : MonoBehaviour
   /// </summary>
   public NoteData Data { get; private set; } = new NoteData();
 
-  public event Action OnDataChanged;
-
   public void SetData(NoteData data)
   {
     Data = data;
-    OnDataChanged?.Invoke();
-  }
-
-  public void SetView(ScapeView view) 
-  {
-    Data.ScapeView = view;
-    OnDataChanged?.Invoke();
   }
 }

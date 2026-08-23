@@ -251,12 +251,6 @@ public class Cartographer25DEngine : MonoBehaviour, ICartographerEngine
 
   public void ApplyView(ScapeView view)
   {
-    for (int i = 0; i < _nodes.Count; i++)
-    {
-      var n = _nodes[i];
-      if (n.star != null)
-        n.star.SetView(view);
-    }
   }
 
   private static float RandomRange(System.Random rng, float min, float max)
