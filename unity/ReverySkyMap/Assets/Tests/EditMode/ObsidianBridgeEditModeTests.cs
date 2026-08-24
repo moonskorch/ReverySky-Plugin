@@ -825,6 +825,50 @@ public class ObsidianBridgeEditModeTests
   }
 
   [Test]
+  public void BuildingCallout_ResolveDirection_NormalizesNameForStableLayout()
+  {
+    MethodInfo resolver = typeof(BuildingCallout).GetMethod(
+      "ResolveDirection",
+      BindingFlags.Static | BindingFlags.NonPublic);
+
+    Assert.That(resolver, Is.Not.Null);
+    var elevationRange = new Vector2(15f, 90f);
+    Vector3 first = ResolveBuildingDirection(resolver, "  Name  ", elevationRange);
+    Vector3 second = ResolveBuildingDirection(resolver, "name", elevationRange);
+
+    Assert.That(Vector3.Distance(first, second), Is.LessThan(0.000001f));
+  }
+
+  [Test]
+  public void BuildingCallout_ResolveDirection_DistributesSequentialNames()
+  {
+    MethodInfo resolver = typeof(BuildingCallout).GetMethod(
+      "ResolveDirection",
+      BindingFlags.Static | BindingFlags.NonPublic);
+
+    Assert.That(resolver, Is.Not.Null);
+    var elevationRange = new Vector2(15f, 90f);
+    Vector3 first = ResolveBuildingDirection(resolver, "Building 1", elevationRange);
+    Vector3 second = ResolveBuildingDirection(resolver, "Building 2", elevationRange);
+    Vector3 third = ResolveBuildingDirection(resolver, "Building 3", elevationRange);
+    Vector3 fourth = ResolveBuildingDirection(resolver, "Building 4", elevationRange);
+
+    Assert.That(Vector3.Distance(first, second), Is.GreaterThan(0.25f));
+    Assert.That(Vector3.Distance(first, third), Is.GreaterThan(0.25f));
+    Assert.That(Vector3.Distance(first, fourth), Is.GreaterThan(0.25f));
+    Assert.That(Vector3.Distance(second, third), Is.GreaterThan(0.25f));
+    Assert.That(Vector3.Distance(second, fourth), Is.GreaterThan(0.25f));
+    Assert.That(Vector3.Distance(third, fourth), Is.GreaterThan(0.25f));
+  }
+
+  [Test]
+  public void StableTextHash_NormalizeCaseInsensitiveKey_TrimsAndUppercases()
+  {
+    Assert.That(StableTextHash.NormalizeCaseInsensitiveKey("  Name  "), Is.EqualTo("NAME"));
+    Assert.That(StableTextHash.NormalizeCaseInsensitiveKey(null), Is.EqualTo(string.Empty));
+  }
+
+  [Test]
   public void OnGraphSet_RepeatApply_ReplacesPreviousStateWithoutStaleData()
   {
     bridge.OnGraphSet(TestPayloads.RepeatApplyPayloadA);
@@ -1069,6 +1113,11 @@ public class ObsidianBridgeEditModeTests
   private static CrystalType ResolveCrystalType(MethodInfo resolver, int directLinkCount)
   {
     return (CrystalType)resolver.Invoke(null, new object[] { directLinkCount });
+  }
+
+  private static Vector3 ResolveBuildingDirection(MethodInfo resolver, string buildingName, Vector2 elevationRange)
+  {
+    return (Vector3)resolver.Invoke(null, new object[] { buildingName, elevationRange });
   }
 
   private sealed class TestCartographerEngine : ICartographerEngine

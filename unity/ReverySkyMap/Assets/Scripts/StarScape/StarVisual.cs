@@ -289,15 +289,10 @@ public class StarVisual : MonoBehaviour
       return;
     }
 
-    float angleStep = Mathf.PI * 2f / activeBuildings.Count;
     float sphereRadius = 0.5f * sphereRenderer.transform.localScale.x;
 
     for (int i = 0; i < activeBuildings.Count; i++)
     {
-      float baseAngle = angleStep * i;
-      float offset = Rng.Range(-angleStep * 0.25f, angleStep * 0.25f);
-      float angle = baseAngle + offset;
-
       var callout = Instantiate(
           buildingPrefab,
           buildings.transform.position,   // center of the sphere
@@ -305,7 +300,7 @@ public class StarVisual : MonoBehaviour
           buildings.transform);           // all the buildings' container
 
       callout.transform.localPosition = Vector3.zero; // root remains at the parent's center
-      callout.Init(activeBuildings[i], sphereRadius, angle);
+      callout.Init(activeBuildings[i], sphereRadius);
       buildingCallouts.Add(callout);
     }
 

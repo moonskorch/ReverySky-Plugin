@@ -3,6 +3,10 @@ using UnityEngine;
 
 public class BuildingCallout : MonoBehaviour
 {
+  private const int AzimuthSalt = 101;
+  private const int ElevationSalt = 211;
+  private const int SignSalt = 307;
+
   [SerializeField] private LineRenderer lineRenderer;
   [SerializeField] private Transform contentRoot;
   [SerializeField] private Transform buildingMarker;
@@ -11,23 +15,9 @@ public class BuildingCallout : MonoBehaviour
   [SerializeField] private Vector2 elevationAngleDegRange = new Vector2(15f, 90f);
   [SerializeField] private float offset = 0.6f;
 
-  public void Init(BuildingData building, float sphereRadius, float angleRad)
+  public void Init(BuildingData building, float sphereRadius)
   {
-    // random vertical elevation
-    float elevationDeg = Rng.Range(
-      elevationAngleDegRange.x,
-      elevationAngleDegRange.y);
-
-    // up or down
-    float sign = Rng.Coin() ? -1f : 1f;
-    float elevationRad = elevationDeg * Mathf.Deg2Rad * sign;
-
-    // line direction with angle and elevation
-    var dir = new Vector3(
-      Mathf.Cos(angleRad) * Mathf.Cos(elevationRad),
-      Mathf.Sin(elevationRad),
-      Mathf.Sin(angleRad) * Mathf.Cos(elevationRad)
-    ).normalized;
+    var dir = ResolveDirection(building.Name, elevationAngleDegRange);
 
     var startLocal = dir * sphereRadius;
     var endLocal = dir * (sphereRadius + offset);
@@ -41,6 +31,21 @@ public class BuildingCallout : MonoBehaviour
     contentRoot.localPosition = endLocal;     // name at the end of the line
 
     nameText.text = $"<u>{building.Name}</u>";
+  }
+
+  private static Vector3 ResolveDirection(string buildingName, Vector2 elevationRange)
+  {
+    string layoutKey = StableTextHash.NormalizeCaseInsensitiveKey(buildingName);
+    float azimuthRad = StableTextHash.Hash01(layoutKey, AzimuthSalt) * Mathf.PI * 2f;
+    float elevationDeg = Mathf.Lerp(elevationRange.x, elevationRange.y, StableTextHash.Hash01(layoutKey, ElevationSalt));
+    float sign = StableTextHash.Hash01(layoutKey, SignSalt) < 0.5f ? -1f : 1f;
+    float elevationRad = elevationDeg * Mathf.Deg2Rad * sign;
+
+    return new Vector3(
+      Mathf.Cos(azimuthRad) * Mathf.Cos(elevationRad),
+      Mathf.Sin(elevationRad),
+      Mathf.Sin(azimuthRad) * Mathf.Cos(elevationRad)
+    ).normalized;
   }
 
   public void SetLabel(bool visible)
