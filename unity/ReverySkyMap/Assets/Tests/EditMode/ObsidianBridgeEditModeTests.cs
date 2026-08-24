@@ -833,32 +833,55 @@ public class ObsidianBridgeEditModeTests
 
     Assert.That(resolver, Is.Not.Null);
     var elevationRange = new Vector2(15f, 90f);
-    Vector3 first = ResolveBuildingDirection(resolver, "  Name  ", elevationRange);
-    Vector3 second = ResolveBuildingDirection(resolver, "name", elevationRange);
+    Vector3 first = ResolveBuildingDirection(resolver, "  Name  ", elevationRange, 64);
+    Vector3 second = ResolveBuildingDirection(resolver, "name", elevationRange, 64);
 
     Assert.That(Vector3.Distance(first, second), Is.LessThan(0.000001f));
   }
 
   [Test]
-  public void BuildingCallout_ResolveDirection_DistributesSequentialNames()
+  public void BuildingCallout_ResolvePreferredSlot_DistributesSequentialNames()
+  {
+    var slots = new HashSet<int>
+    {
+      BuildingCallout.ResolvePreferredSlot("Building 1", 64),
+      BuildingCallout.ResolvePreferredSlot("Building 2", 64),
+      BuildingCallout.ResolvePreferredSlot("Building 3", 64),
+      BuildingCallout.ResolvePreferredSlot("Building 4", 64)
+    };
+
+    Assert.That(slots, Has.Count.EqualTo(4));
+  }
+
+  [Test]
+  public void BuildingCallout_ResolveAvailableSlot_UsesFirstFreeSlotAfterOccupiedPreferredSlot()
+  {
+    var occupiedSlots = new bool[8];
+    occupiedSlots[2] = true;
+    occupiedSlots[3] = true;
+
+    int resolvedSlot = BuildingCallout.ResolveAvailableSlot(2, occupiedSlots);
+
+    Assert.That(resolvedSlot, Is.EqualTo(4));
+  }
+
+  [Test]
+  public void BuildingCallout_ResolveSlotDirection_Uses3DSlotsWithinElevationRange()
   {
     MethodInfo resolver = typeof(BuildingCallout).GetMethod(
-      "ResolveDirection",
+      "ResolveSlotDirection",
       BindingFlags.Static | BindingFlags.NonPublic);
 
     Assert.That(resolver, Is.Not.Null);
     var elevationRange = new Vector2(15f, 90f);
-    Vector3 first = ResolveBuildingDirection(resolver, "Building 1", elevationRange);
-    Vector3 second = ResolveBuildingDirection(resolver, "Building 2", elevationRange);
-    Vector3 third = ResolveBuildingDirection(resolver, "Building 3", elevationRange);
-    Vector3 fourth = ResolveBuildingDirection(resolver, "Building 4", elevationRange);
+    Vector3 first = ResolveSlotDirection(resolver, 0, 64, elevationRange);
+    Vector3 second = ResolveSlotDirection(resolver, 2, 64, elevationRange);
+    float firstElevationDeg = Mathf.Asin(Mathf.Abs(first.y)) * Mathf.Rad2Deg;
+    float secondElevationDeg = Mathf.Asin(Mathf.Abs(second.y)) * Mathf.Rad2Deg;
 
-    Assert.That(Vector3.Distance(first, second), Is.GreaterThan(0.25f));
-    Assert.That(Vector3.Distance(first, third), Is.GreaterThan(0.25f));
-    Assert.That(Vector3.Distance(first, fourth), Is.GreaterThan(0.25f));
-    Assert.That(Vector3.Distance(second, third), Is.GreaterThan(0.25f));
-    Assert.That(Vector3.Distance(second, fourth), Is.GreaterThan(0.25f));
-    Assert.That(Vector3.Distance(third, fourth), Is.GreaterThan(0.25f));
+    Assert.That(firstElevationDeg, Is.InRange(15f, 90f));
+    Assert.That(secondElevationDeg, Is.InRange(15f, 90f));
+    Assert.That(Mathf.Abs(first.y - second.y), Is.GreaterThan(0.000001f));
   }
 
   [Test]
@@ -1115,9 +1138,22 @@ public class ObsidianBridgeEditModeTests
     return (CrystalType)resolver.Invoke(null, new object[] { directLinkCount });
   }
 
-  private static Vector3 ResolveBuildingDirection(MethodInfo resolver, string buildingName, Vector2 elevationRange)
+  private static Vector3 ResolveBuildingDirection(
+    MethodInfo resolver,
+    string buildingName,
+    Vector2 elevationRange,
+    int slotCount)
   {
-    return (Vector3)resolver.Invoke(null, new object[] { buildingName, elevationRange });
+    return (Vector3)resolver.Invoke(null, new object[] { buildingName, elevationRange, slotCount });
+  }
+
+  private static Vector3 ResolveSlotDirection(
+    MethodInfo resolver,
+    int slotIndex,
+    int slotCount,
+    Vector2 elevationRange)
+  {
+    return (Vector3)resolver.Invoke(null, new object[] { slotIndex, slotCount, elevationRange });
   }
 
   private sealed class TestCartographerEngine : ICartographerEngine

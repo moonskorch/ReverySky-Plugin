@@ -290,17 +290,20 @@ public class StarVisual : MonoBehaviour
     }
 
     float sphereRadius = 0.5f * sphereRenderer.transform.localScale.x;
+    int slotCount = buildingPrefab.DirectionSlotCount;
+    var occupiedSlots = new bool[slotCount];
 
     for (int i = 0; i < activeBuildings.Count; i++)
     {
-      var callout = Instantiate(
-          buildingPrefab,
-          buildings.transform.position,   // center of the sphere
-          Quaternion.identity,
-          buildings.transform);           // all the buildings' container
+      var building = activeBuildings[i];
+      int preferredSlot = BuildingCallout.ResolvePreferredSlot(building.Name, slotCount);
+      int resolvedSlot = BuildingCallout.ResolveAvailableSlot(preferredSlot, occupiedSlots);
+      occupiedSlots[resolvedSlot] = true;
 
-      callout.transform.localPosition = Vector3.zero; // root remains at the parent's center
-      callout.Init(activeBuildings[i], sphereRadius);
+      var callout = Instantiate(buildingPrefab, buildings.transform);
+
+      callout.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+      callout.Init(building, sphereRadius, resolvedSlot);
       buildingCallouts.Add(callout);
     }
 

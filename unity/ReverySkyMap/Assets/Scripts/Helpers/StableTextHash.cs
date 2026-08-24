@@ -6,6 +6,14 @@ public static class StableTextHash
   public static float Hash01(string value, int salt)
     => (Hash(value, salt) >> 8) / 16777215f;
 
+  public static int Index(string value, int salt, int count)
+  {
+    if (count <= 0)
+      return 0;
+
+    return (int)(Hash(value, salt) % (uint)count);
+  }
+
   public static uint Hash(string value, int salt)
   {
     unchecked

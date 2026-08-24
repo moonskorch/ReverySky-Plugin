@@ -195,7 +195,8 @@ MonoBehaviour:
   buildingMarker: {fileID: 2936728012321917775}
   nameText: {fileID: 2014586812831880777}
   labelPresenter: {fileID: 9183001000000000001}
-  elevationAngleDegRange: {x: 15, y: 90}
+  elevationAngleDegRange: {x: 0, y: 90}
+  directionSlotCount: 16
   offset: 0.6
 --- !u!114 &9183001000000000001
 MonoBehaviour:
