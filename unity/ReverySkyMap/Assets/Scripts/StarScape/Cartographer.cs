@@ -35,6 +35,9 @@ public class Cartographer : MonoBehaviour
   [SerializeField] private LineBuilder lineBuilder;
   [SerializeField] private CullingManager cullingManager;
 
+  [Header("Visual Effects")]
+  [SerializeField] private StarPulseAnimator starPulseAnimator;
+
   private ScapeView currentView = ScapeView.Planets;
   public ScapeView CurrentView => currentView;
 
@@ -288,6 +291,7 @@ public class Cartographer : MonoBehaviour
 
     var visual = star.GetComponentInChildren<StarVisual>(true);
     visual?.RefreshBuildings();
+    starPulseAnimator?.Play(visual.transform);
   }
 
   private void BindActiveWarper(ScapeCameraWarper warper)
