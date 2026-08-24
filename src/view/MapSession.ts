@@ -655,7 +655,9 @@ export class MapSession {
           }
 
           if (nextSignature.landmarks !== previousSignature.landmarks) {
-            this.sendNoteUpdateForPath(path, cache);
+            const buildings = this.extractFrontmatterLandmarks(cache?.frontmatter);
+            this.updateCachedNoteBuildings(path, buildings);
+            this.sendNoteUpdateForPath(path, buildings);
           }
         })
       );
@@ -856,7 +858,36 @@ export class MapSession {
     });
   }
 
-  private sendNoteUpdateForPath(path: string, cache: CachedMetadata): void {
+  private updateCachedNoteBuildings(path: string, buildings: string[]): void {
+    this.updateGraphPayloadNoteBuildings(this.sourceGraphPayload, path, buildings);
+    this.updateGraphPayloadNoteBuildings(this.outgoingGraphPayload, path, buildings);
+  }
+
+  private updateGraphPayloadNoteBuildings(
+    payload: GraphPayload | null,
+    path: string,
+    buildings: string[]
+  ): void {
+    if (!payload) {
+      return;
+    }
+
+    const normalizedPath = this.normalizeVaultPath(path);
+    const note = payload.notes.find((candidate) => (
+      this.normalizeVaultPath(candidate.path) === normalizedPath
+    ));
+    if (!note) {
+      return;
+    }
+
+    if (buildings.length > 0) {
+      note.buildings = [...buildings];
+    } else {
+      delete note.buildings;
+    }
+  }
+
+  private sendNoteUpdateForPath(path: string, buildings: string[]): void {
     if (!this.bridgeReady) {
       return;
     }
@@ -864,7 +895,7 @@ export class MapSession {
     this.sendNoteUpdate({
       id: makeStableNoteId(path),
       path,
-      buildings: this.extractFrontmatterLandmarks(cache?.frontmatter)
+      buildings
     });
   }
 
