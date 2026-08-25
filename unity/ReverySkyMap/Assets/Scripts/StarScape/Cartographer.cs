@@ -144,9 +144,10 @@ public class Cartographer : MonoBehaviour
 
     SetCurrentView(CurrentView);
     MapRuntimeContext.ClearBuildingGraphRequestId();
-
+    
     var engine = ResolveModeByNotesCount(noteCount, layoutPreference);
     SwitchEngine(engine);
+    BuildingManager.I.Clear();
     ApplyGraphIndex(MapGraphIndex.Empty, updateFocus: noteCount == 0);
   }
 

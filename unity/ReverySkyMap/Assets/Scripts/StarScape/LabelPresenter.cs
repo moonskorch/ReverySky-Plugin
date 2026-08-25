@@ -7,9 +7,7 @@ public sealed class LabelPresenter : MonoBehaviour
   [SerializeField] private NodeVisibility visibilitySource;
   [SerializeField] private GameObject labelRoot;
   [SerializeField] private Behaviour[] relatedBehaviours;
-  [SerializeField] private Material normalMaterialPreset;
-  [SerializeField] private Material focusedMaterialPreset;
-  [SerializeField] private Material linkedMaterialPreset;
+  [SerializeField] private LabelHighlightPresenter highlightPresenter;
 
   private List<TMP_Text> texts;
   private bool modeAllowed = true;
@@ -88,24 +86,7 @@ public sealed class LabelPresenter : MonoBehaviour
 
     texts ??= new List<TMP_Text>();
     labelRoot.GetComponentsInChildren<TMP_Text>(true, texts);
-    for (int i = 0; i < texts.Count; i++)
-    {
-      TMP_Text text = texts[i];
-      Material nextMaterial = ResolveMaterialPreset();
-
-      if (text.fontSharedMaterial != nextMaterial)
-        text.fontSharedMaterial = nextMaterial;
-    }
-  }
-
-  private Material ResolveMaterialPreset()
-  {
-    return highlightState switch
-    {
-      LabelHighlightState.Focused => focusedMaterialPreset,
-      LabelHighlightState.Linked => linkedMaterialPreset,
-      _ => normalMaterialPreset
-    };
+    highlightPresenter.Apply(texts, highlightState);
   }
 
   private void SetRelatedBehavioursVisible(bool visible)

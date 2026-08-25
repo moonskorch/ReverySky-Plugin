@@ -10,12 +10,34 @@ public class BuildingCallout : MonoBehaviour
   [SerializeField] private Transform contentRoot;
   [SerializeField] private Transform buildingMarker;
   [SerializeField] private TextMeshPro nameText;
-  [SerializeField] private LabelPresenter labelPresenter;
+  [SerializeField] private LabelHighlightPresenter highlightPresenter;
+  [SerializeField] private Behaviour[] relatedBehaviours;
   [SerializeField] private Vector2 elevationAngleDegRange = new Vector2(15f, 90f);
   [SerializeField, Range(1, 64)] private int directionSlotCount = 16;
   [SerializeField] private float offset = 0.6f;
 
   public int DirectionSlotCount => directionSlotCount;
+
+  public void PrepareForUse(Transform parent)
+  {
+    if (parent != null && transform.parent != parent)
+      transform.SetParent(parent, false);
+
+    transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+    gameObject.SetActive(true);
+    SetRelatedBehavioursEnabled(true);
+  }
+
+  public void PrepareForPool(Transform parent)
+  {
+    if (parent != null && transform.parent != parent)
+      transform.SetParent(parent, false);
+
+    lineRenderer.positionCount = 0;
+    nameText.text = string.Empty;
+    SetRelatedBehavioursEnabled(false);
+    gameObject.SetActive(false);
+  }
 
   public void Init(BuildingData building, float sphereRadius, int slotIndex)
   {
@@ -34,6 +56,9 @@ public class BuildingCallout : MonoBehaviour
 
     nameText.text = $"<u>{building.Name}</u>";
   }
+
+  public void ApplyHighlight(LabelHighlightState state)
+    => highlightPresenter.Apply(nameText, state);
 
   private static Vector3 ResolveDirection(string buildingName, Vector2 elevationRange, int slotCount)
   {
@@ -104,8 +129,9 @@ public class BuildingCallout : MonoBehaviour
   private static int PositiveModulo(int value, int modulo)
     => ((value % modulo) + modulo) % modulo;
 
-  public void SetLabel(bool visible)
+  private void SetRelatedBehavioursEnabled(bool enabled)
   {
-    labelPresenter.SetModeAllowed(visible);
+    for (int i = 0; i < relatedBehaviours.Length; i++)
+      relatedBehaviours[i].enabled = enabled;
   }
 }

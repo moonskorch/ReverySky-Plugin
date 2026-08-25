@@ -11,6 +11,8 @@ public class ObsidianBridgeEditModeTests
   private GameObject bridgeObject;
   private ObsidianBridge bridge;
   private GameObject cartographerObject;
+  private GameObject buildingManagerObject;
+  private GameObject buildingCalloutPrefabObject;
   private int originalTargetFrameRate;
   private int originalVSyncCount;
 
@@ -19,8 +21,10 @@ public class ObsidianBridgeEditModeTests
   {
     originalTargetFrameRate = Application.targetFrameRate;
     originalVSyncCount = QualitySettings.vSyncCount;
-    ResetRuntimeContext();
     SetCartographerSingleton(null);
+    SetBuildingManagerSingleton(null);
+    EnsureBuildingManagerSingleton();
+    ResetRuntimeContext();
     bridgeObject = new GameObject("ObsidianBridgeEditModeTests");
     bridge = bridgeObject.AddComponent<ObsidianBridge>();
     ResetBridgeSubscriptions();
@@ -30,11 +34,19 @@ public class ObsidianBridgeEditModeTests
   public void TearDown()
   {
     SetCartographerSingleton(null);
+    SetBuildingManagerSingleton(null);
+
     if (cartographerObject != null)
       Object.DestroyImmediate(cartographerObject);
 
     if (bridgeObject != null)
       Object.DestroyImmediate(bridgeObject);
+
+    if (buildingManagerObject != null)
+      Object.DestroyImmediate(buildingManagerObject);
+
+    if (buildingCalloutPrefabObject != null)
+      Object.DestroyImmediate(buildingCalloutPrefabObject);
 
     Application.targetFrameRate = originalTargetFrameRate;
     QualitySettings.vSyncCount = originalVSyncCount;
@@ -1095,10 +1107,29 @@ public class ObsidianBridgeEditModeTests
     SetCartographerSingleton(cartographer);
   }
 
+  private void EnsureBuildingManagerSingleton()
+  {
+    buildingCalloutPrefabObject = new GameObject("ObsidianBridgeEditModeTests_BuildingCalloutPrefab");
+    BuildingCallout calloutPrefab = buildingCalloutPrefabObject.AddComponent<BuildingCallout>();
+
+    buildingManagerObject = new GameObject("ObsidianBridgeEditModeTests_BuildingManager");
+    buildingManagerObject.SetActive(false);
+    BuildingManager manager = buildingManagerObject.AddComponent<BuildingManager>();
+    SetPrivateField(manager, "buildingPrefab", calloutPrefab);
+    InvokeBuildingManagerAwake(manager);
+  }
+
   private static void SetCartographerSingleton(Cartographer value)
   {
     FieldInfo singletonBackingField =
       typeof(Cartographer).GetField("<I>k__BackingField", BindingFlags.Static | BindingFlags.NonPublic);
+    singletonBackingField?.SetValue(null, value);
+  }
+
+  private static void SetBuildingManagerSingleton(BuildingManager value)
+  {
+    FieldInfo singletonBackingField =
+      typeof(BuildingManager).GetField("<I>k__BackingField", BindingFlags.Static | BindingFlags.NonPublic);
     singletonBackingField?.SetValue(null, value);
   }
 
@@ -1107,6 +1138,13 @@ public class ObsidianBridgeEditModeTests
     FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
     Assert.That(field, Is.Not.Null, $"Missing field {fieldName}.");
     field.SetValue(target, value);
+  }
+
+  private static void InvokeBuildingManagerAwake(BuildingManager manager)
+  {
+    MethodInfo awakeMethod = typeof(BuildingManager).GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(awakeMethod, Is.Not.Null, "Missing BuildingManager.Awake.");
+    awakeMethod.Invoke(manager, null);
   }
 
   private static IEnumerator InvokeCartographerRebuildGraphAfterClear(

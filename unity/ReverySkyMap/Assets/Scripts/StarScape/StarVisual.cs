@@ -13,7 +13,6 @@ public class StarVisual : MonoBehaviour
   [SerializeField] private Transform crystalCore;
   [SerializeField] private SphereMaterialCatalogSO sphereMaterialCatalog;
   [SerializeField] private CrystalTypeScaleMapperSO crystalScaleMapper;
-  [SerializeField] private BuildingCallout buildingPrefab;
 
   [Header("Switched sections")]
   [SerializeField] private GameObject sphere;
@@ -25,23 +24,28 @@ public class StarVisual : MonoBehaviour
   private bool titlePrepared;
   private bool spherePrepared;
   private bool crystalPrepared;
-  private bool buildingsPrepared;
-  private readonly List<BuildingCallout> buildingCallouts = new();
   private ScapeView currentView = ScapeView.Planets;
+
+  public Transform BuildingRoot => buildings.transform;
+  public float BuildingSphereRadius => 0.5f * sphereRenderer.transform.localScale.x;
+  public IReadOnlyList<BuildingData> BuildingData => star.Data.Buildings;
 
   private void Start()
   {
     crystalCoreBaseScale = crystalCore.localScale;
 
     visibilitySource.OnVisibilityChanged += HandleVisibilityChanged;
+    visibilitySource.OnHighlightStateChanged += HandleHighlightStateChanged;
 
     Cartographer.I.OnViewChanged += ApplyView;
+
     ApplyView(Cartographer.I.CurrentView);
   }
 
   private void OnDestroy()
   {
     visibilitySource.OnVisibilityChanged -= HandleVisibilityChanged;
+    visibilitySource.OnHighlightStateChanged -= HandleHighlightStateChanged;
     Cartographer.I.OnViewChanged -= ApplyView;
   }
 
@@ -89,7 +93,7 @@ public class StarVisual : MonoBehaviour
     SetTitle(false);
     ShowSphere(true);
     ShowCrystal(false);
-    ShowBuildings(visibilitySource.IsVisible);
+    SyncBuildings();
   }
 
   private void SetTitle(bool visible)
@@ -103,7 +107,13 @@ public class StarVisual : MonoBehaviour
   private void HandleVisibilityChanged(bool visible)
   {
     if (currentView == ScapeView.Buildings)
-      ShowBuildings(visible);
+      SyncBuildings();
+  }
+
+  private void HandleHighlightStateChanged(LabelHighlightState state)
+  {
+    if (currentView == ScapeView.Buildings)
+      SyncBuildings();
   }
 
   private void PrepareTitle()
@@ -242,71 +252,17 @@ public class StarVisual : MonoBehaviour
 
   private void ShowBuildings(bool show)
   {
-    if (show)
-      PrepareBuildings();
-
-    SetBuildingLabels(show);
-
-    if (buildings.activeSelf != show)
-      buildings.SetActive(show);
+    BuildingManager.I.Register(this, show, visibilitySource.HighlightState);
   }
 
   public void RefreshBuildings()
   {
-    ClearBuildings();
-    buildingsPrepared = false;
+    BuildingManager.I.Refresh(this);
 
     if (currentView == ScapeView.Buildings)
-      ShowBuildings(visibilitySource.IsVisible);
+      SyncBuildings();
   }
 
-  private void ClearBuildings()
-  {
-    for (int i = 0; i < buildingCallouts.Count; i++)
-    {
-      if (buildingCallouts[i] != null)
-        Destroy(buildingCallouts[i].gameObject);
-    }
-
-    buildingCallouts.Clear();
-  }
-
-  private void SetBuildingLabels(bool visible)
-  {
-    for (int i = 0; i < buildingCallouts.Count; i++)
-      buildingCallouts[i].SetLabel(visible);
-  }
-
-  private void PrepareBuildings()
-  {
-    if (buildingsPrepared)
-      return;
-
-    var activeBuildings = star.Data.Buildings;
-    if (activeBuildings.Count == 0)
-    {
-      buildingsPrepared = true;
-      return;
-    }
-
-    float sphereRadius = 0.5f * sphereRenderer.transform.localScale.x;
-    int slotCount = buildingPrefab.DirectionSlotCount;
-    var occupiedSlots = new bool[slotCount];
-
-    for (int i = 0; i < activeBuildings.Count; i++)
-    {
-      var building = activeBuildings[i];
-      int preferredSlot = BuildingCallout.ResolvePreferredSlot(building.Name, slotCount);
-      int resolvedSlot = BuildingCallout.ResolveAvailableSlot(preferredSlot, occupiedSlots);
-      occupiedSlots[resolvedSlot] = true;
-
-      var callout = Instantiate(buildingPrefab, buildings.transform);
-
-      callout.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
-      callout.Init(building, sphereRadius, resolvedSlot);
-      buildingCallouts.Add(callout);
-    }
-
-    buildingsPrepared = true;
-  }
+  private void SyncBuildings()
+    => ShowBuildings(currentView == ScapeView.Buildings && visibilitySource.IsVisible);
 }

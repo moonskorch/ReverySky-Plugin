@@ -1,0 +1,376 @@
+using System.Collections.Generic;
+using System.Reflection;
+using NUnit.Framework;
+using TMPro;
+using UnityEditor;
+using UnityEngine;
+using UnityEngine.TestTools;
+
+public sealed class BuildingManagerEditModeTests
+{
+  [Test]
+  public void Register_NormalStars_CreatePartialCalloutsWithinBudget()
+  {
+    using var scope = new BuildingManagerScope(maxActiveCallouts: 3);
+    using var first = new StarVisualScope("First", 2);
+    using var second = new StarVisualScope("Second", 2);
+
+    scope.Manager.Register(first.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+    scope.Manager.Register(second.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+
+    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(3));
+    Assert.That(first.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(2));
+    Assert.That(second.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(1));
+  }
+
+  [Test]
+  public void Register_FocusedStar_OverflowsBudgetWithoutReleasingNormalStars()
+  {
+    using var scope = new BuildingManagerScope(maxActiveCallouts: 2);
+    using var normal = new StarVisualScope("Normal", 2);
+    using var focused = new StarVisualScope("Focused", 3);
+
+    scope.Manager.Register(normal.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+    scope.Manager.Register(focused.Visual, wantsVisible: true, highlightState: LabelHighlightState.Focused);
+
+    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(5));
+    Assert.That(normal.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(2));
+    Assert.That(focused.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(3));
+  }
+
+  [Test]
+  public void Register_ExistingNormalCalloutsAfterFocusedOverflow_UpdatesHighlightWithoutReleasing()
+  {
+    using var scope = new BuildingManagerScope(maxActiveCallouts: 2);
+    using var normal = new StarVisualScope("Normal", 2);
+    using var focused = new StarVisualScope("Focused", 3);
+
+    scope.Manager.Register(normal.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+    scope.Manager.Register(focused.Visual, wantsVisible: true, highlightState: LabelHighlightState.Focused);
+    scope.Manager.Register(normal.Visual, wantsVisible: true, highlightState: LabelHighlightState.Linked);
+
+    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(5));
+    Assert.That(normal.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(2));
+    Assert.That(focused.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(3));
+  }
+
+  [Test]
+  public void Register_PendingNormalStar_RefillsWhenBudgetFreedInBuildingsView()
+  {
+    using var cartographer = new CartographerScope(ScapeView.Buildings);
+    using var scope = new BuildingManagerScope(maxActiveCallouts: 2);
+    using var first = new StarVisualScope("First", 2);
+    using var waiting = new StarVisualScope("Waiting", 1);
+
+    scope.Manager.Register(first.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+    scope.Manager.Register(waiting.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+
+    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(2));
+    Assert.That(waiting.Root.GetComponentsInChildren<BuildingCallout>(true), Is.Empty);
+
+    scope.Manager.Register(first.Visual, wantsVisible: false, highlightState: LabelHighlightState.Normal);
+
+    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(1));
+    Assert.That(first.Root.GetComponentsInChildren<BuildingCallout>(true), Is.Empty);
+    Assert.That(waiting.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(1));
+  }
+
+  [Test]
+  public void Register_PendingNormalStar_DoesNotRefillWhenBudgetFreedOutsideBuildingsView()
+  {
+    using var cartographer = new CartographerScope(ScapeView.Planets);
+    using var scope = new BuildingManagerScope(maxActiveCallouts: 2);
+    using var first = new StarVisualScope("First", 2);
+    using var waiting = new StarVisualScope("Waiting", 1);
+
+    scope.Manager.Register(first.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+    scope.Manager.Register(waiting.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+
+    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(2));
+    Assert.That(waiting.Root.GetComponentsInChildren<BuildingCallout>(true), Is.Empty);
+
+    scope.Manager.Register(first.Visual, wantsVisible: false, highlightState: LabelHighlightState.Normal);
+
+    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(0));
+    Assert.That(first.Root.GetComponentsInChildren<BuildingCallout>(true), Is.Empty);
+    Assert.That(waiting.Root.GetComponentsInChildren<BuildingCallout>(true), Is.Empty);
+  }
+
+  [Test]
+  public void Register_ActiveCallouts_ApplyCurrentHighlightState()
+  {
+    using var scope = new BuildingManagerScope(maxActiveCallouts: 2, startManager: false);
+    using var visual = new StarVisualScope("Highlighted", 1);
+    Material normalMaterial = LoadMaterial("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Drop Shadow.mat");
+    Material focusedMaterial = LoadMaterial("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Bloom.mat");
+    Material linkedMaterial = LoadMaterial("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Bloom Medium.mat");
+
+    SetCalloutHighlightMaterials(scope.Prefab, normalMaterial, focusedMaterial, linkedMaterial);
+    scope.Start();
+
+    scope.Manager.Register(visual.Visual, wantsVisible: true, highlightState: LabelHighlightState.Focused);
+    TMP_Text text = visual.Root.GetComponentInChildren<TMP_Text>(true);
+
+    Assert.That(text, Is.Not.Null);
+    Assert.That(text.fontSharedMaterial, Is.SameAs(focusedMaterial));
+
+    scope.Manager.Register(visual.Visual, wantsVisible: true, highlightState: LabelHighlightState.Linked);
+
+    Assert.That(text.fontSharedMaterial, Is.SameAs(linkedMaterial));
+
+  }
+
+  [Test]
+  public void Register_CalloutLifecycle_TogglesLookAtCamera()
+  {
+    using var cartographer = new CartographerScope(ScapeView.Buildings);
+    using var scope = new BuildingManagerScope(maxActiveCallouts: 1);
+    using var visual = new StarVisualScope("LookAt", 1);
+
+    scope.Manager.Register(visual.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+    LookAtCamera lookAtCamera = visual.Root.GetComponentInChildren<LookAtCamera>(true);
+
+    Assert.That(lookAtCamera, Is.Not.Null);
+    Assert.That(lookAtCamera.enabled, Is.True);
+
+    scope.Manager.Register(visual.Visual, wantsVisible: false, highlightState: LabelHighlightState.Normal);
+
+    Assert.That(lookAtCamera.enabled, Is.False);
+    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(0));
+  }
+
+  [Test]
+  public void Clear_ReleasesCalloutsAndLeavesVisualDestructionIndependent()
+  {
+    using var scope = new BuildingManagerScope(maxActiveCallouts: 1);
+    using var visual = new StarVisualScope("Clear", 1);
+
+    scope.Manager.Register(visual.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+
+    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(1));
+    Assert.That(visual.Root.GetComponentInChildren<BuildingCallout>(true), Is.Not.Null);
+
+    LogAssert.Expect(
+      LogType.Error,
+      "Destroy may not be called from edit mode! Use DestroyImmediate instead.\nDestroying an object in edit mode destroys it permanently.");
+    scope.Manager.Clear();
+
+    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(0));
+    Assert.That(visual.Root.activeSelf, Is.True);
+    Assert.DoesNotThrow(() => Object.DestroyImmediate(visual.RootObject));
+  }
+
+  [Test]
+  public void ManagerDestroyedBeforeVisual_DoesNotLeaveStaleSingleton()
+  {
+    using var scope = new BuildingManagerScope(maxActiveCallouts: 1);
+    using var visual = new StarVisualScope("Shutdown", 1);
+
+    scope.Manager.Register(visual.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+
+    Object.DestroyImmediate(scope.ManagerObject);
+
+    Assert.That(BuildingManager.I == null, Is.True);
+    Assert.DoesNotThrow(() => Object.DestroyImmediate(visual.RootObject));
+  }
+
+  private static void SetPrivateField(object target, string fieldName, object value)
+  {
+    FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(field, Is.Not.Null, $"Missing field {fieldName} on {target.GetType().Name}.");
+    field.SetValue(target, value);
+  }
+
+  private static void SetCalloutHighlightMaterials(
+    BuildingCallout callout,
+    Material normalMaterial,
+    Material focusedMaterial,
+    Material linkedMaterial)
+  {
+    FieldInfo field = typeof(BuildingCallout).GetField(
+      "highlightPresenter",
+      BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(field, Is.Not.Null, "Missing BuildingCallout.highlightPresenter.");
+
+    var highlightPresenter = (LabelHighlightPresenter)field.GetValue(callout);
+    if (highlightPresenter == null)
+    {
+      highlightPresenter = callout.gameObject.AddComponent<LabelHighlightPresenter>();
+      SetSerializedObjectReference(callout, "highlightPresenter", highlightPresenter);
+    }
+
+    SetSerializedObjectReference(highlightPresenter, "normalMaterialPreset", normalMaterial);
+    SetSerializedObjectReference(highlightPresenter, "focusedMaterialPreset", focusedMaterial);
+    SetSerializedObjectReference(highlightPresenter, "linkedMaterialPreset", linkedMaterial);
+  }
+
+  private static void SetSerializedObjectReference(Object target, string propertyName, Object value)
+  {
+    var serializedObject = new SerializedObject(target);
+    SerializedProperty property = serializedObject.FindProperty(propertyName);
+    Assert.That(property, Is.Not.Null, $"Missing serialized property {propertyName} on {target.GetType().Name}.");
+    property.objectReferenceValue = value;
+    serializedObject.ApplyModifiedPropertiesWithoutUndo();
+
+    FieldInfo field = target.GetType().GetField(propertyName, BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(field, Is.Not.Null, $"Missing field {propertyName} on {target.GetType().Name}.");
+    field.SetValue(target, value);
+  }
+
+  private static Material LoadMaterial(string path)
+  {
+    Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
+    Assert.That(material, Is.Not.Null, $"Missing test material at {path}.");
+    return material;
+  }
+
+  private static BuildingCallout CreateCalloutPrefab()
+  {
+    var root = new GameObject("BuildingManagerEditModeTests_CalloutPrefab");
+    var callout = root.AddComponent<BuildingCallout>();
+    var highlightPresenter = root.AddComponent<LabelHighlightPresenter>();
+    var lineRenderer = root.AddComponent<LineRenderer>();
+    var marker = new GameObject("Marker").transform;
+    var content = new GameObject("Content").transform;
+    var lookAtCamera = content.gameObject.AddComponent<LookAtCamera>();
+    var text = new GameObject("NameText").AddComponent<TextMeshPro>();
+
+    marker.SetParent(root.transform, false);
+    content.SetParent(root.transform, false);
+    text.transform.SetParent(content, false);
+    lookAtCamera.enabled = false;
+
+    SetSerializedObjectReference(callout, "lineRenderer", lineRenderer);
+    SetSerializedObjectReference(callout, "buildingMarker", marker);
+    SetSerializedObjectReference(callout, "contentRoot", content);
+    SetSerializedObjectReference(callout, "nameText", text);
+    SetSerializedObjectReference(callout, "highlightPresenter", highlightPresenter);
+    SetPrivateField(callout, "relatedBehaviours", new Behaviour[] { lookAtCamera });
+    SetPrivateField(callout, "directionSlotCount", 16);
+
+    root.SetActive(false);
+    return callout;
+  }
+
+  private sealed class BuildingManagerScope : System.IDisposable
+  {
+    public BuildingManagerScope(int maxActiveCallouts, bool startManager = true)
+    {
+      ManagerObject = new GameObject("BuildingManagerEditModeTests_Manager");
+      ManagerObject.SetActive(false);
+      Prefab = CreateCalloutPrefab();
+      Manager = ManagerObject.AddComponent<BuildingManager>();
+
+      SetPrivateField(Manager, "buildingPrefab", Prefab);
+      SetPrivateField(Manager, "maxActiveCallouts", maxActiveCallouts);
+      if (startManager)
+        Start();
+    }
+
+    public GameObject ManagerObject { get; }
+    public BuildingManager Manager { get; }
+    public BuildingCallout Prefab { get; }
+
+    public void Start()
+      => StartManager(Manager);
+
+    public void Dispose()
+    {
+      if (ManagerObject != null)
+        Object.DestroyImmediate(ManagerObject);
+
+      if (Prefab != null)
+        Object.DestroyImmediate(Prefab.gameObject);
+    }
+  }
+
+  private static void StartManager(BuildingManager manager)
+  {
+    MethodInfo awakeMethod = typeof(BuildingManager).GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(awakeMethod, Is.Not.Null, "Missing BuildingManager.Awake.");
+    awakeMethod.Invoke(manager, null);
+  }
+
+  private static void SetCartographerSingleton(Cartographer value)
+  {
+    FieldInfo singletonBackingField =
+      typeof(Cartographer).GetField("<I>k__BackingField", BindingFlags.Static | BindingFlags.NonPublic);
+    Assert.That(singletonBackingField, Is.Not.Null, "Missing Cartographer singleton backing field.");
+    singletonBackingField.SetValue(null, value);
+  }
+
+  private sealed class CartographerScope : System.IDisposable
+  {
+    public CartographerScope(ScapeView currentView)
+    {
+      SetCartographerSingleton(null);
+      CartographerObject = new GameObject("BuildingManagerEditModeTests_Cartographer");
+      Cartographer = CartographerObject.AddComponent<Cartographer>();
+      SetPrivateField(Cartographer, "currentView", currentView);
+      SetCartographerSingleton(Cartographer);
+    }
+
+    public GameObject CartographerObject { get; }
+    public Cartographer Cartographer { get; }
+
+    public void Dispose()
+    {
+      SetCartographerSingleton(null);
+
+      if (CartographerObject != null)
+        Object.DestroyImmediate(CartographerObject);
+    }
+  }
+
+  private sealed class StarVisualScope : System.IDisposable
+  {
+    public StarVisualScope(string name, int buildingCount)
+    {
+      RootObject = new GameObject($"BuildingManagerEditModeTests_{name}");
+      var sphereObject = new GameObject("Sphere");
+      var buildingRoot = new GameObject("Buildings");
+
+      sphereObject.transform.SetParent(RootObject.transform, false);
+      buildingRoot.transform.SetParent(RootObject.transform, false);
+      buildingRoot.SetActive(true);
+
+      Star = RootObject.AddComponent<Star>();
+      Visual = RootObject.AddComponent<StarVisual>();
+      SphereRenderer = sphereObject.AddComponent<MeshRenderer>();
+      Root = buildingRoot;
+
+      Star.SetData(new NoteData
+      {
+        Id = name,
+        Name = name,
+        Path = $"{name}.md",
+        Buildings = BuildBuildings(buildingCount)
+      });
+
+      SetPrivateField(Visual, "star", Star);
+      SetPrivateField(Visual, "sphereRenderer", SphereRenderer);
+      SetPrivateField(Visual, "buildings", Root);
+    }
+
+    public GameObject RootObject { get; }
+    public Star Star { get; }
+    public StarVisual Visual { get; }
+    public Renderer SphereRenderer { get; }
+    public GameObject Root { get; }
+
+    public void Dispose()
+    {
+      if (RootObject != null)
+        Object.DestroyImmediate(RootObject);
+    }
+
+    private static List<BuildingData> BuildBuildings(int count)
+    {
+      var buildings = new List<BuildingData>(count);
+      for (int i = 0; i < count; i++)
+        buildings.Add(new BuildingData { Name = $"Building {i + 1}" });
+
+      return buildings;
+    }
+  }
+}

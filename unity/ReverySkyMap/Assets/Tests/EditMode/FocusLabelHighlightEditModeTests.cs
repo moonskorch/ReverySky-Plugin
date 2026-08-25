@@ -27,9 +27,7 @@ public class FocusLabelHighlightEditModeTests
     Material linkedMaterial = CreateMaterial("Linked");
 
     label.Text.fontSharedMaterial = normalMaterial;
-    SetPrivateField(label.Presenter, "normalMaterialPreset", normalMaterial);
-    SetPrivateField(label.Presenter, "focusedMaterialPreset", focusMaterial);
-    SetPrivateField(label.Presenter, "linkedMaterialPreset", linkedMaterial);
+    SetHighlightMaterials(label.Presenter, normalMaterial, focusMaterial, linkedMaterial);
     StartPresenter(label.Presenter);
 
     label.VisibilitySource.SetDistanceVisible(null, false);
@@ -67,9 +65,7 @@ public class FocusLabelHighlightEditModeTests
     Material linkedMaterial = CreateMaterial("Linked");
 
     label.Text.fontSharedMaterial = normalMaterial;
-    SetPrivateField(label.Presenter, "normalMaterialPreset", normalMaterial);
-    SetPrivateField(label.Presenter, "focusedMaterialPreset", focusMaterial);
-    SetPrivateField(label.Presenter, "linkedMaterialPreset", linkedMaterial);
+    SetHighlightMaterials(label.Presenter, normalMaterial, focusMaterial, linkedMaterial);
     StartPresenter(label.Presenter);
 
     label.VisibilitySource.SetHighlightState(LabelHighlightState.Focused);
@@ -100,8 +96,7 @@ public class FocusLabelHighlightEditModeTests
 
     label.Text.fontSharedMaterial = normalMaterial;
     TMP_Text secondText = label.AddText(secondInitialMaterial);
-    SetPrivateField(label.Presenter, "normalMaterialPreset", normalMaterial);
-    SetPrivateField(label.Presenter, "focusedMaterialPreset", focusMaterial);
+    SetHighlightMaterials(label.Presenter, normalMaterial, focusMaterial, null);
     StartPresenter(label.Presenter);
 
     label.VisibilitySource.SetHighlightState(LabelHighlightState.Focused);
@@ -266,6 +261,29 @@ public class FocusLabelHighlightEditModeTests
     field.SetValue(target, value);
   }
 
+  private static void SetHighlightMaterials(
+    LabelPresenter presenter,
+    Material normalMaterial,
+    Material focusedMaterial,
+    Material linkedMaterial)
+  {
+    FieldInfo field = typeof(LabelPresenter).GetField(
+      "highlightPresenter",
+      BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(field, Is.Not.Null, "Missing LabelPresenter.highlightPresenter.");
+
+    var highlightPresenter = (LabelHighlightPresenter)field.GetValue(presenter);
+    if (highlightPresenter == null)
+    {
+      highlightPresenter = presenter.gameObject.AddComponent<LabelHighlightPresenter>();
+      field.SetValue(presenter, highlightPresenter);
+    }
+
+    SetPrivateField(highlightPresenter, "normalMaterialPreset", normalMaterial);
+    SetPrivateField(highlightPresenter, "focusedMaterialPreset", focusedMaterial);
+    SetPrivateField(highlightPresenter, "linkedMaterialPreset", linkedMaterial);
+  }
+
   private static void StartPresenter(LabelPresenter presenter)
   {
     MethodInfo startMethod = typeof(LabelPresenter).GetMethod("Start", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -378,9 +396,7 @@ public class FocusLabelHighlightEditModeTests
       star = nodeObject.AddComponent<Star>();
       label = new LabelScope($"{name}_Label", nodeObject);
       label.Text.fontSharedMaterial = NormalMaterial;
-      SetPrivateField(label.Presenter, "normalMaterialPreset", NormalMaterial);
-      SetPrivateField(label.Presenter, "focusedMaterialPreset", FocusMaterial);
-      SetPrivateField(label.Presenter, "linkedMaterialPreset", LinkedMaterial);
+      SetHighlightMaterials(label.Presenter, NormalMaterial, FocusMaterial, LinkedMaterial);
       StartPresenter(label.Presenter);
 
       return nodeObject;

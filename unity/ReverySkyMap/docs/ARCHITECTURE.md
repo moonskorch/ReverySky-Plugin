@@ -15,7 +15,7 @@ Obsidian plugin
   -> Cartographer
   -> active ICartographerEngine
   -> MapGraphIndex
-  -> LineBuilder / CullingManager / FocusHighlighter / FocusNode
+  -> LineBuilder / CullingManager / FocusHighlighter / FocusNode / BuildingManager
 ```
 
 ## System Overview
@@ -49,9 +49,9 @@ Obsidian plugin
   - Main code location: `Assets/Scripts/GameInput/GameInput.cs`, `Assets/Scripts/StarScape/FocusNode.cs`, `Assets/Scripts/StarScape/FocusHighlighter.cs`, `Assets/Scripts/Camera/CameraOrbitalController.cs`, `Assets/Scripts/UI/ChangeViewControl.cs`, `Assets/Scripts/UI/RotateCameraUI.cs`, `Assets/Scripts/UI/RotateHoldButton.cs`
   - Important dependencies: `EventSystem`, cached main camera references, `MapRuntimeContext`, `Cartographer.I`, `GameSettings`
 - Visual support objects
-  - Responsibility: provide prefabs, note-length scale calibration, direct-link crystal buckets, labels, shared culling consumers, notifications, and optional sample graph injection.
-  - Main code location: `Assets/Scripts/ScriptableObjects/StarSO.cs`, `Assets/Scripts/ScriptableObjects/TagNodeSO.cs`, `Assets/Scripts/StarScape/StarVisual.cs`, `Assets/Scripts/StarScape/LabelPresenter.cs`, `Assets/Scripts/StarScape/BehaviourCullingTarget.cs`, `Assets/Scripts/Notification/Notification.cs`, `Assets/Scripts/StarScape/SampleDataGenerator.cs`
-  - Important dependencies: `MapRuntimeContext.NotesVersion`, `MapRuntimeContext.HasRuntimeNotes`, prefab assets in `Assets/Prefabs`
+  - Responsibility: provide prefabs, note-length scale calibration, direct-link crystal buckets, labels, pooled building callouts, shared culling consumers, notifications, and optional sample graph injection.
+  - Main code location: `Assets/Scripts/ScriptableObjects/StarSO.cs`, `Assets/Scripts/ScriptableObjects/TagNodeSO.cs`, `Assets/Scripts/StarScape/StarVisual.cs`, `Assets/Scripts/StarScape/BuildingManager.cs`, `Assets/Scripts/StarScape/BuildingCallout.cs`, `Assets/Scripts/StarScape/LabelPresenter.cs`, `Assets/Scripts/StarScape/LabelHighlightPresenter.cs`, `Assets/Scripts/StarScape/BehaviourCullingTarget.cs`, `Assets/Scripts/Notification/Notification.cs`, `Assets/Scripts/StarScape/SampleDataGenerator.cs`
+  - Important dependencies: `MapRuntimeContext.NotesVersion`, `MapRuntimeContext.HasRuntimeNotes`, `Cartographer.CurrentView`, `NodeVisibility.HighlightState`, `ObjectPool<BuildingCallout>`, prefab assets in `Assets/Prefabs` and `Assets/_Visuals`
 - Automated checks
   - Responsibility: guard bridge parsing, layout rules, focus and highlight behavior, and PlayMode bootstrap and visual stability.
   - Main code location: `Assets/Tests/EditMode/*`, `Assets/Tests/PlayMode/*`
@@ -76,7 +76,7 @@ Obsidian plugin
 5. `MapRuntimeContext.SetTagNames`, `SetLinks`, and `SetNotes` store the runtime source of truth. `SetNotes` stores the envelope `requestId`, derives each note's unique direct note-neighbor count from the current links, increments `NotesVersion`, and raises `OnNotesChanged(requestId)`.
 6. `Cartographer.HandleRuntimeNotesChanged(requestId)` calls `RebuildGraph(MapRuntimeContext.MapLayoutPreference, requestId)`.
 7. `Cartographer.ResolveModeByNotesCount()` uses `defaultEngine` first. Without an override, explicit `Dates` and `ScalableLinks` stay fixed, while `Auto` and `DynamicLinks` resolve by note count: small graphs use `DynamicLinks`, large graphs use `ScalableLinks`.
-8. `Cartographer` clears the engine that owns stale visuals/state, applies `MapGraphIndex.Empty` using the selected engine contract, waits one frame so Unity can destroy old objects, then builds the current `MapRuntimeContext.Notes`. New `graph:set` events stop the pending rebuild coroutine before starting a replacement rebuild.
+8. `Cartographer` clears the engine that owns stale visuals/state, clears `BuildingManager` building callouts, applies `MapGraphIndex.Empty` using the selected engine contract, waits one frame so Unity can destroy old objects, then builds the current `MapRuntimeContext.Notes`. New `graph:set` events stop the pending rebuild coroutine before starting a replacement rebuild.
 9. The chosen engine runs `BuildGraph(notes)` and emits `OnNodesChanged` with the instantiated `Star` and `TagNode` scene objects.
 10. `Cartographer.HandleEngineNodesChanged(...)` builds `GraphIndex = MapGraphIndex.Build(stars, tagNodes, MapRuntimeContext.Links)`.
 11. `Cartographer` passes the same `GraphIndex` to `LineBuilder.Rebuild(...)` and `CullingManager.Rebuild(...)`.
@@ -98,7 +98,7 @@ Obsidian plugin
 9. The next non-transient `HandleEngineNodesChanged(...)` call rebuilds `GraphIndex` and lets `ApplyGraphFocus()` consume pending focus before falling back to restore focus.
 10. `FocusHighlighter.SetFocus(...)` reads `MapGraphIndex.GetNeighborIds(...)`, marks the focused node as `Focused`, marks adjacent nodes as `Linked`, and calls `LineBuilder.ApplyHighlight(...)` so incident edges restyle together with the labels.
 11. Incoming `note:update` messages call `ObsidianBridge.OnNoteUpdate()`, which replaces the matching runtime note's building list through `MapRuntimeContext.TryUpdateNoteBuildings(...)`.
-12. `Cartographer.HandleNoteBuildingsChanged(...)` resolves the current star through `GraphIndex.TryGetStar(...)` and asks `StarVisual.RefreshBuildings()` to recreate only that star's building callouts.
+12. `Cartographer.HandleNoteBuildingsChanged(...)` resolves the current star through `GraphIndex.TryGetStar(...)` and asks `StarVisual.RefreshBuildings()` to resync only that star with the pooled building-callout renderer.
 
 ### 4. Runtime frame-rate settings
 
@@ -123,7 +123,7 @@ Obsidian plugin
 1. `GameInput` translates raw pointer and touch input into semantic events such as select, pan, pinch zoom, scroll zoom, and orbit drag.
 2. `CameraOrbitalController` listens to those events and keeps the camera orbiting around the current pivot.
 3. `FocusNode` uses `CameraOrbitalController` to focus stars or tag nodes.
-4. `ChangeViewControl` raises `OnChangeScapeView`, and `Cartographer.CycleView()` switches between `ScapeView.Planets` and `ScapeView.Plain`, updates the button icon, and calls `ApplyCurrentView()`.
+4. `ChangeViewControl` raises `OnChangeScapeView`, and `Cartographer.CycleView()` switches between `ScapeView.Planets`, `ScapeView.Plain`, and `ScapeView.Buildings`, updates the button icon, and calls `ApplyCurrentView()`.
 5. `RotateHoldButton` feeds `RotateCameraUI`, and `RotateCameraUI` emits the clockwise and pressed state consumed by `CameraOrbitalController`.
 6. `ScapeCameraWarper.OnWarpApplied` refreshes culling targets after 2.5D warp movement, and the date slider only appears when the active engine is `Dates`.
 
@@ -136,6 +136,15 @@ Obsidian plugin
 5. When `CullingGroup` changes a node's visibility, `CullingManager` calls `LineBuilder.SetDistanceVisible(...)`, which updates the visible-node set and marks the edge set dirty.
 6. `LineBuilder.LateUpdate()` applies the focused-node priority, keeps recently visible regions within a refresh budget, reconciles the desired edge set against the pooled renderers, and rewrites each active line's endpoints from the live transforms.
 7. `Cartographer.ApplyCurrentView()` sets `LineBuilder` visibility from `CurrentView`, so switching between `Planets` and `Plain` toggles whether existing line renderers are shown; it does not rebuild the candidate edge set.
+
+### 8. Building callout rendering
+
+1. `StarVisual.Start()` subscribes to `Cartographer.OnViewChanged`, `NodeVisibility.OnVisibilityChanged`, and `NodeVisibility.OnHighlightStateChanged`.
+2. When the current view is `ScapeView.Buildings`, `StarVisual.SyncBuildings()` asks `BuildingManager.Register(...)` to show or hide this star's building callouts based on current distance/focus visibility.
+3. `BuildingManager` owns the shared `ObjectPool<BuildingCallout>` and enforces `maxActiveCallouts` for non-focused stars so building mode can scale without each star instantiating its own full callout set.
+4. Focused stars may exceed the normal callout budget by one full callout set so selected building names remain complete.
+5. `BuildingCallout.PrepareForUse(...)` reparents a pooled callout under the target star's building root, initializes its line, marker, text, and highlight material, then enables related behaviours such as camera-facing text.
+6. `BuildingCallout.PrepareForPool(...)` clears the rendered line/text, disables related behaviours, reparents the callout under `BuildingManager`, and deactivates it for reuse.
 
 ## Subsystems
 
@@ -200,10 +209,20 @@ Obsidian plugin
   - Entry point: called by the active layout engines while building stars
   - Calls / sends to: `MapRuntimeContext.NotesVersion`, `NoteData`, `Star`
 - `StarVisual`
-  - Responsibility: subscribes to `Cartographer.OnViewChanged`, applies the initial `Cartographer.CurrentView` on start, selects stable sphere material from note path, and maps direct note-neighbor count into crystal visual buckets.
-  - Code anchor: `Assets/Scripts/StarScape/StarVisual.cs::Start`, `ApplyView`, `ShowSphere`, `ShowCrystal`, `ResolveCrystalTypeByDirectLinkCount`
+  - Responsibility: subscribes to `Cartographer.OnViewChanged`, applies the initial `Cartographer.CurrentView` on start, selects stable sphere material from note path, maps direct note-neighbor count into crystal visual buckets, and delegates building callout rendering to `BuildingManager`.
+  - Code anchor: `Assets/Scripts/StarScape/StarVisual.cs::Start`, `ApplyView`, `ShowSphere`, `ShowCrystal`, `SyncBuildings`, `RefreshBuildings`, `ResolveCrystalTypeByDirectLinkCount`
   - Entry point: star prefab `Start` and `Cartographer.OnViewChanged`
-  - Calls / sends to: `Cartographer.CurrentView`, `NoteData.Path`, `NoteData.DirectLinkCount`, `SphereMaterialCatalogSO`, `CrystalTypeScaleMapperSO`
+  - Calls / sends to: `Cartographer.CurrentView`, `NoteData.Path`, `NoteData.DirectLinkCount`, `NodeVisibility`, `BuildingManager`, `SphereMaterialCatalogSO`, `CrystalTypeScaleMapperSO`
+- `BuildingManager`
+  - Responsibility: owns pooled building callout rendering, applies the active callout budget, prioritizes focused stars, and releases callouts during graph rebuilds or view/visibility changes.
+  - Code anchor: `Assets/Scripts/StarScape/BuildingManager.cs::Awake`, `Register`, `Refresh`, `Clear`
+  - Entry point: scene startup, `StarVisual.SyncBuildings`, `StarVisual.RefreshBuildings`, `Cartographer.PrepareGraphClear`
+  - Calls / sends to: `BuildingCallout`, `StarVisual`, `ObjectPool<BuildingCallout>`
+- `BuildingCallout`
+  - Responsibility: renders one building label, marker, and surface-to-label line, and prepares itself for active use or pool reuse.
+  - Code anchor: `Assets/Scripts/StarScape/BuildingCallout.cs::PrepareForUse`, `Init`, `ApplyHighlight`, `PrepareForPool`
+  - Entry point: `BuildingManager.Register` and `BuildingManager.Refresh`
+  - Calls / sends to: `LabelHighlightPresenter`, `LineRenderer`, `TextMeshPro`
 - `TagNodeSO`
   - Responsibility: supplies the tag-node prefab used by the layout engines that instantiate tags.
   - Code anchor: `Assets/Scripts/ScriptableObjects/TagNodeSO.cs`
@@ -285,6 +304,7 @@ Obsidian plugin
 - `NoteData` does not own view state. Stars keep runtime note data, while `Cartographer.CurrentView` is broadcast through `OnViewChanged` for view-dependent visuals.
 - Unity does not decide whether a focused note belongs to the active Obsidian filter. The parent plugin gates ordinary focus by the effective graph; Unity pending only bridges the delay between a valid focus message and an indexed star.
 - `CartographerForcesEngine`, `Cartographer25DEngine`, and `CartographerEngineRecursiveHubsEngine` own placement and cleanup of instantiated stars and tags for `DynamicLinks`, `Dates`, and `ScalableLinks`; line visuals are handed off to `LineBuilder` after the engine raises `OnNodesChanged`.
+- `BuildingManager` owns pooled building callout GameObjects independently from engine-owned stars. `StarVisual` exposes the target root, sphere radius, and note building data; the manager decides how many callouts are active, reparents them to visible stars, applies highlight state, and returns them to the pool on hide, refresh, or graph clear.
 - Cartographer engines expose a stable camera navigation pivot at the layout parent origin. Bounds may grow to cover placed nodes, but engines must not move the pivot to the current graph centroid during rebuilds.
 - `MapGraphIndex` is the shared read-only topology index for the current engine-built visual map. It is built once per engine node publication from engine-owned `Star` and `TagNode` objects and `MapRuntimeContext.Links`, remains valid until the next graph rebuild, and is read by line rendering, culling, label emphasis, and focus lookup.
 - `FocusNode.FocusRestoreNoteId` is the continuity fallback for graph rebuilds. It is updated by successful focus selection and is not copied into pending focus during reconciliation.
@@ -335,6 +355,9 @@ Obsidian plugin
 - Focus, labels, and line highlights
   - Automated checks: `Assets/Tests/EditMode/ObsidianBridgeEditModeTests.cs`, `Assets/Tests/EditMode/MapGraphIndexEditModeTests.cs`, `Assets/Tests/EditMode/FocusLabelHighlightEditModeTests.cs`, `Assets/Tests/EditMode/LineBuilderEditModeTests.cs`
   - Manual checks when needed: focus stars and tags, confirm focused and linked label states, and confirm incident lines restyle together with selection
+- Building callout rendering
+  - Automated checks: `Assets/Tests/EditMode/BuildingManagerEditModeTests.cs`, building-update coverage in `Assets/Tests/EditMode/ObsidianBridgeEditModeTests.cs`
+  - Manual checks when needed: switch to `Buildings`, inspect callout budget behavior on dense graphs, focus a star with buildings, and confirm updated building lists refresh only the target star
 - PlayMode bootstrap and visual stability
   - Automated checks: `Assets/Tests/PlayMode/StarScapeRuntimePlayModeTests.cs`
   - Manual checks when needed: open `Assets/Scenes/StarScapeScene.unity`, enter Play mode, and confirm no missing scripts or critical console errors
