@@ -2,8 +2,6 @@ import type { TFile, WorkspaceLeaf } from "obsidian";
 import { MAP_VIEW_TYPE, MapView } from "../view/MapView";
 import type ReverySkyMapPlugin from "../main";
 
-const MAX_LANDMARK_LENGTH = 50;
-
 export function registerCommands(plugin: ReverySkyMapPlugin): void {
   plugin.addRibbonIcon("sparkles", "Toggle ReverySky 3D Graph", async () => {
     await toggleMapView(plugin);
@@ -58,8 +56,6 @@ export function registerEditorMenuCommands(plugin: ReverySkyMapPlugin): void {
 export function normalizeLandmarkSelection(selection: string): string {
   return selection
     .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, MAX_LANDMARK_LENGTH)
     .trim();
 }
 

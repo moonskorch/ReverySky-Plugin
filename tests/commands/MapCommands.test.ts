@@ -5,9 +5,9 @@ import {
 } from "../../src/commands/MapCommands";
 
 describe("normalizeLandmarkSelection", () => {
-  it("collapses whitespace and limits landmarks to 50 characters", () => {
+  it("collapses whitespace without truncating the selection", () => {
     expect(normalizeLandmarkSelection("  The\nancient\tcity   gate with a very long descriptive suffix  ")).toBe(
-      "The ancient city gate with a very long descriptive"
+      "The ancient city gate with a very long descriptive suffix"
     );
   });
 

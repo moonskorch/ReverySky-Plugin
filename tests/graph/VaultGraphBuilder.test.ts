@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 import { VaultGraphBuilder } from "../../src/graph/VaultGraphBuilder";
+import {
+  MAX_RUNTIME_BUILDING_NAME_LENGTH,
+  MAX_RUNTIME_NOTE_TITLE_LENGTH
+} from "../../src/graph/GraphTextLimits";
 
 function makeStableId(path: string): string {
   const digest = createHash("sha256").update(path).digest();
@@ -83,7 +87,32 @@ describe("VaultGraphBuilder", () => {
     });
   });
 
+  it("limits note titles for the runtime payload", () => {
+    const longTitle = "A".repeat(MAX_RUNTIME_NOTE_TITLE_LENGTH + 20);
+    const file = makeFile(`Folder/${longTitle}.md`, {
+      ctime: Date.UTC(2026, 0, 1),
+      mtime: Date.UTC(2026, 0, 2),
+      size: 64
+    });
+
+    const app = {
+      vault: {
+        getMarkdownFiles: () => [file]
+      },
+      metadataCache: {
+        getFileCache: () => ({
+          frontmatter: {}
+        }),
+        resolvedLinks: {}
+      }
+    };
+
+    const payload = VaultGraphBuilder.build(app as never);
+    expect(payload.notes[0]?.title).toBe(longTitle.slice(0, MAX_RUNTIME_NOTE_TITLE_LENGTH));
+  });
+
   it("maps string frontmatter landmarks to optional building names", () => {
+    const longLandmark = "A".repeat(MAX_RUNTIME_BUILDING_NAME_LENGTH + 20);
     const file = makeFile("Folder/Landmarks.md", {
       ctime: Date.UTC(2026, 0, 1),
       mtime: Date.UTC(2026, 0, 2),
@@ -97,7 +126,7 @@ describe("VaultGraphBuilder", () => {
       metadataCache: {
         getFileCache: () => ({
           frontmatter: {
-            landmarks: [" Observatory ", 42, "", "Archive", null]
+            landmarks: [" Observatory ", 42, "", longLandmark, null]
           }
         }),
         resolvedLinks: {}
@@ -105,7 +134,10 @@ describe("VaultGraphBuilder", () => {
     };
 
     const payload = VaultGraphBuilder.build(app as never);
-    expect(payload.notes[0]?.buildings).toEqual(["Observatory", "Archive"]);
+    expect(payload.notes[0]?.buildings).toEqual([
+      "Observatory",
+      longLandmark.slice(0, MAX_RUNTIME_BUILDING_NAME_LENGTH)
+    ]);
   });
 
   it.each([

@@ -2,6 +2,10 @@ import type { App, CachedMetadata, TFile } from "obsidian";
 import { createHash } from "node:crypto";
 import { GraphLink, GraphNoteNode, GraphPayload } from "../bridge/BridgeTypes";
 import { GraphNormalizer } from "./GraphNormalizer";
+import {
+  normalizeRuntimeBuildingName,
+  normalizeRuntimeNoteTitle
+} from "./GraphTextLimits";
 
 /**
  * Graph note ids are derived only from normalized vault-relative paths.
@@ -108,7 +112,7 @@ export class VaultGraphBuilder {
     return {
       id: makeStableNoteId(path),
       path,
-      title: file.basename,
+      title: normalizeRuntimeNoteTitle(file.basename),
       tags,
       size: VaultGraphBuilder.getNoteSizeBytes(file),
       ...(buildings.length > 0 ? { buildings } : {}),
@@ -143,7 +147,7 @@ export class VaultGraphBuilder {
 
     return value
       .filter((x): x is string => typeof x === "string")
-      .map((x) => x.trim())
+      .map((x) => normalizeRuntimeBuildingName(x))
       .filter(Boolean);
   }
 
