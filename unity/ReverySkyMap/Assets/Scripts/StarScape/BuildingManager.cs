@@ -65,6 +65,11 @@ public sealed class BuildingManager : MonoBehaviour
       if (!wantsVisible)
         return;
 
+      // Only skip empty data before manager state exists. Existing entries must
+      // keep flowing into UpdateStarBuildings so note updates can clear old callouts.
+      if (visual.BuildingData.Count <= 0)
+        return;
+
       starBuildings = new StarBuildings();
       buildingsByStar[visual] = starBuildings;
     }

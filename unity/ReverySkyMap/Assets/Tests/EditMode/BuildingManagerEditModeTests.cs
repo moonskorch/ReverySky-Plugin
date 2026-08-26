@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
@@ -21,6 +22,33 @@ public sealed class BuildingManagerEditModeTests
 
     Assert.That(first.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(2));
     Assert.That(second.Root.GetComponentsInChildren<BuildingCallout>(true), Is.Empty);
+  }
+
+  [Test]
+  public void Register_NewVisibleStarWithoutBuildings_DoesNotCreateState()
+  {
+    using var scope = new BuildingManagerScope(calloutBudget: 1);
+    using var visual = new StarVisualScope("Empty", 0);
+
+    scope.Manager.Register(visual.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+
+    Assert.That(visual.Root.GetComponentsInChildren<BuildingCallout>(true), Is.Empty);
+    Assert.That(GetStarBuildingState(scope.Manager), Is.Empty);
+  }
+
+  [Test]
+  public void Register_ExistingVisibleStarWithoutBuildings_ClearsState()
+  {
+    using var cartographer = new CartographerScope(ScapeView.Buildings);
+    using var scope = new BuildingManagerScope(calloutBudget: 1);
+    using var visual = new StarVisualScope("Cleared", 1);
+
+    scope.Manager.Register(visual.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+    visual.Star.Data.Buildings.Clear();
+    scope.Manager.Register(visual.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+
+    Assert.That(visual.Root.GetComponentsInChildren<BuildingCallout>(true), Is.Empty);
+    Assert.That(GetStarBuildingState(scope.Manager), Is.Empty);
   }
 
   [Test]
@@ -335,6 +363,15 @@ public sealed class BuildingManagerEditModeTests
     FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
     Assert.That(field, Is.Not.Null, $"Missing field {fieldName} on {target.GetType().Name}.");
     field.SetValue(target, value);
+  }
+
+  private static IDictionary GetStarBuildingState(BuildingManager manager)
+  {
+    FieldInfo field = typeof(BuildingManager).GetField(
+      "buildingsByStar",
+      BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(field, Is.Not.Null, "Missing BuildingManager.buildingsByStar.");
+    return (IDictionary)field.GetValue(manager);
   }
 
   private static void InvokePrivate(object target, string methodName)
