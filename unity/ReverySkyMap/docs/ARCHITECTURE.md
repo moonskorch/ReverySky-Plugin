@@ -141,8 +141,8 @@ Obsidian plugin
 
 1. `StarVisual.Start()` subscribes to `Cartographer.OnViewChanged`, `NodeVisibility.OnDistanceVisibilityChanged`, and `NodeVisibility.OnHighlightStateChanged`.
 2. When the current view is `ScapeView.Buildings`, `StarVisual.SyncBuildings()` asks `BuildingManager.Register(...)` to show or hide this star's building callouts when the star is distance-visible or focused. Linked state alone does not make buildings visible.
-3. `BuildingManager` owns the shared `ObjectPool<BuildingCallout>` and enforces `maxActiveCallouts` for non-focused stars so building mode can scale without each star instantiating its own full callout set.
-4. Focused stars may exceed the normal callout budget by one full callout set so selected building names remain complete.
+3. `BuildingManager` owns the shared `ObjectPool<BuildingCallout>` and enforces `calloutBudget` for non-focused stars. A non-focused star receives its complete callout set only when the remaining budget can fit it; otherwise it receives none.
+4. Focused callouts do not consume the normal callout budget and may exceed it by one full callout set so selected building names remain complete.
 5. `BuildingCallout.PrepareForUse(...)` reparents a pooled callout under the target star's building root, initializes its line, marker, text, and highlight material, then enables related behaviours such as camera-facing text.
 6. `BuildingCallout.PrepareForPool(...)` clears the rendered line/text, disables related behaviours, reparents the callout under `BuildingManager`, and deactivates it for reuse.
 

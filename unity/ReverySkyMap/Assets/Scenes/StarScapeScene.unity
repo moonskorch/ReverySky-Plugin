@@ -386,7 +386,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ReverySkyMap.Runtime::BuildingManager
   buildingPrefab: {fileID: 8148632401623996498, guid: 77c3eda2047bff8499f1e1530dbc0070, type: 3}
-  maxActiveCallouts: 512
+  calloutBudget: 512
 --- !u!4 &227137745
 Transform:
   m_ObjectHideFlags: 0
@@ -3579,5 +3579,5 @@ SceneRoots:
   - {fileID: 1780593169}
   - {fileID: 1900010002}
   - {fileID: 1217411435}
-  - {fileID: 1632812280}
   - {fileID: 227137745}
+  - {fileID: 1632812280}

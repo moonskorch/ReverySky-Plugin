@@ -15,13 +15,12 @@ public sealed class BuildingManager : MonoBehaviour
   public static BuildingManager I { get; private set; }
 
   [SerializeField] private BuildingCallout buildingPrefab;
-  [SerializeField, Range(0, 10000)] private int maxActiveCallouts = 256;
+  [SerializeField, Range(0, 10000)] private int calloutBudget = 256;
 
   private readonly Dictionary<StarVisual, StarBuildings> buildingsByStar = new();
   private ObjectPool<BuildingCallout> calloutPool;
-  private int activeCalloutCount;
+  private int usedCalloutBudget;
 
-  public int ActiveCalloutCount => activeCalloutCount;
   private static bool CanRefillBuildings => Cartographer.I.CurrentView == ScapeView.Buildings;
 
   private void Awake()
@@ -31,7 +30,7 @@ public sealed class BuildingManager : MonoBehaviour
     I = this;
 
     // Focused stars may exceed the non-focused budget by up to one full callout set.
-    int poolSize = maxActiveCallouts + buildingPrefab.DirectionSlotCount;
+    int poolSize = calloutBudget + buildingPrefab.DirectionSlotCount;
     calloutPool = new ObjectPool<BuildingCallout>(
       CreateCallout,
       null,
@@ -53,7 +52,7 @@ public sealed class BuildingManager : MonoBehaviour
     ReleaseAllBuildings();
     calloutPool.Clear();
     buildingsByStar.Clear();
-    activeCalloutCount = 0;
+    usedCalloutBudget = 0;
   }
 
   public void Register(StarVisual visual, bool wantsVisible, LabelHighlightState highlightState)
@@ -70,8 +69,6 @@ public sealed class BuildingManager : MonoBehaviour
       buildingsByStar[visual] = starBuildings;
     }
 
-    starBuildings.HighlightState = highlightState;
-
     if (!wantsVisible)
     {
       RemoveStarBuildings(visual, starBuildings);
@@ -79,7 +76,18 @@ public sealed class BuildingManager : MonoBehaviour
       return;
     }
 
+    int budgetBefore = usedCalloutBudget;
+    bool wasFocused = starBuildings.Focused;
+    bool willBeFocused = highlightState == LabelHighlightState.Focused;
+    if (wasFocused && !willBeFocused)
+      ReleaseBuildings(starBuildings);
+    else if (!wasFocused && willBeFocused)
+      usedCalloutBudget -= starBuildings.Callouts.Count;
+
+    starBuildings.HighlightState = highlightState;
     UpdateStarBuildings(visual, starBuildings, allowFocusedOverflow: starBuildings.Focused);
+    if (usedCalloutBudget < budgetBefore)
+      RefillAvailableBuildings();
   }
 
   public void Refresh(StarVisual visual)
@@ -104,15 +112,15 @@ public sealed class BuildingManager : MonoBehaviour
 
     int targetCount = ResolveTargetBuildingCount(buildingCount, starBuildings, allowFocusedOverflow);
 
-    if (CanReuseBuildings(starBuildings, buildingCount, targetCount, allowFocusedOverflow))
-    {
-      ApplyHighlight(starBuildings);
-      return;
-    }
-
     if (targetCount <= 0)
     {
       ReleaseBuildings(starBuildings);
+      return;
+    }
+
+    if (starBuildings.Callouts.Count == targetCount)
+    {
+      ApplyHighlight(starBuildings);
       return;
     }
 
@@ -127,27 +135,10 @@ public sealed class BuildingManager : MonoBehaviour
     if (allowFocusedOverflow)
       return buildingCount;
 
-    int availableCount = maxActiveCallouts - activeCalloutCount + starBuildings.Callouts.Count;
-    return Mathf.Min(buildingCount, availableCount);
-  }
+    int availableCount = calloutBudget - usedCalloutBudget;
+    availableCount += starBuildings.Callouts.Count;
 
-  private static bool CanReuseBuildings(
-    StarBuildings starBuildings,
-    int buildingCount,
-    int targetCount,
-    bool allowFocusedOverflow)
-  {
-    int currentCount = starBuildings.Callouts.Count;
-    if (currentCount <= 0)
-      return false;
-
-    if (currentCount == targetCount)
-      return true;
-
-    if (!allowFocusedOverflow && targetCount <= currentCount && currentCount <= buildingCount)
-      return true;
-
-    return false;
+    return availableCount >= buildingCount ? buildingCount : 0;
   }
 
   private void RemoveStarBuildings(StarVisual visual, StarBuildings starBuildings)
@@ -169,7 +160,6 @@ public sealed class BuildingManager : MonoBehaviour
     for (int i = 0; i < targetCount; i++)
     {
       BuildingCallout callout = calloutPool.Get();
-      activeCalloutCount++;
       BuildingData building = buildings[i];
       int preferredSlot = BuildingCallout.ResolvePreferredSlot(building.Name, slotCount);
       int resolvedSlot = BuildingCallout.ResolveAvailableSlot(preferredSlot, occupiedSlots);
@@ -180,16 +170,19 @@ public sealed class BuildingManager : MonoBehaviour
       callout.ApplyHighlight(starBuildings.HighlightState);
       starBuildings.Callouts.Add(callout);
     }
+
+    if (!starBuildings.Focused)
+      usedCalloutBudget += targetCount;
   }
 
   private void RefillAvailableBuildings()
   {
-    if (!CanRefillBuildings || activeCalloutCount >= maxActiveCallouts)
+    if (!CanRefillBuildings || usedCalloutBudget >= calloutBudget)
       return;
 
     foreach (var pair in buildingsByStar)
     {
-      if (activeCalloutCount >= maxActiveCallouts)
+      if (usedCalloutBudget >= calloutBudget)
         return;
 
       StarVisual visual = pair.Key;
@@ -214,11 +207,13 @@ public sealed class BuildingManager : MonoBehaviour
 
   private void ReleaseBuildings(StarBuildings starBuildings)
   {
+    if (!starBuildings.Focused)
+      usedCalloutBudget -= starBuildings.Callouts.Count;
+
     for (int i = 0; i < starBuildings.Callouts.Count; i++)
     {
       BuildingCallout callout = starBuildings.Callouts[i];
       calloutPool.Release(callout);
-      activeCalloutCount = Mathf.Max(0, activeCalloutCount - 1);
     }
 
     starBuildings.Callouts.Clear();

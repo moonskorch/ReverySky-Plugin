@@ -9,39 +9,82 @@ using UnityEngine.TestTools;
 public sealed class BuildingManagerEditModeTests
 {
   [Test]
-  public void Register_NormalStars_CreatePartialCalloutsWithinBudget()
+  public void Register_NormalStars_ShowAllOrNothingWithinBudget()
   {
-    using var scope = new BuildingManagerScope(maxActiveCallouts: 3);
+    using var scope = new BuildingManagerScope(calloutBudget: 3);
     using var first = new StarVisualScope("First", 2);
     using var second = new StarVisualScope("Second", 2);
 
     scope.Manager.Register(first.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
     scope.Manager.Register(second.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
 
-    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(3));
     Assert.That(first.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(2));
-    Assert.That(second.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(1));
+    Assert.That(second.Root.GetComponentsInChildren<BuildingCallout>(true), Is.Empty);
   }
 
   [Test]
   public void Register_FocusedStar_OverflowsBudgetWithoutReleasingNormalStars()
   {
-    using var scope = new BuildingManagerScope(maxActiveCallouts: 2);
+    using var scope = new BuildingManagerScope(calloutBudget: 2);
     using var normal = new StarVisualScope("Normal", 2);
     using var focused = new StarVisualScope("Focused", 3);
 
     scope.Manager.Register(normal.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
     scope.Manager.Register(focused.Visual, wantsVisible: true, highlightState: LabelHighlightState.Focused);
 
-    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(5));
     Assert.That(normal.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(2));
     Assert.That(focused.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(3));
   }
 
   [Test]
+  public void Register_FocusedStar_DoesNotConsumeNormalBudget()
+  {
+    using var scope = new BuildingManagerScope(calloutBudget: 2);
+    using var focused = new StarVisualScope("Focused", 3);
+    using var normal = new StarVisualScope("Normal", 2);
+
+    scope.Manager.Register(focused.Visual, wantsVisible: true, highlightState: LabelHighlightState.Focused);
+    scope.Manager.Register(normal.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+
+    Assert.That(focused.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(3));
+    Assert.That(normal.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(2));
+  }
+
+  [Test]
+  public void Register_NormalStarEnteringFocus_RefillsFreedNormalBudget()
+  {
+    using var cartographer = new CartographerScope(ScapeView.Buildings);
+    using var scope = new BuildingManagerScope(calloutBudget: 2);
+    using var focused = new StarVisualScope("Focused", 2);
+    using var waiting = new StarVisualScope("Waiting", 1);
+
+    scope.Manager.Register(focused.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+    scope.Manager.Register(waiting.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+    scope.Manager.Register(focused.Visual, wantsVisible: true, highlightState: LabelHighlightState.Focused);
+
+    Assert.That(focused.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(2));
+    Assert.That(waiting.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(1));
+  }
+
+  [Test]
+  public void Register_FocusedStarLeavingFocus_HidesWhenFullSetDoesNotFitNormalBudget()
+  {
+    using var scope = new BuildingManagerScope(calloutBudget: 2);
+    using var focused = new StarVisualScope("Focused", 3);
+    using var normal = new StarVisualScope("Normal", 2);
+
+    scope.Manager.Register(focused.Visual, wantsVisible: true, highlightState: LabelHighlightState.Focused);
+    scope.Manager.Register(normal.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+    scope.Manager.Register(focused.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+
+    Assert.That(focused.Root.GetComponentsInChildren<BuildingCallout>(true), Is.Empty);
+    Assert.That(normal.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(2));
+  }
+
+  [Test]
   public void Register_ExistingNormalCalloutsAfterFocusedOverflow_UpdateHighlightWithoutReleasing()
   {
-    using var scope = new BuildingManagerScope(maxActiveCallouts: 2);
+    using var scope = new BuildingManagerScope(calloutBudget: 2);
     using var normal = new StarVisualScope("Normal", 2);
     using var focused = new StarVisualScope("Focused", 3);
 
@@ -49,7 +92,6 @@ public sealed class BuildingManagerEditModeTests
     scope.Manager.Register(focused.Visual, wantsVisible: true, highlightState: LabelHighlightState.Focused);
     scope.Manager.Register(normal.Visual, wantsVisible: true, highlightState: LabelHighlightState.Linked);
 
-    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(5));
     Assert.That(normal.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(2));
     Assert.That(focused.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(3));
   }
@@ -58,19 +100,17 @@ public sealed class BuildingManagerEditModeTests
   public void Register_PendingNormalStar_RefillsWhenBudgetFreedInBuildingsView()
   {
     using var cartographer = new CartographerScope(ScapeView.Buildings);
-    using var scope = new BuildingManagerScope(maxActiveCallouts: 2);
+    using var scope = new BuildingManagerScope(calloutBudget: 2);
     using var first = new StarVisualScope("First", 2);
     using var waiting = new StarVisualScope("Waiting", 1);
 
     scope.Manager.Register(first.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
     scope.Manager.Register(waiting.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
 
-    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(2));
     Assert.That(waiting.Root.GetComponentsInChildren<BuildingCallout>(true), Is.Empty);
 
     scope.Manager.Register(first.Visual, wantsVisible: false, highlightState: LabelHighlightState.Normal);
 
-    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(1));
     Assert.That(first.Root.GetComponentsInChildren<BuildingCallout>(true), Is.Empty);
     Assert.That(waiting.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(1));
   }
@@ -79,19 +119,17 @@ public sealed class BuildingManagerEditModeTests
   public void Register_PendingNormalStar_DoesNotRefillWhenBudgetFreedOutsideBuildingsView()
   {
     using var cartographer = new CartographerScope(ScapeView.Planets);
-    using var scope = new BuildingManagerScope(maxActiveCallouts: 2);
+    using var scope = new BuildingManagerScope(calloutBudget: 2);
     using var first = new StarVisualScope("First", 2);
     using var waiting = new StarVisualScope("Waiting", 1);
 
     scope.Manager.Register(first.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
     scope.Manager.Register(waiting.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
 
-    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(2));
     Assert.That(waiting.Root.GetComponentsInChildren<BuildingCallout>(true), Is.Empty);
 
     scope.Manager.Register(first.Visual, wantsVisible: false, highlightState: LabelHighlightState.Normal);
 
-    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(0));
     Assert.That(first.Root.GetComponentsInChildren<BuildingCallout>(true), Is.Empty);
     Assert.That(waiting.Root.GetComponentsInChildren<BuildingCallout>(true), Is.Empty);
   }
@@ -99,7 +137,7 @@ public sealed class BuildingManagerEditModeTests
   [Test]
   public void Register_ActiveCallouts_ApplyCurrentHighlightState()
   {
-    using var scope = new BuildingManagerScope(maxActiveCallouts: 2, startManager: false);
+    using var scope = new BuildingManagerScope(calloutBudget: 2, startManager: false);
     using var visual = new StarVisualScope("Highlighted", 1);
     Material normalMaterial = LoadMaterial("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Drop Shadow.mat");
     Material focusedMaterial = LoadMaterial("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Bloom.mat");
@@ -124,14 +162,13 @@ public sealed class BuildingManagerEditModeTests
   public void SyncBuildings_DistantLinkedStarStaysHidden()
   {
     using var cartographer = new CartographerScope(ScapeView.Buildings);
-    using var scope = new BuildingManagerScope(maxActiveCallouts: 2);
+    using var scope = new BuildingManagerScope(calloutBudget: 2);
     using var visual = new StarVisualScope("DistantLinked", 1);
 
     SetPrivateField(visual.Visual, "currentView", ScapeView.Buildings);
     visual.VisibilitySource.SetHighlightState(LabelHighlightState.Linked);
     InvokePrivate(visual.Visual, "SyncBuildings");
 
-    Assert.That(scope.Manager.ActiveCalloutCount, Is.Zero);
     Assert.That(visual.Root.GetComponentsInChildren<BuildingCallout>(true), Is.Empty);
   }
 
@@ -139,7 +176,7 @@ public sealed class BuildingManagerEditModeTests
   public void SyncBuildings_NearbyLinkedStarUsesLinkedStyle()
   {
     using var cartographer = new CartographerScope(ScapeView.Buildings);
-    using var scope = new BuildingManagerScope(maxActiveCallouts: 1, startManager: false);
+    using var scope = new BuildingManagerScope(calloutBudget: 1, startManager: false);
     using var visual = new StarVisualScope("NearbyLinked", 1);
     Material normalMaterial = LoadMaterial("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Drop Shadow.mat");
     Material focusedMaterial = LoadMaterial("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Bloom.mat");
@@ -153,7 +190,6 @@ public sealed class BuildingManagerEditModeTests
     InvokePrivate(visual.Visual, "SyncBuildings");
 
     TMP_Text text = visual.Root.GetComponentInChildren<TMP_Text>(true);
-    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(1));
     Assert.That(text, Is.Not.Null);
     Assert.That(text.fontSharedMaterial, Is.SameAs(linkedMaterial));
   }
@@ -162,14 +198,13 @@ public sealed class BuildingManagerEditModeTests
   public void SyncBuildings_DistantFocusedStarOverflowsBudget()
   {
     using var cartographer = new CartographerScope(ScapeView.Buildings);
-    using var scope = new BuildingManagerScope(maxActiveCallouts: 0);
+    using var scope = new BuildingManagerScope(calloutBudget: 0);
     using var visual = new StarVisualScope("DistantFocused", 2);
 
     SetPrivateField(visual.Visual, "currentView", ScapeView.Buildings);
     visual.VisibilitySource.SetHighlightState(LabelHighlightState.Focused);
     InvokePrivate(visual.Visual, "SyncBuildings");
 
-    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(2));
     Assert.That(visual.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(2));
   }
 
@@ -177,7 +212,7 @@ public sealed class BuildingManagerEditModeTests
   public void Register_CalloutLifecycle_TogglesLookAtCamera()
   {
     using var cartographer = new CartographerScope(ScapeView.Buildings);
-    using var scope = new BuildingManagerScope(maxActiveCallouts: 1);
+    using var scope = new BuildingManagerScope(calloutBudget: 1);
     using var visual = new StarVisualScope("LookAt", 1);
 
     scope.Manager.Register(visual.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
@@ -189,18 +224,17 @@ public sealed class BuildingManagerEditModeTests
     scope.Manager.Register(visual.Visual, wantsVisible: false, highlightState: LabelHighlightState.Normal);
 
     Assert.That(lookAtCamera.enabled, Is.False);
-    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(0));
+    Assert.That(visual.Root.GetComponentsInChildren<BuildingCallout>(true), Is.Empty);
   }
 
   [Test]
   public void Clear_ReleasesCalloutsAndLeavesVisualDestructionIndependent()
   {
-    using var scope = new BuildingManagerScope(maxActiveCallouts: 1);
+    using var scope = new BuildingManagerScope(calloutBudget: 1);
     using var visual = new StarVisualScope("Clear", 1);
 
     scope.Manager.Register(visual.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
 
-    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(1));
     Assert.That(visual.Root.GetComponentInChildren<BuildingCallout>(true), Is.Not.Null);
 
     LogAssert.Expect(
@@ -208,7 +242,7 @@ public sealed class BuildingManagerEditModeTests
       "Destroy may not be called from edit mode! Use DestroyImmediate instead.\nDestroying an object in edit mode destroys it permanently.");
     scope.Manager.Clear();
 
-    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(0));
+    Assert.That(visual.Root.GetComponentsInChildren<BuildingCallout>(true), Is.Empty);
     Assert.That(visual.Root.activeSelf, Is.True);
     Assert.DoesNotThrow(() => Object.DestroyImmediate(visual.RootObject));
   }
@@ -216,7 +250,7 @@ public sealed class BuildingManagerEditModeTests
   [Test]
   public void ManagerDestroyedBeforeVisual_DoesNotLeaveStaleSingleton()
   {
-    using var scope = new BuildingManagerScope(maxActiveCallouts: 1);
+    using var scope = new BuildingManagerScope(calloutBudget: 1);
     using var visual = new StarVisualScope("Shutdown", 1);
 
     scope.Manager.Register(visual.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
@@ -314,7 +348,7 @@ public sealed class BuildingManagerEditModeTests
 
   private sealed class BuildingManagerScope : System.IDisposable
   {
-    public BuildingManagerScope(int maxActiveCallouts, bool startManager = true)
+    public BuildingManagerScope(int calloutBudget, bool startManager = true)
     {
       ManagerObject = new GameObject("BuildingManagerEditModeTests_Manager");
       ManagerObject.SetActive(false);
@@ -322,7 +356,7 @@ public sealed class BuildingManagerEditModeTests
       Manager = ManagerObject.AddComponent<BuildingManager>();
 
       SetPrivateField(Manager, "buildingPrefab", Prefab);
-      SetPrivateField(Manager, "maxActiveCallouts", maxActiveCallouts);
+      SetPrivateField(Manager, "calloutBudget", calloutBudget);
       if (startManager)
         Start();
     }
