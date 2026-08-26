@@ -189,6 +189,43 @@ public class ObsidianBridgeEditModeTests
   }
 
   [Test]
+  public void HandleNoteBuildingsChanged_SelectsBuildingsViewWithoutGraphRebuild()
+  {
+    var cartographerObject = new GameObject("CartographerBuildingsUpdateViewTests");
+    var starObject = new GameObject("CartographerBuildingsUpdateViewTests_Star");
+    try
+    {
+      var cartographer = cartographerObject.AddComponent<Cartographer>();
+      var engine = new TestCartographerEngine(MapLayoutMode.DynamicLinks);
+      var star = starObject.AddComponent<Star>();
+      star.SetData(new NoteData { Id = "b1", Path = "buildings/b1.md" });
+      MapGraphIndex graphIndex = MapGraphIndex.Build(
+        new List<Star> { star },
+        new List<TagNode>(),
+        new List<MapRuntimeContext.RuntimeNoteLink>());
+
+      Assert.That(graphIndex.TryGetStar("b1", out _), Is.True);
+
+      SetPrivateField(cartographer, "<CurrentView>k__BackingField", ScapeView.Plain);
+      SetPrivateField(cartographer, "_activeEngine", engine);
+      SetPrivateField(cartographer, "<GraphIndex>k__BackingField", graphIndex);
+
+      InvokePrivate(cartographer, "HandleNoteBuildingsChanged", "b1");
+
+      Assert.That(cartographer.CurrentView, Is.EqualTo(ScapeView.Buildings));
+      Assert.That(engine.ApplyViewCallCount, Is.EqualTo(1));
+      Assert.That(engine.LastAppliedView, Is.EqualTo(ScapeView.Buildings));
+      Assert.That(engine.BuildGraphCallCount, Is.EqualTo(0));
+      Assert.That(engine.ClearGraphCallCount, Is.EqualTo(0));
+    }
+    finally
+    {
+      Object.DestroyImmediate(cartographerObject);
+      Object.DestroyImmediate(starObject);
+    }
+  }
+
+  [Test]
   public void OnGraphSet_TitleAndDateFallbacks_AreMappedPredictably()
   {
     bridge.OnGraphSet(TestPayloads.FallbacksPayload);
@@ -1147,6 +1184,13 @@ public class ObsidianBridgeEditModeTests
     awakeMethod.Invoke(manager, null);
   }
 
+  private static void InvokePrivate(object target, string methodName, params object[] arguments)
+  {
+    MethodInfo method = target.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(method, Is.Not.Null, $"Missing method {methodName}.");
+    method.Invoke(target, arguments);
+  }
+
   private static IEnumerator InvokeCartographerRebuildGraphAfterClear(
     Cartographer cartographer,
     MapLayoutMode layoutPreference,
@@ -1226,6 +1270,8 @@ public class ObsidianBridgeEditModeTests
     public MapLayoutMode EngineType { get; }
     public int BuildGraphCallCount { get; private set; }
     public int ClearGraphCallCount { get; private set; }
+    public int ApplyViewCallCount { get; private set; }
+    public ScapeView LastAppliedView { get; private set; } = ScapeView.Undefined;
     public List<NoteData> LastBuiltNotes { get; private set; } = new();
     public int MaxActiveLines { get; }
     public int MaxActiveLongLines => 0;
@@ -1250,7 +1296,11 @@ public class ObsidianBridgeEditModeTests
       ClearGraphCallCount++;
     }
 
-    public void ApplyView(ScapeView view) { }
+    public void ApplyView(ScapeView view)
+    {
+      ApplyViewCallCount++;
+      LastAppliedView = view;
+    }
 
     public bool TryGetNavigationWorld(Transform tr, out Vector3 pos)
     {

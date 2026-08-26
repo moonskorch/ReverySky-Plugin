@@ -257,10 +257,11 @@ public class StarVisual : MonoBehaviour
 
   public void RefreshBuildings()
   {
-    BuildingManager.I.Refresh(this);
+    if (currentView != ScapeView.Buildings)
+      return;
 
-    if (currentView == ScapeView.Buildings)
-      SyncBuildings();
+    SyncBuildings();
+    BuildingManager.I.Refresh(this);
   }
 
   private void SyncBuildings()

@@ -38,8 +38,7 @@ public class Cartographer : MonoBehaviour
   [Header("Visual Effects")]
   [SerializeField] private StarPulseAnimator starPulseAnimator;
 
-  private ScapeView currentView = ScapeView.Planets;
-  public ScapeView CurrentView => currentView;
+  public ScapeView CurrentView { get; private set; } = ScapeView.Planets;
 
   public float BoundRadius => _activeEngine != null ? _activeEngine.BoundRadius : 10f;
   public Vector3 Pivot => _activeEngine != null ? _activeEngine.Pivot : transform.position;
@@ -142,7 +141,6 @@ public class Cartographer : MonoBehaviour
         noEntriesMessage);
     }
 
-    SetCurrentView(CurrentView);
     MapRuntimeContext.ClearBuildingGraphRequestId();
     
     var engine = ResolveModeByNotesCount(noteCount, layoutPreference);
@@ -215,7 +213,7 @@ public class Cartographer : MonoBehaviour
 
   private void CycleView()
   {
-    currentView = ScapeViewHelper.CycleView(CurrentView);
+    CurrentView = ScapeViewHelper.CycleView(CurrentView);
     UpdateViewButtonIcon();
     ApplyCurrentView();
   }
@@ -251,14 +249,6 @@ public class Cartographer : MonoBehaviour
       focusNode.SetSelectedStar(star);
   }
 
-  private void SetCurrentView(ScapeView defaultView)
-  {
-    currentView = defaultView;
-
-    if (currentView == ScapeView.Undefined)
-      currentView = ScapeView.Planets;
-  }
-
   private void UpdateViewButtonIcon()
   {
     if (viewButtonImage == null)
@@ -291,7 +281,19 @@ public class Cartographer : MonoBehaviour
       return;
 
     var visual = star.GetComponentInChildren<StarVisual>(true);
-    visual?.RefreshBuildings();
+
+    if (CurrentView == ScapeView.Buildings)
+    {
+      visual?.RefreshBuildings();
+    }
+    else
+    {
+      // StarVisual refreshes buildings through OnViewChanged after the mode switch
+      CurrentView = ScapeView.Buildings;
+      UpdateViewButtonIcon();
+      ApplyCurrentView();
+    }
+
     starPulseAnimator?.Play(visual.transform);
   }
 

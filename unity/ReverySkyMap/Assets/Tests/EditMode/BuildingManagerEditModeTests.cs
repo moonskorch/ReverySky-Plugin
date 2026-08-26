@@ -4,6 +4,7 @@ using NUnit.Framework;
 using TMPro;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Pool;
 using UnityEngine.TestTools;
 
 public sealed class BuildingManagerEditModeTests
@@ -292,14 +293,23 @@ public sealed class BuildingManagerEditModeTests
     using var scope = new BuildingManagerScope(calloutBudget: 1);
     using var visual = new StarVisualScope("Clear", 1);
 
+    SetPrivateField(
+      scope.Manager,
+      "calloutPool",
+      new ObjectPool<BuildingCallout>(
+        () => Object.Instantiate(scope.Prefab, scope.Manager.transform),
+        null,
+        callout => callout.PrepareForPool(scope.Manager.transform),
+        callout => Object.DestroyImmediate(callout.gameObject),
+        collectionCheck: false,
+        defaultCapacity: 1,
+        maxSize: 1));
+
     scope.Manager.Register(visual.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
 
     Assert.That(visual.Root.GetComponentInChildren<BuildingCallout>(true), Is.Not.Null);
 
-    LogAssert.Expect(
-      LogType.Error,
-      "Destroy may not be called from edit mode! Use DestroyImmediate instead.\nDestroying an object in edit mode destroys it permanently.");
-    scope.Manager.Clear();
+    Assert.DoesNotThrow(() => scope.Manager.Clear());
 
     Assert.That(visual.Root.GetComponentsInChildren<BuildingCallout>(true), Is.Empty);
     Assert.That(visual.Root.activeSelf, Is.True);
@@ -459,7 +469,7 @@ public sealed class BuildingManagerEditModeTests
       SetCartographerSingleton(null);
       CartographerObject = new GameObject("BuildingManagerEditModeTests_Cartographer");
       Cartographer = CartographerObject.AddComponent<Cartographer>();
-      SetPrivateField(Cartographer, "currentView", currentView);
+      SetPrivateField(Cartographer, "<CurrentView>k__BackingField", currentView);
       SetCartographerSingleton(Cartographer);
     }
 
