@@ -7,12 +7,10 @@ public sealed class NodeVisibility : MonoBehaviour, ICullingConsumer
   [SerializeField, Min(0.01f)] private float radius = 1f;
   [SerializeField, Min(0.01f)] private float visibleDistance = 25f;
 
-  private bool distanceVisible;
-
-  public bool IsVisible { get; private set; }
+  public bool IsDistanceVisible { get; private set; }
   public LabelHighlightState HighlightState { get; private set; }
 
-  public event Action<bool> OnVisibilityChanged;
+  public event Action<bool> OnDistanceVisibilityChanged;
   public event Action<LabelHighlightState> OnHighlightStateChanged;
 
   public bool TryCreateDistanceEntry(Component node, out CullingManager.Entry entry)
@@ -33,11 +31,11 @@ public sealed class NodeVisibility : MonoBehaviour, ICullingConsumer
 
   public void SetDistanceVisible(Component node, bool visible)
   {
-    if (distanceVisible == visible)
+    if (IsDistanceVisible == visible)
       return;
 
-    distanceVisible = visible;
-    ApplyVisibility();
+    IsDistanceVisible = visible;
+    OnDistanceVisibilityChanged?.Invoke(IsDistanceVisible);
   }
 
   public void SetHighlightState(LabelHighlightState state)
@@ -47,16 +45,5 @@ public sealed class NodeVisibility : MonoBehaviour, ICullingConsumer
 
     HighlightState = state;
     OnHighlightStateChanged?.Invoke(HighlightState);
-    ApplyVisibility();
-  }
-
-  private void ApplyVisibility()
-  {
-    bool visible = distanceVisible || HighlightState != LabelHighlightState.Normal;
-    if (IsVisible == visible)
-      return;
-
-    IsVisible = visible;
-    OnVisibilityChanged?.Invoke(IsVisible);
   }
 }

@@ -51,7 +51,7 @@ Obsidian plugin
 - Visual support objects
   - Responsibility: provide prefabs, note-length scale calibration, direct-link crystal buckets, labels, pooled building callouts, shared culling consumers, notifications, and optional sample graph injection.
   - Main code location: `Assets/Scripts/ScriptableObjects/StarSO.cs`, `Assets/Scripts/ScriptableObjects/TagNodeSO.cs`, `Assets/Scripts/StarScape/StarVisual.cs`, `Assets/Scripts/StarScape/BuildingManager.cs`, `Assets/Scripts/StarScape/BuildingCallout.cs`, `Assets/Scripts/StarScape/LabelPresenter.cs`, `Assets/Scripts/StarScape/LabelHighlightPresenter.cs`, `Assets/Scripts/StarScape/BehaviourCullingTarget.cs`, `Assets/Scripts/Notification/Notification.cs`, `Assets/Scripts/StarScape/SampleDataGenerator.cs`
-  - Important dependencies: `MapRuntimeContext.NotesVersion`, `MapRuntimeContext.HasRuntimeNotes`, `Cartographer.CurrentView`, `NodeVisibility.HighlightState`, `ObjectPool<BuildingCallout>`, prefab assets in `Assets/Prefabs` and `Assets/_Visuals`
+  - Important dependencies: `MapRuntimeContext.NotesVersion`, `MapRuntimeContext.HasRuntimeNotes`, `Cartographer.CurrentView`, `NodeVisibility.IsDistanceVisible`, `NodeVisibility.HighlightState`, `ObjectPool<BuildingCallout>`, prefab assets in `Assets/Prefabs` and `Assets/_Visuals`
 - Automated checks
   - Responsibility: guard bridge parsing, layout rules, focus and highlight behavior, and PlayMode bootstrap and visual stability.
   - Main code location: `Assets/Tests/EditMode/*`, `Assets/Tests/PlayMode/*`
@@ -139,8 +139,8 @@ Obsidian plugin
 
 ### 8. Building callout rendering
 
-1. `StarVisual.Start()` subscribes to `Cartographer.OnViewChanged`, `NodeVisibility.OnVisibilityChanged`, and `NodeVisibility.OnHighlightStateChanged`.
-2. When the current view is `ScapeView.Buildings`, `StarVisual.SyncBuildings()` asks `BuildingManager.Register(...)` to show or hide this star's building callouts based on current distance/focus visibility.
+1. `StarVisual.Start()` subscribes to `Cartographer.OnViewChanged`, `NodeVisibility.OnDistanceVisibilityChanged`, and `NodeVisibility.OnHighlightStateChanged`.
+2. When the current view is `ScapeView.Buildings`, `StarVisual.SyncBuildings()` asks `BuildingManager.Register(...)` to show or hide this star's building callouts when the star is distance-visible or focused. Linked state alone does not make buildings visible.
 3. `BuildingManager` owns the shared `ObjectPool<BuildingCallout>` and enforces `maxActiveCallouts` for non-focused stars so building mode can scale without each star instantiating its own full callout set.
 4. Focused stars may exceed the normal callout budget by one full callout set so selected building names remain complete.
 5. `BuildingCallout.PrepareForUse(...)` reparents a pooled callout under the target star's building root, initializes its line, marker, text, and highlight material, then enables related behaviours such as camera-facing text.
@@ -304,7 +304,7 @@ Obsidian plugin
 - `NoteData` does not own view state. Stars keep runtime note data, while `Cartographer.CurrentView` is broadcast through `OnViewChanged` for view-dependent visuals.
 - Unity does not decide whether a focused note belongs to the active Obsidian filter. The parent plugin gates ordinary focus by the effective graph; Unity pending only bridges the delay between a valid focus message and an indexed star.
 - `CartographerForcesEngine`, `Cartographer25DEngine`, and `CartographerEngineRecursiveHubsEngine` own placement and cleanup of instantiated stars and tags for `DynamicLinks`, `Dates`, and `ScalableLinks`; line visuals are handed off to `LineBuilder` after the engine raises `OnNodesChanged`.
-- `BuildingManager` owns pooled building callout GameObjects independently from engine-owned stars. `StarVisual` exposes the target root, sphere radius, and note building data; the manager decides how many callouts are active, reparents them to visible stars, applies highlight state, and returns them to the pool on hide, refresh, or graph clear.
+- `BuildingManager` owns pooled building callout GameObjects independently from engine-owned stars. `StarVisual` exposes the target root, sphere radius, note building data, and highlight state; the manager decides how many callouts are active, reparents them to visible stars, applies normal, linked, or focused styling, and returns them to the pool on hide, refresh, or graph clear. Linked state affects styling only; it does not make a distance-hidden star's buildings visible.
 - Cartographer engines expose a stable camera navigation pivot at the layout parent origin. Bounds may grow to cover placed nodes, but engines must not move the pivot to the current graph centroid during rebuilds.
 - `MapGraphIndex` is the shared read-only topology index for the current engine-built visual map. It is built once per engine node publication from engine-owned `Star` and `TagNode` objects and `MapRuntimeContext.Links`, remains valid until the next graph rebuild, and is read by line rendering, culling, label emphasis, and focus lookup.
 - `FocusNode.FocusRestoreNoteId` is the continuity fallback for graph rebuilds. It is updated by successful focus selection and is not copied into pending focus during reconciliation.

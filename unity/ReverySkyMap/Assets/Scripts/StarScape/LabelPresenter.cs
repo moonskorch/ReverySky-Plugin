@@ -45,7 +45,7 @@ public sealed class LabelPresenter : MonoBehaviour
       return;
 
     highlightState = visibilitySource.HighlightState;
-    visibilitySource.OnVisibilityChanged += HandleVisibilityChanged;
+    visibilitySource.OnDistanceVisibilityChanged += HandleDistanceVisibilityChanged;
     visibilitySource.OnHighlightStateChanged += HandleHighlightStateChanged;
   }
 
@@ -54,11 +54,11 @@ public sealed class LabelPresenter : MonoBehaviour
     if (visibilitySource == null)
       return;
 
-    visibilitySource.OnVisibilityChanged -= HandleVisibilityChanged;
+    visibilitySource.OnDistanceVisibilityChanged -= HandleDistanceVisibilityChanged;
     visibilitySource.OnHighlightStateChanged -= HandleHighlightStateChanged;
   }
 
-  private void HandleVisibilityChanged(bool visible)
+  private void HandleDistanceVisibilityChanged(bool visible)
   {
     ApplyVisibility();
   }
@@ -72,7 +72,9 @@ public sealed class LabelPresenter : MonoBehaviour
 
   private void ApplyVisibility()
   {
-    bool visible = modeAllowed && visibilitySource != null && visibilitySource.IsVisible;
+    bool visible = modeAllowed &&
+      visibilitySource != null &&
+      (visibilitySource.IsDistanceVisible || highlightState != LabelHighlightState.Normal);
     SetRelatedBehavioursVisible(visible);
 
     if (labelRoot.activeSelf != visible)

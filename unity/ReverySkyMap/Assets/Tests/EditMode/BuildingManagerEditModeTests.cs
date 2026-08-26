@@ -39,7 +39,7 @@ public sealed class BuildingManagerEditModeTests
   }
 
   [Test]
-  public void Register_ExistingNormalCalloutsAfterFocusedOverflow_UpdatesHighlightWithoutReleasing()
+  public void Register_ExistingNormalCalloutsAfterFocusedOverflow_UpdateHighlightWithoutReleasing()
   {
     using var scope = new BuildingManagerScope(maxActiveCallouts: 2);
     using var normal = new StarVisualScope("Normal", 2);
@@ -121,6 +121,59 @@ public sealed class BuildingManagerEditModeTests
   }
 
   [Test]
+  public void SyncBuildings_DistantLinkedStarStaysHidden()
+  {
+    using var cartographer = new CartographerScope(ScapeView.Buildings);
+    using var scope = new BuildingManagerScope(maxActiveCallouts: 2);
+    using var visual = new StarVisualScope("DistantLinked", 1);
+
+    SetPrivateField(visual.Visual, "currentView", ScapeView.Buildings);
+    visual.VisibilitySource.SetHighlightState(LabelHighlightState.Linked);
+    InvokePrivate(visual.Visual, "SyncBuildings");
+
+    Assert.That(scope.Manager.ActiveCalloutCount, Is.Zero);
+    Assert.That(visual.Root.GetComponentsInChildren<BuildingCallout>(true), Is.Empty);
+  }
+
+  [Test]
+  public void SyncBuildings_NearbyLinkedStarUsesLinkedStyle()
+  {
+    using var cartographer = new CartographerScope(ScapeView.Buildings);
+    using var scope = new BuildingManagerScope(maxActiveCallouts: 1, startManager: false);
+    using var visual = new StarVisualScope("NearbyLinked", 1);
+    Material normalMaterial = LoadMaterial("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Drop Shadow.mat");
+    Material focusedMaterial = LoadMaterial("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Bloom.mat");
+    Material linkedMaterial = LoadMaterial("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Bloom Medium.mat");
+
+    SetCalloutHighlightMaterials(scope.Prefab, normalMaterial, focusedMaterial, linkedMaterial);
+    scope.Start();
+    SetPrivateField(visual.Visual, "currentView", ScapeView.Buildings);
+    visual.VisibilitySource.SetDistanceVisible(visual.Star, true);
+    visual.VisibilitySource.SetHighlightState(LabelHighlightState.Linked);
+    InvokePrivate(visual.Visual, "SyncBuildings");
+
+    TMP_Text text = visual.Root.GetComponentInChildren<TMP_Text>(true);
+    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(1));
+    Assert.That(text, Is.Not.Null);
+    Assert.That(text.fontSharedMaterial, Is.SameAs(linkedMaterial));
+  }
+
+  [Test]
+  public void SyncBuildings_DistantFocusedStarOverflowsBudget()
+  {
+    using var cartographer = new CartographerScope(ScapeView.Buildings);
+    using var scope = new BuildingManagerScope(maxActiveCallouts: 0);
+    using var visual = new StarVisualScope("DistantFocused", 2);
+
+    SetPrivateField(visual.Visual, "currentView", ScapeView.Buildings);
+    visual.VisibilitySource.SetHighlightState(LabelHighlightState.Focused);
+    InvokePrivate(visual.Visual, "SyncBuildings");
+
+    Assert.That(scope.Manager.ActiveCalloutCount, Is.EqualTo(2));
+    Assert.That(visual.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(2));
+  }
+
+  [Test]
   public void Register_CalloutLifecycle_TogglesLookAtCamera()
   {
     using var cartographer = new CartographerScope(ScapeView.Buildings);
@@ -179,6 +232,13 @@ public sealed class BuildingManagerEditModeTests
     FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
     Assert.That(field, Is.Not.Null, $"Missing field {fieldName} on {target.GetType().Name}.");
     field.SetValue(target, value);
+  }
+
+  private static void InvokePrivate(object target, string methodName)
+  {
+    MethodInfo method = target.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.That(method, Is.Not.Null, $"Missing method {methodName} on {target.GetType().Name}.");
+    method.Invoke(target, null);
   }
 
   private static void SetCalloutHighlightMaterials(
@@ -335,6 +395,7 @@ public sealed class BuildingManagerEditModeTests
       buildingRoot.SetActive(true);
 
       Star = RootObject.AddComponent<Star>();
+      VisibilitySource = RootObject.AddComponent<NodeVisibility>();
       Visual = RootObject.AddComponent<StarVisual>();
       SphereRenderer = sphereObject.AddComponent<MeshRenderer>();
       Root = buildingRoot;
@@ -348,12 +409,14 @@ public sealed class BuildingManagerEditModeTests
       });
 
       SetPrivateField(Visual, "star", Star);
+      SetPrivateField(Visual, "visibilitySource", VisibilitySource);
       SetPrivateField(Visual, "sphereRenderer", SphereRenderer);
       SetPrivateField(Visual, "buildings", Root);
     }
 
     public GameObject RootObject { get; }
     public Star Star { get; }
+    public NodeVisibility VisibilitySource { get; }
     public StarVisual Visual { get; }
     public Renderer SphereRenderer { get; }
     public GameObject Root { get; }

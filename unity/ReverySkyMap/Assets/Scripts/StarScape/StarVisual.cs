@@ -34,7 +34,7 @@ public class StarVisual : MonoBehaviour
   {
     crystalCoreBaseScale = crystalCore.localScale;
 
-    visibilitySource.OnVisibilityChanged += HandleVisibilityChanged;
+    visibilitySource.OnDistanceVisibilityChanged += HandleDistanceVisibilityChanged;
     visibilitySource.OnHighlightStateChanged += HandleHighlightStateChanged;
 
     Cartographer.I.OnViewChanged += ApplyView;
@@ -44,7 +44,7 @@ public class StarVisual : MonoBehaviour
 
   private void OnDestroy()
   {
-    visibilitySource.OnVisibilityChanged -= HandleVisibilityChanged;
+    visibilitySource.OnDistanceVisibilityChanged -= HandleDistanceVisibilityChanged;
     visibilitySource.OnHighlightStateChanged -= HandleHighlightStateChanged;
     Cartographer.I.OnViewChanged -= ApplyView;
   }
@@ -104,7 +104,7 @@ public class StarVisual : MonoBehaviour
     titlePresenter.SetModeAllowed(visible);
   }
 
-  private void HandleVisibilityChanged(bool visible)
+  private void HandleDistanceVisibilityChanged(bool visible)
   {
     if (currentView == ScapeView.Buildings)
       SyncBuildings();
@@ -264,5 +264,8 @@ public class StarVisual : MonoBehaviour
   }
 
   private void SyncBuildings()
-    => ShowBuildings(currentView == ScapeView.Buildings && visibilitySource.IsVisible);
+  {
+    bool focused = visibilitySource.HighlightState == LabelHighlightState.Focused;
+    ShowBuildings(currentView == ScapeView.Buildings && (visibilitySource.IsDistanceVisible || focused));
+  }
 }
