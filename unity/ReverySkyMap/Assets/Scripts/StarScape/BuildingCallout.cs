@@ -24,19 +24,24 @@ public class BuildingCallout : MonoBehaviour
       transform.SetParent(parent, false);
 
     transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
-    gameObject.SetActive(true);
+  }
+
+  public void Activate()
+  {
     SetRelatedBehavioursEnabled(true);
+    gameObject.SetActive(true);
   }
 
   public void PrepareForPool(Transform parent)
   {
+    gameObject.SetActive(false);
+    SetRelatedBehavioursEnabled(false);
+
     if (parent != null && transform.parent != parent)
       transform.SetParent(parent, false);
 
     lineRenderer.positionCount = 0;
     nameText.text = string.Empty;
-    SetRelatedBehavioursEnabled(false);
-    gameObject.SetActive(false);
   }
 
   public void Init(BuildingData building, float sphereRadius, int slotIndex)

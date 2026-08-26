@@ -15,6 +15,8 @@ public sealed class LookAtCamera : MonoBehaviour
   {
     if (mode == LookAtCameraMode.OnCameraChanged)
       CameraForwardWatcher.I.Register(this);
+    else if (mode == LookAtCameraMode.EveryFrame)
+      ApplyCameraForward(CameraForwardWatcher.I.CurrentForward);
   }
 
   private void OnDisable()

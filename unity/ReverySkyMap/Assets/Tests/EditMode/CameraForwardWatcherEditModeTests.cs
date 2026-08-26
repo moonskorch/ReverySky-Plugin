@@ -16,6 +16,9 @@ public sealed class CameraForwardWatcherEditModeTests
   private static readonly MethodInfo LabelOnDisableMethod = typeof(LookAtCamera)
     .GetMethod("OnDisable", BindingFlags.Instance | BindingFlags.NonPublic);
 
+  private static readonly FieldInfo LabelModeField = typeof(LookAtCamera)
+    .GetField("mode", BindingFlags.Instance | BindingFlags.NonPublic);
+
   private static readonly FieldInfo SingletonField = typeof(CameraForwardWatcher)
     .GetField("<I>k__BackingField", BindingFlags.Static | BindingFlags.NonPublic);
 
@@ -59,6 +62,41 @@ public sealed class CameraForwardWatcherEditModeTests
       LabelOnDisableMethod.Invoke(label, null);
       cameraObject.transform.rotation = Quaternion.LookRotation(Vector3.back, Vector3.up);
       InvokeLateUpdate(watcher);
+
+      AssertForward(label.transform, Vector3.right);
+    }
+    finally
+    {
+      if (labelObject != null)
+        Object.DestroyImmediate(labelObject);
+
+      if (cameraObject != null)
+        Object.DestroyImmediate(cameraObject);
+
+      ResetWatcherSingleton();
+    }
+  }
+
+  [Test]
+  public void EveryFrameLookAtCamera_AlignsImmediatelyOnEnable()
+  {
+    GameObject cameraObject = null;
+    GameObject labelObject = null;
+
+    try
+    {
+      cameraObject = new GameObject("CameraForwardWatcherTests_Camera");
+      cameraObject.transform.rotation = Quaternion.LookRotation(Vector3.right, Vector3.up);
+      CameraForwardWatcher watcher = cameraObject.AddComponent<CameraForwardWatcher>();
+      WatcherAwakeMethod.Invoke(watcher, null);
+
+      labelObject = new GameObject("CameraForwardWatcherTests_EveryFrameLabel");
+      labelObject.SetActive(false);
+      LookAtCamera label = labelObject.AddComponent<LookAtCamera>();
+      LabelModeField.SetValue(label, LookAtCameraMode.EveryFrame);
+      labelObject.transform.forward = Vector3.back;
+
+      LabelOnEnableMethod.Invoke(label, null);
 
       AssertForward(label.transform, Vector3.right);
     }

@@ -228,6 +228,41 @@ public sealed class BuildingManagerEditModeTests
   }
 
   [Test]
+  public void CalloutLifecycle_ActivatesOnlyAfterPreparation()
+  {
+    var parent = new GameObject("BuildingManagerEditModeTests_CalloutParent");
+    BuildingCallout callout = CreateCalloutPrefab();
+    var relatedBehaviour = callout.gameObject.AddComponent<Light>();
+    relatedBehaviour.enabled = false;
+    SetPrivateField(callout, "relatedBehaviours", new Behaviour[] { relatedBehaviour });
+
+    try
+    {
+      callout.PrepareForUse(parent.transform);
+      callout.Init(new BuildingData { Name = "Prepared" }, sphereRadius: 1f, slotIndex: 0);
+
+      Assert.That(callout.gameObject.activeSelf, Is.False);
+      Assert.That(relatedBehaviour.enabled, Is.False);
+      Assert.That(callout.GetComponentInChildren<TMP_Text>(true).text, Is.EqualTo("<u>Prepared</u>"));
+
+      callout.Activate();
+
+      Assert.That(callout.gameObject.activeSelf, Is.True);
+      Assert.That(relatedBehaviour.enabled, Is.True);
+
+      callout.PrepareForPool(parent.transform);
+
+      Assert.That(callout.gameObject.activeSelf, Is.False);
+      Assert.That(relatedBehaviour.enabled, Is.False);
+      Assert.That(callout.GetComponentInChildren<TMP_Text>(true).text, Is.Empty);
+    }
+    finally
+    {
+      Object.DestroyImmediate(parent);
+    }
+  }
+
+  [Test]
   public void Clear_ReleasesCalloutsAndLeavesVisualDestructionIndependent()
   {
     using var scope = new BuildingManagerScope(calloutBudget: 1);

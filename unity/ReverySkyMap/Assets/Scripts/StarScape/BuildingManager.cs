@@ -169,6 +169,7 @@ public sealed class BuildingManager : MonoBehaviour
       callout.Init(building, visual.BuildingSphereRadius, resolvedSlot);
       callout.ApplyHighlight(starBuildings.HighlightState);
       starBuildings.Callouts.Add(callout);
+      callout.Activate();
     }
 
     if (!starBuildings.Focused)
