@@ -42,6 +42,7 @@ public class BuildingCallout : MonoBehaviour
 
     lineRenderer.positionCount = 0;
     nameText.text = string.Empty;
+    nameText.ClearMesh(updateMesh: true);
   }
 
   public void Init(BuildingData building, float sphereRadius, int slotIndex)

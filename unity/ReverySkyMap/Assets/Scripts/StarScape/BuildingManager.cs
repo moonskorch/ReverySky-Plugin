@@ -120,6 +120,8 @@ public sealed class BuildingManager : MonoBehaviour
 
     if (starBuildings.Callouts.Count == targetCount)
     {
+      // Same-count reuse is only for visibility/highlight resyncs.
+      // Buildings are rebuilt through Refresh().
       ApplyHighlight(starBuildings);
       return;
     }
