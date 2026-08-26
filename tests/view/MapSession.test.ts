@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TFile } from "obsidian";
 import type { GraphPayload, NoteFocusPayload } from "../../src/bridge/BridgeTypes";
-import { MAX_RUNTIME_BUILDING_NAME_LENGTH } from "../../src/graph/GraphTextLimits";
+import {
+  MAX_RUNTIME_BUILDING_COUNT,
+  MAX_RUNTIME_BUILDING_NAME_LENGTH
+} from "../../src/graph/GraphTextLimits";
 import { makeStableNoteId } from "../../src/graph/VaultGraphBuilder";
 import { MapSession } from "../../src/view/MapSession";
 import { callMaybe, makeBuildGraphMock, makeVoidCallback } from "./testUtils";
@@ -714,7 +717,15 @@ describe("MapSession", () => {
   it("keeps landmark-only changes in the next graph payload", () => {
     vi.useFakeTimers();
     const longLandmark = "A".repeat(MAX_RUNTIME_BUILDING_NAME_LENGTH + 20);
-    const expectedLandmark = longLandmark.slice(0, MAX_RUNTIME_BUILDING_NAME_LENGTH);
+    const extraLandmarks = Array.from(
+      { length: MAX_RUNTIME_BUILDING_COUNT + 2 },
+      (_, index) => `Building ${index + 1}`
+    );
+    const nextLandmarks = [longLandmark, ...extraLandmarks];
+    const expectedLandmarks = [
+      longLandmark.slice(0, MAX_RUNTIME_BUILDING_NAME_LENGTH),
+      ...extraLandmarks
+    ].slice(0, MAX_RUNTIME_BUILDING_COUNT);
 
     const metadataCallbacks: {
       changed?: (file: { path?: string }, data: string, cache: { links?: Array<{ link: string }>; tags?: Array<{ tag: string }>; frontmatter?: unknown }) => void;
@@ -774,7 +785,7 @@ describe("MapSession", () => {
       {
         links: [],
         tags: [],
-        frontmatter: { landmarks: [longLandmark] }
+        frontmatter: { landmarks: nextLandmarks }
       }
     );
 
@@ -783,7 +794,7 @@ describe("MapSession", () => {
     expect(sendNoteUpdate).toHaveBeenCalledWith({
       id: makeStableNoteId("Note.md"),
       path: "Note.md",
-      buildings: [expectedLandmark]
+      buildings: expectedLandmarks
     });
 
     session.setMapLayoutPreference("dates");
@@ -791,7 +802,7 @@ describe("MapSession", () => {
 
     expect(buildGraph).toHaveBeenCalledTimes(1);
     expect(sendGraph).toHaveBeenCalledTimes(2);
-    expect((sendGraph.mock.calls[1]?.[0] as GraphPayload).notes[0]?.buildings).toEqual([expectedLandmark]);
+    expect((sendGraph.mock.calls[1]?.[0] as GraphPayload).notes[0]?.buildings).toEqual(expectedLandmarks);
   });
 
   it("does not send note:update when non-landmark metadata changes", () => {

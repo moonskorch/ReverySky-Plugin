@@ -69,20 +69,18 @@ public class BuildingCallout : MonoBehaviour
   private static Vector3 ResolveDirection(string buildingName, Vector2 elevationRange, int slotCount)
   {
     string layoutKey = StableTextHash.NormalizeCaseInsensitiveKey(buildingName);
-    int resolvedSlotCount = Mathf.Max(1, slotCount);
-    int slotIndex = ResolveSlotFromLayoutKey(layoutKey, resolvedSlotCount);
-    return ResolveSlotDirection(slotIndex, resolvedSlotCount, elevationRange);
+    int slotIndex = ResolveSlotFromLayoutKey(layoutKey, slotCount);
+    return ResolveSlotDirection(slotIndex, slotCount, elevationRange);
   }
 
   private static Vector3 ResolveSlotDirection(int slotIndex, int slotCount, Vector2 elevationRange)
   {
-    int resolvedSlotCount = Mathf.Max(1, slotCount);
-    int wrappedSlot = PositiveModulo(slotIndex, resolvedSlotCount);
+    int wrappedSlot = PositiveModulo(slotIndex, slotCount);
     bool upperHemisphere = (wrappedSlot % 2) == 0;
     int hemisphereSlot = wrappedSlot / 2;
     int hemisphereSlotCount = upperHemisphere
-      ? (resolvedSlotCount + 1) / 2
-      : Mathf.Max(1, resolvedSlotCount / 2);
+      ? (slotCount + 1) / 2
+      : slotCount / 2;
 
     float minElevationDeg = Mathf.Clamp(Mathf.Min(Mathf.Abs(elevationRange.x), Mathf.Abs(elevationRange.y)), 0f, 90f);
     float maxElevationDeg = Mathf.Clamp(Mathf.Max(Mathf.Abs(elevationRange.x), Mathf.Abs(elevationRange.y)), minElevationDeg, 90f);

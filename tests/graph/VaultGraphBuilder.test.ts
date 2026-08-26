@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 import { VaultGraphBuilder } from "../../src/graph/VaultGraphBuilder";
 import {
+  MAX_RUNTIME_BUILDING_COUNT,
   MAX_RUNTIME_BUILDING_NAME_LENGTH,
   MAX_RUNTIME_NOTE_TITLE_LENGTH
 } from "../../src/graph/GraphTextLimits";
@@ -138,6 +139,37 @@ describe("VaultGraphBuilder", () => {
       "Observatory",
       longLandmark.slice(0, MAX_RUNTIME_BUILDING_NAME_LENGTH)
     ]);
+  });
+
+  it("keeps only the first runtime building names", () => {
+    const file = makeFile("Folder/ManyBuildings.md", {
+      ctime: Date.UTC(2026, 0, 1),
+      mtime: Date.UTC(2026, 0, 2),
+      size: 64
+    });
+    const landmarks = Array.from(
+      { length: MAX_RUNTIME_BUILDING_COUNT + 4 },
+      (_, index) => `Building ${index + 1}`
+    );
+
+    const app = {
+      vault: {
+        getMarkdownFiles: () => [file]
+      },
+      metadataCache: {
+        getFileCache: () => ({
+          frontmatter: {
+            landmarks
+          }
+        }),
+        resolvedLinks: {}
+      }
+    };
+
+    const payload = VaultGraphBuilder.build(app as never);
+    expect(payload.notes[0]?.buildings).toEqual(
+      landmarks.slice(0, MAX_RUNTIME_BUILDING_COUNT)
+    );
   });
 
   it.each([

@@ -32,7 +32,10 @@ import {
   type QueryFilterParseResult
 } from "../graph/GraphQueryFilter";
 import { extractActiveFilterTermValue } from "../graph/GraphQuerySyntax";
-import { normalizeRuntimeBuildingName } from "../graph/GraphTextLimits";
+import {
+  MAX_RUNTIME_BUILDING_COUNT,
+  normalizeRuntimeBuildingName
+} from "../graph/GraphTextLimits";
 import { makeStableNoteId } from "../graph/VaultGraphBuilder";
 import { MapFocusController, type FocusRequestOptions } from "./MapFocusController";
 
@@ -1291,7 +1294,8 @@ export class MapSession {
     return landmarksRaw
       .filter((landmark): landmark is string => typeof landmark === "string")
       .map((landmark) => normalizeRuntimeBuildingName(landmark))
-      .filter((landmark) => landmark.length > 0);
+      .filter((landmark) => landmark.length > 0)
+      .slice(0, MAX_RUNTIME_BUILDING_COUNT);
   }
 
   private isGraphRelevantPath(pathValue: unknown): boolean {

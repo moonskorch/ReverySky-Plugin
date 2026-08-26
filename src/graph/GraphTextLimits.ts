@@ -1,4 +1,5 @@
 export const MAX_RUNTIME_BUILDING_NAME_LENGTH = 64;
+export const MAX_RUNTIME_BUILDING_COUNT = 16;
 export const MAX_RUNTIME_NOTE_TITLE_LENGTH = 100;
 
 export function normalizeRuntimeText(value: string, maxLength: number): string {

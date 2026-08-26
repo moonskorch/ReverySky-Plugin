@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { GraphLink, GraphNoteNode, GraphPayload } from "../bridge/BridgeTypes";
 import { GraphNormalizer } from "./GraphNormalizer";
 import {
+  MAX_RUNTIME_BUILDING_COUNT,
   normalizeRuntimeBuildingName,
   normalizeRuntimeNoteTitle
 } from "./GraphTextLimits";
@@ -148,7 +149,8 @@ export class VaultGraphBuilder {
     return value
       .filter((x): x is string => typeof x === "string")
       .map((x) => normalizeRuntimeBuildingName(x))
-      .filter(Boolean);
+      .filter(Boolean)
+      .slice(0, MAX_RUNTIME_BUILDING_COUNT);
   }
 
   private static getFrontmatterDate(value: unknown): string | undefined {

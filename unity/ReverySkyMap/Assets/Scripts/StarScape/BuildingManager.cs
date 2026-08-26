@@ -103,7 +103,7 @@ public sealed class BuildingManager : MonoBehaviour
   private void UpdateStarBuildings(StarVisual visual, StarBuildings starBuildings, bool allowFocusedOverflow)
   {
     IReadOnlyList<BuildingData> buildings = visual.BuildingData;
-    int buildingCount = buildings?.Count ?? 0;
+    int buildingCount = ResolveCalloutCount(buildings);
     if (buildingCount <= 0)
     {
       RemoveStarBuildings(visual, starBuildings);
@@ -128,6 +128,9 @@ public sealed class BuildingManager : MonoBehaviour
 
     RebuildBuildings(visual, starBuildings, buildings, targetCount);
   }
+
+  private int ResolveCalloutCount(IReadOnlyList<BuildingData> buildings)
+    => Mathf.Min(buildings?.Count ?? 0, buildingPrefab.DirectionSlotCount);
 
   private int ResolveTargetBuildingCount(
     int buildingCount,
@@ -190,7 +193,7 @@ public sealed class BuildingManager : MonoBehaviour
 
       StarVisual visual = pair.Key;
       StarBuildings starBuildings = pair.Value;
-      int buildingCount = visual.BuildingData?.Count ?? 0;
+      int buildingCount = ResolveCalloutCount(visual.BuildingData);
       if (buildingCount <= 0 ||
           starBuildings.Focused ||
           starBuildings.Callouts.Count >= buildingCount)

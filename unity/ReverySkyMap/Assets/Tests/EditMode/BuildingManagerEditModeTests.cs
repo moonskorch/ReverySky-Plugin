@@ -23,6 +23,18 @@ public sealed class BuildingManagerEditModeTests
   }
 
   [Test]
+  public void Register_NormalStar_CapsCalloutsAtDirectionSlotCount()
+  {
+    using var scope = new BuildingManagerScope(calloutBudget: 16);
+    using var visual = new StarVisualScope("NormalOverflow", 17);
+
+    scope.Manager.Register(visual.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+
+    Assert.That(visual.Visual.BuildingData, Has.Count.EqualTo(17));
+    Assert.That(visual.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(16));
+  }
+
+  [Test]
   public void Register_FocusedStar_OverflowsBudgetWithoutReleasingNormalStars()
   {
     using var scope = new BuildingManagerScope(calloutBudget: 2);
@@ -34,6 +46,18 @@ public sealed class BuildingManagerEditModeTests
 
     Assert.That(normal.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(2));
     Assert.That(focused.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(3));
+  }
+
+  [Test]
+  public void Register_FocusedStar_CapsCalloutsAtDirectionSlotCount()
+  {
+    using var scope = new BuildingManagerScope(calloutBudget: 0);
+    using var visual = new StarVisualScope("FocusedOverflow", 17);
+
+    scope.Manager.Register(visual.Visual, wantsVisible: true, highlightState: LabelHighlightState.Focused);
+
+    Assert.That(visual.Visual.BuildingData, Has.Count.EqualTo(17));
+    Assert.That(visual.Root.GetComponentsInChildren<BuildingCallout>(true), Has.Length.EqualTo(16));
   }
 
   [Test]
