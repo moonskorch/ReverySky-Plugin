@@ -217,9 +217,12 @@ describe("EmbeddedUnityRuntimeInstaller", () => {
       await createDevRuntime(pluginDir);
 
       const installer = new EmbeddedUnityRuntimeInstaller();
-      const runtimeDir = await installer.resolveRuntimeDirectory(pluginDir, "1.2.3");
+      const resolution = await installer.resolveRuntimeDirectory(pluginDir, "1.2.3");
 
-      expect(runtimeDir).toBe(path.join(pluginDir, "unity-webgl"));
+      expect(resolution).toEqual({
+        runtimeDir: path.join(pluginDir, "unity-webgl"),
+        extracted: false
+      });
     });
   });
 
@@ -233,10 +236,14 @@ describe("EmbeddedUnityRuntimeInstaller", () => {
         archiveSha256: archive.sha256
       });
 
-      const runtimeDir = await installer.resolveRuntimeDirectory(pluginDir, "9.9.9");
+      const resolution = await installer.resolveRuntimeDirectory(pluginDir, "9.9.9");
       const versionDir = path.join(pluginDir, ".reverysky-runtime", "9.9.9");
+      const runtimeDir = path.join(versionDir, "unity-webgl");
 
-      expect(runtimeDir).toBe(path.join(versionDir, "unity-webgl"));
+      expect(resolution).toEqual({
+        runtimeDir,
+        extracted: true
+      });
       expect(await readFile(path.join(versionDir, ".runtime-ready.json"), "utf8")).toContain('"schemaVersion": 1');
       expect(await readFile(path.join(versionDir, ".runtime-ready.json"), "utf8")).toContain('"pluginVersion": "9.9.9"');
       expect(await readFile(path.join(versionDir, ".runtime-ready.json"), "utf8")).toContain(archive.sha256);
@@ -257,7 +264,10 @@ describe("EmbeddedUnityRuntimeInstaller", () => {
       });
 
       const resolved = await installer.resolveRuntimeDirectory(pluginDir, "1.0.0");
-      expect(resolved).toBe(runtimeDir);
+      expect(resolved).toEqual({
+        runtimeDir,
+        extracted: false
+      });
       expect(await readFile(path.join(runtimeDir, "Build", "runtime-entry.js"), "utf8")).toContain("cached entry");
     });
   });
@@ -272,11 +282,16 @@ describe("EmbeddedUnityRuntimeInstaller", () => {
         archiveSha256: archive.sha256
       });
 
-      const firstRuntimeDir = await installer.resolveRuntimeDirectory(pluginDir, "2.0.0");
+      const firstResolution = await installer.resolveRuntimeDirectory(pluginDir, "2.0.0");
+      const firstRuntimeDir = firstResolution.runtimeDir;
       await unlink(path.join(firstRuntimeDir, "Build", "runtime-core.js"));
 
-      const secondRuntimeDir = await installer.resolveRuntimeDirectory(pluginDir, "2.0.0");
-      expect(secondRuntimeDir).toBe(firstRuntimeDir);
+      const secondResolution = await installer.resolveRuntimeDirectory(pluginDir, "2.0.0");
+      expect(secondResolution).toEqual({
+        runtimeDir: firstRuntimeDir,
+        extracted: true
+      });
+      const secondRuntimeDir = secondResolution.runtimeDir;
       expect(await readFile(path.join(secondRuntimeDir, "Build", "runtime-core.js"), "utf8")).toContain("runtime-core");
     });
   });

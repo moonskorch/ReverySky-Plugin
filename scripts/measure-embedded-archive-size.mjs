@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { stripPackageModeMarker } from "./package-mode-marker.mjs";
+import { resolveWhatsNewRuntimePaths } from "./whats-new-selection.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,6 +21,7 @@ const rootManifestPath = path.join(repoRoot, "manifest.json");
 const rootStylesPath = path.join(repoRoot, "styles.css");
 const buildDir = path.join(repoRoot, "unity-webgl", "Build");
 const streamingAssetsDir = path.join(repoRoot, "unity-webgl", "StreamingAssets");
+const whatsNewSourceDir = path.join(repoRoot, "whats-new");
 const droidSansFallbackLicensePath = path.join(
   repoRoot,
   "unity",
@@ -250,6 +252,13 @@ async function stageCompactRuntime(tempRoot) {
   const hasStreamingAssets = await pathExists(streamingAssetsDir);
   if (hasStreamingAssets) {
     await copyDirectoryRecursive(streamingAssetsDir, path.join(runtimeRoot, "StreamingAssets"));
+  }
+
+  const whatsNewFile = await resolveWhatsNewRuntimePaths(rootManifestPath, whatsNewSourceDir);
+  if (whatsNewFile) {
+    const targetPath = path.join(runtimeRoot, whatsNewFile.runtimePath);
+    await mkdir(path.dirname(targetPath), { recursive: true });
+    await copyFile(whatsNewFile.sourcePath, targetPath);
   }
 
   return runtimeRoot;

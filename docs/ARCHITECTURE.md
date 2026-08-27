@@ -9,6 +9,7 @@ Current in-scope behavior:
 - let the view narrow the effective graph with Ego scope and query/tag filters before sending it to Unity;
 - persist graph view preferences across close and reopen;
 - host the local WebGL runtime on `127.0.0.1`;
+- show a packaged What's New note once after a meaningful `embedded-archive` update;
 - round-trip note selection between Obsidian and the Unity runtime.
 
 The primary workflow is one graph leaf opened by the plugin command. Duplicate graph leaves can exist through Obsidian workspace restore, popouts, or manual workspace manipulation; they should remain operable, but they are treated as a recovery case rather than the main interaction model.
@@ -54,8 +55,13 @@ Main system parts:
 
 - Local WebGL host
   Serves the selected Unity runtime source over loopback HTTP and rejects path traversal or unsupported methods.
-  Main code: `src/runtime/UnityWebglLocalServer.ts`, `src/runtime/EmbeddedUnityRuntimeInstaller.ts`, `src/runtime/EmbeddedUnityRuntimeArchive.ts`, `src/runtime/EmbeddedUnityIndexHtml.ts`
+  Main code: `src/runtime/UnityWebglLocalServer.ts`, `src/runtime/EmbeddedUnityRuntimeInstaller.ts`, `src/runtime/EmbeddedUnityRuntimeArchive.ts`, `src/runtime/EmbeddedUnityIndexHtml.ts`, `src/runtime/WhatsNewFile.ts`
   Depends on: Node `http`, `fs`, `path`, embedded runtime payload helpers
+
+- What's New announcement flow
+  Packages one versioned Markdown announcement into the `embedded-archive` runtime, opens it in a plugin-owned view after fresh extraction, and persists the shown version in plugin data.
+  Main code: `scripts/whats-new-selection.mjs`, `scripts/package-embedded-archive.mjs`, `src/main.ts`, `src/runtime/WhatsNewFile.ts`, `src/view/WhatsNewView.ts`
+  Depends on: root `manifest.json`, `whats-new/*.md`, Obsidian `ItemView`, `MarkdownRenderer`, plugin `loadData()` / `saveData()`
 
 - Unity runtime source
   Receives graph payloads, owns runtime graph state, rebuilds the scene, focuses notes, and requests note opening back in Obsidian.
@@ -84,6 +90,8 @@ Main system parts:
   - root `main.js` contains a compressed Unity runtime archive;
   - the first graph open extracts the runtime into a versioned local cache;
   - later graph opens reuse the cache when plugin version and archive SHA match;
+  - the archive may contain one selected `whats-new/<version>.md` file;
+  - What's New is checked only after fresh extraction, not on every plugin load or every graph view open;
   - no runtime network download is used;
   - this is the current release-shaped candidate; dashboard submission and scan status are tracked separately.
 
@@ -162,7 +170,7 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
 
 ### Path 1. Command -> view activation -> iframe startup
 1. `src/main.ts` -> `ReverySkyMapPlugin.onload()`
-   Loads plugin data `mapViewState`, registers `MAP_VIEW_TYPE`, and registers the `open-map` command.
+   Loads plugin data `mapViewState` and `whatsNewShownVersion`, registers `MAP_VIEW_TYPE`, registers `WHATS_NEW_VIEW_TYPE`, and registers the `open-map` command.
 2. `src/commands/MapCommands.ts` -> `activateMapView()`
    Finds an existing graph leaf or creates one with `workspace.getRightLeaf(false)` and `leaf.setViewState(...)`.
    The plugin intentionally opens and owns a single graph leaf: repeated open actions reveal the existing leaf instead of creating another one.
@@ -176,6 +184,19 @@ Most plugin-side behavior now flows through a small shell in `MapView`, while `s
    Starts a loopback HTTP server and returns `http://127.0.0.1:<port>/index.html`.
 7. `MapView.onOpen()` creates the iframe with that URL, cache-busting `t`, and the session `renderScale`, then waits for the iframe `load` event.
 8. On iframe load, `MapView.onOpen()` calls `bridge.attach(iframe.contentWindow, callbacks)`.
+
+### Path 1a. Fresh embedded archive extraction -> What's New view
+1. `scripts/package-embedded-archive.mjs` calls `resolveWhatsNewRuntimePaths(...)`.
+   The helper reads root `manifest.json`, scans source `whats-new/*.md`, parses only `x.y.z.md` names, and selects the highest semantic version that does not exceed `manifest.version`.
+2. The package script copies only that selected file into the archive as `unity-webgl/whats-new/<version>.md`.
+   Older source files may remain in the repository; they are not all copied into a release archive.
+3. `src/main.ts` -> `getUnityRuntimeUrl()` calls `EmbeddedUnityRuntimeInstaller.resolveRuntimeDirectory(pluginDir, manifest.version)` for `embedded-archive` builds.
+4. `src/runtime/EmbeddedUnityRuntimeInstaller.ts` returns `extracted: true` only when the current plugin version cache was rebuilt from the archive.
+   Reused caches, folder-runtime installs, and embedded-html installs return or follow paths that do not trigger What's New.
+5. On `extracted: true`, `src/main.ts` calls `showWhatsNew(runtimeDir)`.
+   `showWhatsNew(...)` reads `runtimeDir/whats-new/`, lets the runtime reader choose the newest valid versioned Markdown file when several are present, exits when there is no file or when the selected version is not newer than `whatsNewShownVersion`, otherwise opens `WHATS_NEW_VIEW_TYPE` in a new tab.
+6. `src/view/WhatsNewView.ts` renders the packaged Markdown with Obsidian `MarkdownRenderer`.
+7. After a successful open, `src/main.ts` stores the shown version under `whatsNewShownVersion` in plugin data while preserving `mapViewState`.
 
 ### Path 2. Handshake -> graph build -> postMessage -> Unity ingest
 1. After successful Unity WebGL boot, the runtime posts `bridge:ready`.
@@ -518,6 +539,11 @@ Open graph leaves do not share live filter state. Each leaf's `MapSession` owns 
   It is stored as plugin data under `mapViewState`, then passed to a newly created `MapView` as `initialState` on the next open.
   It is not per-window persisted state.
 
+- The latest shown What's New version is owned by `ReverySkyMapPlugin`.
+  It is stored in plugin data under `whatsNewShownVersion`.
+  Missing `whatsNewShownVersion` is valid old data and means no announcement has been recorded as shown yet.
+  This field is checked only after a fresh `embedded-archive` extraction; it is not a general plugin-startup notification system.
+
 - Filter panel visibility is owned by `MapFilterPanelController`.
   Active suggestion pane, selected suggestion index, ARIA active descendant state, and suggestion hide-delay timers are owned by `MapFilterSuggestionsController`.
   They are UI-only transient state and are intentionally not persisted in plugin data.
@@ -606,6 +632,10 @@ Main repository surfaces:
   Role: compact Unity runtime input for `embedded-archive` release builds
   Type: tracked generated input
 
+- `whats-new/*.md`
+  Role: versioned source announcements for `embedded-archive` releases
+  Type: source
+
 - other `unity-webgl/Build/*` files and `unity-webgl/TemplateData/*`
   Role: local WebGL export staging artifacts
   Type: generated
@@ -617,9 +647,17 @@ Main repository surfaces:
 Build and import flow:
 1. Unity exports WebGL from `unity/ReverySkyMap`.
 2. `scripts/import-unity-webgl.ps1` copies the export into `unity-webgl/` and regenerates runtime files used by all package modes.
-3. `npm run build` builds the current `embedded-archive` release candidate from the prepared runtime and writes root `main.js`.
+3. `npm run build` builds the current `embedded-archive` release candidate from the prepared runtime, copies the selected `whats-new/<version>.md` file into the archive when one is eligible, and writes root `main.js`.
 4. Local folder-runtime installs can be built with `npm run package:folder-runtime`.
 5. Other release-shaped package modes can be built with `npm run package:embedded-html` or `npm run package:embedded-archive`.
+
+What's New packaging rules:
+- Source announcement files may accumulate in `whats-new/`.
+- File names must be exact semantic versions in `x.y.z.md` form.
+- The selected file is the highest `whats-new` version less than or equal to `manifest.version`, using numeric `major`, `minor`, and `patch` comparison.
+- Intermediate plugin releases without their own announcement reuse the nearest lower eligible announcement.
+- A release archive contains at most one announcement file, so a skipped-version user sees the selected release note, not a sequence of every older note.
+- Unity does not need to be rebuilt when only `whats-new/*.md` changes; rebuilding root `main.js` through `npm run build` is enough.
 
 ## Verification
 Detailed commands live in `docs/VERIFICATION.md`. This section only maps the main architecture areas to their checks.
@@ -639,6 +677,10 @@ Detailed commands live in `docs/VERIFICATION.md`. This section only maps the mai
 - Graph state persistence across close and reopen
   Automated checks: `npm run test`, especially `tests/main.test.ts`
   Manual checks: set filters, tags visibility, layout, and render scale; close the graph through the ribbon toggle; reopen it; then repeat after restarting Obsidian
+
+- What's New packaging and one-time display
+  Automated checks: `npm run test`, especially `tests/scripts/whatsNewSelection.test.ts`, `tests/runtime/WhatsNewFile.test.ts`, `tests/view/WhatsNewView.test.ts`, and `tests/main.test.ts`
+  Manual checks: install or update an `embedded-archive` build, open the graph after plugin reload, confirm the announcement opens once, then reopen the graph and confirm it does not repeat
 
 - Visual plugin UI states
   Automated checks: `npm run test:ui-visual` when UI changed

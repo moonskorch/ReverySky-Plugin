@@ -88,6 +88,18 @@ export class ItemView {
   async setState(_state: unknown): Promise<void> {}
 }
 
+export class MarkdownRenderer {
+  static async render(
+    _app: unknown,
+    markdown: string,
+    el: HTMLElement,
+    sourcePath: string
+  ): Promise<void> {
+    el.setAttribute("data-source-path", sourcePath);
+    el.textContent = markdown;
+  }
+}
+
 export class Notice {
   constructor(_message: string) {}
 }
