@@ -1,3 +1,4 @@
+import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const runtimeServerMock = vi.hoisted(() => {
@@ -571,7 +572,7 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
     });
 
     expect(embeddedRuntimeMock.resolveRuntimeDirectory).toHaveBeenCalledWith(
-      "C:\\Vault\\.obsidian\\plugins\\reverysky-map",
+      path.join("C:\\Vault", ".obsidian", "plugins", "reverysky-map"),
       "1.4.1"
     );
     expect(whatsNewFileMock.readWhatsNewFile).toHaveBeenCalledWith(embeddedRuntimeMock.runtimeDir);
