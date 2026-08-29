@@ -12,7 +12,7 @@ describe("WhatsNewView", () => {
     }, {} as never);
 
     expect(view.getViewType()).toBe(WHATS_NEW_VIEW_TYPE);
-    expect(view.getDisplayText()).toBe("What's New");
+    expect(view.getDisplayText()).toBe("ReverySky 3D Graph: What's New");
     expect(view.getIcon()).toBe("sparkles");
     expect(view.contentEl.classList.contains("reverysky-whats-new-view")).toBe(true);
     expect(view.contentEl.querySelector(".markdown-preview-view")?.textContent).toBe("# ReverySky\n\n- New tab\n");

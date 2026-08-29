@@ -37,7 +37,7 @@ export class WhatsNewView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "What's New";
+    return "ReverySky 3D Graph: What's New";
   }
 
   getIcon(): string {
