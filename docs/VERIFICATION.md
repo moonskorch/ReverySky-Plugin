@@ -16,6 +16,7 @@ Policy:
 - Manual checks complement automated checks and do not replace them.
 - Manual check reporting must list concrete owner actions to perform when the agent cannot run the check directly; do not leave the manual-check section empty or only say that checks were not run.
 - If no suitable automated check exists for changed behavior, add a minimal targeted check when feasible; if not feasible in-task, report the gap and required follow-up.
+- Automated tests must be deterministic across the supported local and CI environments: Windows developer machines and Ubuntu GitHub Actions runners. Build expected filesystem paths, line endings, temporary paths, and environment-dependent values through platform-aware helpers instead of hard-coded OS-specific strings.
 
 ## Current automated checks in this repository
 

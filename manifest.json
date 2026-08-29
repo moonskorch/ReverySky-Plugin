@@ -1,7 +1,7 @@
 {
   "id": "reverysky-map",
   "name": "ReverySky 3D Graph",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "minAppVersion": "1.12.7",
   "description": "Explore your vault through an immersive Unity-powered 3D graph.",
   "author": "MoonSkorch Studio",
