@@ -73,9 +73,9 @@ export class WhatsNewView extends ItemView {
     emptyElement(this.contentEl);
     this.contentEl.classList.add("reverysky-whats-new-view");
 
-    const markdownContainer = this.contentEl.ownerDocument.createElement("div");
-    markdownContainer.classList.add("markdown-preview-view", "markdown-rendered");
-    this.contentEl.appendChild(markdownContainer);
+    const markdownContainer = this.contentEl.createDiv({
+      cls: ["markdown-preview-view", "markdown-rendered"]
+    });
 
     if (!this.markdown) {
       return;
