@@ -7,11 +7,11 @@
 * A dynamic force-directed layout for smaller graphs
 * A wide panoramic starfield for larger, denser graphs
 * A chronological layout that arranges notes by date
+* Ego Graph mode for exploring the neighborhood around a focused note
+* Landmarks view for displaying selected note details directly on the graph
 * Combined filters by path, tag, and date
 * Two-way navigation: click a node to fly to it and open its note; activate a note to find it on the graph
 * Pan, zoom, rotation, and timeline navigation
-* Detailed and simplified display modes
-* Graphs with or without tag nodes
 * Longer notes appear as larger nodes; more connected nodes glow brighter
 * Stress-tested with graphs of up to 10,000 notes
 
@@ -54,7 +54,7 @@ Graph note titles support Latin text with accents, Cyrillic text, Simplified Chi
 - Rotate: use the on-screen rotate controls, or hold the right mouse button and drag horizontally.
 - Node to note: click any node to fly to it and open its note.
 - Note to node: activate a note to find and highlight it on the graph.
-- Display mode: use the round view button to switch between the standard detailed rendering and a simplified rendering. In link layouts, the standard mode shows tag nodes and link lines; the simplified mode keeps note nodes visible and hides those extra details.
+- Display mode: use the round view button to switch between detailed, simplified, and Landmarks views, each showing a different level of graph detail.
 - Date navigation: in the `Dates` layout, use the date slider to move along the time axis while keeping pan, zoom, and rotation available.
 
 ## Filter
@@ -87,6 +87,20 @@ Ego Graph limits the graph to the active note and its connected neighborhood. Th
 - `Neighbor links`: shows all links between notes included in the Ego Graph. When disabled, only links connecting one layer of the neighborhood to the next remain visible.
 
 The current filters, tag visibility, and layout settings continue to apply to the resulting graph.
+
+## Landmarks
+
+Landmarks are keywords or key phrases selected from a note and displayed as short text labels around its note node in Landmarks mode. They make important names, places, concepts, events, and other details visible directly in the graph.
+
+To add a landmark:
+
+1. Select text in a Markdown note.
+2. Right-click the selection.
+3. Choose **Add landmark**.
+
+ReverySky 3D Graph stores the selected text in the note's `landmarks` frontmatter property. If the graph is open, the node updates immediately and the view switches to Landmarks mode. Landmarks can also be edited or removed directly in the `landmarks` property.
+
+Use the round view button to switch to Landmarks mode at any time. Landmarks are attached to existing note nodes and do not create additional graph nodes or links.
 
 ## Screenshot
 
