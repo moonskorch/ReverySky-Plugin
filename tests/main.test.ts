@@ -1,3 +1,4 @@
+import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const runtimeServerMock = vi.hoisted(() => {
@@ -42,6 +43,40 @@ const runtimeServerMock = vi.hoisted(() => {
   };
 });
 
+const embeddedRuntimeMock = vi.hoisted(() => {
+  return {
+    hasArchive: false,
+    runtimeDir: "C:\\Vault\\.obsidian\\plugins\\reverysky-map\\.reverysky-runtime\\1.4.1\\unity-webgl",
+    extracted: false,
+    resolveRuntimeDirectory: vi.fn(),
+    reset() {
+      this.hasArchive = false;
+      this.extracted = false;
+      this.resolveRuntimeDirectory.mockReset();
+      this.resolveRuntimeDirectory.mockImplementation(() => Promise.resolve({
+        runtimeDir: this.runtimeDir,
+        extracted: this.extracted
+      }));
+    }
+  };
+});
+
+const whatsNewFileMock = vi.hoisted(() => {
+  return {
+    file: null as null | {
+      version: string;
+      markdown: string;
+      sourcePath: string;
+    },
+    readWhatsNewFile: vi.fn(),
+    reset() {
+      this.file = null;
+      this.readWhatsNewFile.mockReset();
+      this.readWhatsNewFile.mockImplementation(() => Promise.resolve(this.file));
+    }
+  };
+});
+
 vi.mock("../src/runtime/UnityWebglLocalServer", () => ({
   UnityWebglLocalServer: vi.fn().mockImplementation(function MockUnityWebglLocalServer() {
     return runtimeServerMock.createInstance();
@@ -51,8 +86,24 @@ vi.mock("../src/runtime/UnityWebglLocalServer", () => ({
 vi.mock("../src/runtime/EmbeddedUnityRuntimeArchive", () => ({
   getEmbeddedUnityRuntimeArchiveBase64: () => null,
   getEmbeddedUnityRuntimeArchiveSha256: () => null,
-  hasEmbeddedUnityRuntimeArchive: () => false
+  hasEmbeddedUnityRuntimeArchive: () => embeddedRuntimeMock.hasArchive
 }));
+
+vi.mock("../src/runtime/EmbeddedUnityRuntimeInstaller", () => ({
+  EmbeddedUnityRuntimeInstaller: vi.fn().mockImplementation(function MockEmbeddedUnityRuntimeInstaller() {
+    return {
+      resolveRuntimeDirectory: embeddedRuntimeMock.resolveRuntimeDirectory
+    };
+  })
+}));
+
+vi.mock("../src/runtime/WhatsNewFile", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/runtime/WhatsNewFile")>();
+  return {
+    ...actual,
+    readWhatsNewFile: whatsNewFileMock.readWhatsNewFile
+  };
+});
 
 vi.mock("../src/runtime/EmbeddedUnityIndexHtml", () => ({
   getEmbeddedUnityIndexHtml: () => null
@@ -73,9 +124,13 @@ function createPluginHarness(options?: {
   loadDataResult?: unknown;
   existingLeaves?: MockLeaf[];
   rightLeaf?: MockLeaf | null;
+  whatsNewLeaf?: MockLeaf;
 }) {
   const existingLeaves = options?.existingLeaves ?? [];
   const rightLeaf = options?.rightLeaf ?? null;
+  const whatsNewLeaf = options?.whatsNewLeaf ?? {
+    setViewState: vi.fn().mockResolvedValue(undefined)
+  };
   const registerView = vi.fn();
   const registerEditorExtension = vi.fn();
   const addRibbonIcon = vi.fn();
@@ -86,6 +141,7 @@ function createPluginHarness(options?: {
   const getLeavesOfType = vi.fn((viewType: string) => (viewType === MAP_VIEW_TYPE ? existingLeaves : []));
   const getActiveViewOfType = vi.fn().mockReturnValue(null);
   const getRightLeaf = vi.fn().mockReturnValue(rightLeaf);
+  const getLeaf = vi.fn().mockReturnValue(whatsNewLeaf);
   const workspaceOn = vi.fn().mockReturnValue({ id: "workspace-event-ref" });
   const loadData = vi.fn().mockResolvedValue(options?.loadDataResult ?? null);
   const saveData = vi.fn().mockResolvedValue(undefined);
@@ -100,6 +156,7 @@ function createPluginHarness(options?: {
         getLeavesOfType,
         getActiveViewOfType,
         getRightLeaf,
+        getLeaf,
         revealLeaf,
         detachLeavesOfType,
         on: workspaceOn
@@ -111,7 +168,7 @@ function createPluginHarness(options?: {
         }
       }
     },
-    manifest: { id: "reverysky-map" },
+    manifest: { id: "reverysky-map", version: "1.4.1" },
     registerView,
     registerEditorExtension,
     addRibbonIcon,
@@ -132,16 +189,20 @@ function createPluginHarness(options?: {
     getLeavesOfType,
     getActiveViewOfType,
     getRightLeaf,
+    getLeaf,
     revealLeaf,
     detachLeavesOfType,
     loadData,
-    saveData
+    saveData,
+    whatsNewLeaf
   };
 }
 
 describe("ReverySkyMapPlugin map view state persistence", () => {
   beforeEach(() => {
     runtimeServerMock.reset();
+    embeddedRuntimeMock.reset();
+    whatsNewFileMock.reset();
   });
 
   it("captures map state before toggle close and restores it on next open", async () => {
@@ -486,5 +547,250 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
 
     expect(runtimeServerMock.instances[0]?.stop).toHaveBeenCalledTimes(1);
     expect((harness.plugin as unknown as { unityWebglServer: unknown }).unityWebglServer).toBeNull();
+  });
+
+  it("opens and persists What's New after a fresh embedded archive extraction", async () => {
+    embeddedRuntimeMock.hasArchive = true;
+    embeddedRuntimeMock.extracted = true;
+    whatsNewFileMock.file = {
+      version: "1.4.1",
+      markdown: "# What's New\n",
+      sourcePath: "whats-new/1.4.1.md"
+    };
+    const whatsNewLeaf: MockLeaf = {
+      setViewState: vi.fn().mockResolvedValue(undefined)
+    };
+    const harness = createPluginHarness({
+      whatsNewLeaf
+    });
+
+    await harness.plugin.onload();
+    await harness.plugin.getUnityRuntimeUrl();
+
+    await vi.waitFor(() => {
+      expect(whatsNewLeaf.setViewState).toHaveBeenCalledTimes(1);
+    });
+
+    expect(embeddedRuntimeMock.resolveRuntimeDirectory).toHaveBeenCalledWith(
+      path.join("C:\\Vault", ".obsidian", "plugins", "reverysky-map"),
+      "1.4.1"
+    );
+    expect(whatsNewFileMock.readWhatsNewFile).toHaveBeenCalledWith(embeddedRuntimeMock.runtimeDir);
+    expect(whatsNewLeaf.setViewState).toHaveBeenCalledWith({
+      type: "reverysky-whats-new-view",
+      active: true,
+      state: {
+        version: "1.4.1",
+        markdown: "# What's New\n",
+        sourcePath: "whats-new/1.4.1.md"
+      }
+    });
+    expect(harness.revealLeaf).toHaveBeenCalledWith(whatsNewLeaf);
+    await vi.waitFor(() => {
+      expect(harness.saveData).toHaveBeenCalledWith({
+        mapViewState: undefined,
+        whatsNewShownVersion: "1.4.1"
+      });
+    });
+  });
+
+  it("serializes plugin data saves so the What's New marker survives a pending map state save", async () => {
+    embeddedRuntimeMock.hasArchive = true;
+    embeddedRuntimeMock.extracted = true;
+    whatsNewFileMock.file = {
+      version: "1.4.1",
+      markdown: "# What's New\n",
+      sourcePath: "whats-new/1.4.1.md"
+    };
+    const whatsNewLeaf: MockLeaf = {
+      setViewState: vi.fn().mockResolvedValue(undefined)
+    };
+    const harness = createPluginHarness({
+      whatsNewLeaf
+    });
+    let resolveFirstSave: (() => void) | null = null;
+    harness.saveData.mockImplementation(() => {
+      if (!resolveFirstSave) {
+        return new Promise<void>((resolve) => {
+          resolveFirstSave = resolve;
+        });
+      }
+
+      return Promise.resolve();
+    });
+
+    await harness.plugin.onload();
+    (harness.plugin as unknown as { updateMapViewState: (state: Record<string, unknown>) => void }).updateMapViewState({
+      filterQuery: "tag:#pending-save",
+      showTags: true
+    });
+    await vi.waitFor(() => {
+      expect(harness.saveData).toHaveBeenCalledTimes(1);
+    });
+
+    await harness.plugin.getUnityRuntimeUrl();
+    await vi.waitFor(() => {
+      expect(whatsNewLeaf.setViewState).toHaveBeenCalledTimes(1);
+    });
+    expect(harness.saveData).toHaveBeenCalledTimes(1);
+
+    resolveFirstSave?.();
+
+    await vi.waitFor(() => {
+      expect(harness.saveData).toHaveBeenCalledTimes(2);
+    });
+    expect(harness.saveData.mock.calls[0]?.[0]).toEqual({
+      mapViewState: {
+        filterQuery: "tag:#pending-save",
+        showTags: true
+      }
+    });
+    expect(harness.saveData.mock.calls[1]?.[0]).toEqual({
+      mapViewState: {
+        filterQuery: "tag:#pending-save",
+        showTags: true
+      },
+      whatsNewShownVersion: "1.4.1"
+    });
+  });
+
+  it("does not read What's New when an embedded archive cache is reused", async () => {
+    embeddedRuntimeMock.hasArchive = true;
+    embeddedRuntimeMock.extracted = false;
+    const harness = createPluginHarness();
+
+    await harness.plugin.onload();
+    await harness.plugin.getUnityRuntimeUrl();
+
+    expect(whatsNewFileMock.readWhatsNewFile).not.toHaveBeenCalled();
+    expect(harness.getLeaf).not.toHaveBeenCalled();
+    expect(harness.saveData).not.toHaveBeenCalled();
+  });
+
+  it("does not reopen an already shown What's New version after extraction", async () => {
+    embeddedRuntimeMock.hasArchive = true;
+    embeddedRuntimeMock.extracted = true;
+    whatsNewFileMock.file = {
+      version: "1.4.1",
+      markdown: "# What's New\n",
+      sourcePath: "whats-new/1.4.1.md"
+    };
+    const harness = createPluginHarness({
+      loadDataResult: {
+        whatsNewShownVersion: "1.4.1"
+      }
+    });
+
+    await harness.plugin.onload();
+    await harness.plugin.getUnityRuntimeUrl();
+
+    await vi.waitFor(() => {
+      expect(whatsNewFileMock.readWhatsNewFile).toHaveBeenCalledTimes(1);
+    });
+    expect(harness.getLeaf).not.toHaveBeenCalled();
+    expect(harness.saveData).not.toHaveBeenCalled();
+  });
+
+  it("opens a newer What's New version after skipped plugin versions", async () => {
+    embeddedRuntimeMock.hasArchive = true;
+    embeddedRuntimeMock.extracted = true;
+    whatsNewFileMock.file = {
+      version: "1.10.0",
+      markdown: "# Newer\n",
+      sourcePath: "whats-new/1.10.0.md"
+    };
+    const whatsNewLeaf: MockLeaf = {
+      setViewState: vi.fn().mockResolvedValue(undefined)
+    };
+    const harness = createPluginHarness({
+      loadDataResult: {
+        whatsNewShownVersion: "1.9.9"
+      },
+      whatsNewLeaf
+    });
+
+    await harness.plugin.onload();
+    await harness.plugin.getUnityRuntimeUrl();
+
+    await vi.waitFor(() => {
+      expect(whatsNewLeaf.setViewState).toHaveBeenCalledTimes(1);
+    });
+    expect(whatsNewLeaf.setViewState).toHaveBeenCalledWith({
+      type: "reverysky-whats-new-view",
+      active: true,
+      state: {
+        version: "1.10.0",
+        markdown: "# Newer\n",
+        sourcePath: "whats-new/1.10.0.md"
+      }
+    });
+    await vi.waitFor(() => {
+      expect(harness.saveData).toHaveBeenCalledWith({
+        mapViewState: undefined,
+        whatsNewShownVersion: "1.10.0"
+      });
+    });
+  });
+
+  it("does not reopen older What's New after rollback or downgrade", async () => {
+    embeddedRuntimeMock.hasArchive = true;
+    embeddedRuntimeMock.extracted = true;
+    whatsNewFileMock.file = {
+      version: "1.4.1",
+      markdown: "# Older\n",
+      sourcePath: "whats-new/1.4.1.md"
+    };
+    const harness = createPluginHarness({
+      loadDataResult: {
+        whatsNewShownVersion: "1.5.0"
+      }
+    });
+
+    await harness.plugin.onload();
+    await harness.plugin.getUnityRuntimeUrl();
+
+    await vi.waitFor(() => {
+      expect(whatsNewFileMock.readWhatsNewFile).toHaveBeenCalledTimes(1);
+    });
+    expect(harness.getLeaf).not.toHaveBeenCalled();
+    expect(harness.saveData).not.toHaveBeenCalled();
+  });
+
+  it("opens What's New on first install or old data without a shown version", async () => {
+    embeddedRuntimeMock.hasArchive = true;
+    embeddedRuntimeMock.extracted = true;
+    whatsNewFileMock.file = {
+      version: "1.4.1",
+      markdown: "# First run\n",
+      sourcePath: "whats-new/1.4.1.md"
+    };
+    const whatsNewLeaf: MockLeaf = {
+      setViewState: vi.fn().mockResolvedValue(undefined)
+    };
+    const harness = createPluginHarness({
+      loadDataResult: {
+        mapViewState: {
+          filterQuery: "tag:#saved",
+          showTags: true
+        }
+      },
+      whatsNewLeaf
+    });
+
+    await harness.plugin.onload();
+    await harness.plugin.getUnityRuntimeUrl();
+
+    await vi.waitFor(() => {
+      expect(whatsNewLeaf.setViewState).toHaveBeenCalledTimes(1);
+    });
+    await vi.waitFor(() => {
+      expect(harness.saveData).toHaveBeenCalledWith({
+        mapViewState: {
+          filterQuery: "tag:#saved",
+          showTags: true
+        },
+        whatsNewShownVersion: "1.4.1"
+      });
+    });
   });
 });

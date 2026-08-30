@@ -12,16 +12,15 @@ import {
   EmbeddedUnityRuntimeInstaller
 } from "./runtime/EmbeddedUnityRuntimeInstaller";
 import { getEmbeddedUnityIndexHtml } from "./runtime/EmbeddedUnityIndexHtml";
+import { readWhatsNewFile, shouldShowWhatsNew } from "./runtime/WhatsNewFile";
 import {
   registerEditorMenuCommands,
   registerCommands,
   forwardFocusToViews
 } from "./commands/MapCommands";
+import { WHATS_NEW_VIEW_TYPE, WhatsNewView } from "./view/WhatsNewView";
+import { PluginDataPersistence } from "./PluginDataPersistence";
 import path from "node:path";
-
-type PersistedPluginData = {
-  mapViewState?: Record<string, unknown>;
-};
 
 /**
  * Obsidian plugin entry point.
@@ -60,24 +59,22 @@ export default class ReverySkyMapPlugin extends Plugin {
    */
   private readonly serverLeases = new Set<symbol>();
 
+  private whatsNewShowPromise: Promise<void> | null = null;
   /**
-   * Last plugin-level graph view state loaded from or written to Obsidian plugin data.
-   *
-   * This intentionally remains a single shared snapshot rather than per-window
-   * state: duplicate graph views are tolerated as a recovery edge case, but the
-   * supported reopen path restores the most recently persisted filter/layout
-   * settings.
+   * Owns plugin data shape, normalization, and serialized writes to Obsidian.
    */
-  private mapViewState: Record<string, unknown> | null = null;
+  private readonly pluginData = new PluginDataPersistence({
+    loadData: () => this.loadData(),
+    saveData: (data) => this.saveData(data)
+  });
 
   async onload(): Promise<void> {
-    const persistedData = this.normalizePersistedData(await this.loadData());
-    this.mapViewState = persistedData.mapViewState ?? null;
+    await this.pluginData.load();
 
     this.registerView(
       MAP_VIEW_TYPE,
       (leaf: WorkspaceLeaf) => new MapView(leaf, this, {
-        initialState: this.mapViewState ? { ...this.mapViewState } : null,
+        initialState: this.pluginData.getMapViewStateSnapshot(),
         onStateChanged: (state, options) => {
           this.updateMapViewState(state, options?.persist ?? true);
         },
@@ -86,6 +83,10 @@ export default class ReverySkyMapPlugin extends Plugin {
           await this.releaseMapViewRuntimeLease(lease);
         }
       })
+    );
+    this.registerView(
+      WHATS_NEW_VIEW_TYPE,
+      (leaf: WorkspaceLeaf) => new WhatsNewView(leaf)
     );
 
     registerCommands(this);
@@ -169,23 +170,30 @@ export default class ReverySkyMapPlugin extends Plugin {
     if (!this.unityWebglServer) {
       const pluginDir = this.resolvePluginDirectory();
       const embeddedIndexHtml = getEmbeddedUnityIndexHtml();
-      const runtimeSource: UnityWebglRuntimeSource = hasEmbeddedUnityRuntimeArchive()
-        ? {
-            kind: "directory",
-            rootDir: await this.unityRuntimeInstaller.resolveRuntimeDirectory(
-              pluginDir,
-              this.manifest.version
-            )
-          }
-        : embeddedIndexHtml
-          ? {
-              kind: "embedded-index",
-              indexHtml: embeddedIndexHtml
-            }
-          : {
-              kind: "directory",
-              rootDir: path.join(pluginDir, "unity-webgl")
-            };
+      let runtimeSource: UnityWebglRuntimeSource;
+      if (hasEmbeddedUnityRuntimeArchive()) {
+        const runtimeResolution = await this.unityRuntimeInstaller.resolveRuntimeDirectory(
+          pluginDir,
+          this.manifest.version
+        );
+        runtimeSource = {
+          kind: "directory",
+          rootDir: runtimeResolution.runtimeDir
+        };
+        if (runtimeResolution.extracted) {
+          void this.showWhatsNew(runtimeResolution.runtimeDir);
+        }
+      } else if (embeddedIndexHtml) {
+        runtimeSource = {
+          kind: "embedded-index",
+          indexHtml: embeddedIndexHtml
+        };
+      } else {
+        runtimeSource = {
+          kind: "directory",
+          rootDir: path.join(pluginDir, "unity-webgl")
+        };
+      }
 
       this.unityWebglServer = new UnityWebglLocalServer(runtimeSource);
     }
@@ -236,37 +244,52 @@ export default class ReverySkyMapPlugin extends Plugin {
   }
 
   private updateMapViewState(state: Record<string, unknown>, persist: boolean = true): void {
-    this.mapViewState = { ...state };
+    this.pluginData.setMapViewState(state);
     if (!persist) {
       return;
     }
 
-    void this.persistMapViewState().catch((error: unknown) => {
+    void this.pluginData.persist().catch((error: unknown) => {
       console.error("Failed to persist ReverySky 3D Graph state.", error);
     });
   }
 
   async flushPersistedMapViewState(): Promise<void> {
-    await this.persistMapViewState();
+    await this.pluginData.persist();
   }
 
-  private persistMapViewState(): Promise<void> {
-    const data = {
-      mapViewState: this.mapViewState ?? undefined
-    } satisfies PersistedPluginData;
-    return this.saveData(data);
-  }
-
-  private normalizePersistedData(data: unknown): PersistedPluginData {
-    if (!data || typeof data !== "object") {
-      return {};
+  private showWhatsNew(runtimeDir: string): Promise<void> {
+    if (this.whatsNewShowPromise) {
+      return this.whatsNewShowPromise;
     }
 
-    const mapViewState = (data as { mapViewState?: unknown }).mapViewState;
-    return {
-      mapViewState: mapViewState && typeof mapViewState === "object"
-        ? (mapViewState as Record<string, unknown>)
-        : undefined
-    };
+    const showPromise = (async () => {
+      const whatsNewFile = await readWhatsNewFile(runtimeDir);
+      if (!whatsNewFile || !shouldShowWhatsNew(whatsNewFile.version, this.pluginData.getWhatsNewShownVersion())) {
+        return;
+      }
+
+      const leaf = this.app.workspace.getLeaf("tab");
+      await leaf.setViewState({
+        type: WHATS_NEW_VIEW_TYPE,
+        active: true,
+        state: {
+          version: whatsNewFile.version,
+          markdown: whatsNewFile.markdown,
+          sourcePath: whatsNewFile.sourcePath
+        }
+      });
+      await this.app.workspace.revealLeaf(leaf);
+
+      this.pluginData.setWhatsNewShownVersion(whatsNewFile.version);
+      await this.pluginData.persist();
+    })().catch((error: unknown) => {
+      console.warn("Failed to show ReverySky What's New.", error);
+    }).finally(() => {
+      this.whatsNewShowPromise = null;
+    });
+
+    this.whatsNewShowPromise = showPromise;
+    return showPromise;
   }
 }

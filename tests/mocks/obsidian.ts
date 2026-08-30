@@ -8,6 +8,16 @@ if (typeof HTMLElement !== "undefined" && typeof HTMLElement.prototype.createEl 
   };
 }
 
+if (typeof HTMLElement !== "undefined" && typeof HTMLElement.prototype.createDiv !== "function") {
+  HTMLElement.prototype.createDiv = function (options?: { cls?: string | string[] }): HTMLDivElement {
+    const child = document.createElement("div");
+    const classes = Array.isArray(options?.cls) ? options.cls : [options?.cls];
+    child.classList.add(...classes.filter((cls): cls is string => typeof cls === "string"));
+    this.appendChild(child);
+    return child;
+  };
+}
+
 if (typeof HTMLElement !== "undefined" && typeof HTMLElement.prototype.setCssStyles !== "function") {
   HTMLElement.prototype.setCssStyles = function (styles: Partial<CSSStyleDeclaration>): void {
     for (const [property, value] of Object.entries(styles)) {
@@ -86,6 +96,18 @@ export class ItemView {
   }
 
   async setState(_state: unknown): Promise<void> {}
+}
+
+export class MarkdownRenderer {
+  static async render(
+    _app: unknown,
+    markdown: string,
+    el: HTMLElement,
+    sourcePath: string
+  ): Promise<void> {
+    el.setAttribute("data-source-path", sourcePath);
+    el.textContent = markdown;
+  }
 }
 
 export class Notice {

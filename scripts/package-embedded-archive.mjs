@@ -21,6 +21,7 @@ import {
   stripPackageModeMarker,
   writeRootMainJsWithPackageMode
 } from "./package-mode-marker.mjs";
+import { resolveWhatsNewRuntimePaths } from "./whats-new-selection.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,6 +35,7 @@ const rootStylesPath = path.join(repoRoot, "styles.css");
 const runtimeTemplatePath = path.join(repoRoot, "unity-webgl", "index.disk-runtime.template.html");
 const buildDir = path.join(repoRoot, "unity-webgl", "Build");
 const streamingAssetsDir = path.join(repoRoot, "unity-webgl", "StreamingAssets");
+const whatsNewSourceDir = path.join(repoRoot, "whats-new");
 const droidSansFallbackLicensePath = path.join(
   repoRoot,
   "unity",
@@ -184,6 +186,13 @@ async function stageCompactRuntime(tempRoot) {
 
   if (await pathExists(streamingAssetsDir)) {
     await copyDirectoryRecursive(streamingAssetsDir, path.join(runtimeRoot, "StreamingAssets"));
+  }
+
+  const whatsNewFile = await resolveWhatsNewRuntimePaths(rootManifestPath, whatsNewSourceDir);
+  if (whatsNewFile) {
+    const targetPath = path.join(runtimeRoot, whatsNewFile.runtimePath);
+    await mkdir(path.dirname(targetPath), { recursive: true });
+    await copyFile(whatsNewFile.sourcePath, targetPath);
   }
 
   return {

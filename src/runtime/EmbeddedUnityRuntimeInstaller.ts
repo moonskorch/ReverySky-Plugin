@@ -13,6 +13,11 @@ export type EmbeddedUnityRuntimeInstallerOptions = {
   archiveSha256?: string;
 };
 
+export type EmbeddedUnityRuntimeResolution = {
+  runtimeDir: string;
+  extracted: boolean;
+};
+
 type RuntimeFileMatch = {
   name: string;
   absolutePath: string;
@@ -200,21 +205,27 @@ export class EmbeddedUnityRuntimeInstaller {
    * builds do not have an archive payload, so they validate and return the local
    * `unity-webgl/` folder beside the plugin bundle.
    */
-  async resolveRuntimeDirectory(pluginDir: string, pluginVersion: string): Promise<string> {
+  async resolveRuntimeDirectory(pluginDir: string, pluginVersion: string): Promise<EmbeddedUnityRuntimeResolution> {
     const pluginDirResolved = path.resolve(pluginDir);
     const runtimeRoot = path.join(pluginDirResolved, RUNTIME_VERSION_ROOT_NAME);
     const devRuntimeDir = path.join(pluginDirResolved, RUNTIME_ROOT_NAME);
 
     if (!this.archiveBase64 || !this.archiveSha256) {
       await validateRuntimeDirectory(devRuntimeDir);
-      return devRuntimeDir;
+      return {
+        runtimeDir: devRuntimeDir,
+        extracted: false
+      };
     }
 
     const versionDir = path.join(runtimeRoot, pluginVersion);
     const runtimeDir = path.join(versionDir, RUNTIME_ROOT_NAME);
 
     if (await this.isValidCachedRuntime(versionDir, pluginVersion)) {
-      return runtimeDir;
+      return {
+        runtimeDir,
+        extracted: false
+      };
     }
 
     const archiveBuffer = this.decodeAndValidateArchive();
@@ -250,7 +261,10 @@ export class EmbeddedUnityRuntimeInstaller {
       }
 
       await rename(tempRoot, versionDir);
-      return runtimeDir;
+      return {
+        runtimeDir,
+        extracted: true
+      };
     } catch (error) {
       await rm(tempRoot, { recursive: true, force: true });
       throw new Error(

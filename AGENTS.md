@@ -38,10 +38,15 @@
 - Runtime flow is `bridge:ready` first, then `graph:set`.
 - Keep path normalization stable (`/` separators, vault-relative paths) across bridge layers.
 - Unity runtime is served from a local loopback HTTP server (`127.0.0.1`), not external hosting.
-- For UI styling, do not set inline styles directly; use CSS classes, `setCssProps`, or `setCssStyles` instead.
 - Do not modify `*.unity`, `*.prefab`, `*.asset`, or `*.meta` unless the task explicitly requires it.
 - If such files must change, say which ones and why before editing.
 - `reference/ReverySky` may be used only for targeted comparison or selective fragment adaptation, not rollback, reset, or bulk-copy.
+
+## Obsidian API Recommendations
+- For Obsidian-facing UI, navigation, file, metadata, and platform interactions, prefer Obsidian APIs when they cover the required behavior. Use standard DOM/Web APIs for plugin-owned iframe/runtime code, test harnesses, or behavior outside Obsidian's API surface.
+- For Obsidian-owned DOM creation, prefer Obsidian element helpers such as `createEl`, `createDiv`, and `createSpan` over `document.createElement`.
+- For UI styling, do not set inline styles directly; use CSS classes, `setCssProps`, or `setCssStyles` instead.
+- Avoid `globalThis` in Obsidian-facing code. Use `window` or `activeWindow` when a window object is needed.
 
 ## Workflow And Verification
 - Before edits, define a compact task contract with:
@@ -71,14 +76,11 @@
 - When explaining code, include relevant file paths and line numbers.
 - Avoid Markdown/text tables in documentation; prefer short bullet lists or explicit per-mode subsections.
 - Prefer existing `src/*` patterns before introducing new abstractions.
-- For Obsidian-facing UI, navigation, file, metadata, and platform interactions, prefer Obsidian APIs when they cover the required behavior. Use standard DOM/Web APIs for plugin-owned iframe/runtime code or behavior outside Obsidian's API surface.
-- Avoid `globalThis` in Obsidian-facing code. Use `window` or `activeWindow` when a window object is needed.
 - Do not modify application code when only documentation maintenance is requested.
 - Never create temporary test files in the repository.
 - Use `apply_patch` for source/doc edits.
 - Avoid shell rewrite commands.
 - Avoid destructive git history operations.
-- Use `apply_patch` for source/doc edits; avoid shell rewrite commands.
 - Keep edits small and targeted.
 - Optionally check `.local-notes/` for relevant local documentation before making implementation decisions.
 
