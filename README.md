@@ -2,6 +2,8 @@
 
 **ReverySky 3D Graph** is an interactive 3D graph that lets you explore your vault as a connected universe. It runs on a bundled Unity WebGL runtime with live graph updates and integrated note navigation.
 
+[▶ Watch the demo on YouTube](https://youtu.be/LLOcByJbbj8)
+
 ## Features
 
 * A dynamic force-directed layout for smaller graphs
