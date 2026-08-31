@@ -29,9 +29,9 @@
 ## Development Commands
 - Install deps: `npm install`
 - Common plugin commands: `npm run dev`, `npm run build`, `npm run check`, `npm run test`.
-- Verification command matrix and UI visual regression commands: `docs/VERIFICATION.md`
+- Verification command matrix and UI visual regression commands live in `docs/VERIFICATION.md`.
 - Unity export import: `powershell -ExecutionPolicy Bypass -File .\scripts\import-unity-webgl.ps1 -ExportRoot "<UnityWebGLExportRoot>"`
-- Clean setup, WebGL import, packaging, and local smoke workflow: `docs/WEBGL_INTEGRATION_RUNBOOK.md`
+- Clean setup, WebGL import, packaging, and local smoke workflow live in `docs/WEBGL_INTEGRATION_RUNBOOK.md`.
 
 ## Core Rules
 - Bridge protocol version and payload contract live in `docs/DATA_CONTRACT.md`.
@@ -49,25 +49,14 @@
 - Avoid `globalThis` in Obsidian-facing code. Use `window` or `activeWindow` when a window object is needed.
 
 ## Workflow And Verification
-- Before edits, define a compact task contract with:
-  - `Mode`
-  - `Goal`
-  - `Scope`
-  - `Out of scope`
-  - `Verification`
-  - `Stop condition`
+- Before edits, define a compact task contract: `Mode`, `Goal`, `Scope`, `Out of scope`, `Verification`, and `Stop condition`.
 - For substantial MVP work, use `docs/MVP_PLAN.md`; after MVP, use the owner request and current docs as the task source.
 - Use `docs/AGENT_WORKFLOW.md` for task modes, scope control, repair loop, and final report shape.
 - Use `docs/VERIFICATION.md` as the canonical verification policy and command matrix.
 - For non-documentation tasks, run automated checks before manual checks.
 - For bridge/runtime changes, verify the end-to-end `bridge:ready` -> `graph:set` flow.
 - If docs and code conflict, report the contradiction explicitly.
-- Final reports must include:
-  - `Task`
-  - `Changes made`
-  - `Verification`
-  - `Manual checks`
-  - `Risks / follow-ups`
+- Final reports must include `Task`, `Changes made`, `Verification`, `Manual checks`, and `Risks / follow-ups`.
 
 ## Working Rules
 - English only: write code, tests, comments, documentation, runbooks, and user-facing strings in English. No exceptions.
@@ -93,29 +82,24 @@
 * Keep names concise. Add qualifiers only when they distinguish meaningful behavior.
 
 ## Context Discipline
-- Avoid loading or pasting large generated artifacts unless necessary.
-- For `unity-webgl/index.html`, inspect only targeted fragments or metadata unless full content is explicitly required.
+- Avoid loading or pasting large generated artifacts, binaries, or embedded payload files unless necessary.
+- For generated HTML or runtime outputs, inspect targeted fragments or metadata unless full content is explicitly required.
 - Prefer:
   - file size and timestamps
   - marker search (`Select-String`, `rg`)
   - source-of-truth script inspection
-- Treat large generated binaries and embedded payload files as noise by default.
-
-## Known Giant Blob Denylist
-- Avoid loading or pasting generated artifacts or large binaries unless necessary.
 - Never read fully unless explicitly requested:
   - `unity-webgl/index.html`
   - WebGL `GameAssembly.a` artifacts
   - Unity/`reference` nebula cubemap `.exr` files
   - `unity/ReverySkyMap/Library/PackageCache/com.unity.burst@973857688024/.Runtime/libburst-llvm-19.dylib`
 - For these files, use metadata-only inspection by default.
-- If new files larger than 100 MB are discovered, add them to this denylist.
+- If new generated or binary files larger than 100 MB are discovered, add them here.
 
 ## Safety And Approvals
 - Treat generated artifacts as build outputs unless explicitly marked as source or tracked compact runtime input.
 - Keep references, caches, and environment-specific files out of commits.
-- `reference/ReverySky` is for targeted comparison or selective fragment adaptation only.
-- Do not use it for rollback, reset, or bulk-copy into `unity/ReverySkyMap`.
+- Use `reference/ReverySky` only for targeted comparison or selective fragment adaptation, never rollback, reset, or bulk-copy into `unity/ReverySkyMap`.
 - Every source or documentation edit must produce a visible patch card.
 - Do not delete and re-add an existing file when a normal update patch is possible.
 - If an edit cannot be represented as a visible patch, stop and ask before editing.
@@ -131,6 +115,7 @@
 - Task workflow, repair loop, and final report policy: `docs/AGENT_WORKFLOW.md`
 - Delivery sequence and manual acceptance checks: `docs/MVP_PLAN.md`
 - Verification policy and command matrix: `docs/VERIFICATION.md`
+- Package modes and release shapes: `docs/PACKAGING_MODES.md`
 - Risk register and mitigations: `docs/RISKS.md`
 - Build/import/install operations: `docs/WEBGL_INTEGRATION_RUNBOOK.md`
 
