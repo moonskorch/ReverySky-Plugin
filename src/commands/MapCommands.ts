@@ -61,12 +61,15 @@ export function normalizeLandmarkSelection(selection: string): string {
 
 export function addLandmarkToFrontmatter(frontmatter: Record<string, unknown>, landmark: string): void {
   const currentLandmarks = frontmatter.landmarks;
-  if (currentLandmarks == null) {
+  if (currentLandmarks === null || currentLandmarks === undefined) {
     frontmatter.landmarks = [landmark];
     return;
   }
 
-  if (!Array.isArray(currentLandmarks)) {
+  if (
+    !Array.isArray(currentLandmarks) ||
+    !currentLandmarks.every((currentLandmark) => typeof currentLandmark === "string")
+  ) {
     return;
   }
 
