@@ -32,10 +32,7 @@ import {
   type QueryFilterParseResult
 } from "../graph/GraphQueryFilter";
 import { extractActiveFilterTermValue } from "../graph/GraphQuerySyntax";
-import {
-  MAX_RUNTIME_BUILDING_COUNT,
-  normalizeRuntimeBuildingName
-} from "../graph/GraphTextLimits";
+import { readLandmarkField } from "../graph/FrontmatterLandmarkReader";
 import { makeStableNoteId } from "../graph/VaultGraphBuilder";
 import { MapFocusController, type FocusRequestOptions } from "./MapFocusController";
 
@@ -659,7 +656,7 @@ export class MapSession {
           }
 
           if (nextSignature.landmarks !== previousSignature.landmarks) {
-            const buildings = this.extractFrontmatterLandmarks(cache?.frontmatter);
+            const buildings = readLandmarkField(cache?.frontmatter);
             this.updateCachedNoteBuildings(path, buildings);
             this.sendNoteUpdateForPath(path, buildings);
           }
@@ -1228,7 +1225,7 @@ export class MapSession {
   }
 
   private buildLandmarksSignature(frontmatter: unknown): string {
-    return this.hashSignature(JSON.stringify(this.extractFrontmatterLandmarks(frontmatter)));
+    return this.hashSignature(JSON.stringify(readLandmarkField(frontmatter)));
   }
 
   private hashSignature(value: string): string {
@@ -1279,23 +1276,6 @@ export class MapSession {
       return tagsRaw.filter((tag): tag is string => typeof tag === "string");
     }
     return [];
-  }
-
-  private extractFrontmatterLandmarks(frontmatter: unknown): string[] {
-    if (!frontmatter || typeof frontmatter !== "object") {
-      return [];
-    }
-
-    const landmarksRaw = (frontmatter as { landmarks?: unknown }).landmarks;
-    if (!Array.isArray(landmarksRaw)) {
-      return [];
-    }
-
-    return landmarksRaw
-      .filter((landmark): landmark is string => typeof landmark === "string")
-      .map((landmark) => normalizeRuntimeBuildingName(landmark))
-      .filter((landmark) => landmark.length > 0)
-      .slice(0, MAX_RUNTIME_BUILDING_COUNT);
   }
 
   private isGraphRelevantPath(pathValue: unknown): boolean {

@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 import { VaultGraphBuilder } from "../../src/graph/VaultGraphBuilder";
 import {
-  MAX_RUNTIME_BUILDING_COUNT,
-  MAX_RUNTIME_BUILDING_NAME_LENGTH,
-  MAX_RUNTIME_NOTE_TITLE_LENGTH
+  MAX_LANDMARK_COUNT,
+  MAX_LANDMARK_NAME_LENGTH,
+  MAX_NOTE_TITLE_LENGTH
 } from "../../src/graph/GraphTextLimits";
 
 function makeStableId(path: string): string {
@@ -89,7 +89,7 @@ describe("VaultGraphBuilder", () => {
   });
 
   it("limits note titles for the runtime payload", () => {
-    const longTitle = "A".repeat(MAX_RUNTIME_NOTE_TITLE_LENGTH + 20);
+    const longTitle = "A".repeat(MAX_NOTE_TITLE_LENGTH + 20);
     const file = makeFile(`Folder/${longTitle}.md`, {
       ctime: Date.UTC(2026, 0, 1),
       mtime: Date.UTC(2026, 0, 2),
@@ -109,11 +109,11 @@ describe("VaultGraphBuilder", () => {
     };
 
     const payload = VaultGraphBuilder.build(app as never);
-    expect(payload.notes[0]?.title).toBe(longTitle.slice(0, MAX_RUNTIME_NOTE_TITLE_LENGTH));
+    expect(payload.notes[0]?.title).toBe(longTitle.slice(0, MAX_NOTE_TITLE_LENGTH));
   });
 
-  it("maps string frontmatter landmarks to optional building names", () => {
-    const longLandmark = "A".repeat(MAX_RUNTIME_BUILDING_NAME_LENGTH + 20);
+  it("maps frontmatter landmark arrays to optional building names", () => {
+    const longLandmark = "A".repeat(MAX_LANDMARK_NAME_LENGTH + 20);
     const file = makeFile("Folder/Landmarks.md", {
       ctime: Date.UTC(2026, 0, 1),
       mtime: Date.UTC(2026, 0, 2),
@@ -137,8 +137,33 @@ describe("VaultGraphBuilder", () => {
     const payload = VaultGraphBuilder.build(app as never);
     expect(payload.notes[0]?.buildings).toEqual([
       "Observatory",
-      longLandmark.slice(0, MAX_RUNTIME_BUILDING_NAME_LENGTH)
+      longLandmark.slice(0, MAX_LANDMARK_NAME_LENGTH)
     ]);
+  });
+
+  it("maps scalar frontmatter landmarks as one building name", () => {
+    const file = makeFile("Folder/ScalarLandmark.md", {
+      ctime: Date.UTC(2026, 0, 1),
+      mtime: Date.UTC(2026, 0, 2),
+      size: 64
+    });
+
+    const app = {
+      vault: {
+        getMarkdownFiles: () => [file]
+      },
+      metadataCache: {
+        getFileCache: () => ({
+          frontmatter: {
+            landmarks: "[[Places/Berlin|Berlin]]"
+          }
+        }),
+        resolvedLinks: {}
+      }
+    };
+
+    const payload = VaultGraphBuilder.build(app as never);
+    expect(payload.notes[0]?.buildings).toEqual(["Berlin"]);
   });
 
   it("keeps only the first runtime building names", () => {
@@ -148,7 +173,7 @@ describe("VaultGraphBuilder", () => {
       size: 64
     });
     const landmarks = Array.from(
-      { length: MAX_RUNTIME_BUILDING_COUNT + 4 },
+      { length: MAX_LANDMARK_COUNT + 4 },
       (_, index) => `Building ${index + 1}`
     );
 
@@ -168,7 +193,7 @@ describe("VaultGraphBuilder", () => {
 
     const payload = VaultGraphBuilder.build(app as never);
     expect(payload.notes[0]?.buildings).toEqual(
-      landmarks.slice(0, MAX_RUNTIME_BUILDING_COUNT)
+      landmarks.slice(0, MAX_LANDMARK_COUNT)
     );
   });
 
@@ -178,9 +203,9 @@ describe("VaultGraphBuilder", () => {
       frontmatter: {}
     },
     {
-      name: "non-array landmarks",
+      name: "invalid scalar landmarks",
       frontmatter: {
-        landmarks: "Observatory"
+        landmarks: 42
       }
     },
     {

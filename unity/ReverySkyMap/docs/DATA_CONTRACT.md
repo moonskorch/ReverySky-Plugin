@@ -228,7 +228,7 @@ Current runtime behavior snapshot for Unity ingestion and map interaction:
 - `notes[].tags[]` -> trimmed runtime tag-id mapping; per-note deduplication is applied later by Forces engine.
   - derivation: trimmed tag string -> shared integer id mapping.
 - `notes[].buildings[]` -> `NoteData.Buildings`; each string maps to one `BuildingData.Name`.
-  - producer source: `frontmatter.landmarks` when it is an array; non-string and blank items are ignored, and the field is omitted when no names remain.
+  - producer source: `frontmatter.landmarks` when it is a string or an array. A scalar string maps to one building name without separator splitting; arrays contribute only string items. Whole-string wikilinks map to their alias or final path segment. Non-string and blank items are ignored, and the field is omitted when no names remain.
   - fallback: missing field maps to an empty `NoteData.Buildings` list.
 - `notes[].date` -> static-25D date depth placement.
   - fallback: parse failure or missing date maps to `DateTime.MinValue`.

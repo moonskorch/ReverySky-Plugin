@@ -234,7 +234,7 @@ type NoteUpdatePayload = {
 - Ego focus acceptance updates the plugin-side focus path independently from bridge dispatch. Ordinary Ego focus rebuilds the effective payload around a changed center before sending `note:focus`; startup accepts the active center before the initial `graph:set`; active-note rename can skip the immediate Ego rebuild because the rename event already schedules a fresh source graph rebuild.
 - `notes[].date` uses `frontmatter.date`, then `frontmatter.created`, then `frontmatter.created_at`, then file creation time. Missing, blank, or invalid candidates are skipped, and the field is omitted when no valid source exists.
 - Source `notes[].tags` are merged, normalized, and deduplicated; effective `graph:set` payloads may clear or trim them for tag visibility.
-- `notes[].buildings` uses `frontmatter.landmarks` when it is an array; string items are trimmed and limited to 64 characters, non-string and blank items are ignored, and the field is omitted when no names remain.
+- `notes[].buildings` uses `frontmatter.landmarks` when it is a string or an array. A scalar string maps to one building name without separator splitting; arrays contribute only string items. Whole-string wikilinks map to their alias or final path segment. Names are trimmed and limited to 64 characters, non-string and blank items are ignored, and the field is omitted when no names remain.
 - `notes[].size` is emitted as file size in bytes.
 - `mapLayout`, when present, is a plugin-owned runtime hint and travels with the effective graph payload.
 - `note:focus` carries the current note identity separately; `graph:set` stays focused on the graph payload itself.

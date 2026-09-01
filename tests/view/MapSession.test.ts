@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TFile } from "obsidian";
 import type { GraphPayload, NoteFocusPayload } from "../../src/bridge/BridgeTypes";
 import {
-  MAX_RUNTIME_BUILDING_COUNT,
-  MAX_RUNTIME_BUILDING_NAME_LENGTH
+  MAX_LANDMARK_COUNT,
+  MAX_LANDMARK_NAME_LENGTH
 } from "../../src/graph/GraphTextLimits";
 import { makeStableNoteId } from "../../src/graph/VaultGraphBuilder";
 import { MapSession } from "../../src/view/MapSession";
@@ -716,16 +716,16 @@ describe("MapSession", () => {
 
   it("keeps landmark-only changes in the next graph payload", () => {
     vi.useFakeTimers();
-    const longLandmark = "A".repeat(MAX_RUNTIME_BUILDING_NAME_LENGTH + 20);
+    const longLandmark = "A".repeat(MAX_LANDMARK_NAME_LENGTH + 20);
     const extraLandmarks = Array.from(
-      { length: MAX_RUNTIME_BUILDING_COUNT + 2 },
+      { length: MAX_LANDMARK_COUNT + 2 },
       (_, index) => `Building ${index + 1}`
     );
     const nextLandmarks = [longLandmark, ...extraLandmarks];
     const expectedLandmarks = [
-      longLandmark.slice(0, MAX_RUNTIME_BUILDING_NAME_LENGTH),
+      longLandmark.slice(0, MAX_LANDMARK_NAME_LENGTH),
       ...extraLandmarks
-    ].slice(0, MAX_RUNTIME_BUILDING_COUNT);
+    ].slice(0, MAX_LANDMARK_COUNT);
 
     const metadataCallbacks: {
       changed?: (file: { path?: string }, data: string, cache: { links?: Array<{ link: string }>; tags?: Array<{ tag: string }>; frontmatter?: unknown }) => void;
@@ -803,6 +803,73 @@ describe("MapSession", () => {
     expect(buildGraph).toHaveBeenCalledTimes(1);
     expect(sendGraph).toHaveBeenCalledTimes(2);
     expect((sendGraph.mock.calls[1]?.[0] as GraphPayload).notes[0]?.buildings).toEqual(expectedLandmarks);
+  });
+
+  it("sends note:update for scalar wikilink landmark changes", () => {
+    const metadataCallbacks: {
+      changed?: (file: { path?: string }, data: string, cache: { links?: Array<{ link: string }>; tags?: Array<{ tag: string }>; frontmatter?: unknown }) => void;
+    } = {};
+
+    const app = {
+      metadataCache: {
+        getFileCache: vi.fn().mockReturnValue({
+          links: [],
+          tags: [],
+          frontmatter: { landmarks: ["Observatory"] }
+        }),
+        on: vi.fn((name: "changed" | "resolved", callback: (...args: never[]) => void) => {
+          if (name === "changed") {
+            metadataCallbacks.changed = callback as typeof metadataCallbacks.changed;
+          }
+          return { id: `metadata-${name}` };
+        })
+      },
+      vault: {
+        getAbstractFileByPath: vi.fn((path: string) => makeTestTFile(path)),
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+      },
+      workspace: {
+        activeLeaf: null,
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+
+    const buildGraph = makeBuildGraphMock(makePayload());
+    const sendGraph = vi.fn();
+    const sendNoteUpdate = vi.fn();
+    const session = new MapSession({
+      app: app as never,
+      buildGraph,
+      now: () => 1700000000000,
+      sendGraph,
+      sendFocus: vi.fn(),
+      sendNoteUpdate
+    });
+
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    session.requestFocusFromEditor("Note.md");
+    sendNoteUpdate.mockClear();
+
+    metadataCallbacks.changed?.(
+      { path: "Note.md" },
+      "content",
+      {
+        links: [],
+        tags: [],
+        frontmatter: { landmarks: "[[People/Alice|Ally]]" }
+      }
+    );
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(sendGraph).toHaveBeenCalledTimes(1);
+    expect(sendNoteUpdate).toHaveBeenCalledWith({
+      id: makeStableNoteId("Note.md"),
+      path: "Note.md",
+      buildings: ["Ally"]
+    });
   });
 
   it("does not send note:update when non-landmark metadata changes", () => {

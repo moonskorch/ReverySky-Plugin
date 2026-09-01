@@ -1,11 +1,10 @@
 import type { App, CachedMetadata, TFile } from "obsidian";
 import { createHash } from "node:crypto";
 import { GraphLink, GraphNoteNode, GraphPayload } from "../bridge/BridgeTypes";
+import { readLandmarkField } from "./FrontmatterLandmarkReader";
 import { GraphNormalizer } from "./GraphNormalizer";
 import {
-  MAX_RUNTIME_BUILDING_COUNT,
-  normalizeRuntimeBuildingName,
-  normalizeRuntimeNoteTitle
+  normalizeNoteTitle
 } from "./GraphTextLimits";
 
 /**
@@ -108,12 +107,12 @@ export class VaultGraphBuilder {
     ]);
 
     const date = VaultGraphBuilder.getCanonicalNoteDate(frontmatter, file);
-    const buildings = VaultGraphBuilder.getFrontmatterLandmarks(frontmatter?.landmarks);
+    const buildings = readLandmarkField(frontmatter);
 
     return {
       id: makeStableNoteId(path),
       path,
-      title: normalizeRuntimeNoteTitle(file.basename),
+      title: normalizeNoteTitle(file.basename),
       tags,
       size: VaultGraphBuilder.getNoteSizeBytes(file),
       ...(buildings.length > 0 ? { buildings } : {}),
@@ -139,18 +138,6 @@ export class VaultGraphBuilder {
         .filter(Boolean);
     }
     return [];
-  }
-
-  private static getFrontmatterLandmarks(value: unknown): string[] {
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    return value
-      .filter((x): x is string => typeof x === "string")
-      .map((x) => normalizeRuntimeBuildingName(x))
-      .filter(Boolean)
-      .slice(0, MAX_RUNTIME_BUILDING_COUNT);
   }
 
   private static getFrontmatterDate(value: unknown): string | undefined {
