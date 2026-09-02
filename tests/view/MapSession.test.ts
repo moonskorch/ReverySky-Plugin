@@ -400,7 +400,8 @@ describe("MapSession", () => {
       frameRateMode: "auto",
       egoEnabled: false,
       egoDepth: 1,
-      egoNeighborLinksEnabled: false
+      egoNeighborLinksEnabled: false,
+      landmarkSource: "landmarks"
     }, { persist: false });
 
     vi.runOnlyPendingTimers();
@@ -413,7 +414,8 @@ describe("MapSession", () => {
       frameRateMode: "auto",
       egoEnabled: false,
       egoDepth: 1,
-      egoNeighborLinksEnabled: false
+      egoNeighborLinksEnabled: false,
+      landmarkSource: "landmarks"
     }, undefined);
   });
 
@@ -430,7 +432,8 @@ describe("MapSession", () => {
       frameRateMode: "auto",
       egoEnabled: true,
       egoDepth: 1,
-      egoNeighborLinksEnabled: false
+      egoNeighborLinksEnabled: false,
+      landmarkSource: "landmarks"
     }, undefined);
 
     session.setEgoDepth("5");
@@ -442,7 +445,8 @@ describe("MapSession", () => {
       frameRateMode: "auto",
       egoEnabled: true,
       egoDepth: 5,
-      egoNeighborLinksEnabled: false
+      egoNeighborLinksEnabled: false,
+      landmarkSource: "landmarks"
     }, undefined);
 
     session.setEgoNeighborLinksEnabled(true);
@@ -454,8 +458,88 @@ describe("MapSession", () => {
       frameRateMode: "auto",
       egoEnabled: true,
       egoDepth: 5,
-      egoNeighborLinksEnabled: true
+      egoNeighborLinksEnabled: true,
+      landmarkSource: "landmarks"
     }, undefined);
+  });
+
+  it("persists landmark source without re-emitting graph data", () => {
+    const sendGraph = vi.fn();
+    const onStateChanged = vi.fn();
+    const session = createSessionForStateTests({ sendGraph, onStateChanged });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    sendGraph.mockClear();
+    onStateChanged.mockClear();
+
+    session.setLandmarkSource("people");
+
+    expect(session.getState()).toMatchObject({ landmarkSource: "people" });
+    expect(onStateChanged).toHaveBeenLastCalledWith({
+      filterQuery: "",
+      showTags: true,
+      mapLayout: "auto",
+      renderScale: 1,
+      frameRateMode: "auto",
+      egoEnabled: false,
+      egoDepth: 1,
+      egoNeighborLinksEnabled: false,
+      landmarkSource: "people"
+    }, undefined);
+    expect(sendGraph).not.toHaveBeenCalled();
+  });
+
+  it("restores landmark source from state and falls back to the default for invalid values", async () => {
+    const session = createSessionForStateTests();
+
+    await session.setState({});
+    expect(session.getState()).toMatchObject({ landmarkSource: "landmarks" });
+    expect(session.getFilterUiState()).toMatchObject({ landmarkSource: "landmarks" });
+
+    await session.setState({ landmarkSource: "people" });
+    expect(session.getState()).toMatchObject({ landmarkSource: "people" });
+    expect(session.getFilterUiState()).toMatchObject({ landmarkSource: "people" });
+
+    await session.setState({ landmarkSource: "  places  " });
+    expect(session.getState()).toMatchObject({ landmarkSource: "places" });
+    expect(session.getFilterUiState()).toMatchObject({ landmarkSource: "places" });
+
+    await session.setState({ landmarkSource: 42 });
+    expect(session.getState()).toMatchObject({ landmarkSource: "landmarks" });
+    expect(session.getFilterUiState()).toMatchObject({ landmarkSource: "landmarks" });
+
+    await session.setState({ landmarkSource: "   " });
+    expect(session.getState()).toMatchObject({ landmarkSource: "landmarks" });
+    expect(session.getFilterUiState()).toMatchObject({ landmarkSource: "landmarks" });
+  });
+
+  it("keeps the previous landmark source when live input is empty or multiline", () => {
+    const onStateChanged = vi.fn();
+    const session = createSessionForStateTests({ onStateChanged });
+    session.setLandmarkSource("people");
+    onStateChanged.mockClear();
+
+    session.setLandmarkSource("   ");
+    session.setLandmarkSource("bad\nname");
+
+    expect(session.getState()).toMatchObject({ landmarkSource: "people" });
+    expect(onStateChanged).not.toHaveBeenCalled();
+  });
+
+  it("accepts single-line landmark source names without a narrow character allowlist", () => {
+    const session = createSessionForStateTests();
+
+    session.setLandmarkSource("  subject (project)\tactivity  ");
+
+    expect(session.getState()).toMatchObject({ landmarkSource: "subject (project)\tactivity" });
+  });
+
+  it("includes the default landmark source when it matches the property suggestion query", () => {
+    const session = createSessionForStateTests();
+
+    expect(session.getLandmarkSourcePropertySuggestions("")).toEqual(["landmarks"]);
+    expect(session.getLandmarkSourcePropertySuggestions("la")).toEqual(["landmarks"]);
+    expect(session.getLandmarkSourcePropertySuggestions("pe")).toEqual([]);
   });
 
   it("does not re-emit graph when the parsed filter stays unchanged", () => {
@@ -554,7 +638,8 @@ describe("MapSession", () => {
       frameRateMode: "auto",
       egoEnabled: false,
       egoDepth: 1,
-      egoNeighborLinksEnabled: false
+      egoNeighborLinksEnabled: false,
+      landmarkSource: "landmarks"
     }, { persist: false });
 
     session.persistRenderScale();
@@ -567,7 +652,8 @@ describe("MapSession", () => {
       frameRateMode: "auto",
       egoEnabled: false,
       egoDepth: 1,
-      egoNeighborLinksEnabled: false
+      egoNeighborLinksEnabled: false,
+      landmarkSource: "landmarks"
     }, undefined);
   });
 

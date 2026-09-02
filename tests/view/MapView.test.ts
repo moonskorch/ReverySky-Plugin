@@ -2252,6 +2252,86 @@ describe("MapView bridge integration", () => {
     expect(filterMessage.classList.contains(FILTER_MESSAGE_HIDDEN_CLASS)).toBe(true);
   });
 
+  it("updates landmark source UI state without rebuilding graph or frontmatter updates", async () => {
+    vi.useFakeTimers();
+
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" }),
+        getAbstractFileByPath: vi.fn()
+      },
+      workspace: {
+        activeLeaf: null,
+        getActiveFile: vi.fn().mockReturnValue(null),
+        getMostRecentLeaf: vi.fn().mockReturnValue(null),
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const plugin = {
+      getUnityRuntimeUrl: vi.fn().mockResolvedValue("http://127.0.0.1:7777/index.html")
+    };
+
+    const callbacks: BridgeCallbacks = {};
+    const bridge = makeBridgeForTest({
+      attach: vi.fn((_: Window, received: BridgeCallbacks) => {
+        callbacks.onReady = received.onReady;
+      })
+    });
+    const onStateChanged = vi.fn();
+    const buildGraph = vi.fn().mockReturnValue(makePathPayload());
+    const view = new MapView(
+      { app } as never,
+      plugin as never,
+      {
+        createBridge: () => bridge,
+        buildGraph: buildGraph as BuildGraphForTest,
+        notify: vi.fn(),
+        now: () => 1700000000000,
+        onStateChanged
+      }
+    );
+
+    await view.onOpen();
+    const iframe = view.contentEl.querySelector("iframe");
+    Object.defineProperty(iframe!, "contentWindow", {
+      value: { postMessage: vi.fn() } as unknown as Window,
+      configurable: true
+    });
+    iframe!.dispatchEvent(new Event("load"));
+    callbacks.onReady?.();
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+    expect(bridge.sendNoteUpdate).not.toHaveBeenCalled();
+
+    const landmarkSourceInput = view.contentEl.querySelector(
+      'input[aria-label="Landmark source"]'
+    ) as HTMLInputElement;
+    expect(landmarkSourceInput.value).toBe("landmarks");
+
+    landmarkSourceInput.value = "people";
+    landmarkSourceInput.dispatchEvent(new Event("input"));
+
+    expect(onStateChanged).not.toHaveBeenCalled();
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+    expect(bridge.sendNoteUpdate).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(500);
+
+    expect(onStateChanged).toHaveBeenLastCalledWith(expect.objectContaining({
+      landmarkSource: "people"
+    }), undefined);
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+    expect(bridge.sendNoteUpdate).not.toHaveBeenCalled();
+  });
+
   it("toggles tags visibility in outgoing graph payload without rebuilding source graph", async () => {
     vi.useFakeTimers();
     const app = {

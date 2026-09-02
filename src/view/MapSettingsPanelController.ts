@@ -15,6 +15,7 @@ import {
   RENDER_SCALE_STEP
 } from "./MapSession";
 import { MapFilterSuggestionsController } from "./MapFilterSuggestionsController";
+import { LandmarkSuggestionsController } from "./LandmarkSuggestionsController";
 
 type ObsidianHTMLElement = HTMLElement & {
   createEl: <K extends keyof HTMLElementTagNameMap>(tagName: K) => HTMLElementTagNameMap[K];
@@ -43,6 +44,9 @@ export class MapSettingsPanelController {
   private egoDepthInputEl: HTMLInputElement | null = null;
   private egoDepthValueEl: HTMLElement | null = null;
   private egoNeighborLinksToggleButtonEl: HTMLButtonElement | null = null;
+  private landmarksSectionEl: HTMLElement | null = null;
+  private landmarksSectionToggleButtonEl: HTMLButtonElement | null = null;
+  private landmarksSectionContentEl: HTMLElement | null = null;
   private graphicsSectionEl: HTMLElement | null = null;
   private graphicsSectionToggleButtonEl: HTMLButtonElement | null = null;
   private graphicsSectionContentEl: HTMLElement | null = null;
@@ -56,11 +60,14 @@ export class MapSettingsPanelController {
   private renderScaleValueEl: HTMLElement | null = null;
   private renderScaleMessageEl: HTMLElement | null = null;
   private searchComponent: SearchComponent | null = null;
+  private landmarkSourceComponent: SearchComponent | null = null;
   private filterSuggestionsController: MapFilterSuggestionsController | null = null;
+  private landmarkSourceSuggestionsController: LandmarkSuggestionsController | null = null;
   private screenshotButtonEl: HTMLButtonElement | null = null;
   private settingsPanelOpen = false;
   private settingsSectionCollapsed = true;
   private egoSectionCollapsed = true;
+  private landmarksSectionCollapsed = true;
   private graphicsSectionCollapsed = true;
   private screenshotSectionCollapsed = true;
 
@@ -117,6 +124,7 @@ export class MapSettingsPanelController {
     this.settingsScrollAreaEl = settingsScrollArea;
     settingsScrollArea.addEventListener("scroll", () => {
       this.filterSuggestionsController?.position();
+      this.landmarkSourceSuggestionsController?.position();
     });
 
     const settingsSection = createCollapsibleSection(settingsScrollArea, {
@@ -270,6 +278,49 @@ export class MapSettingsPanelController {
     });
     this.egoNeighborLinksToggleButtonEl = neighborLinksToggle.button;
 
+    const landmarksSection = createCollapsibleSection(settingsScrollArea, {
+      className: "reverysky-map-landmarks-section",
+      label: "Landmarks",
+      onToggle: () => {
+        this.setLandmarksSectionCollapsed(!this.landmarksSectionCollapsed);
+      }
+    });
+    this.landmarksSectionEl = landmarksSection.section;
+    this.landmarksSectionToggleButtonEl = landmarksSection.toggleButton;
+    this.landmarksSectionContentEl = landmarksSection.content;
+    const landmarksSectionContent = landmarksSection.content;
+
+    const landmarkSourceArea = createChild(landmarksSectionContent as ObsidianHTMLElement, "div");
+    landmarkSourceArea.className = "reverysky-map-filter-search-area reverysky-map-landmark-source-search-area";
+
+    const landmarkSourceLabel = createChild(landmarkSourceArea as ObsidianHTMLElement, "div");
+    landmarkSourceLabel.className = "reverysky-map-settings-field-label";
+    landmarkSourceLabel.textContent = "Landmark source";
+
+    const landmarkSourceHost = createChild(landmarkSourceArea as ObsidianHTMLElement, "div");
+    this.landmarkSourceComponent = new SearchComponent(landmarkSourceHost);
+    this.landmarkSourceComponent.setPlaceholder("Property name");
+    this.landmarkSourceSuggestionsController = new LandmarkSuggestionsController({
+      inputEl: this.landmarkSourceComponent.inputEl,
+      rootEl: root,
+      anchorEl: landmarkSourceArea,
+      getValue: () => this.landmarkSourceComponent?.getValue() ?? this.session.getFilterUiState().landmarkSource,
+      getCommittedValue: () => this.session.getFilterUiState().landmarkSource,
+      setValue: (value) => {
+        this.landmarkSourceComponent?.setValue(value);
+      },
+      commitValue: (value) => {
+        this.session.setLandmarkSource(value);
+      },
+      getSuggestions: (query) => this.session.getLandmarkSourcePropertySuggestions(query),
+      openPanel: () => {
+        this.setSettingsPanelOpen(true);
+      }
+    });
+    this.landmarkSourceComponent.onChange((value) => {
+      this.landmarkSourceSuggestionsController?.handleInputChanged(value);
+    });
+
     const graphicsSection = createCollapsibleSection(settingsScrollArea, {
       className: "reverysky-map-graphics-section",
       label: "Graphics",
@@ -345,6 +396,7 @@ export class MapSettingsPanelController {
 
   syncFromSession(): void {
     this.syncSearchComponentValue();
+    this.syncLandmarkSourceComponentValue();
     this.refreshFilterMessage();
     this.refreshTagsToggleUi();
     this.refreshLayoutDropdownUi();
@@ -355,12 +407,16 @@ export class MapSettingsPanelController {
 
   refreshSuggestions(): void {
     this.filterSuggestionsController?.refresh();
+    this.landmarkSourceSuggestionsController?.refresh();
   }
 
   dispose(): void {
     this.filterSuggestionsController?.dispose();
     this.filterSuggestionsController = null;
+    this.landmarkSourceSuggestionsController?.dispose();
+    this.landmarkSourceSuggestionsController = null;
     this.searchComponent = null;
+    this.landmarkSourceComponent = null;
     this.filterMessageEl = null;
     this.settingsPanelEl = null;
     this.settingsScrollAreaEl = null;
@@ -375,6 +431,9 @@ export class MapSettingsPanelController {
     this.egoDepthInputEl = null;
     this.egoDepthValueEl = null;
     this.egoNeighborLinksToggleButtonEl = null;
+    this.landmarksSectionEl = null;
+    this.landmarksSectionToggleButtonEl = null;
+    this.landmarksSectionContentEl = null;
     this.graphicsSectionEl = null;
     this.graphicsSectionToggleButtonEl = null;
     this.graphicsSectionContentEl = null;
@@ -391,6 +450,7 @@ export class MapSettingsPanelController {
     this.settingsPanelOpen = false;
     this.settingsSectionCollapsed = true;
     this.egoSectionCollapsed = true;
+    this.landmarksSectionCollapsed = true;
     this.graphicsSectionCollapsed = true;
     this.screenshotSectionCollapsed = true;
   }
@@ -405,6 +465,7 @@ export class MapSettingsPanelController {
     this.settingsToggleButtonEl.classList.toggle("reverysky-map-settings-toggle--hidden", isOpen);
     if (!isOpen) {
       this.filterSuggestionsController?.hide();
+      this.landmarkSourceSuggestionsController?.hide();
     }
   }
 
@@ -412,6 +473,14 @@ export class MapSettingsPanelController {
     this.settingsSectionCollapsed = isCollapsed;
     if (isCollapsed) {
       this.filterSuggestionsController?.hide();
+    }
+    this.refreshCollapsibleSections();
+  }
+
+  private setLandmarksSectionCollapsed(isCollapsed: boolean): void {
+    this.landmarksSectionCollapsed = isCollapsed;
+    if (isCollapsed) {
+      this.landmarkSourceSuggestionsController?.hide();
     }
     this.refreshCollapsibleSections();
   }
@@ -445,6 +514,13 @@ export class MapSettingsPanelController {
       this.egoSectionContentEl,
       this.egoSectionCollapsed,
       "Ego Graph"
+    );
+    this.refreshCollapsibleSection(
+      this.landmarksSectionEl,
+      this.landmarksSectionToggleButtonEl,
+      this.landmarksSectionContentEl,
+      this.landmarksSectionCollapsed,
+      "Landmarks"
     );
     this.refreshCollapsibleSection(
       this.graphicsSectionEl,
@@ -491,6 +567,19 @@ export class MapSettingsPanelController {
     }
 
     this.searchComponent.setValue(uiState.filterQuery);
+  }
+
+  private syncLandmarkSourceComponentValue(): void {
+    if (!this.landmarkSourceComponent) {
+      return;
+    }
+
+    const uiState = this.session.getFilterUiState();
+    if (this.landmarkSourceComponent.getValue() === uiState.landmarkSource) {
+      return;
+    }
+
+    this.landmarkSourceComponent.setValue(uiState.landmarkSource);
   }
 
   private refreshFilterMessage(): void {

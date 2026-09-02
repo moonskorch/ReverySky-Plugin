@@ -197,13 +197,15 @@
 
 .reverysky-map-selection-section > .reverysky-map-settings-section-content,
 .reverysky-map-graphics-section > .reverysky-map-settings-section-content,
-.reverysky-map-ego-section > .reverysky-map-settings-section-content {
+.reverysky-map-ego-section > .reverysky-map-settings-section-content,
+.reverysky-map-landmarks-section > .reverysky-map-settings-section-content {
   padding: 0 var(--size-4-3) var(--reverysky-filter-section-padding-y);
 }
 
 .reverysky-map-selection-section,
 .reverysky-map-graphics-section,
-.reverysky-map-ego-section {
+.reverysky-map-ego-section,
+.reverysky-map-landmarks-section {
   box-sizing: border-box;
   gap: var(--reverysky-filter-section-gap);
 }
@@ -211,18 +213,21 @@
 .reverysky-map-selection-section.reverysky-map-settings-section--collapsed,
 .reverysky-map-graphics-section.reverysky-map-settings-section--collapsed,
 .reverysky-map-ego-section.reverysky-map-settings-section--collapsed,
+.reverysky-map-landmarks-section.reverysky-map-settings-section--collapsed,
 .reverysky-map-screenshot-section.reverysky-map-settings-section--collapsed {
   padding-bottom: var(--reverysky-filter-header-padding-edge);
 }
 
 .reverysky-map-graphics-section,
-.reverysky-map-ego-section {
+.reverysky-map-ego-section,
+.reverysky-map-landmarks-section {
   border-top: 1px solid var(--background-modifier-border);
 }
 
 .reverysky-map-selection-section:not(.reverysky-map-settings-section--collapsed),
 .reverysky-map-graphics-section:not(.reverysky-map-settings-section--collapsed),
-.reverysky-map-ego-section:not(.reverysky-map-settings-section--collapsed) {
+.reverysky-map-ego-section:not(.reverysky-map-settings-section--collapsed),
+.reverysky-map-landmarks-section:not(.reverysky-map-settings-section--collapsed) {
   padding-bottom: var(--reverysky-filter-header-padding-edge);
 }
 

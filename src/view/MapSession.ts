@@ -35,6 +35,12 @@ import { extractActiveFilterTermValue } from "../graph/GraphQuerySyntax";
 import { readLandmarkField } from "../graph/FrontmatterLandmarkReader";
 import { makeStableNoteId } from "../graph/VaultGraphBuilder";
 import { MapFocusController, type FocusRequestOptions } from "./MapFocusController";
+import { getLandmarkPropertySuggestions } from "./LandmarkPropertySuggestions";
+import {
+  DEFAULT_LANDMARK_SOURCE,
+  normalizeLandmarkSource,
+  normalizeLandmarkSourceName
+} from "./LandmarkSource";
 
 const GRAPH_REFRESH_DEBOUNCE_MS = 250;
 const GRAPH_SETTINGS_DEBOUNCE_MS = 250;
@@ -60,6 +66,7 @@ export type MapViewState = {
   egoEnabled?: unknown;
   egoDepth?: unknown;
   egoNeighborLinksEnabled?: unknown;
+  landmarkSource?: unknown;
 };
 
 export type MapFilterUiState = {
@@ -72,6 +79,7 @@ export type MapFilterUiState = {
   egoEnabled: boolean;
   egoDepth: number;
   egoNeighborLinksEnabled: boolean;
+  landmarkSource: string;
   filterParseValid: boolean;
   filterMessage: string;
 };
@@ -173,6 +181,7 @@ export class MapSession {
   private egoEnabled = DEFAULT_EGO_ENABLED;
   private egoDepth = DEFAULT_EGO_DEPTH;
   private egoNeighborLinksEnabled = DEFAULT_EGO_NEIGHBOR_LINKS_ENABLED;
+  private landmarkSource = DEFAULT_LANDMARK_SOURCE;
 
   // Parsed filter currently applied to the outgoing graph; live input commits it only after debounce.
   private activeQueryFilter: ParsedQueryFilter | null = null;
@@ -209,7 +218,8 @@ export class MapSession {
       frameRateMode: this.frameRateMode,
       egoEnabled: this.egoEnabled,
       egoDepth: this.egoDepth,
-      egoNeighborLinksEnabled: this.egoNeighborLinksEnabled
+      egoNeighborLinksEnabled: this.egoNeighborLinksEnabled,
+      landmarkSource: this.landmarkSource
     };
   }
 
@@ -230,6 +240,7 @@ export class MapSession {
     this.egoNeighborLinksEnabled = typeof nextState.egoNeighborLinksEnabled === "boolean"
       ? nextState.egoNeighborLinksEnabled
       : DEFAULT_EGO_NEIGHBOR_LINKS_ENABLED;
+    this.landmarkSource = normalizeLandmarkSource(nextState.landmarkSource);
     this.applyParsedQueryResult(GraphQueryFilter.parseQuery(nextQuery));
   }
 
@@ -384,6 +395,20 @@ export class MapSession {
     }
   }
 
+  setLandmarkSource(landmarkSource: string): void {
+    const nextLandmarkSource = normalizeLandmarkSourceName(landmarkSource);
+    if (!nextLandmarkSource) {
+      return;
+    }
+
+    if (nextLandmarkSource === this.landmarkSource) {
+      return;
+    }
+
+    this.landmarkSource = nextLandmarkSource;
+    this.notifyStateChanged();
+  }
+
   persistRenderScale(): void {
     this.notifyStateChanged();
   }
@@ -413,9 +438,35 @@ export class MapSession {
       egoEnabled: this.egoEnabled,
       egoDepth: this.egoDepth,
       egoNeighborLinksEnabled: this.egoNeighborLinksEnabled,
+      landmarkSource: this.landmarkSource,
       filterParseValid: this.filterParseValid,
       filterMessage: this.filterMessage
     };
+  }
+
+  getLandmarkSourcePropertySuggestions(query: string): string[] {
+    const normalizedQuery = this.normalizeSearchTerm(query);
+    const suggestions: string[] = [];
+    const seenSuggestions = new Set<string>();
+
+    const maybeAddSuggestion = (propertyName: string) => {
+      const propertyKey = this.normalizeSearchTerm(propertyName);
+      if (seenSuggestions.has(propertyKey)) {
+        return;
+      }
+
+      if (!normalizedQuery || propertyKey.includes(normalizedQuery)) {
+        suggestions.push(propertyName);
+        seenSuggestions.add(propertyKey);
+      }
+    };
+
+    maybeAddSuggestion(DEFAULT_LANDMARK_SOURCE);
+    for (const propertyName of getLandmarkPropertySuggestions(this.app)) {
+      maybeAddSuggestion(propertyName);
+    }
+
+    return suggestions;
   }
 
   getFolderSuggestions(query: string): FolderPathSuggestion[] {

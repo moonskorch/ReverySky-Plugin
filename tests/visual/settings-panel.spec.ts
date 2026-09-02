@@ -26,6 +26,9 @@ test.describe("settings panel", () => {
     );
     const egoSection = page.locator(".reverysky-map-ego-section");
     const egoToggle = page.locator(".reverysky-map-ego-section .reverysky-map-settings-section-toggle");
+    const landmarksSection = page.locator(".reverysky-map-landmarks-section");
+    const landmarksToggle = page.locator(".reverysky-map-landmarks-section .reverysky-map-settings-section-toggle");
+    const landmarkSourceInput = page.locator(".reverysky-map-landmark-source-search-area .search-input");
     const graphicsSection = page.locator(".reverysky-map-graphics-section");
     const graphicsToggle = page.locator(".reverysky-map-graphics-section .reverysky-map-settings-section-toggle");
     const screenshotSection = page.locator(".reverysky-map-screenshot-section");
@@ -44,6 +47,13 @@ test.describe("settings panel", () => {
     await expect(egoSection).toContainText("Depth");
     await expect(egoSection).toContainText("Neighbor links");
     await expect(egoToggle).toHaveAttribute("aria-expanded", "true");
+    await landmarksToggle.evaluate((button) => {
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 0 }));
+    });
+    await expect(landmarksSection).toContainText("Landmarks");
+    await expect(landmarksSection).toContainText("Landmark source");
+    await expect(landmarkSourceInput).toHaveValue("landmarks");
+    await expect(landmarksToggle).toHaveAttribute("aria-expanded", "true");
     await expect(graphicsSection).toContainText("Graphics");
     await expect(graphicsSection).toContainText("Render scale");
     await screenshotToggle.evaluate((button) => {
@@ -52,6 +62,7 @@ test.describe("settings panel", () => {
     await expect(screenshotSection).toContainText("Screenshot");
     await expect(screenshotButton).toHaveText("Copy screenshot");
     await expect(selectionToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(landmarksToggle).toHaveAttribute("aria-expanded", "true");
     await expect(screenshotToggle).toHaveAttribute("aria-expanded", "true");
     await expect(graphicsToggle).toHaveAttribute("aria-expanded", "true");
     await expect(frameRateSelect).toHaveValue("auto");
@@ -69,6 +80,11 @@ test.describe("settings panel", () => {
     expect(gearBox).not.toBeNull();
     expect(Math.abs((closeBox!.x + closeBox!.width / 2) - (gearBox!.x + gearBox!.width / 2))).toBeLessThanOrEqual(1);
     expect(Math.abs((closeBox!.y + closeBox!.height / 2) - (gearBox!.y + gearBox!.height / 2))).toBeLessThanOrEqual(1);
+    const stageBox = await stage.boundingBox();
+    const panelBox = await page.locator(".reverysky-map-settings-panel").boundingBox();
+    expect(stageBox).not.toBeNull();
+    expect(panelBox).not.toBeNull();
+    expect(stageBox!.y + stageBox!.height - (panelBox!.y + panelBox!.height)).toBeGreaterThanOrEqual(24);
 
     await expect(stage).toHaveScreenshot("settings-panel-expanded.png", {
       animations: "disabled"
@@ -83,10 +99,13 @@ test.describe("settings panel", () => {
     await page.locator(".reverysky-map-ego-section .reverysky-map-settings-section-toggle").evaluate((button) => {
       button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 0 }));
     });
+    await page.locator(".reverysky-map-landmarks-section .reverysky-map-settings-section-toggle").evaluate((button) => {
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 0 }));
+    });
     await page.locator(".reverysky-map-screenshot-section .reverysky-map-settings-section-toggle").evaluate((button) => {
       button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 0 }));
     });
-    for (let step = 0; step < 10; step += 1) {
+    for (let step = 0; step < 11; step += 1) {
       await page.keyboard.press("Tab");
       focusedControls.push(
         await page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? "")
@@ -101,6 +120,7 @@ test.describe("settings panel", () => {
       "Toggle Ego mode",
       "Ego Graph depth",
       "Toggle neighbor links",
+      "Landmark source",
       "Render scale",
       "Select frame rate",
       "Copy graph screenshot"
@@ -119,6 +139,9 @@ test.describe("settings panel", () => {
     const egoToggle = page.locator(
       ".reverysky-map-ego-section .reverysky-map-settings-section-toggle"
     );
+    const landmarksToggle = page.locator(
+      ".reverysky-map-landmarks-section .reverysky-map-settings-section-toggle"
+    );
     const graphicsToggle = page.locator(
       ".reverysky-map-graphics-section .reverysky-map-settings-section-toggle"
     );
@@ -126,6 +149,7 @@ test.describe("settings panel", () => {
       ".reverysky-map-screenshot-section .reverysky-map-settings-section-toggle"
     );
     const egoSection = page.locator(".reverysky-map-ego-section");
+    const landmarksSection = page.locator(".reverysky-map-landmarks-section");
     const screenshotSection = page.locator(".reverysky-map-screenshot-section");
     const screenshotButton = page.locator(".reverysky-map-screenshot-button");
     const egoDepthInput = page.locator(".reverysky-map-ego-depth-input");
@@ -138,15 +162,22 @@ test.describe("settings panel", () => {
 
     await expect(settingsToggle).toHaveAttribute("aria-expanded", "false");
     await expect(egoToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(landmarksToggle).toHaveAttribute("aria-expanded", "false");
     await expect(graphicsToggle).toHaveAttribute("aria-expanded", "false");
     await expect(screenshotToggle).toHaveAttribute("aria-expanded", "false");
     await expect(egoSection).toContainText("Ego Graph");
+    await expect(landmarksSection).toContainText("Landmarks");
     await expect(egoDepthInput).not.toBeVisible();
     await expect(screenshotSection).toContainText("Screenshot");
     await expect(screenshotButton).not.toBeVisible();
     await expect(selectionSection).toHaveCSS("padding-bottom", await egoSection.evaluate((element) => {
       return getComputedStyle(element).paddingBottom;
     }));
+    const stageBox = await stage.boundingBox();
+    const screenshotBox = await screenshotSection.boundingBox();
+    expect(stageBox).not.toBeNull();
+    expect(screenshotBox).not.toBeNull();
+    expect(screenshotBox!.y + screenshotBox!.height).toBeLessThanOrEqual(stageBox!.y + stageBox!.height);
 
     await expect(stage).toHaveScreenshot("settings-panel-collapsed.png", {
       animations: "disabled"

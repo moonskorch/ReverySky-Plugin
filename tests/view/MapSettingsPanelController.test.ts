@@ -40,10 +40,16 @@ function makePathPayload(): GraphPayload {
   };
 }
 
-function createSession() {
+function createSession(options?: {
+  activeFrontmatter?: unknown;
+}) {
+  const activeFile = options?.activeFrontmatter === undefined
+    ? null
+    : { path: "Active.md" };
   return new MapSession({
     app: {
       metadataCache: {
+        getFileCache: vi.fn().mockReturnValue({ frontmatter: options?.activeFrontmatter }),
         on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
       },
       vault: {
@@ -51,6 +57,7 @@ function createSession() {
       },
       workspace: {
         activeLeaf: null,
+        getActiveFile: vi.fn().mockReturnValue(activeFile),
         getLeavesOfType: vi.fn().mockReturnValue([]),
         iterateAllLeaves: vi.fn(),
         on: vi.fn().mockReturnValue({ id: "event-ref" })
@@ -682,6 +689,8 @@ describe("MapSettingsPanelController", () => {
     expect(container.textContent).not.toContain("Settings");
     expect(container.textContent).toContain("Layout");
     expect(container.textContent).toContain("Ego Graph");
+    expect(container.textContent).toContain("Landmarks");
+    expect(container.textContent).toContain("Landmark source");
     expect(container.textContent).toContain("Graphics");
     expect(container.textContent).toContain("Frame rate");
     const graphicsSection = container.querySelector(".reverysky-map-graphics-section") as HTMLElement;
@@ -698,6 +707,7 @@ describe("MapSettingsPanelController", () => {
 
     const settingsBody = container.querySelector(".reverysky-map-settings-panel-body") as HTMLElement;
     const egoSection = container.querySelector(".reverysky-map-ego-section") as HTMLElement;
+    const landmarksSection = container.querySelector(".reverysky-map-landmarks-section") as HTMLElement;
     const graphicsSection = container.querySelector(".reverysky-map-graphics-section") as HTMLElement;
     const egoToggle = egoSection.querySelector(".reverysky-map-settings-section-toggle") as HTMLButtonElement;
     const egoContent = egoSection.querySelector(".reverysky-map-settings-section-content") as HTMLElement;
@@ -709,7 +719,8 @@ describe("MapSettingsPanelController", () => {
     ) as HTMLButtonElement;
 
     expect(settingsBody.children[1]).toBe(egoSection);
-    expect(settingsBody.children[2]).toBe(graphicsSection);
+    expect(settingsBody.children[2]).toBe(landmarksSection);
+    expect(settingsBody.children[3]).toBe(graphicsSection);
     expect(egoSection.textContent).toContain("Ego Graph");
     expect(egoSection.textContent).toContain("Depth");
     expect(egoSection.textContent).toContain("Neighbor links");
@@ -723,6 +734,277 @@ describe("MapSettingsPanelController", () => {
     expect(egoDepthInput.value).toBe("1");
     expect(egoDepthValue.textContent).toBe("1");
     expect(neighborLinksToggle.getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("renders the landmarks section after ego graph with a default landmark source", () => {
+    const session = createSession();
+    const controller = new MapSettingsPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const landmarksSection = container.querySelector(".reverysky-map-landmarks-section") as HTMLElement;
+    const landmarksToggle = landmarksSection.querySelector(
+      ".reverysky-map-settings-section-toggle"
+    ) as HTMLButtonElement;
+    const landmarkSourceInput = landmarksSection.querySelector(
+      'input[aria-label="Landmark source"]'
+    ) as HTMLInputElement;
+
+    expect(landmarksSection.textContent).toContain("Landmarks");
+    expect(landmarksSection.textContent).toContain("Landmark source");
+    expect(landmarksSection.classList.contains("reverysky-map-settings-section--collapsed")).toBe(true);
+    expect(landmarksToggle.getAttribute("aria-expanded")).toBe("false");
+    expect(landmarksToggle.getAttribute("aria-label")).toBe("Expand Landmarks");
+    expect(landmarkSourceInput.value).toBe("landmarks");
+    expect(session.getState()).toMatchObject({ landmarkSource: "landmarks" });
+  });
+
+  it("updates landmark source from free text input", () => {
+    vi.useFakeTimers();
+
+    const session = createSession();
+    const controller = new MapSettingsPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const landmarkSourceInput = container.querySelector(
+      'input[aria-label="Landmark source"]'
+    ) as HTMLInputElement;
+
+    landmarkSourceInput.value = "people";
+    landmarkSourceInput.dispatchEvent(new Event("input"));
+
+    expect(landmarkSourceInput.value).toBe("people");
+    expect(session.getState()).toMatchObject({ landmarkSource: "landmarks" });
+
+    vi.advanceTimersByTime(500);
+
+    expect(session.getState()).toMatchObject({ landmarkSource: "people" });
+  });
+
+  it("commits pending landmark source input when the field loses focus", () => {
+    vi.useFakeTimers();
+
+    const session = createSession();
+    const controller = new MapSettingsPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const landmarkSourceInput = container.querySelector(
+      'input[aria-label="Landmark source"]'
+    ) as HTMLInputElement;
+
+    landmarkSourceInput.value = "people";
+    landmarkSourceInput.dispatchEvent(new Event("input"));
+    landmarkSourceInput.dispatchEvent(new Event("blur"));
+
+    expect(session.getState()).toMatchObject({ landmarkSource: "people" });
+    expect(landmarkSourceInput.value).toBe("people");
+  });
+
+  it("shows readable property suggestions for landmark source without limiting manual input", () => {
+    vi.useFakeTimers();
+
+    const session = createSession({
+      activeFrontmatter: {
+        count: 42,
+        landmarks: ["Observatory"],
+        mood: "focused",
+        people: ["Alice"],
+        tags: ["map"]
+      }
+    });
+    const controller = new MapSettingsPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const landmarkSourceInput = container.querySelector(
+      'input[aria-label="Landmark source"]'
+    ) as HTMLInputElement;
+
+    landmarkSourceInput.value = "pe";
+    landmarkSourceInput.dispatchEvent(new Event("input"));
+
+    const suggestions = container.querySelector(".reverysky-map-property-suggestions") as HTMLElement;
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(true);
+
+    landmarkSourceInput.dispatchEvent(new Event("focus"));
+
+    const options = container.querySelectorAll(".reverysky-map-property-suggestion-option");
+    expect(suggestions.classList.contains(SUGGESTIONS_HIDDEN_CLASS)).toBe(false);
+    expect(suggestions.textContent).toContain("Properties");
+    expect(options).toHaveLength(1);
+    expect(options[0]?.textContent).toBe("people");
+    expect(options[0]?.classList.contains("reverysky-map-folder-suggestion-option--active")).toBe(true);
+    expect(options[0]?.getAttribute("aria-selected")).toBe("true");
+
+    landmarkSourceInput.value = "customLandmarks";
+    landmarkSourceInput.dispatchEvent(new Event("input"));
+
+    expect(session.getState()).toMatchObject({ landmarkSource: "landmarks" });
+    expect(landmarkSourceInput.value).toBe("customLandmarks");
+
+    vi.advanceTimersByTime(500);
+
+    expect(session.getState()).toMatchObject({ landmarkSource: "customLandmarks" });
+  });
+
+  it("keeps landmark source editable when property suggestions are unavailable", () => {
+    vi.useFakeTimers();
+
+    const session = createSession();
+    const controller = new MapSettingsPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const landmarkSourceInput = container.querySelector(
+      'input[aria-label="Landmark source"]'
+    ) as HTMLInputElement;
+
+    landmarkSourceInput.value = "";
+    landmarkSourceInput.dispatchEvent(new Event("input"));
+    vi.advanceTimersByTime(500);
+
+    expect(landmarkSourceInput.value).toBe("");
+    expect(session.getState()).toMatchObject({ landmarkSource: "landmarks" });
+
+    landmarkSourceInput.dispatchEvent(new Event("focus"));
+    const suggestions = container.querySelector(".reverysky-map-property-suggestions") as HTMLElement;
+    expect(suggestions.textContent).toContain("Properties");
+    expect(suggestions.textContent).toContain("landmarks");
+    expect(session.getState()).toMatchObject({ landmarkSource: "landmarks" });
+
+    landmarkSourceInput.dispatchEvent(new Event("blur"));
+
+    expect(landmarkSourceInput.value).toBe("landmarks");
+
+    landmarkSourceInput.value = "people";
+    landmarkSourceInput.dispatchEvent(new Event("input"));
+
+    vi.advanceTimersByTime(500);
+
+    expect(session.getState()).toMatchObject({ landmarkSource: "people" });
+    expect(landmarkSourceInput.value).toBe("people");
+  });
+
+  it("shows the default landmark source first for an empty property query without duplicating it", () => {
+    const session = createSession({
+      activeFrontmatter: {
+        landmarks: ["Observatory"],
+        mood: "focused",
+        people: ["Alice"]
+      }
+    });
+    const controller = new MapSettingsPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const landmarkSourceInput = container.querySelector(
+      'input[aria-label="Landmark source"]'
+    ) as HTMLInputElement;
+    landmarkSourceInput.value = "";
+    landmarkSourceInput.dispatchEvent(new Event("input"));
+    landmarkSourceInput.dispatchEvent(new Event("focus"));
+
+    const optionLabels = Array.from(
+      container.querySelectorAll(".reverysky-map-property-suggestion-option")
+    ).map((option) => option.textContent);
+    expect(optionLabels).toEqual(["landmarks", "mood", "people"]);
+    expect(session.getState()).toMatchObject({ landmarkSource: "landmarks" });
+  });
+
+  it("shows an active-note landmarks property when it matches a non-empty query", () => {
+    const session = createSession({
+      activeFrontmatter: {
+        landmarks: ["Observatory"],
+        people: ["Alice"]
+      }
+    });
+    const controller = new MapSettingsPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const landmarkSourceInput = container.querySelector(
+      'input[aria-label="Landmark source"]'
+    ) as HTMLInputElement;
+    landmarkSourceInput.value = "land";
+    landmarkSourceInput.dispatchEvent(new Event("input"));
+    landmarkSourceInput.dispatchEvent(new Event("focus"));
+
+    const optionLabels = Array.from(
+      container.querySelectorAll(".reverysky-map-property-suggestion-option")
+    ).map((option) => option.textContent);
+    expect(optionLabels).toEqual(["landmarks"]);
+  });
+
+  it("shows the default landmark source when it matches a non-empty query", () => {
+    const session = createSession();
+    const controller = new MapSettingsPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const landmarkSourceInput = container.querySelector(
+      'input[aria-label="Landmark source"]'
+    ) as HTMLInputElement;
+    landmarkSourceInput.value = "la";
+    landmarkSourceInput.dispatchEvent(new Event("input"));
+    landmarkSourceInput.dispatchEvent(new Event("focus"));
+
+    const optionLabels = Array.from(
+      container.querySelectorAll(".reverysky-map-property-suggestion-option")
+    ).map((option) => option.textContent);
+    expect(optionLabels).toEqual(["landmarks"]);
+  });
+
+  it("scrolls long landmark source suggestions while navigating with the keyboard", () => {
+    const propertyNames = Array.from({ length: 12 }, (_, index) => `people-${index + 1}`);
+    const session = createSession({
+      activeFrontmatter: Object.fromEntries(
+        propertyNames.map((name) => [name, ["Alice"]])
+      )
+    });
+    const controller = new MapSettingsPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const landmarkSourceInput = container.querySelector(
+      'input[aria-label="Landmark source"]'
+    ) as HTMLInputElement;
+    landmarkSourceInput.value = "people";
+    landmarkSourceInput.dispatchEvent(new Event("input"));
+    landmarkSourceInput.dispatchEvent(new Event("focus"));
+
+    const suggestions = container.querySelector(".reverysky-map-property-suggestions") as HTMLElement;
+    const options = Array.from(
+      container.querySelectorAll<HTMLElement>(".reverysky-map-property-suggestion-option")
+    );
+    let suggestionsScrollTop = 0;
+    Object.defineProperty(suggestions, "clientHeight", {
+      configurable: true,
+      value: 72
+    });
+    Object.defineProperty(suggestions, "scrollTop", {
+      configurable: true,
+      get: () => suggestionsScrollTop,
+      set: (value: number) => {
+        suggestionsScrollTop = value;
+      }
+    });
+    options.forEach((option, index) => {
+      Object.defineProperty(option, "offsetTop", {
+        configurable: true,
+        value: index * 36
+      });
+      Object.defineProperty(option, "offsetHeight", {
+        configurable: true,
+        value: 36
+      });
+    });
+
+    landmarkSourceInput.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    landmarkSourceInput.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+
+    expect(suggestionsScrollTop).toBe(36);
   });
 
   it("updates ego section controls in session state", () => {
