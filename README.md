@@ -100,7 +100,9 @@ To add a landmark:
 2. Right-click the selection.
 3. Choose **Add landmark**.
 
-ReverySky 3D Graph stores the selected text in the note's `landmarks` frontmatter property. If the graph is open, the node updates immediately and the view switches to Landmarks mode. Landmarks can also be edited or removed directly in the `landmarks` property.
+ReverySky 3D Graph uses the note's `landmarks` frontmatter property by default. `Landmark source` in the settings selects another frontmatter property. ReverySky displays a string or an array of strings from that property; **Add landmark** creates the property when missing or appends to an existing array of strings.
+
+If the graph is open, a new landmark appears immediately and the view switches to Landmarks mode. Editing the currently selected frontmatter property also updates the displayed landmarks on the existing graph.
 
 Use the round view button to switch to Landmarks mode at any time. Landmarks are attached to existing note nodes and do not create additional graph nodes or links.
 

@@ -186,8 +186,8 @@ The main entry points are plugin startup, the graph command, view startup, and i
    Marks the bridge ready, sends runtime settings, accepts any Ego startup focus before graph emission, sends the initial graph, then dispatches accepted startup focus.
 4. `src/view/MapSession.ts` -> `prepareStartupGraph()` -> `sendOutgoingGraph()`
    Reuses the latest queued effective graph when one exists; otherwise rebuilds the source graph and outgoing graph before sending the payload.
-5. `src/graph/VaultGraphBuilder.ts` -> `build(app)`
-   Reads markdown files from the vault, derives stable note ids, normalizes tags and paths, adds date and byte-size fields, and builds links from `metadataCache.resolvedLinks`.
+5. `src/graph/VaultGraphBuilder.ts` -> `build(app, landmarkSource)`
+   Reads markdown files from the vault, derives stable note ids, normalizes tags and paths, reads `notes[].buildings` from the selected frontmatter landmark source, adds date and byte-size fields, and builds links from `metadataCache.resolvedLinks`.
 6. `src/view/MapView.ts` -> `bridge.sendGraphSet(outgoingPayload)`
 7. `src/bridge/UnityIframeBridge.ts` -> `sendGraphSet()`
    Validates the payload with `MessageValidator`, builds a `graph:set` envelope, and calls `iframeWindow.postMessage(...)`.
@@ -228,6 +228,7 @@ Graph emission timing is grouped by event intent:
   graph-setting changes wait 250 ms before rebuilding and sending the latest effective graph.
 - No immediate `graph:set`:
   Global focus sends only `note:focus`.
+  metadata changes limited to the selected landmark source send `note:update`.
   active-note rename sends only `note:focus` immediately and lets the scheduled rename rebuild send the fresh graph.
   render scale waits for iframe reopen.
   frame-rate mode sends `runtime:settings`.
@@ -422,8 +423,12 @@ Persistence remains one plugin-level snapshot, so later opens restore the most r
   `outgoingGraphPayload` is the effective Unity payload after query filtering, optional Ego scope, tag visibility, and layout hint.
   Each open graph leaf owns its own live session state.
 
-- `filterQuery`, `showTags`, `mapLayout`, `renderScale`, and Ego settings are owned by `MapSession`.
+- `filterQuery`, `showTags`, `mapLayout`, `renderScale`, `landmarkSource`, and Ego settings are owned by `MapSession`.
   They are live per-view while the leaf is open. `ReverySkyMapPlugin` stores one latest snapshot under `mapViewState` and applies it to later opens.
+
+- The selected landmark source defaults to `landmarks` and is used by both graph extraction and editor-side Add landmark writes.
+  Changing it clears cached metadata signatures, re-reads current frontmatter values into the source graph, rebuilds the effective graph, and sends the latest payload.
+  Metadata changes that affect only the normalized landmark list for the selected source update cached `buildings` values and dispatch `note:update` instead of waiting for a full graph rebuild.
 
 - Ego settings are fully active in the effective graph pipeline.
   `egoEnabled` chooses global or scoped payloads.
@@ -499,6 +504,7 @@ Plugin-to-runtime messages:
 Payload rules:
 - `path` values stay vault-relative and use `/` separators.
 - `notes[].size` is a non-negative byte count from Obsidian file metadata and maps to Unity `NoteData.Length`.
+- `notes[].buildings` is read from the selected frontmatter landmark source, defaults to `landmarks`, and may be updated independently through `note:update`.
 - `graph:set` carries the effective graph after query filtering, Ego scope, tag visibility, and layout hint.
 - Focus changes are sent separately via `note:focus`, which must include both `id` and `path`.
 - Ego `graph:set` payloads use `egoDepth` for note inclusion and `egoNeighborLinksEnabled` for link selection.
