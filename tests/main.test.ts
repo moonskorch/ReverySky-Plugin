@@ -406,6 +406,24 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
     });
   });
 
+  it("resolves the persisted landmark source with a default fallback", async () => {
+    const harness = createPluginHarness({
+      loadDataResult: {
+        mapViewState: {
+          landmarkSource: "  people  "
+        }
+      }
+    });
+
+    await harness.plugin.onload();
+    expect(harness.plugin.getPersistedLandmarkSource()).toBe("people");
+
+    (harness.plugin as unknown as { updateMapViewState: (state: Record<string, unknown>) => void }).updateMapViewState({
+      landmarkSource: "   "
+    });
+    expect(harness.plugin.getPersistedLandmarkSource()).toBe("landmarks");
+  });
+
   it("reveals the existing map leaf instead of creating another one", async () => {
     const existingLeaf: MockLeaf = {
       setViewState: vi.fn()

@@ -404,7 +404,7 @@ describe("MapView bridge integration", () => {
     callbacks.onReady?.();
 
     expect(buildGraph).toHaveBeenCalledTimes(1);
-    expect(buildGraph).toHaveBeenCalledWith(app);
+    expect(buildGraph).toHaveBeenCalledWith(app, "landmarks");
     expect(bridge.sendRuntimeSettings).toHaveBeenCalledWith({ frameRateMode: "fps60" });
     expect(bridge.sendRuntimeSettings.mock.invocationCallOrder[0]).toBeLessThan(
       bridge.sendGraphSet.mock.invocationCallOrder[0]
@@ -2252,7 +2252,7 @@ describe("MapView bridge integration", () => {
     expect(filterMessage.classList.contains(FILTER_MESSAGE_HIDDEN_CLASS)).toBe(true);
   });
 
-  it("updates landmark source UI state without rebuilding graph or frontmatter updates", async () => {
+  it("updates landmark source UI state and re-emits graph without rebuilding source graph", async () => {
     vi.useFakeTimers();
 
     const app = {
@@ -2328,7 +2328,7 @@ describe("MapView bridge integration", () => {
       landmarkSource: "people"
     }), undefined);
     expect(buildGraph).toHaveBeenCalledTimes(1);
-    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(1);
+    expect(bridge.sendGraphSet).toHaveBeenCalledTimes(2);
     expect(bridge.sendNoteUpdate).not.toHaveBeenCalled();
   });
 

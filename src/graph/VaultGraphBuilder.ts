@@ -19,10 +19,10 @@ export function makeStableNoteId(path: string): string {
  * Build the graph payload from the current vault snapshot for the Unity runtime.
  */
 export class VaultGraphBuilder {
-  static build(app: App): GraphPayload {
+  static build(app: App, landmarkSource?: string): GraphPayload {
     const files = app.vault.getMarkdownFiles();
     const notes = files
-      .map((file) => VaultGraphBuilder.toNoteNode(app, file))
+      .map((file) => VaultGraphBuilder.toNoteNode(app, file, landmarkSource))
       .filter((note): note is GraphNoteNode => note !== null)
       .sort((a, b) => a.path.localeCompare(b.path));
     const links = VaultGraphBuilder.buildLinks(app, notes);
@@ -92,7 +92,7 @@ export class VaultGraphBuilder {
   /**
    * Merge frontmatter, inline tags, and file metadata into the compact node shape Unity needs.
    */
-  private static toNoteNode(app: App, file: TFile): GraphNoteNode | null {
+  private static toNoteNode(app: App, file: TFile, landmarkSource?: string): GraphNoteNode | null {
     const path = GraphNormalizer.normalizePath(file.path);
     if (!path.trim()) {
       return null;
@@ -107,7 +107,7 @@ export class VaultGraphBuilder {
     ]);
 
     const date = VaultGraphBuilder.getCanonicalNoteDate(frontmatter, file);
-    const buildings = readLandmarkField(frontmatter);
+    const buildings = readLandmarkField(frontmatter, landmarkSource);
 
     return {
       id: makeStableNoteId(path),

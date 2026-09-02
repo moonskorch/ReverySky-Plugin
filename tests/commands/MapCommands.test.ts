@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   addLandmarkToFrontmatter,
-  normalizeLandmarkSelection
+  normalizeLandmarkSelection,
+  registerEditorMenuCommands
 } from "../../src/commands/MapCommands";
 
 describe("normalizeLandmarkSelection", () => {
@@ -81,5 +82,81 @@ describe("addLandmarkToFrontmatter", () => {
 
     expect(frontmatter.landmarks).toBe(landmarks);
     expect(frontmatter.landmarks).toEqual([123, true, "Sky Garden"]);
+  });
+
+  it("writes to a custom landmark source with the same strict array rules", () => {
+    const frontmatter: Record<string, unknown> = {
+      landmarks: ["Observatory"],
+      people: ["Alice"],
+      topics: "Research",
+      mixed: ["Sky Garden", 42]
+    };
+
+    addLandmarkToFrontmatter(frontmatter, "Bob", "people");
+    addLandmarkToFrontmatter(frontmatter, "Berlin", "places");
+    addLandmarkToFrontmatter(frontmatter, "Draft", "topics");
+    addLandmarkToFrontmatter(frontmatter, "Moon Bridge", "mixed");
+
+    expect(frontmatter.landmarks).toEqual(["Observatory"]);
+    expect(frontmatter.people).toEqual(["Alice", "Bob"]);
+    expect(frontmatter.places).toEqual(["Berlin"]);
+    expect(frontmatter.topics).toBe("Research");
+    expect(frontmatter.mixed).toEqual(["Sky Garden", 42]);
+  });
+});
+
+describe("registerEditorMenuCommands", () => {
+  it("adds the selected landmark to the persisted landmark source", async () => {
+    const frontmatter: Record<string, unknown> = {
+      landmarks: ["Observatory"]
+    };
+    let editorMenuHandler:
+      | ((menu: unknown, editor: unknown, info: { file?: unknown }) => void)
+      | null = null;
+    let clickHandler: (() => Promise<void>) | null = null;
+    const menuItem = {} as {
+      setTitle: ReturnType<typeof vi.fn>;
+      setIcon: ReturnType<typeof vi.fn>;
+      onClick: ReturnType<typeof vi.fn>;
+    };
+    menuItem.setTitle = vi.fn(() => menuItem);
+    menuItem.setIcon = vi.fn(() => menuItem);
+    menuItem.onClick = vi.fn((callback: () => Promise<void>) => {
+      clickHandler = callback;
+      return menuItem;
+    });
+    const menu = {
+      addItem: vi.fn((callback: (item: typeof menuItem) => void) => callback(menuItem))
+    };
+    const plugin = {
+      registerEvent: vi.fn(),
+      getPersistedLandmarkSource: vi.fn().mockReturnValue("people"),
+      app: {
+        workspace: {
+          on: vi.fn((_name: string, callback: typeof editorMenuHandler) => {
+            editorMenuHandler = callback;
+            return { id: "editor-menu-event" };
+          })
+        },
+        fileManager: {
+          processFrontMatter: vi.fn(async (_file: unknown, callback: (frontmatter: Record<string, unknown>) => void) => {
+            callback(frontmatter);
+          })
+        }
+      }
+    };
+
+    registerEditorMenuCommands(plugin as never);
+    editorMenuHandler?.(
+      menu,
+      { getSelection: () => "  Alice  " },
+      { file: { path: "Note.md" } }
+    );
+    expect(clickHandler).toBeTypeOf("function");
+    await clickHandler?.();
+
+    expect(plugin.getPersistedLandmarkSource).toHaveBeenCalledTimes(1);
+    expect(frontmatter.landmarks).toEqual(["Observatory"]);
+    expect(frontmatter.people).toEqual(["Alice"]);
   });
 });

@@ -141,6 +141,58 @@ describe("VaultGraphBuilder", () => {
     ]);
   });
 
+  it("uses the default landmarks property when no landmark source is provided", () => {
+    const file = makeFile("Folder/DefaultLandmarks.md", {
+      ctime: Date.UTC(2026, 0, 1),
+      mtime: Date.UTC(2026, 0, 2),
+      size: 64
+    });
+
+    const app = {
+      vault: {
+        getMarkdownFiles: () => [file]
+      },
+      metadataCache: {
+        getFileCache: () => ({
+          frontmatter: {
+            landmarks: ["Observatory"],
+            people: ["Alice"]
+          }
+        }),
+        resolvedLinks: {}
+      }
+    };
+
+    const payload = VaultGraphBuilder.build(app as never);
+    expect(payload.notes[0]?.buildings).toEqual(["Observatory"]);
+  });
+
+  it("uses a custom landmark source for full graph builds", () => {
+    const file = makeFile("Folder/People.md", {
+      ctime: Date.UTC(2026, 0, 1),
+      mtime: Date.UTC(2026, 0, 2),
+      size: 64
+    });
+
+    const app = {
+      vault: {
+        getMarkdownFiles: () => [file]
+      },
+      metadataCache: {
+        getFileCache: () => ({
+          frontmatter: {
+            landmarks: ["Observatory"],
+            people: ["Alice", "Bob"]
+          }
+        }),
+        resolvedLinks: {}
+      }
+    };
+
+    const payload = VaultGraphBuilder.build(app as never, "people");
+    expect(payload.notes[0]?.buildings).toEqual(["Alice", "Bob"]);
+  });
+
   it("maps scalar frontmatter landmarks as one building name", () => {
     const file = makeFile("Folder/ScalarLandmark.md", {
       ctime: Date.UTC(2026, 0, 1),

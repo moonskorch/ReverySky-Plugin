@@ -120,7 +120,7 @@ type NoteMetadataSignature = {
 
 export type MapSessionDependencies = {
   app: App;
-  buildGraph: (app: App) => GraphPayload;
+  buildGraph: (app: App, landmarkSource: string) => GraphPayload;
   now: () => number;
   sendGraph: (payload: GraphPayload) => void;
   sendStatus?: (message: string) => void;
@@ -137,7 +137,7 @@ export type MapSessionDependencies = {
 export class MapSession {
   private readonly app: App;
   private readonly focus: MapFocusController;
-  private readonly buildGraph: (app: App) => GraphPayload;
+  private readonly buildGraph: (app: App, landmarkSource: string) => GraphPayload;
   private readonly now: () => number;
   private readonly sendGraph: (payload: GraphPayload) => void;
   private readonly sendStatus?: (message: string) => void;
@@ -407,6 +407,10 @@ export class MapSession {
 
     this.landmarkSource = nextLandmarkSource;
     this.notifyStateChanged();
+    this.noteMetadataSignatureByPath.clear();
+    this.updateSourceGraphBuildingsFromCurrentSource();
+    this.rebuildOutgoingGraph();
+    this.sendOutgoingGraph();
   }
 
   persistRenderScale(): void {
@@ -707,7 +711,7 @@ export class MapSession {
           }
 
           if (nextSignature.landmarks !== previousSignature.landmarks) {
-            const buildings = readLandmarkField(cache?.frontmatter);
+            const buildings = readLandmarkField(cache?.frontmatter, this.landmarkSource);
             this.updateCachedNoteBuildings(path, buildings);
             this.sendNoteUpdateForPath(path, buildings);
           }
@@ -803,7 +807,7 @@ export class MapSession {
   }
 
   private rebuildSourceGraph(): void {
-    this.sourceGraphPayload = this.buildGraph(this.app);
+    this.sourceGraphPayload = this.buildGraph(this.app, this.landmarkSource);
     this.folderPathSuggestions = this.buildFolderPathSuggestions(this.sourceGraphPayload);
     this.tagSuggestions = this.buildTagSuggestions(this.sourceGraphPayload);
   }
@@ -913,6 +917,34 @@ export class MapSession {
   private updateCachedNoteBuildings(path: string, buildings: string[]): void {
     this.updateGraphPayloadNoteBuildings(this.sourceGraphPayload, path, buildings);
     this.updateGraphPayloadNoteBuildings(this.outgoingGraphPayload, path, buildings);
+  }
+
+  private updateSourceGraphBuildingsFromCurrentSource(): void {
+    if (!this.sourceGraphPayload) {
+      return;
+    }
+
+    this.sourceGraphPayload = {
+      ...this.sourceGraphPayload,
+      notes: this.sourceGraphPayload.notes.map((note) => this.withCurrentSourceBuildings(note))
+    };
+  }
+
+  private withCurrentSourceBuildings(note: GraphNoteNode): GraphNoteNode {
+    const nextNote: GraphNoteNode = { ...note };
+    const file = this.app.vault.getAbstractFileByPath(this.normalizeVaultPath(note.path));
+    const cache = file instanceof TFile
+      ? this.app.metadataCache.getFileCache(file)
+      : null;
+    const buildings = readLandmarkField(cache?.frontmatter, this.landmarkSource);
+
+    if (buildings.length > 0) {
+      nextNote.buildings = [...buildings];
+    } else {
+      delete nextNote.buildings;
+    }
+
+    return nextNote;
   }
 
   private updateGraphPayloadNoteBuildings(
@@ -1276,7 +1308,7 @@ export class MapSession {
   }
 
   private buildLandmarksSignature(frontmatter: unknown): string {
-    return this.hashSignature(JSON.stringify(readLandmarkField(frontmatter)));
+    return this.hashSignature(JSON.stringify(readLandmarkField(frontmatter, this.landmarkSource)));
   }
 
   private hashSignature(value: string): string {
@@ -1457,7 +1489,7 @@ export class MapSession {
     }
 
     if (!this.sourceGraphPayload) {
-      this.sourceGraphPayload = this.buildGraph(this.app);
+      this.sourceGraphPayload = this.buildGraph(this.app, this.landmarkSource);
     }
 
     if (!this.sourceGraphPayload) {
@@ -1473,7 +1505,7 @@ export class MapSession {
     }
 
     if (!this.sourceGraphPayload) {
-      this.sourceGraphPayload = this.buildGraph(this.app);
+      this.sourceGraphPayload = this.buildGraph(this.app, this.landmarkSource);
     }
 
     if (!this.sourceGraphPayload) {

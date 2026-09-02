@@ -35,7 +35,7 @@ type RuntimeWindow = Window & {
 
 export type MapViewDependencies = {
   createBridge?: () => BridgePort;
-  buildGraph?: (app: App) => GraphPayload;
+  buildGraph?: (app: App, landmarkSource: string) => GraphPayload;
   notify?: (message: string) => void;
   now?: () => number;
   copyScreenshotToClipboard?: (blob: Blob) => Promise<void> | void;
@@ -78,7 +78,7 @@ export class MapView extends ItemView {
   ) {
     super(leaf);
     this.bridge = deps.createBridge?.() ?? new UnityIframeBridge();
-    const buildGraph = deps.buildGraph ?? ((app: App) => VaultGraphBuilder.build(app));
+    const buildGraph = deps.buildGraph ?? ((app: App, landmarkSource: string) => VaultGraphBuilder.build(app, landmarkSource));
     this.notify = deps.notify ?? ((message: string) => new Notice(message));
     this.now = deps.now ?? Date.now;
     this.copyScreenshotToClipboard = deps.copyScreenshotToClipboard ?? ((blob: Blob) => this.writeScreenshotToClipboard(blob));

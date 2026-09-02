@@ -1,6 +1,10 @@
 import type { TFile, WorkspaceLeaf } from "obsidian";
 import { MAP_VIEW_TYPE, MapView } from "../view/MapView";
 import type ReverySkyMapPlugin from "../main";
+import {
+  DEFAULT_LANDMARK_SOURCE,
+  normalizeLandmarkSource
+} from "../view/LandmarkSource";
 
 export function registerCommands(plugin: ReverySkyMapPlugin): void {
   plugin.addRibbonIcon("sparkles", "Toggle ReverySky 3D Graph", async () => {
@@ -59,10 +63,15 @@ export function normalizeLandmarkSelection(selection: string): string {
     .trim();
 }
 
-export function addLandmarkToFrontmatter(frontmatter: Record<string, unknown>, landmark: string): void {
-  const currentLandmarks = frontmatter.landmarks;
+export function addLandmarkToFrontmatter(
+  frontmatter: Record<string, unknown>,
+  landmark: string,
+  landmarkSource: string = DEFAULT_LANDMARK_SOURCE
+): void {
+  const fieldName = normalizeLandmarkSource(landmarkSource);
+  const currentLandmarks = frontmatter[fieldName];
   if (currentLandmarks === null || currentLandmarks === undefined) {
-    frontmatter.landmarks = [landmark];
+    frontmatter[fieldName] = [landmark];
     return;
   }
 
@@ -155,7 +164,8 @@ async function addLandmarkToFile(
   file: TFile,
   landmark: string
 ): Promise<void> {
+  const landmarkSource = plugin.getPersistedLandmarkSource();
   await plugin.app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
-    addLandmarkToFrontmatter(frontmatter, landmark);
+    addLandmarkToFrontmatter(frontmatter, landmark, landmarkSource);
   });
 }

@@ -1,8 +1,8 @@
 import { vi } from "vitest";
 import type { GraphPayload } from "../../src/bridge/BridgeTypes";
 
-export function makeBuildGraphMock(payload: GraphPayload): (app: unknown) => GraphPayload {
-  return vi.fn(() => payload) as unknown as (app: unknown) => GraphPayload;
+export function makeBuildGraphMock(payload: GraphPayload): (app: unknown, landmarkSource: string) => GraphPayload {
+  return vi.fn(() => payload) as unknown as (app: unknown, landmarkSource: string) => GraphPayload;
 }
 
 export function makeVoidCallback<Args extends unknown[] = []>(): (...args: Args) => void {

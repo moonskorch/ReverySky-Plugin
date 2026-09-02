@@ -216,9 +216,11 @@ function createSessionForStateTests(options?: {
   return new MapSession({
     app: {
       metadataCache: {
+        getFileCache: vi.fn().mockReturnValue(null),
         on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
       },
       vault: {
+        getAbstractFileByPath: vi.fn((path: string) => makeTestTFile(path)),
         on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
       },
       workspace: {
@@ -463,12 +465,13 @@ describe("MapSession", () => {
     }, undefined);
   });
 
-  it("persists landmark source without re-emitting graph data", () => {
+  it("persists landmark source and re-emits cached graph data without rebuilding source graph", () => {
     const sendGraph = vi.fn();
     const onStateChanged = vi.fn();
     const session = createSessionForStateTests({ sendGraph, onStateChanged });
     session.start(() => undefined);
     session.handleRuntimeReady();
+    const initialGraphCalls = sendGraph.mock.calls.length;
     sendGraph.mockClear();
     onStateChanged.mockClear();
 
@@ -486,7 +489,8 @@ describe("MapSession", () => {
       egoNeighborLinksEnabled: false,
       landmarkSource: "people"
     }, undefined);
-    expect(sendGraph).not.toHaveBeenCalled();
+    expect(sendGraph).toHaveBeenCalledTimes(1);
+    expect(initialGraphCalls).toBe(1);
   });
 
   it("restores landmark source from state and falls back to the default for invalid values", async () => {
@@ -511,6 +515,88 @@ describe("MapSession", () => {
     await session.setState({ landmarkSource: "   " });
     expect(session.getState()).toMatchObject({ landmarkSource: "landmarks" });
     expect(session.getFilterUiState()).toMatchObject({ landmarkSource: "landmarks" });
+  });
+
+  it("passes the restored landmark source into the initial graph build", async () => {
+    const app = {
+      metadataCache: {
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+      },
+      workspace: {
+        activeLeaf: null,
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const buildGraph = vi.fn().mockReturnValue(makePayload());
+    const session = new MapSession({
+      app: app as never,
+      buildGraph,
+      now: () => 1700000000000,
+      sendGraph: vi.fn(),
+      sendFocus: vi.fn()
+    });
+
+    await session.setState({ landmarkSource: "people" });
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(buildGraph).toHaveBeenCalledWith(app, "people");
+  });
+
+  it("switches landmark source by updating cached buildings without rebuilding the source graph", () => {
+    const payload = makePathPayload();
+    payload.notes = payload.notes.map((note) => ({
+      ...note,
+      buildings: ["Old building"]
+    }));
+    const sendGraph = vi.fn();
+    const app = {
+      metadataCache: {
+        getFileCache: vi.fn((file: TFile) => ({
+          frontmatter: file.path === "Projects/ReverySky/Spec.md"
+            ? { people: ["Alice", "Bob"] }
+            : { people: [] }
+        })),
+        on: vi.fn().mockReturnValue({ id: "metadata-event-ref" })
+      },
+      vault: {
+        getAbstractFileByPath: vi.fn((path: string) => makeTestTFile(path)),
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+      },
+      workspace: {
+        activeLeaf: null,
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const buildGraph = vi.fn().mockReturnValue(payload);
+    const session = new MapSession({
+      app: app as never,
+      buildGraph,
+      now: () => 1700000000000,
+      sendGraph,
+      sendFocus: vi.fn()
+    });
+
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    sendGraph.mockClear();
+
+    session.setLandmarkSource("people");
+
+    expect(buildGraph).toHaveBeenCalledTimes(1);
+    expect(sendGraph).toHaveBeenCalledTimes(1);
+    const switchedPayload = sendGraph.mock.calls[0]?.[0] as GraphPayload;
+    expect(switchedPayload.links).toEqual(payload.links);
+    expect(switchedPayload.notes.find((note) => note.id === "project")?.buildings).toEqual(["Alice", "Bob"]);
+    expect(switchedPayload.notes.find((note) => note.id === "daily")?.buildings).toBeUndefined();
   });
 
   it("keeps the previous landmark source when live input is empty or multiline", () => {
@@ -1021,6 +1107,155 @@ describe("MapSession", () => {
     );
 
     expect(sendNoteUpdate).not.toHaveBeenCalled();
+  });
+
+  it("clears metadata signatures when landmark source changes", () => {
+    vi.useFakeTimers();
+    const metadataCallbacks: {
+      changed?: (file: { path?: string }, data: string, cache: { links?: Array<{ link: string }>; tags?: Array<{ tag: string }>; frontmatter?: unknown }) => void;
+      resolved?: () => void;
+    } = {};
+    const currentCache = {
+      links: [],
+      tags: [],
+      frontmatter: {
+        landmarks: ["Observatory"],
+        people: ["Alice"]
+      }
+    };
+    const app = {
+      metadataCache: {
+        getFileCache: vi.fn().mockReturnValue(currentCache),
+        on: vi.fn((name: "changed" | "resolved", callback: (...args: never[]) => void) => {
+          if (name === "changed") {
+            metadataCallbacks.changed = callback as typeof metadataCallbacks.changed;
+          } else {
+            metadataCallbacks.resolved = callback as () => void;
+          }
+          return { id: `metadata-${name}` };
+        })
+      },
+      vault: {
+        getAbstractFileByPath: vi.fn((path: string) => makeTestTFile(path)),
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+      },
+      workspace: {
+        activeLeaf: null,
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const buildGraph = vi.fn().mockReturnValue(makePayload());
+    const sendNoteUpdate = vi.fn();
+    const session = new MapSession({
+      app: app as never,
+      buildGraph,
+      now: () => 1700000000000,
+      sendGraph: vi.fn(),
+      sendFocus: vi.fn(),
+      sendNoteUpdate
+    });
+
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    session.requestFocusFromEditor("Note.md");
+    session.setLandmarkSource("people");
+    sendNoteUpdate.mockClear();
+
+    metadataCallbacks.changed?.(
+      { path: "Note.md" },
+      "content",
+      currentCache
+    );
+    metadataCallbacks.resolved?.();
+    vi.advanceTimersByTime(250);
+
+    expect(sendNoteUpdate).not.toHaveBeenCalled();
+    expect(buildGraph).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses the current landmark source for live metadata signatures and updates", () => {
+    const metadataCallbacks: {
+      changed?: (file: { path?: string }, data: string, cache: { links?: Array<{ link: string }>; tags?: Array<{ tag: string }>; frontmatter?: unknown }) => void;
+    } = {};
+    const currentCache = {
+      links: [],
+      tags: [],
+      frontmatter: {
+        landmarks: ["Observatory"],
+        people: ["Alice"]
+      }
+    };
+    const app = {
+      metadataCache: {
+        getFileCache: vi.fn().mockReturnValue(currentCache),
+        on: vi.fn((name: "changed" | "resolved", callback: (...args: never[]) => void) => {
+          if (name === "changed") {
+            metadataCallbacks.changed = callback as typeof metadataCallbacks.changed;
+          }
+          return { id: `metadata-${name}` };
+        })
+      },
+      vault: {
+        getAbstractFileByPath: vi.fn((path: string) => makeTestTFile(path)),
+        on: vi.fn().mockReturnValue({ id: "vault-event-ref" })
+      },
+      workspace: {
+        activeLeaf: null,
+        getLeavesOfType: vi.fn().mockReturnValue([]),
+        iterateAllLeaves: vi.fn(),
+        on: vi.fn().mockReturnValue({ id: "event-ref" })
+      }
+    };
+    const buildGraph = vi.fn().mockReturnValue(makePayload());
+    const sendNoteUpdate = vi.fn();
+    const session = new MapSession({
+      app: app as never,
+      buildGraph,
+      now: () => 1700000000000,
+      sendGraph: vi.fn(),
+      sendFocus: vi.fn(),
+      sendNoteUpdate
+    });
+
+    session.start(() => undefined);
+    session.handleRuntimeReady();
+    session.setLandmarkSource("people");
+    session.requestFocusFromEditor("Note.md");
+    sendNoteUpdate.mockClear();
+
+    metadataCallbacks.changed?.(
+      { path: "Note.md" },
+      "content",
+      {
+        links: [],
+        tags: [],
+        frontmatter: {
+          landmarks: ["Different default"],
+          people: ["Alice"]
+        }
+      }
+    );
+    metadataCallbacks.changed?.(
+      { path: "Note.md" },
+      "content",
+      {
+        links: [],
+        tags: [],
+        frontmatter: {
+          landmarks: ["Different default"],
+          people: ["Bob"]
+        }
+      }
+    );
+
+    expect(sendNoteUpdate).toHaveBeenCalledTimes(1);
+    expect(sendNoteUpdate).toHaveBeenCalledWith({
+      id: makeStableNoteId("Note.md"),
+      path: "Note.md",
+      buildings: ["Bob"]
+    });
   });
 
   it("queues latest graph before bridge ready and sends it on ready", () => {

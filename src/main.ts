@@ -19,6 +19,7 @@ import {
   forwardFocusToViews
 } from "./commands/MapCommands";
 import { WHATS_NEW_VIEW_TYPE, WhatsNewView } from "./view/WhatsNewView";
+import { normalizeLandmarkSource } from "./view/LandmarkSource";
 import { PluginDataPersistence } from "./PluginDataPersistence";
 import path from "node:path";
 
@@ -256,6 +257,11 @@ export default class ReverySkyMapPlugin extends Plugin {
 
   async flushPersistedMapViewState(): Promise<void> {
     await this.pluginData.persist();
+  }
+
+  getPersistedLandmarkSource(): string {
+    const mapViewState = this.pluginData.getMapViewStateSnapshot();
+    return normalizeLandmarkSource(mapViewState?.landmarkSource);
   }
 
   private showWhatsNew(runtimeDir: string): Promise<void> {
