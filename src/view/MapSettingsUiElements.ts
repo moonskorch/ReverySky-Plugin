@@ -109,7 +109,7 @@ export function createCollapsibleSection(
   const actions = createChild(header as ObsidianHTMLElement, "div");
   actions.className = "reverysky-map-settings-section-actions";
   if (options.helpUrl) {
-    createSectionHelpLink(actions as ObsidianHTMLElement, options.label, options.helpUrl);
+    createSectionHelpLink(actions, options.label, options.helpUrl);
   }
 
   const content = createChild(section as ObsidianHTMLElement, "div");
