@@ -26,12 +26,15 @@ test.describe("settings panel", () => {
     );
     const egoSection = page.locator(".reverysky-map-ego-section");
     const egoToggle = page.locator(".reverysky-map-ego-section .reverysky-map-settings-section-toggle");
+    const egoHelpLink = page.locator(".reverysky-map-ego-section .reverysky-map-settings-help-link");
     const graphicsSection = page.locator(".reverysky-map-graphics-section");
     const graphicsToggle = page.locator(".reverysky-map-graphics-section .reverysky-map-settings-section-toggle");
+    const graphicsHelpLink = page.locator(".reverysky-map-graphics-section .reverysky-map-settings-help-link");
     const screenshotSection = page.locator(".reverysky-map-screenshot-section");
     const screenshotToggle = page.locator(
       ".reverysky-map-screenshot-section .reverysky-map-settings-section-toggle"
     );
+    const screenshotHelpLink = page.locator(".reverysky-map-screenshot-section .reverysky-map-settings-help-link");
     const screenshotButton = page.locator(".reverysky-map-screenshot-button");
     const frameRateSelect = page.locator(".reverysky-map-frame-rate-mode-select");
     const closeButton = page.locator(".reverysky-map-settings-close");
@@ -54,6 +57,9 @@ test.describe("settings panel", () => {
     await expect(selectionToggle).toHaveAttribute("aria-expanded", "true");
     await expect(screenshotToggle).toHaveAttribute("aria-expanded", "true");
     await expect(graphicsToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(egoHelpLink).toBeVisible();
+    await expect(graphicsHelpLink).toBeVisible();
+    await expect(screenshotHelpLink).toBeVisible();
     await expect(frameRateSelect).toHaveValue("auto");
     await expect(
       page.locator(".reverysky-map-selection-section .reverysky-map-settings-section-toggle")
@@ -86,7 +92,7 @@ test.describe("settings panel", () => {
     await page.locator(".reverysky-map-screenshot-section .reverysky-map-settings-section-toggle").evaluate((button) => {
       button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 0 }));
     });
-    for (let step = 0; step < 10; step += 1) {
+    for (let step = 0; step < 13; step += 1) {
       await page.keyboard.press("Tab");
       focusedControls.push(
         await page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? "")
@@ -98,11 +104,14 @@ test.describe("settings panel", () => {
       "Search in filter",
       "Toggle tags",
       "Select layout",
+      "Open Ego Graph documentation",
       "Toggle Ego mode",
       "Ego Graph depth",
       "Toggle neighbor links",
+      "Open Graphics documentation",
       "Render scale",
       "Select frame rate",
+      "Open Screenshot documentation",
       "Copy graph screenshot"
     ]);
   });
@@ -129,6 +138,9 @@ test.describe("settings panel", () => {
     const screenshotSection = page.locator(".reverysky-map-screenshot-section");
     const screenshotButton = page.locator(".reverysky-map-screenshot-button");
     const egoDepthInput = page.locator(".reverysky-map-ego-depth-input");
+    const egoHelpLink = page.locator(".reverysky-map-ego-section .reverysky-map-settings-help-link");
+    const graphicsHelpLink = page.locator(".reverysky-map-graphics-section .reverysky-map-settings-help-link");
+    const screenshotHelpLink = page.locator(".reverysky-map-screenshot-section .reverysky-map-settings-help-link");
 
     await settingsToggle.click();
     await graphicsToggle.click();
@@ -144,6 +156,9 @@ test.describe("settings panel", () => {
     await expect(egoDepthInput).not.toBeVisible();
     await expect(screenshotSection).toContainText("Screenshot");
     await expect(screenshotButton).not.toBeVisible();
+    await expect(egoHelpLink).not.toBeVisible();
+    await expect(graphicsHelpLink).not.toBeVisible();
+    await expect(screenshotHelpLink).not.toBeVisible();
     await expect(selectionSection).toHaveCSS("padding-bottom", await egoSection.evaluate((element) => {
       return getComputedStyle(element).paddingBottom;
     }));

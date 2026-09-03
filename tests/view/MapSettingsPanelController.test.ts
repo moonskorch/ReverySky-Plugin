@@ -725,6 +725,35 @@ describe("MapSettingsPanelController", () => {
     expect(neighborLinksToggle.getAttribute("aria-checked")).toBe("false");
   });
 
+  it("renders help links for documented non-selection sections", () => {
+    const session = createSession();
+    const controller = new MapSettingsPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const selectionHelpLink = container.querySelector(
+      ".reverysky-map-selection-section .reverysky-map-settings-help-link"
+    );
+    const egoHelpLink = container.querySelector(
+      ".reverysky-map-ego-section .reverysky-map-settings-help-link"
+    ) as HTMLAnchorElement;
+    const graphicsHelpLink = container.querySelector(
+      ".reverysky-map-graphics-section .reverysky-map-settings-help-link"
+    ) as HTMLAnchorElement;
+    const screenshotHelpLink = container.querySelector(
+      ".reverysky-map-screenshot-section .reverysky-map-settings-help-link"
+    ) as HTMLAnchorElement;
+
+    expect(selectionHelpLink).toBeNull();
+    expect(egoHelpLink.href).toBe("https://github.com/moonskorch/ReverySky-Plugin#ego-graph");
+    expect(graphicsHelpLink.href).toBe("https://github.com/moonskorch/ReverySky-Plugin#visual-quality");
+    expect(screenshotHelpLink.href).toBe("https://github.com/moonskorch/ReverySky-Plugin#screenshot");
+    expect(egoHelpLink.target).toBe("_blank");
+    expect(egoHelpLink.rel).toBe("noopener noreferrer");
+    expect(egoHelpLink.getAttribute("aria-label")).toBe("Open Ego Graph documentation");
+    expect(egoHelpLink.getAttribute("title")).toBe("Open Ego Graph documentation");
+  });
+
   it("updates ego section controls in session state", () => {
     const session = createSession();
     const controller = new MapSettingsPanelController(session);

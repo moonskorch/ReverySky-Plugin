@@ -14,6 +14,7 @@ export type CollapsibleSectionElements = {
 export type CollapsibleSectionOptions = {
   className: string;
   label: string;
+  helpUrl?: string;
   onToggle: () => void;
 };
 
@@ -104,6 +105,9 @@ export function createCollapsibleSection(
   title.textContent = options.label;
 
   registerSectionToggle(toggleButton, options.onToggle);
+  if (options.helpUrl) {
+    createSectionHelpLink(header as ObsidianHTMLElement, options.label, options.helpUrl);
+  }
 
   const content = createChild(section as ObsidianHTMLElement, "div");
   content.className = "reverysky-map-settings-section-content";
@@ -263,6 +267,23 @@ function registerSectionToggle(button: HTMLButtonElement, toggle: () => void): v
     event.preventDefault();
     toggle();
   });
+}
+
+function createSectionHelpLink(
+  parent: ObsidianHTMLElement,
+  label: string,
+  url: string
+): HTMLAnchorElement {
+  const link = createChild(parent, "a");
+  const tooltip = `Open ${label} documentation`;
+  link.className = "reverysky-map-settings-help-link";
+  link.href = url;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.setAttribute("aria-label", tooltip);
+  link.setAttribute("title", tooltip);
+  setIcon(link, "circle-help");
+  return link;
 }
 
 function joinClassNames(...classNames: Array<string | undefined>): string {

@@ -25,6 +25,13 @@ type MapSettingsPanelControllerDependencies = {
   onCopyScreenshotRequested?: () => Promise<void> | void;
 };
 
+const README_BASE_URL = "https://github.com/moonskorch/ReverySky-Plugin";
+const SETTINGS_SECTION_HELP_URLS = {
+  egoGraph: `${README_BASE_URL}#ego-graph`,
+  graphics: `${README_BASE_URL}#visual-quality`,
+  screenshot: `${README_BASE_URL}#screenshot`
+} as const;
+
 /**
  * Owns the settings-panel UI state machine and keeps the DOM synchronized with `MapSession`.
  */
@@ -211,6 +218,7 @@ export class MapSettingsPanelController {
     const egoSection = createCollapsibleSection(settingsScrollArea, {
       className: "reverysky-map-ego-section",
       label: "Ego Graph",
+      helpUrl: SETTINGS_SECTION_HELP_URLS.egoGraph,
       onToggle: () => {
         this.setEgoSectionCollapsed(!this.egoSectionCollapsed);
       }
@@ -273,6 +281,7 @@ export class MapSettingsPanelController {
     const graphicsSection = createCollapsibleSection(settingsScrollArea, {
       className: "reverysky-map-graphics-section",
       label: "Graphics",
+      helpUrl: SETTINGS_SECTION_HELP_URLS.graphics,
       onToggle: () => {
         this.setGraphicsSectionCollapsed(!this.graphicsSectionCollapsed);
       }
@@ -319,6 +328,7 @@ export class MapSettingsPanelController {
     const screenshotSection = createCollapsibleSection(settingsScrollArea, {
       className: "reverysky-map-screenshot-section",
       label: "Screenshot",
+      helpUrl: SETTINGS_SECTION_HELP_URLS.screenshot,
       onToggle: () => {
         this.setScreenshotSectionCollapsed(!this.screenshotSectionCollapsed);
       }

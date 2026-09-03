@@ -365,7 +365,8 @@ button.reverysky-map-settings-section-toggle:active {
   stroke-width: var(--reverysky-filter-icon-stroke-width);
 }
 
-button.reverysky-map-settings-close {
+button.reverysky-map-settings-close,
+a.reverysky-map-settings-help-link {
   grid-column: 2;
   justify-self: end;
   width: var(--reverysky-filter-close-size);
@@ -386,24 +387,45 @@ button.reverysky-map-settings-close {
   border: none;
 }
 
-button.reverysky-map-settings-close:hover {
+a.reverysky-map-settings-help-link,
+a.reverysky-map-settings-help-link:hover,
+a.reverysky-map-settings-help-link:focus,
+a.reverysky-map-settings-help-link:active {
+  text-decoration: none;
+}
+
+.reverysky-map-settings-section--collapsed
+  > .reverysky-map-settings-section-header
+  > .reverysky-map-settings-help-link {
+  display: none;
+}
+
+button.reverysky-map-settings-close:hover,
+a.reverysky-map-settings-help-link:hover {
   background: var(--background-modifier-hover);
   color: var(--text-muted);
-  box-shadow: none;
-  border: none;
 }
 
 button.reverysky-map-settings-close:focus,
-button.reverysky-map-settings-close:active {
+button.reverysky-map-settings-close:active,
+a.reverysky-map-settings-help-link:focus,
+a.reverysky-map-settings-help-link:active {
   background: transparent;
   box-shadow: none;
   border: none;
 }
 
-button.reverysky-map-settings-close svg {
+button.reverysky-map-settings-close svg,
+a.reverysky-map-settings-help-link svg {
   width: var(--reverysky-filter-action-icon-size);
   height: var(--reverysky-filter-action-icon-size);
   stroke-width: var(--reverysky-filter-icon-stroke-width);
+}
+
+a.reverysky-map-settings-help-link svg {
+  width: calc(var(--reverysky-filter-action-icon-size) - 2px);
+  height: calc(var(--reverysky-filter-action-icon-size) - 2px);
+  stroke-width: 1.5;
 }
 
 /* Filter Controls */
