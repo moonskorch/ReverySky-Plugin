@@ -30,6 +30,7 @@ const README_BASE_URL = "https://github.com/moonskorch/ReverySky-Plugin";
 const SETTINGS_SECTION_HELP_URLS = {
   selection: `${README_BASE_URL}#filter`,
   egoGraph: `${README_BASE_URL}#ego-graph`,
+  landmarks: `${README_BASE_URL}#landmarks`,
   graphics: `${README_BASE_URL}#visual-quality`,
   screenshot: `${README_BASE_URL}#screenshot`
 } as const;
@@ -291,6 +292,7 @@ export class MapSettingsPanelController {
     const landmarksSection = createCollapsibleSection(settingsScrollArea, {
       className: "reverysky-map-landmarks-section",
       label: "Landmarks",
+      helpUrl: SETTINGS_SECTION_HELP_URLS.landmarks,
       onToggle: () => {
         this.setLandmarksSectionCollapsed(!this.landmarksSectionCollapsed);
       }

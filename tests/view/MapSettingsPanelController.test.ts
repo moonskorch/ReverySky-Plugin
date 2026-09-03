@@ -1023,6 +1023,9 @@ describe("MapSettingsPanelController", () => {
     const egoHelpLink = container.querySelector(
       ".reverysky-map-ego-section .reverysky-map-settings-help-link"
     ) as HTMLAnchorElement;
+    const landmarksHelpLink = container.querySelector(
+      ".reverysky-map-landmarks-section .reverysky-map-settings-help-link"
+    ) as HTMLAnchorElement;
     const graphicsHelpLink = container.querySelector(
       ".reverysky-map-graphics-section .reverysky-map-settings-help-link"
     ) as HTMLAnchorElement;
@@ -1034,12 +1037,15 @@ describe("MapSettingsPanelController", () => {
     expect(selectionActions.children[1]).toBe(closeButton);
     expect(selectionHelpLink.href).toBe("https://github.com/moonskorch/ReverySky-Plugin#filter");
     expect(egoHelpLink.href).toBe("https://github.com/moonskorch/ReverySky-Plugin#ego-graph");
+    expect(landmarksHelpLink.href).toBe("https://github.com/moonskorch/ReverySky-Plugin#landmarks");
     expect(graphicsHelpLink.href).toBe("https://github.com/moonskorch/ReverySky-Plugin#visual-quality");
     expect(screenshotHelpLink.href).toBe("https://github.com/moonskorch/ReverySky-Plugin#screenshot");
     expect(selectionHelpLink.target).toBe("_blank");
     expect(selectionHelpLink.rel).toBe("noopener noreferrer");
     expect(selectionHelpLink.getAttribute("aria-label")).toBe("Open Selection documentation");
     expect(selectionHelpLink.getAttribute("title")).toBe("Open Selection documentation");
+    expect(landmarksHelpLink.getAttribute("aria-label")).toBe("Open Landmarks documentation");
+    expect(landmarksHelpLink.getAttribute("title")).toBe("Open Landmarks documentation");
   });
 
   it("updates ego section controls in session state", () => {

@@ -31,6 +31,7 @@ test.describe("settings panel", () => {
     const landmarksToggle = page.locator(".reverysky-map-landmarks-section .reverysky-map-settings-section-toggle");
     const landmarkSourceInput = page.locator(".reverysky-map-landmark-source-search-area .search-input");
     const egoHelpLink = page.locator(".reverysky-map-ego-section .reverysky-map-settings-help-link");
+    const landmarksHelpLink = page.locator(".reverysky-map-landmarks-section .reverysky-map-settings-help-link");
     const graphicsSection = page.locator(".reverysky-map-graphics-section");
     const graphicsToggle = page.locator(".reverysky-map-graphics-section .reverysky-map-settings-section-toggle");
     const graphicsHelpLink = page.locator(".reverysky-map-graphics-section .reverysky-map-settings-help-link");
@@ -71,6 +72,7 @@ test.describe("settings panel", () => {
     await expect(graphicsToggle).toHaveAttribute("aria-expanded", "true");
     await expect(selectionHelpLink).toBeVisible();
     await expect(egoHelpLink).toBeVisible();
+    await expect(landmarksHelpLink).toBeVisible();
     await expect(graphicsHelpLink).toBeVisible();
     await expect(screenshotHelpLink).toBeVisible();
     await expect(frameRateSelect).toHaveValue("auto");
@@ -116,7 +118,7 @@ test.describe("settings panel", () => {
     await page.locator(".reverysky-map-screenshot-section .reverysky-map-settings-section-toggle").evaluate((button) => {
       button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 0 }));
     });
-    for (let step = 0; step < 15; step += 1) {
+    for (let step = 0; step < 16; step += 1) {
       await page.keyboard.press("Tab");
       focusedControls.push(
         await page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? "")
@@ -133,6 +135,7 @@ test.describe("settings panel", () => {
       "Toggle Ego mode",
       "Ego Graph depth",
       "Toggle neighbor links",
+      "Open Landmarks documentation",
       "Landmark source",
       "Open Graphics documentation",
       "Render scale",
@@ -170,6 +173,7 @@ test.describe("settings panel", () => {
     const egoDepthInput = page.locator(".reverysky-map-ego-depth-input");
     const selectionHelpLink = page.locator(".reverysky-map-selection-section .reverysky-map-settings-help-link");
     const egoHelpLink = page.locator(".reverysky-map-ego-section .reverysky-map-settings-help-link");
+    const landmarksHelpLink = page.locator(".reverysky-map-landmarks-section .reverysky-map-settings-help-link");
     const graphicsHelpLink = page.locator(".reverysky-map-graphics-section .reverysky-map-settings-help-link");
     const screenshotHelpLink = page.locator(".reverysky-map-screenshot-section .reverysky-map-settings-help-link");
 
@@ -191,6 +195,7 @@ test.describe("settings panel", () => {
     await expect(screenshotButton).not.toBeVisible();
     await expect(selectionHelpLink).not.toBeVisible();
     await expect(egoHelpLink).not.toBeVisible();
+    await expect(landmarksHelpLink).not.toBeVisible();
     await expect(graphicsHelpLink).not.toBeVisible();
     await expect(screenshotHelpLink).not.toBeVisible();
     await expect(selectionSection).toHaveCSS("padding-bottom", await egoSection.evaluate((element) => {
