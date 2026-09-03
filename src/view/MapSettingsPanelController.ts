@@ -27,6 +27,7 @@ type MapSettingsPanelControllerDependencies = {
 
 const README_BASE_URL = "https://github.com/moonskorch/ReverySky-Plugin";
 const SETTINGS_SECTION_HELP_URLS = {
+  selection: `${README_BASE_URL}#filter`,
   egoGraph: `${README_BASE_URL}#ego-graph`,
   graphics: `${README_BASE_URL}#visual-quality`,
   screenshot: `${README_BASE_URL}#screenshot`
@@ -129,6 +130,7 @@ export class MapSettingsPanelController {
     const settingsSection = createCollapsibleSection(settingsScrollArea, {
       className: "reverysky-map-selection-section",
       label: "Selection",
+      helpUrl: SETTINGS_SECTION_HELP_URLS.selection,
       onToggle: () => {
         this.setSettingsSectionCollapsed(!this.settingsSectionCollapsed);
       }
@@ -137,7 +139,7 @@ export class MapSettingsPanelController {
     this.settingsSectionToggleButtonEl = settingsSection.toggleButton;
     this.settingsSectionContentEl = settingsSection.content;
 
-    const panelCloseButton = createChild(settingsSection.header as ObsidianHTMLElement, "button");
+    const panelCloseButton = createChild(settingsSection.actions as ObsidianHTMLElement, "button");
     panelCloseButton.type = "button";
     panelCloseButton.className = "reverysky-map-settings-close";
     panelCloseButton.setAttribute("aria-label", "Close filters");

@@ -7,6 +7,7 @@ type ObsidianHTMLElement = HTMLElement & {
 export type CollapsibleSectionElements = {
   section: HTMLElement;
   header: HTMLElement;
+  actions: HTMLElement;
   toggleButton: HTMLButtonElement;
   content: HTMLElement;
 };
@@ -105,8 +106,10 @@ export function createCollapsibleSection(
   title.textContent = options.label;
 
   registerSectionToggle(toggleButton, options.onToggle);
+  const actions = createChild(header as ObsidianHTMLElement, "div");
+  actions.className = "reverysky-map-settings-section-actions";
   if (options.helpUrl) {
-    createSectionHelpLink(header as ObsidianHTMLElement, options.label, options.helpUrl);
+    createSectionHelpLink(actions as ObsidianHTMLElement, options.label, options.helpUrl);
   }
 
   const content = createChild(section as ObsidianHTMLElement, "div");
@@ -115,6 +118,7 @@ export function createCollapsibleSection(
   return {
     section,
     header,
+    actions,
     toggleButton,
     content
   };
