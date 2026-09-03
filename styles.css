@@ -173,7 +173,7 @@
 
 .reverysky-map-settings-section-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--reverysky-filter-header-side);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--reverysky-filter-control-gap);
   min-height: var(--reverysky-filter-header-row-height);
@@ -370,9 +370,17 @@ button.reverysky-map-settings-section-toggle:active {
   stroke-width: var(--reverysky-filter-icon-stroke-width);
 }
 
-button.reverysky-map-settings-close {
+.reverysky-map-settings-section-actions {
   grid-column: 2;
   justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--size-2-1);
+}
+
+button.reverysky-map-settings-close,
+a.reverysky-map-settings-help-link {
   width: var(--reverysky-filter-close-size);
   height: var(--reverysky-filter-close-size);
   border-radius: var(--reverysky-chip-radius);
@@ -391,24 +399,46 @@ button.reverysky-map-settings-close {
   border: none;
 }
 
-button.reverysky-map-settings-close:hover {
+a.reverysky-map-settings-help-link,
+a.reverysky-map-settings-help-link:hover,
+a.reverysky-map-settings-help-link:focus,
+a.reverysky-map-settings-help-link:active {
+  text-decoration: none;
+}
+
+.reverysky-map-settings-section--collapsed
+  > .reverysky-map-settings-section-header
+  > .reverysky-map-settings-section-actions
+  > .reverysky-map-settings-help-link {
+  display: none;
+}
+
+button.reverysky-map-settings-close:hover,
+a.reverysky-map-settings-help-link:hover {
   background: var(--background-modifier-hover);
   color: var(--text-muted);
-  box-shadow: none;
-  border: none;
 }
 
 button.reverysky-map-settings-close:focus,
-button.reverysky-map-settings-close:active {
+button.reverysky-map-settings-close:active,
+a.reverysky-map-settings-help-link:focus,
+a.reverysky-map-settings-help-link:active {
   background: transparent;
   box-shadow: none;
   border: none;
 }
 
-button.reverysky-map-settings-close svg {
+button.reverysky-map-settings-close svg,
+a.reverysky-map-settings-help-link svg {
   width: var(--reverysky-filter-action-icon-size);
   height: var(--reverysky-filter-action-icon-size);
   stroke-width: var(--reverysky-filter-icon-stroke-width);
+}
+
+a.reverysky-map-settings-help-link svg {
+  width: calc(var(--reverysky-filter-action-icon-size) - 2px);
+  height: calc(var(--reverysky-filter-action-icon-size) - 2px);
+  stroke-width: 1.5;
 }
 
 /* Filter Controls */

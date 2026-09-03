@@ -1007,6 +1007,41 @@ describe("MapSettingsPanelController", () => {
     expect(suggestionsScrollTop).toBe(36);
   });
 
+  it("renders help links for documented sections", () => {
+    const session = createSession();
+    const controller = new MapSettingsPanelController(session);
+    const container = createObsidianTestContainer();
+    controller.render(container);
+
+    const selectionActions = container.querySelector(
+      ".reverysky-map-selection-section .reverysky-map-settings-section-actions"
+    ) as HTMLElement;
+    const selectionHelpLink = container.querySelector(
+      ".reverysky-map-selection-section .reverysky-map-settings-help-link"
+    ) as HTMLAnchorElement;
+    const closeButton = container.querySelector(".reverysky-map-settings-close") as HTMLButtonElement;
+    const egoHelpLink = container.querySelector(
+      ".reverysky-map-ego-section .reverysky-map-settings-help-link"
+    ) as HTMLAnchorElement;
+    const graphicsHelpLink = container.querySelector(
+      ".reverysky-map-graphics-section .reverysky-map-settings-help-link"
+    ) as HTMLAnchorElement;
+    const screenshotHelpLink = container.querySelector(
+      ".reverysky-map-screenshot-section .reverysky-map-settings-help-link"
+    ) as HTMLAnchorElement;
+
+    expect(selectionActions.children[0]).toBe(selectionHelpLink);
+    expect(selectionActions.children[1]).toBe(closeButton);
+    expect(selectionHelpLink.href).toBe("https://github.com/moonskorch/ReverySky-Plugin#filter");
+    expect(egoHelpLink.href).toBe("https://github.com/moonskorch/ReverySky-Plugin#ego-graph");
+    expect(graphicsHelpLink.href).toBe("https://github.com/moonskorch/ReverySky-Plugin#visual-quality");
+    expect(screenshotHelpLink.href).toBe("https://github.com/moonskorch/ReverySky-Plugin#screenshot");
+    expect(selectionHelpLink.target).toBe("_blank");
+    expect(selectionHelpLink.rel).toBe("noopener noreferrer");
+    expect(selectionHelpLink.getAttribute("aria-label")).toBe("Open Selection documentation");
+    expect(selectionHelpLink.getAttribute("title")).toBe("Open Selection documentation");
+  });
+
   it("updates ego section controls in session state", () => {
     const session = createSession();
     const controller = new MapSettingsPanelController(session);

@@ -128,6 +128,8 @@ The graph payload does not include the full Markdown contents of your notes.
 
 Vault data is passed from the Obsidian plugin to the embedded Unity runtime through local bridge messaging within Obsidian. It is not sent to external servers.
 
+Settings-panel help icons are external GitHub README links and open only when clicked by the user.
+
 ReverySky 3D Graph does not include telemetry, analytics, advertising, user accounts, subscriptions, or payments.
 
 ### Local runtime files

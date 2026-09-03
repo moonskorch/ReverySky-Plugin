@@ -24,17 +24,21 @@ test.describe("settings panel", () => {
     const selectionToggle = page.locator(
       ".reverysky-map-selection-section .reverysky-map-settings-section-toggle"
     );
+    const selectionHelpLink = page.locator(".reverysky-map-selection-section .reverysky-map-settings-help-link");
     const egoSection = page.locator(".reverysky-map-ego-section");
     const egoToggle = page.locator(".reverysky-map-ego-section .reverysky-map-settings-section-toggle");
     const landmarksSection = page.locator(".reverysky-map-landmarks-section");
     const landmarksToggle = page.locator(".reverysky-map-landmarks-section .reverysky-map-settings-section-toggle");
     const landmarkSourceInput = page.locator(".reverysky-map-landmark-source-search-area .search-input");
+    const egoHelpLink = page.locator(".reverysky-map-ego-section .reverysky-map-settings-help-link");
     const graphicsSection = page.locator(".reverysky-map-graphics-section");
     const graphicsToggle = page.locator(".reverysky-map-graphics-section .reverysky-map-settings-section-toggle");
+    const graphicsHelpLink = page.locator(".reverysky-map-graphics-section .reverysky-map-settings-help-link");
     const screenshotSection = page.locator(".reverysky-map-screenshot-section");
     const screenshotToggle = page.locator(
       ".reverysky-map-screenshot-section .reverysky-map-settings-section-toggle"
     );
+    const screenshotHelpLink = page.locator(".reverysky-map-screenshot-section .reverysky-map-settings-help-link");
     const screenshotButton = page.locator(".reverysky-map-screenshot-button");
     const frameRateSelect = page.locator(".reverysky-map-frame-rate-mode-select");
     const closeButton = page.locator(".reverysky-map-settings-close");
@@ -65,6 +69,10 @@ test.describe("settings panel", () => {
     await expect(landmarksToggle).toHaveAttribute("aria-expanded", "true");
     await expect(screenshotToggle).toHaveAttribute("aria-expanded", "true");
     await expect(graphicsToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(selectionHelpLink).toBeVisible();
+    await expect(egoHelpLink).toBeVisible();
+    await expect(graphicsHelpLink).toBeVisible();
+    await expect(screenshotHelpLink).toBeVisible();
     await expect(frameRateSelect).toHaveValue("auto");
     await expect(
       page.locator(".reverysky-map-selection-section .reverysky-map-settings-section-toggle")
@@ -75,9 +83,12 @@ test.describe("settings panel", () => {
     }));
 
     const closeBox = await closeButton.boundingBox();
+    const selectionHelpBox = await selectionHelpLink.boundingBox();
     const gearBox = await gearReference.boundingBox();
     expect(closeBox).not.toBeNull();
+    expect(selectionHelpBox).not.toBeNull();
     expect(gearBox).not.toBeNull();
+    expect(selectionHelpBox!.x + selectionHelpBox!.width).toBeLessThanOrEqual(closeBox!.x);
     expect(Math.abs((closeBox!.x + closeBox!.width / 2) - (gearBox!.x + gearBox!.width / 2))).toBeLessThanOrEqual(1);
     expect(Math.abs((closeBox!.y + closeBox!.height / 2) - (gearBox!.y + gearBox!.height / 2))).toBeLessThanOrEqual(1);
     const stageBox = await stage.boundingBox();
@@ -105,7 +116,7 @@ test.describe("settings panel", () => {
     await page.locator(".reverysky-map-screenshot-section .reverysky-map-settings-section-toggle").evaluate((button) => {
       button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 0 }));
     });
-    for (let step = 0; step < 11; step += 1) {
+    for (let step = 0; step < 15; step += 1) {
       await page.keyboard.press("Tab");
       focusedControls.push(
         await page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? "")
@@ -113,16 +124,20 @@ test.describe("settings panel", () => {
     }
 
     expect(focusedControls).toEqual([
+      "Open Selection documentation",
       "Close filters",
       "Search in filter",
       "Toggle tags",
       "Select layout",
+      "Open Ego Graph documentation",
       "Toggle Ego mode",
       "Ego Graph depth",
       "Toggle neighbor links",
       "Landmark source",
+      "Open Graphics documentation",
       "Render scale",
       "Select frame rate",
+      "Open Screenshot documentation",
       "Copy graph screenshot"
     ]);
   });
@@ -153,6 +168,10 @@ test.describe("settings panel", () => {
     const screenshotSection = page.locator(".reverysky-map-screenshot-section");
     const screenshotButton = page.locator(".reverysky-map-screenshot-button");
     const egoDepthInput = page.locator(".reverysky-map-ego-depth-input");
+    const selectionHelpLink = page.locator(".reverysky-map-selection-section .reverysky-map-settings-help-link");
+    const egoHelpLink = page.locator(".reverysky-map-ego-section .reverysky-map-settings-help-link");
+    const graphicsHelpLink = page.locator(".reverysky-map-graphics-section .reverysky-map-settings-help-link");
+    const screenshotHelpLink = page.locator(".reverysky-map-screenshot-section .reverysky-map-settings-help-link");
 
     await settingsToggle.click();
     await graphicsToggle.click();
@@ -170,6 +189,10 @@ test.describe("settings panel", () => {
     await expect(egoDepthInput).not.toBeVisible();
     await expect(screenshotSection).toContainText("Screenshot");
     await expect(screenshotButton).not.toBeVisible();
+    await expect(selectionHelpLink).not.toBeVisible();
+    await expect(egoHelpLink).not.toBeVisible();
+    await expect(graphicsHelpLink).not.toBeVisible();
+    await expect(screenshotHelpLink).not.toBeVisible();
     await expect(selectionSection).toHaveCSS("padding-bottom", await egoSection.evaluate((element) => {
       return getComputedStyle(element).paddingBottom;
     }));
