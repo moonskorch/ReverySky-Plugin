@@ -77,6 +77,7 @@ describe("UnityIframeBridge", () => {
     const iframeWindow = { postMessage } as unknown as Window;
     const payload = makeValidPayload();
     payload.mapLayout = "dynamicLinks";
+    payload.scapeView = "planets";
 
     bridge.attach(iframeWindow, {});
     bridge.sendGraphSet(payload);
@@ -88,6 +89,7 @@ describe("UnityIframeBridge", () => {
     expect(message.protocolVersion).toBe(BRIDGE_PROTOCOL_VERSION);
     expect(message.requestId).toEqual(expect.stringMatching(/^req_\d+_\d+$/));
     expect((message.payload as GraphPayload).mapLayout).toBe("dynamicLinks");
+    expect((message.payload as GraphPayload).scapeView).toBe("planets");
     bridge.detach();
   });
 

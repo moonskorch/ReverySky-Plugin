@@ -6,6 +6,7 @@ public class BridgeGraphPayload
   public BridgeGraphNote[] notes;
   public BridgeGraphLink[] links;
   public string mapLayout;
+  public string scapeView;
 }
 
 [Serializable]

@@ -85,6 +85,7 @@ public class ObsidianBridge : MonoBehaviour
     }
 
     MapRuntimeContext.MapLayoutPreference = ParseMapLayoutPreference(envelope.payload.mapLayout);
+    ScapeView? scapeView = ParseScapeViewPreference(envelope.payload.scapeView);
 
     var notes = envelope.payload.notes ?? Array.Empty<BridgeGraphNote>();
     var links = envelope.payload.links ?? Array.Empty<BridgeGraphLink>();
@@ -162,7 +163,7 @@ public class ObsidianBridge : MonoBehaviour
 
     MapRuntimeContext.SetTagNames(tagNameById);
     MapRuntimeContext.SetLinks(linksRuntime);
-    MapRuntimeContext.SetNotes(runtimeNotes, envelope.requestId);
+    MapRuntimeContext.SetNotes(runtimeNotes, envelope.requestId, scapeView);
 
     Debug.Log($"[ObsidianBridge] graph:set applied. notes={notes.Length}, links={links.Length}, runtimeNotes={runtimeNotes.Count}, tags={tagNameById.Count}");
   }
@@ -389,6 +390,20 @@ public class ObsidianBridge : MonoBehaviour
       return MapLayoutMode.ScalableLinks;
 
     return MapLayoutMode.Auto;
+  }
+
+  private static ScapeView? ParseScapeViewPreference(string value)
+  {
+    if (string.Equals(value, "planets", StringComparison.OrdinalIgnoreCase))
+      return ScapeView.Planets;
+
+    if (string.Equals(value, "plain", StringComparison.OrdinalIgnoreCase))
+      return ScapeView.Plain;
+
+    if (string.Equals(value, "buildings", StringComparison.OrdinalIgnoreCase))
+      return ScapeView.Buildings;
+
+    return null;
   }
 
   private static MapFrameRateMode ApplyFrameRateMode(string frameRateMode)

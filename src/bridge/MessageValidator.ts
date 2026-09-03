@@ -18,6 +18,10 @@ import {
   formatFrameRateModeValues,
   isFrameRateMode
 } from "./FrameRateMode";
+import {
+  formatScapeViewPreferenceValues,
+  isScapeViewPreference
+} from "./ScapeViewPreference";
 
 /**
  * Validate bridge messages at the boundary so malformed payloads fail fast.
@@ -102,6 +106,13 @@ export class MessageValidator {
       !isMapLayoutPreference(payload.mapLayout)
     ) {
       errors.push(`payload.mapLayout must be one of: ${formatMapLayoutPreferenceValues()}`);
+    }
+
+    if (
+      payload.scapeView !== undefined &&
+      !isScapeViewPreference(payload.scapeView)
+    ) {
+      errors.push(`payload.scapeView must be one of: ${formatScapeViewPreferenceValues()}`);
     }
 
     return errors;

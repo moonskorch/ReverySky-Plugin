@@ -34,18 +34,18 @@ public static class MapRuntimeContext
   public static event Action<string, string> OnOpenNoteRequested;
   public static event Action<string> OnTagActivateRequested;
   public static event Action<string> OnGraphReady;
-  public static event Action<string> OnNotesChanged;
+  public static event Action<string, ScapeView?> OnNotesChanged;
   public static event Action<string> OnNoteBuildingsChanged;
 
   public static bool HasRuntimeNotes => Notes != null && Notes.Count > 0;
 
-  public static void SetNotes(List<NoteData> notes, string requestId)
+  public static void SetNotes(List<NoteData> notes, string requestId, ScapeView? scapeView = null)
   {
     Notes = notes ?? new List<NoteData>();
     SetLatestGraphRequestId(requestId);
     ApplyDirectLinkCounts();
     NotesVersion++;
-    OnNotesChanged?.Invoke(LatestGraphRequestId);
+    OnNotesChanged?.Invoke(LatestGraphRequestId, scapeView);
   }
 
   public static void SetLinks(List<RuntimeNoteLink> links)

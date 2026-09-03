@@ -14,7 +14,8 @@ import type {
   NoteFocusPayload,
   NoteUpdatePayload,
   NoteOpenPayload,
-  RuntimeSettingsPayload
+  RuntimeSettingsPayload,
+  ScapeViewPreference
 } from "../bridge/BridgeTypes";
 import {
   DEFAULT_MAP_LAYOUT_PREFERENCE,
@@ -111,6 +112,10 @@ type EgoGraphScope = {
 type AcceptedFocus = {
   path: string;
   centerChanged: boolean;
+};
+
+type SendOutgoingGraphOptions = {
+  scapeView?: ScapeViewPreference;
 };
 
 type NoteMetadataSignature = {
@@ -410,7 +415,7 @@ export class MapSession {
     this.noteMetadataSignatureByPath.clear();
     this.updateSourceGraphBuildingsFromCurrentSource();
     this.rebuildOutgoingGraph();
-    this.sendOutgoingGraph();
+    this.sendOutgoingGraph({ scapeView: "buildings" });
   }
 
   persistRenderScale(): void {
@@ -983,12 +988,16 @@ export class MapSession {
     });
   }
 
-  private sendOutgoingGraph(): void {
+  private sendOutgoingGraph(options: SendOutgoingGraphOptions = {}): void {
     if (!this.bridgeReady || !this.outgoingGraphPayload) {
       return;
     }
 
-    this.sendGraph(this.outgoingGraphPayload);
+    const scapeView = options.scapeView;
+    const payload = scapeView
+      ? { ...this.outgoingGraphPayload, scapeView }
+      : this.outgoingGraphPayload;
+    this.sendGraph(payload);
     if (this.egoEnabled && this.isEgoNoteFocusSuspended) {
       this.restoreEgoFocus();
     }

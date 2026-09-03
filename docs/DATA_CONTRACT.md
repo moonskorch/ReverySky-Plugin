@@ -162,9 +162,11 @@ type GraphPayload = {
   notes: GraphNoteNode[];
   links: GraphLink[];
   mapLayout?: MapLayoutPreference;
+  scapeView?: ScapeViewPreference;
 };
 
 type MapLayoutPreference = "auto" | "dynamicLinks" | "dates" | "scalableLinks";
+type ScapeViewPreference = "planets" | "plain" | "buildings";
 
 type GraphNoteNode = {
   id: string;
@@ -200,6 +202,7 @@ type NoteUpdatePayload = {
 - `note:update` `buildings` must be an array of non-empty strings; an empty array is valid and means all buildings were removed.
 - `buildings` entries are trimmed and limited to 64 characters for runtime payloads.
 - `mapLayout`, when provided, must be one of: `auto`, `dynamicLinks`, `dates`, `scalableLinks`.
+- `scapeView`, when provided, must be one of: `planets`, `plain`, `buildings`.
 - Producer rule: `vault.noteCount` should equal `notes.length` for every emitted payload.
 - Unknown fields must be safely ignored by consumers.
 
@@ -218,6 +221,7 @@ type NoteUpdatePayload = {
 - Unity runtime ingest is fail-soft: it treats `vault.noteCount` as informational (uses `notes` as source of truth).
 - Unity runtime ingest is fail-soft for unresolved links: missing endpoints are tolerated at ingest and dropped later during edge resolution.
 - `mapLayout` is optional and controls the preferred runtime layout selection when the consumer supports it.
+- `scapeView` is optional and controls a one-shot runtime view switch for the graph build when the consumer supports it.
 
 ## Unity Runtime Usage Reference
 - Unity-side field-to-behavior mapping, runtime defaults, and ingestion-specific fallbacks are documented in `unity/ReverySkyMap/docs/DATA_CONTRACT.md` under `Runtime Field Usage (Unity)`.
@@ -237,6 +241,7 @@ type NoteUpdatePayload = {
 - `notes[].buildings` uses the configured frontmatter landmark source property, defaulting to `landmarks`, when it is a string or an array. A scalar string maps to one building name without separator splitting; arrays contribute only string items. Whole-string wikilinks map to their alias or final path segment. Names are trimmed and limited to 64 characters, non-string and blank items are ignored, and the field is omitted when no names remain.
 - `notes[].size` is emitted as file size in bytes.
 - `mapLayout`, when present, is a plugin-owned runtime hint and travels with the effective graph payload.
+- `scapeView`, when present, is a plugin-owned runtime hint and travels with the effective graph payload. It is not persisted by the plugin view; current producer behavior sends `buildings` only for graph emission triggered by a landmark source change.
 - `note:focus` carries the current note identity separately; `graph:set` stays focused on the graph payload itself.
 - `note:update` carries the current note identity and full normalized `buildings` list separately; `graph:set` stays focused on full graph replacement.
 - `runtime:settings` carries frame-rate mode separately; `graph:set` stays focused on graph payload data.

@@ -1,7 +1,9 @@
 import type { MapLayoutPreference } from "./LayoutPreference";
 import type { FrameRateMode } from "./FrameRateMode";
+import type { ScapeViewPreference } from "./ScapeViewPreference";
 export type { MapLayoutPreference } from "./LayoutPreference";
 export type { FrameRateMode } from "./FrameRateMode";
+export type { ScapeViewPreference } from "./ScapeViewPreference";
 
 export const BRIDGE_PROTOCOL_VERSION = "2.0.0";
 
@@ -143,6 +145,7 @@ export type GraphPayload = {
   notes: GraphNoteNode[];
   links: GraphLink[];
   mapLayout?: MapLayoutPreference;
+  scapeView?: ScapeViewPreference;
 };
 
 export type GraphSetMessage = {

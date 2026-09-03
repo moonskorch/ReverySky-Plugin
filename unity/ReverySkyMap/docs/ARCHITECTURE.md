@@ -73,14 +73,14 @@ Obsidian plugin
 2. The bridge rejects payloads with a wrong `protocolVersion` or `type`, then normalizes the payload into `NoteData` and `MapRuntimeContext.RuntimeNoteLink` objects.
 3. Tags are trimmed and mapped by case-insensitive name to shared runtime tag ids, blank titles become `GameSettings.DefaultTitle`, invalid dates become `DateTime.MinValue`, and note size is clamped to `0` or greater.
 4. Links with empty endpoints or self-links are dropped, and non-positive link weights are normalized to `1`.
-5. `MapRuntimeContext.SetTagNames`, `SetLinks`, and `SetNotes` store the runtime source of truth. `SetNotes` stores the envelope `requestId`, derives each note's unique direct note-neighbor count from the current links, increments `NotesVersion`, and raises `OnNotesChanged(requestId)`.
-6. `Cartographer.HandleRuntimeNotesChanged(requestId)` calls `RebuildGraph(MapRuntimeContext.MapLayoutPreference, requestId)`.
+5. `MapRuntimeContext.SetTagNames`, `SetLinks`, and `SetNotes` store the runtime source of truth. `SetNotes` stores the envelope `requestId`, derives each note's unique direct note-neighbor count from the current links, increments `NotesVersion`, and raises `OnNotesChanged(requestId, scapeView)` with a nullable view hint.
+6. `Cartographer.HandleRuntimeNotesChanged(requestId, scapeView)` calls `RebuildGraph(MapRuntimeContext.MapLayoutPreference, requestId, scapeView)`.
 7. `Cartographer.ResolveModeByNotesCount()` uses `defaultEngine` first. Without an override, explicit `Dates` and `ScalableLinks` stay fixed, while `Auto` and `DynamicLinks` resolve by note count: small graphs use `DynamicLinks`, large graphs use `ScalableLinks`.
 8. `Cartographer` clears the engine that owns stale visuals/state, clears `BuildingManager` building callouts, applies `MapGraphIndex.Empty` using the selected engine contract, waits one frame so Unity can destroy old objects, then builds the current `MapRuntimeContext.Notes`. New `graph:set` events stop the pending rebuild coroutine before starting a replacement rebuild.
 9. The chosen engine runs `BuildGraph(notes)` and emits `OnNodesChanged` with the instantiated `Star` and `TagNode` scene objects.
 10. `Cartographer.HandleEngineNodesChanged(...)` builds `GraphIndex = MapGraphIndex.Build(stars, tagNodes, MapRuntimeContext.Links)`.
 11. `Cartographer` passes the same `GraphIndex` to `LineBuilder.Rebuild(...)` and `CullingManager.Rebuild(...)`.
-12. `BuildClearedGraph(...)` calls `ApplyCurrentView()`, which applies `CurrentView` to the active engine, notifies star visuals through `OnViewChanged`, and sets `LineBuilder` visibility from the current view before the active `ScapeCameraWarper` is rebound and build timing is logged.
+12. `BuildClearedGraph(...)` calls `ApplyView(scapeView ?? CurrentView)`, which applies the provided graph view hint or reapplies the current view before notifying the active engine and star visuals through `OnViewChanged`, then sets `LineBuilder` visibility from the current view before the active `ScapeCameraWarper` is rebound and build timing is logged.
 13. After each non-transient index publication, `Cartographer.ApplyGraphFocus()` tries `MapRuntimeContext.PendingFocusNoteId` once, then tries `FocusNode.FocusRestoreNoteId`, then calls `ResetFocus()`.
 14. When a build starts, `Cartographer` sets the building graph request id from the request id carried by the rebuild coroutine.
 15. When the active engine reaches its ready point, it calls `MapRuntimeContext.RequestGraphReady()`. `ObsidianBridge` forwards the building graph `requestId` to JavaScript as `graph:ready`, unless the id is empty; the iframe wrapper ignores stale ready ids when updating loading status.
@@ -123,7 +123,7 @@ Obsidian plugin
 1. `GameInput` translates raw pointer and touch input into semantic events such as select, pan, pinch zoom, scroll zoom, and orbit drag.
 2. `CameraOrbitalController` listens to those events and keeps the camera orbiting around the current pivot.
 3. `FocusNode` uses `CameraOrbitalController` to focus stars or tag nodes.
-4. `ChangeViewControl` raises `OnChangeScapeView`, and `Cartographer.CycleView()` switches between `ScapeView.Planets`, `ScapeView.Plain`, and `ScapeView.Buildings`, updates the button icon, and calls `ApplyCurrentView()`.
+4. `ChangeViewControl` raises `OnChangeScapeView`, and `Cartographer.CycleView()` applies the next view from `ScapeView.Planets`, `ScapeView.Plain`, and `ScapeView.Buildings`.
 5. `RotateHoldButton` feeds `RotateCameraUI`, and `RotateCameraUI` emits the clockwise and pressed state consumed by `CameraOrbitalController`.
 6. `ScapeCameraWarper.OnWarpApplied` refreshes culling targets after 2.5D warp movement, and the date slider only appears when the active engine is `Dates`.
 
@@ -135,7 +135,7 @@ Obsidian plugin
 4. `Cartographer.Update()` refreshes culling targets after ticking moving engines.
 5. When `CullingGroup` changes a node's visibility, `CullingManager` calls `LineBuilder.SetDistanceVisible(...)`, which updates the visible-node set and marks the edge set dirty.
 6. `LineBuilder.LateUpdate()` applies the focused-node priority, keeps recently visible regions within a refresh budget, reconciles the desired edge set against the pooled renderers, and rewrites each active line's endpoints from the live transforms.
-7. `Cartographer.ApplyCurrentView()` sets `LineBuilder` visibility from `CurrentView`, so switching between `Planets` and `Plain` toggles whether existing line renderers are shown; it does not rebuild the candidate edge set.
+7. `Cartographer.ApplyView(view)` applies a concrete view and sets `LineBuilder` visibility from `CurrentView`, so switching between `Planets` and `Plain` toggles whether existing line renderers are shown; it does not rebuild the candidate edge set.
 
 ### 8. Building callout rendering
 
@@ -170,7 +170,7 @@ Obsidian plugin
 
 - `Cartographer`
   - Responsibility: chooses the active engine, rebuilds the graph, builds `GraphIndex`, applies the current view, and reconciles focus from pending focus, restore focus, or reset after real index publications.
-  - Code anchor: `Assets/Scripts/StarScape/Cartographer.cs::Start`, `RebuildGraph`, `BuildClearedGraph`, `ApplyCurrentView`, `HandleEngineNodesChanged`, `ApplyGraphFocus`, `FocusRuntimeNote`
+  - Code anchor: `Assets/Scripts/StarScape/Cartographer.cs::Start`, `RebuildGraph`, `BuildClearedGraph`, `ApplyView`, `HandleEngineNodesChanged`, `ApplyGraphFocus`, `FocusRuntimeNote`
   - Entry point: `MapRuntimeContext.OnNotesChanged`, UI events, scene start
   - Calls / sends to: `ICartographerEngine`, `MapGraphIndex`, `LineBuilder`, `CullingManager`, `FocusNode`, `FocusHighlighter`, `Notification`, `ScapeCameraWarper`
 - `ICartographerEngine`
@@ -234,7 +234,7 @@ Obsidian plugin
 - `LineBuilder`
   - Responsibility: consumes `MapGraphIndex`, owns pooled line renderers, focus-priority ordering, recent-visibility refresh, and per-frame endpoint updates for visible indexed edges.
   - Code anchor: `Assets/Scripts/StarScape/LineBuilder.cs::Rebuild`, `SetDistanceVisible`, `LateUpdate`, `ShowLine`
-  - Entry point: `Cartographer.HandleEngineNodesChanged`, `CullingManager`, `FocusHighlighter`, `Cartographer.ApplyCurrentView`
+  - Entry point: `Cartographer.HandleEngineNodesChanged`, `CullingManager`, `FocusHighlighter`, `Cartographer.ApplyView`
   - Calls / sends to: `CullingManager`, `MapGraphIndex`, `FocusNode`, `LineRenderer`
 - `FocusHighlighter`
   - Responsibility: derives focused and linked label states from graph adjacency and keeps line highlighting in sync with the current selection.
@@ -298,9 +298,9 @@ Obsidian plugin
 ## State Ownership and Contracts
 
 - `MapRuntimeContext` is the source of truth for live runtime notes, links, tag names, pending focus note id, layout preference, graph request id, and the `NotesVersion` counter. `PendingFocusNoteId` is a one-shot focus delivery/materialization buffer, not a durable remembered selection.
-- `MapRuntimeContext.SetNotes(notes, requestId)` derives `NoteData.DirectLinkCount` from unique direct note-note neighbors in `MapRuntimeContext.Links`. `StarVisual` reads that value to choose crystal buckets; layout engines do not own this visual metric.
+- `MapRuntimeContext.SetNotes(notes, requestId, scapeView)` derives `NoteData.DirectLinkCount` from unique direct note-note neighbors in `MapRuntimeContext.Links` and passes the nullable one-shot graph view hint through `OnNotesChanged`. `StarVisual` reads direct link counts to choose crystal buckets; layout engines do not own this visual metric.
 - `ObsidianBridge` owns bridge validation and all conversion from the JSON envelope into runtime models.
-- `Cartographer` owns engine selection, rebuild timing, current view, `GraphIndex` creation, and focus reconciliation after the index changes. `ApplyCurrentView()` is the single place that applies view state to the active engine, star visuals, and line visibility. The focus order is pending once, restore, then reset.
+- `Cartographer` owns engine selection, rebuild timing, current view, `GraphIndex` creation, and focus reconciliation after the index changes. `ApplyView(view)` is the single place that applies a concrete view to the active engine, star visuals, and line visibility; graph rebuilds pass `scapeView ?? CurrentView`. The focus order is pending once, restore, then reset.
 - `NoteData` does not own view state. Stars keep runtime note data, while `Cartographer.CurrentView` is broadcast through `OnViewChanged` for view-dependent visuals.
 - Unity does not decide whether a focused note belongs to the active Obsidian filter. The parent plugin gates ordinary focus by the effective graph; Unity pending only bridges the delay between a valid focus message and an indexed star.
 - `CartographerForcesEngine`, `Cartographer25DEngine`, and `CartographerEngineRecursiveHubsEngine` own placement and cleanup of instantiated stars and tags for `DynamicLinks`, `Dates`, and `ScalableLinks`; line visuals are handed off to `LineBuilder` after the engine raises `OnNodesChanged`.

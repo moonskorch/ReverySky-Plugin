@@ -577,11 +577,15 @@ describe("MapSession", () => {
       }
     };
     const buildGraph = vi.fn().mockReturnValue(payload);
+    let sentScapeView: GraphPayload["scapeView"];
     const session = new MapSession({
       app: app as never,
       buildGraph,
       now: () => 1700000000000,
-      sendGraph,
+      sendGraph: (sentPayload) => {
+        sentScapeView = sentPayload.scapeView;
+        sendGraph(sentPayload);
+      },
       sendFocus: vi.fn()
     });
 
@@ -597,6 +601,8 @@ describe("MapSession", () => {
     expect(switchedPayload.links).toEqual(payload.links);
     expect(switchedPayload.notes.find((note) => note.id === "project")?.buildings).toEqual(["Alice", "Bob"]);
     expect(switchedPayload.notes.find((note) => note.id === "daily")?.buildings).toBeUndefined();
+    expect(sentScapeView).toBe("buildings");
+    expect(switchedPayload.scapeView).toBe("buildings");
   });
 
   it("keeps the previous landmark source when live input is empty or multiline", () => {

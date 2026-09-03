@@ -100,8 +100,8 @@ Runtime -> parent:
 ```
 
 Unity-side behavior:
-- `ObsidianBridge.OnGraphSet` passes the incoming `requestId` to `MapRuntimeContext.SetNotes(...)` after payload normalization succeeds.
-- `MapRuntimeContext.OnNotesChanged(requestId)` carries that id to `Cartographer`.
+- `ObsidianBridge.OnGraphSet` passes the incoming `requestId` and parsed nullable `scapeView` to `MapRuntimeContext.SetNotes(...)` after payload normalization succeeds.
+- `MapRuntimeContext.OnNotesChanged(requestId, scapeView)` carries them to `Cartographer`.
 - `Cartographer` sets the building graph request id when a graph build starts, using the request id carried by the rebuild coroutine.
 - Engines call `MapRuntimeContext.RequestGraphReady()` when their current graph reaches its user-visible ready point.
 - `MapRuntimeContext.RequestGraphReady()` emits the building graph `requestId`; the iframe wrapper ignores stale `graph:ready` messages whose `requestId` no longer matches the latest accepted `graph:set`.
@@ -174,9 +174,11 @@ type GraphPayload = {
   notes: GraphNoteNode[];
   links: GraphLink[];
   mapLayout?: MapLayoutPreference;
+  scapeView?: ScapeViewPreference;
 };
 
 type MapLayoutPreference = "auto" | "dynamicLinks" | "dates" | "scalableLinks";
+type ScapeViewPreference = "planets" | "plain" | "buildings";
 
 type RuntimeSettingsPayload = {
   frameRateMode: FrameRateMode;
@@ -215,6 +217,7 @@ type GraphLink = {
 - `path` is vault-relative with `/` separators.
 - Links with missing note ids are tolerated at ingest and dropped later during Forces edge resolution.
 - `mapLayout`, when provided, must be one of: `auto`, `dynamicLinks`, `dates`, `scalableLinks`.
+- `scapeView`, when provided, must be one of: `planets`, `plain`, `buildings`.
 - `runtime:settings.payload.frameRateMode` must be one of: `auto`, `fps60`, `fps30`, `fps24`.
 - Unknown fields are ignored, not fatal.
 
@@ -239,9 +242,12 @@ Current runtime behavior snapshot for Unity ingestion and map interaction:
   - fallback: negative size maps to `0`.
 - `mapLayout` -> preferred runtime map layout for the next graph build.
   - expected mapping: `auto` = threshold-based selection (`DynamicLinks` for small graphs, `ScalableLinks` for large graphs), `dynamicLinks` = links map preference with the same large-graph fallback to `ScalableLinks`, `dates` = explicit dates map preference, `scalableLinks` = explicit scalable links map preference.
+- `scapeView` -> one-shot runtime view selection for the next graph build.
+  - expected mapping: `planets` = `ScapeView.Planets`, `plain` = `ScapeView.Plain`, `buildings` = `ScapeView.Buildings`.
+  - fallback: missing or unknown values map to no view hint and leave the current runtime view unchanged.
 - `runtime:settings.payload.frameRateMode` -> live Unity frame-rate mode.
   - expected mapping: `auto` = vSync on and platform/browser cadence, `fps60` = software cap at 60 FPS, `fps30` = software cap at 30 FPS, `fps24` = software cap at 24 FPS.
-- envelope `requestId` -> stored with the accepted runtime notes, carried through `OnNotesChanged(requestId)` and the active rebuild coroutine, then echoed through `graph:ready` after that build reaches its ready point.
+- envelope `requestId` -> stored with the accepted runtime notes, carried through `OnNotesChanged(requestId, scapeView)` and the active rebuild coroutine, then echoed through `graph:ready` after that build reaches its ready point.
 - `links[].sourceId` and `links[].targetId` -> note-note edges in Forces engine.
   - gate: empty ids and self-links are dropped during bridge mapping; missing runtime node ids are dropped by Forces edge resolution.
 - `links[].weight` -> Forces spring rest length (`idealEdgeLen / sqrt(weight)`).

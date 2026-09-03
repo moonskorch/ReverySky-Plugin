@@ -60,7 +60,7 @@ public class Cartographer : MonoBehaviour
 
   private void Awake()
   {
-    if (I != null) 
+    if (I != null)
       Debug.LogError("More than one instance of Cartographer");
     I = this;
 
@@ -111,22 +111,22 @@ public class Cartographer : MonoBehaviour
     }
   }
 
-  private void RebuildGraph(MapLayoutMode layoutPreference, string requestId)
+  private void RebuildGraph(MapLayoutMode layoutPreference, string requestId, ScapeView? scapeView = null)
   {
     if (rebuildGraphCoroutine != null)
       StopCoroutine(rebuildGraphCoroutine);
 
-    rebuildGraphCoroutine = StartCoroutine(RebuildGraphAfterClear(layoutPreference, requestId));
+    rebuildGraphCoroutine = StartCoroutine(RebuildGraphAfterClear(layoutPreference, requestId, scapeView));
   }
 
-  private IEnumerator RebuildGraphAfterClear(MapLayoutMode layoutPreference, string requestId)
+  private IEnumerator RebuildGraphAfterClear(MapLayoutMode layoutPreference, string requestId, ScapeView? scapeView)
   {
     int noteCount = MapRuntimeContext.Notes?.Count ?? 0;
 
     PrepareGraphClear(noteCount, layoutPreference);
     yield return null;
 
-    BuildClearedGraph(MapRuntimeContext.Notes ?? new List<NoteData>(), requestId);
+    BuildClearedGraph(MapRuntimeContext.Notes ?? new List<NoteData>(), requestId, scapeView);
     rebuildGraphCoroutine = null;
   }
 
@@ -149,12 +149,12 @@ public class Cartographer : MonoBehaviour
     ApplyGraphIndex(MapGraphIndex.Empty, updateFocus: noteCount == 0);
   }
 
-  private void BuildClearedGraph(List<NoteData> notes, string requestId)
+  private void BuildClearedGraph(List<NoteData> notes, string requestId, ScapeView? scapeView)
   {
     MapRuntimeContext.SetBuildingGraphRequestId(requestId);
     var stopwatch = System.Diagnostics.Stopwatch.StartNew();
     _activeEngine.BuildGraph(notes);
-    ApplyCurrentView();
+    ApplyView(scapeView ?? CurrentView);
 
     var warper = _activeEngine.ScapeWarper;
     warper?.ApplyEngineProfile(_activeEngine.EngineType);
@@ -213,9 +213,7 @@ public class Cartographer : MonoBehaviour
 
   private void CycleView()
   {
-    CurrentView = ScapeViewHelper.CycleView(CurrentView);
-    UpdateViewButtonIcon();
-    ApplyCurrentView();
+    ApplyView(ScapeViewHelper.CycleView(CurrentView));
   }
 
   public void FocusRuntimeNote(string noteId)
@@ -263,16 +261,25 @@ public class Cartographer : MonoBehaviour
     };
   }
 
-  private void ApplyCurrentView()
+  private void ApplyView(ScapeView view)
   {
+    if (view == ScapeView.Undefined)
+      view = ScapeView.Planets;
+
+    if (CurrentView != view)
+    {
+      CurrentView = view;
+      UpdateViewButtonIcon();
+    }
+
     _activeEngine?.ApplyView(CurrentView);
     OnViewChanged?.Invoke(CurrentView);
     lineBuilder?.SetLinesVisible(CurrentView == ScapeView.Planets);
   }
 
-  private void HandleRuntimeNotesChanged(string requestId)
+  private void HandleRuntimeNotesChanged(string requestId, ScapeView? scapeView)
   {
-    RebuildGraph(MapRuntimeContext.MapLayoutPreference, requestId);
+    RebuildGraph(MapRuntimeContext.MapLayoutPreference, requestId, scapeView);
   }
 
   private void HandleNoteBuildingsChanged(string noteId)
@@ -289,9 +296,7 @@ public class Cartographer : MonoBehaviour
     else
     {
       // StarVisual refreshes buildings through OnViewChanged after the mode switch
-      CurrentView = ScapeView.Buildings;
-      UpdateViewButtonIcon();
-      ApplyCurrentView();
+      ApplyView(ScapeView.Buildings);
     }
 
     starPulseAnimator?.Play(visual.transform);

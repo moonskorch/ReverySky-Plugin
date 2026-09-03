@@ -34,6 +34,7 @@ describe("MessageValidator", () => {
   it("accepts a valid graph payload", () => {
     const payload = makeValidPayload();
     payload.mapLayout = "auto";
+    payload.scapeView = "plain";
     payload.notes[0].buildings = ["Observatory", "Archive"];
     const errors = MessageValidator.validateGraphPayload(payload);
     expect(errors).toEqual([]);
@@ -48,6 +49,7 @@ describe("MessageValidator", () => {
     payload.notes[0].buildings = ["Observatory", ""];
     payload.notes[0].size = -1;
     payload.mapLayout = "invalid" as GraphPayload["mapLayout"];
+    payload.scapeView = "invalid" as GraphPayload["scapeView"];
 
     const errors = MessageValidator.validateGraphPayload(payload);
     expect(errors).toContain("payload.generatedAt must be a valid ISO-like date string");
@@ -57,6 +59,7 @@ describe("MessageValidator", () => {
     expect(errors).toContain("payload.notes[0].buildings[1] must be a non-empty string");
     expect(errors).toContain("payload.notes[0].size must be a non-negative integer");
     expect(errors).toContain("payload.mapLayout must be one of: auto, dynamicLinks, dates, scalableLinks");
+    expect(errors).toContain("payload.scapeView must be one of: planets, plain, buildings");
   });
 
   it("rejects empty graph note buildings when the field is defined", () => {

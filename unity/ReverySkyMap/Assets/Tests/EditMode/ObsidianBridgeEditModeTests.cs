@@ -123,7 +123,7 @@ public class ObsidianBridgeEditModeTests
     int notesChangedCount = 0;
 
     void HandleNoteBuildingsChanged(string noteId) => changedNoteIds.Add(noteId);
-    void HandleNotesChanged(string requestId) => notesChangedCount++;
+    void HandleNotesChanged(string requestId, ScapeView? scapeView) => notesChangedCount++;
 
     MapRuntimeContext.OnNoteBuildingsChanged += HandleNoteBuildingsChanged;
     MapRuntimeContext.OnNotesChanged += HandleNotesChanged;
@@ -256,6 +256,36 @@ public class ObsidianBridgeEditModeTests
 
     bridge.OnGraphSet(TestPayloads.LayoutPreferenceInvalidPayload);
     Assert.That(MapRuntimeContext.MapLayoutPreference, Is.EqualTo(MapLayoutMode.Auto));
+  }
+
+  [Test]
+  public void OnGraphSet_ScapeViewPreference_MapsSupportedValues()
+  {
+    var requestedViews = new List<ScapeView?>();
+    void HandleNotesChanged(string requestId, ScapeView? scapeView) => requestedViews.Add(scapeView);
+
+    MapRuntimeContext.OnNotesChanged += HandleNotesChanged;
+    try
+    {
+      bridge.OnGraphSet(TestPayloads.ScapeViewPlanetsPayload);
+      bridge.OnGraphSet(TestPayloads.ScapeViewPlainPayload);
+      bridge.OnGraphSet(TestPayloads.ScapeViewBuildingsPayload);
+      bridge.OnGraphSet(TestPayloads.ScapeViewInvalidPayload);
+      bridge.OnGraphSet(TestPayloads.MinimalGraphSetPayload);
+    }
+    finally
+    {
+      MapRuntimeContext.OnNotesChanged -= HandleNotesChanged;
+    }
+
+    Assert.That(requestedViews, Is.EqualTo(new List<ScapeView?>
+    {
+      ScapeView.Planets,
+      ScapeView.Plain,
+      ScapeView.Buildings,
+      null,
+      null
+    }));
   }
 
   [Test]
@@ -600,6 +630,70 @@ public class ObsidianBridgeEditModeTests
       Assert.That(engine.BuildGraphCallCount, Is.EqualTo(1));
       Assert.That(engine.LastBuiltNotes, Has.Count.EqualTo(1));
       Assert.That(engine.LastBuiltNotes[0].Id, Is.EqualTo("latest"));
+    }
+    finally
+    {
+      Object.DestroyImmediate(cartographerObject);
+    }
+  }
+
+  [Test]
+  public void RebuildGraphAfterClear_ScapeView_AppliesAfterFreshGraphBuild()
+  {
+    var cartographerObject = new GameObject("CartographerScapeViewTests");
+    try
+    {
+      var cartographer = cartographerObject.AddComponent<Cartographer>();
+      var engine = new TestCartographerEngine(MapLayoutMode.DynamicLinks);
+
+      SetCartographerSingleton(cartographer);
+      SetPrivateField(cartographer, "_dynamicLinksEngine", engine);
+      SetPrivateField(cartographer, "<CurrentView>k__BackingField", ScapeView.Plain);
+
+      MapRuntimeContext.SetNotes(new List<NoteData> { new NoteData { Id = "latest", Path = "notes/latest.md" } }, string.Empty);
+      IEnumerator rebuildGraph = InvokeCartographerRebuildGraphAfterClear(
+        cartographer,
+        MapLayoutMode.DynamicLinks,
+        string.Empty,
+        ScapeView.Buildings);
+
+      Assert.That(rebuildGraph.MoveNext(), Is.True);
+      Assert.That(cartographer.CurrentView, Is.EqualTo(ScapeView.Plain));
+      Assert.That(engine.ApplyViewCallCount, Is.EqualTo(0));
+
+      Assert.That(rebuildGraph.MoveNext(), Is.False);
+      Assert.That(cartographer.CurrentView, Is.EqualTo(ScapeView.Buildings));
+      Assert.That(engine.ApplyViewCallCount, Is.EqualTo(1));
+      Assert.That(engine.LastAppliedView, Is.EqualTo(ScapeView.Buildings));
+    }
+    finally
+    {
+      Object.DestroyImmediate(cartographerObject);
+    }
+  }
+
+  [Test]
+  public void RebuildGraphAfterClear_MissingScapeView_PreservesCurrentView()
+  {
+    var cartographerObject = new GameObject("CartographerMissingScapeViewTests");
+    try
+    {
+      var cartographer = cartographerObject.AddComponent<Cartographer>();
+      var engine = new TestCartographerEngine(MapLayoutMode.DynamicLinks);
+
+      SetCartographerSingleton(cartographer);
+      SetPrivateField(cartographer, "_dynamicLinksEngine", engine);
+      SetPrivateField(cartographer, "<CurrentView>k__BackingField", ScapeView.Plain);
+
+      MapRuntimeContext.SetNotes(new List<NoteData> { new NoteData { Id = "latest", Path = "notes/latest.md" } }, string.Empty);
+      IEnumerator rebuildGraph = InvokeCartographerRebuildGraphAfterClear(
+        cartographer,
+        MapLayoutMode.DynamicLinks);
+
+      Assert.That(rebuildGraph.MoveNext(), Is.True);
+      Assert.That(rebuildGraph.MoveNext(), Is.False);
+      Assert.That(cartographer.CurrentView, Is.EqualTo(ScapeView.Plain));
+      Assert.That(engine.LastAppliedView, Is.EqualTo(ScapeView.Plain));
     }
     finally
     {
@@ -1194,13 +1288,14 @@ public class ObsidianBridgeEditModeTests
   private static IEnumerator InvokeCartographerRebuildGraphAfterClear(
     Cartographer cartographer,
     MapLayoutMode layoutPreference,
-    string requestId = "")
+    string requestId = "",
+    ScapeView? scapeView = null)
   {
     MethodInfo rebuildGraph = typeof(Cartographer).GetMethod("RebuildGraphAfterClear", BindingFlags.Instance | BindingFlags.NonPublic);
     Assert.That(rebuildGraph, Is.Not.Null);
     try
     {
-      return (IEnumerator)rebuildGraph.Invoke(cartographer, new object[] { layoutPreference, requestId });
+      return (IEnumerator)rebuildGraph.Invoke(cartographer, new object[] { layoutPreference, requestId, scapeView });
     }
     catch (TargetInvocationException ex) when (ex.InnerException != null)
     {
@@ -1407,6 +1502,26 @@ public class ObsidianBridgeEditModeTests
     public const string LayoutPreferenceInvalidPayload =
       "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"mapLayout\":\"unsupported\",\"notes\":[" +
       "{\"id\":\"e3\",\"path\":\"engine/auto.md\",\"title\":\"Auto\",\"tags\":[],\"date\":\"2025-01-01T00:00:00Z\",\"size\":1}" +
+      "],\"links\":[]}}";
+
+    public const string ScapeViewPlanetsPayload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"scapeView\":\"planets\",\"notes\":[" +
+      "{\"id\":\"v1\",\"path\":\"view/planets.md\",\"title\":\"Planets\",\"tags\":[],\"date\":\"2025-01-01T00:00:00Z\",\"size\":1}" +
+      "],\"links\":[]}}";
+
+    public const string ScapeViewPlainPayload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"scapeView\":\"plain\",\"notes\":[" +
+      "{\"id\":\"v2\",\"path\":\"view/plain.md\",\"title\":\"Plain\",\"tags\":[],\"date\":\"2025-01-01T00:00:00Z\",\"size\":1}" +
+      "],\"links\":[]}}";
+
+    public const string ScapeViewBuildingsPayload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"scapeView\":\"buildings\",\"notes\":[" +
+      "{\"id\":\"v3\",\"path\":\"view/buildings.md\",\"title\":\"Buildings\",\"tags\":[],\"date\":\"2025-01-01T00:00:00Z\",\"size\":1}" +
+      "],\"links\":[]}}";
+
+    public const string ScapeViewInvalidPayload =
+      "{\"protocolVersion\":\"2.0.0\",\"type\":\"graph:set\",\"payload\":{\"scapeView\":\"unsupported\",\"notes\":[" +
+      "{\"id\":\"v4\",\"path\":\"view/unsupported.md\",\"title\":\"Unsupported\",\"tags\":[],\"date\":\"2025-01-01T00:00:00Z\",\"size\":1}" +
       "],\"links\":[]}}";
 
     public const string NoteFocusByIdPayload =
