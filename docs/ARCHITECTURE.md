@@ -426,7 +426,7 @@ Persistence remains one plugin-level snapshot, so later opens restore the most r
 - `filterQuery`, `showTags`, `mapLayout`, `renderScale`, `landmarkSource`, and Ego settings are owned by `MapSession`.
   They are live per-view while the leaf is open. `ReverySkyMapPlugin` stores one latest snapshot under `mapViewState` and applies it to later opens.
 
-- The selected landmark source defaults to `landmarks` and is used by both graph extraction and editor-side Add landmark writes.
+- The selected landmark source defaults to `landmarks` and is used by both graph extraction and editor-side `Add to <property name>` writes.
   Changing it clears cached metadata signatures, re-reads current frontmatter values into the source graph, rebuilds the effective graph, and sends the latest payload.
   Metadata changes that affect only the normalized landmark list for the selected source update cached `buildings` values and dispatch `note:update` instead of waiting for a full graph rebuild.
 

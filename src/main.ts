@@ -259,7 +259,7 @@ export default class ReverySkyMapPlugin extends Plugin {
     await this.pluginData.persist();
   }
 
-  getPersistedLandmarkSource(): string {
+  getLandmarkSource(): string {
     const mapViewState = this.pluginData.getMapViewStateSnapshot();
     return normalizeLandmarkSource(mapViewState?.landmarkSource);
   }

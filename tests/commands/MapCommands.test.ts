@@ -130,7 +130,7 @@ describe("registerEditorMenuCommands", () => {
     };
     const plugin = {
       registerEvent: vi.fn(),
-      getPersistedLandmarkSource: vi.fn().mockReturnValue("people"),
+      getLandmarkSource: vi.fn().mockReturnValue("people"),
       app: {
         workspace: {
           on: vi.fn((_name: string, callback: typeof editorMenuHandler) => {
@@ -153,9 +153,10 @@ describe("registerEditorMenuCommands", () => {
       { file: { path: "Note.md" } }
     );
     expect(clickHandler).toBeTypeOf("function");
+    expect(menuItem.setTitle).toHaveBeenCalledWith("Add to people");
     await clickHandler?.();
 
-    expect(plugin.getPersistedLandmarkSource).toHaveBeenCalledTimes(1);
+    expect(plugin.getLandmarkSource).toHaveBeenCalledTimes(1);
     expect(frontmatter.landmarks).toEqual(["Observatory"]);
     expect(frontmatter.people).toEqual(["Alice"]);
   });

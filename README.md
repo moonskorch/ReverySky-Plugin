@@ -98,9 +98,9 @@ To add a landmark:
 
 1. Select text in a Markdown note.
 2. Right-click the selection.
-3. Choose **Add landmark**.
+3. Choose **Add to landmarks** or **Add to `<property name>`** when using a custom Landmark source.
 
-ReverySky 3D Graph uses the note's `landmarks` frontmatter property by default. `Landmark source` in the settings selects another frontmatter property. ReverySky displays a string or an array of strings from that property; **Add landmark** creates the property when missing or appends to an existing array of strings.
+ReverySky 3D Graph uses the note's `landmarks` frontmatter property by default. `Landmark source` in the settings selects another frontmatter property. ReverySky displays a string or an array of strings from that property; **Add to `<property name>`** creates the property when missing or appends to an existing array of strings.
 
 If the graph is open, a new landmark appears immediately and the view switches to Landmarks mode. Editing the currently selected frontmatter property also updates the displayed landmarks on the existing graph.
 

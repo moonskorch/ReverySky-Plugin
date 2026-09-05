@@ -416,12 +416,12 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
     });
 
     await harness.plugin.onload();
-    expect(harness.plugin.getPersistedLandmarkSource()).toBe("people");
+    expect(harness.plugin.getLandmarkSource()).toBe("people");
 
     (harness.plugin as unknown as { updateMapViewState: (state: Record<string, unknown>) => void }).updateMapViewState({
       landmarkSource: "   "
     });
-    expect(harness.plugin.getPersistedLandmarkSource()).toBe("landmarks");
+    expect(harness.plugin.getLandmarkSource()).toBe("landmarks");
   });
 
   it("reveals the existing map leaf instead of creating another one", async () => {

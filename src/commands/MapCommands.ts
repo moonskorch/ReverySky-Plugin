@@ -44,13 +44,14 @@ export function registerEditorMenuCommands(plugin: ReverySkyMapPlugin): void {
       if (!file || !landmark) {
         return;
       }
+      const landmarkSource = plugin.getLandmarkSource();
 
       menu.addItem((item) => {
         item
-          .setTitle("Add landmark")
+          .setTitle(`Add to ${landmarkSource}`)
           .setIcon("map-pin")
           .onClick(async () => {
-            await addLandmarkToFile(plugin, file, landmark);
+            await addLandmarkToFile(plugin, file, landmark, landmarkSource);
           });
       });
     })
@@ -162,9 +163,9 @@ function getActiveMapView(plugin: ReverySkyMapPlugin): MapView | null {
 async function addLandmarkToFile(
   plugin: ReverySkyMapPlugin,
   file: TFile,
-  landmark: string
+  landmark: string,
+  landmarkSource: string
 ): Promise<void> {
-  const landmarkSource = plugin.getPersistedLandmarkSource();
   await plugin.app.fileManager.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
     addLandmarkToFrontmatter(frontmatter, landmark, landmarkSource);
   });
