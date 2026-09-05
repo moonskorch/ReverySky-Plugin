@@ -51,7 +51,7 @@ export function registerEditorMenuCommands(plugin: ReverySkyMapPlugin): void {
 
       const landmarkSourceProperty = plugin.getLandmarkSource();
       const frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter;
-      if (!canWriteLandmarkField(frontmatter, landmarkSourceProperty)) {
+      if (!canWriteLandmarkValue(frontmatter?.[landmarkSourceProperty])) {
         return;
       }
 
@@ -73,22 +73,11 @@ export function normalizeLandmarkSelection(selection: string): string {
     .trim();
 }
 
-function canWriteLandmarkField(
-  frontmatter: Record<string, unknown> | null | undefined,
-  fieldName: string = DEFAULT_LANDMARK_SOURCE
-): boolean {
-  if (!frontmatter) {
-    return true;
-  }
-
-  const currentLandmarks = frontmatter[fieldName];
-  if (currentLandmarks === null || currentLandmarks === undefined) {
-    return true;
-  }
-
+function canWriteLandmarkValue(value: unknown): value is string[] | null | undefined {
   return (
-    Array.isArray(currentLandmarks) &&
-    currentLandmarks.every((currentLandmark) => typeof currentLandmark === "string")
+    value === null ||
+    value === undefined ||
+    (Array.isArray(value) && value.every((item) => typeof item === "string"))
   );
 }
 
@@ -98,20 +87,17 @@ export function addLandmarkToFrontmatter(
   landmarkSource: string = DEFAULT_LANDMARK_SOURCE
 ): void {
   const landmarkSourceProperty = normalizeLandmarkSource(landmarkSource);
-  if (!canWriteLandmarkField(frontmatter, landmarkSourceProperty)) {
+  const currentLandmarks = frontmatter[landmarkSourceProperty];
+  if (!canWriteLandmarkValue(currentLandmarks)) {
     return;
   }
 
-  const currentLandmarks = frontmatter[landmarkSourceProperty];
   if (currentLandmarks === null || currentLandmarks === undefined) {
     frontmatter[landmarkSourceProperty] = [landmark];
     return;
   }
 
-  if (
-    Array.isArray(currentLandmarks) &&
-    !currentLandmarks.some((currentLandmark) => normalizeLandmarkSelection(currentLandmark) === landmark)
-  ) {
+  if (!currentLandmarks.some((currentLandmark) => normalizeLandmarkSelection(currentLandmark) === landmark)) {
     currentLandmarks.push(landmark);
   }
 }
