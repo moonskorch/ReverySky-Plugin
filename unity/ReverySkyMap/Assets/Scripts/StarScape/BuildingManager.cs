@@ -105,6 +105,14 @@ public sealed class BuildingManager : MonoBehaviour
     RefillAvailableBuildings();
   }
 
+  public IReadOnlyList<BuildingCallout> GetCallouts(StarVisual visual)
+  {
+    if (visual == null || !buildingsByStar.TryGetValue(visual, out var starBuildings))
+      return System.Array.Empty<BuildingCallout>();
+
+    return starBuildings.Callouts;
+  }
+
   private void UpdateStarBuildings(StarVisual visual, StarBuildings starBuildings, bool allowFocusedOverflow)
   {
     IReadOnlyList<BuildingData> buildings = visual.BuildingData;

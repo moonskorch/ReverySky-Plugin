@@ -281,6 +281,27 @@ public sealed class BuildingManagerEditModeTests
   }
 
   [Test]
+  public void PlayBuildingChangeAnimation_OnlyTargetsMatchingAddedCallout()
+  {
+    using var scope = new BuildingManagerScope(calloutBudget: 2);
+    using var visual = new StarVisualScope("Reveal", 2);
+
+    scope.Manager.Register(visual.Visual, wantsVisible: true, highlightState: LabelHighlightState.Normal);
+
+    BuildingCallout[] callouts = visual.Root.GetComponentsInChildren<BuildingCallout>(true);
+    BuildingCallout existing = FindCallout(callouts, "Building 1");
+    BuildingCallout added = FindCallout(callouts, "Building 2");
+    Assert.That(existing, Is.Not.Null);
+    Assert.That(added, Is.Not.Null);
+    Assert.That(existing.GetComponentInChildren<TMP_Text>(true).maxVisibleCharacters, Is.EqualTo(int.MaxValue));
+
+    visual.Visual.PlayBuildingChangeAnimation(null, new List<string> { "Building 2" });
+
+    Assert.That(added.GetComponentInChildren<TMP_Text>(true).maxVisibleCharacters, Is.LessThan(int.MaxValue));
+    Assert.That(existing.GetComponentInChildren<TMP_Text>(true).maxVisibleCharacters, Is.EqualTo(int.MaxValue));
+  }
+
+  [Test]
   public void CalloutLifecycle_ActivatesOnlyAfterPreparation()
   {
     var parent = new GameObject("BuildingManagerEditModeTests_CalloutParent");
@@ -297,6 +318,8 @@ public sealed class BuildingManagerEditModeTests
       Assert.That(callout.gameObject.activeSelf, Is.False);
       Assert.That(relatedBehaviour.enabled, Is.False);
       Assert.That(callout.GetComponentInChildren<TMP_Text>(true).text, Is.EqualTo("<u>Prepared</u>"));
+      Assert.That(callout.BuildingName, Is.EqualTo("Prepared"));
+      Assert.That(callout.GetComponentInChildren<TMP_Text>(true).maxVisibleCharacters, Is.EqualTo(int.MaxValue));
 
       callout.Activate();
 
@@ -307,7 +330,32 @@ public sealed class BuildingManagerEditModeTests
 
       Assert.That(callout.gameObject.activeSelf, Is.False);
       Assert.That(relatedBehaviour.enabled, Is.False);
+      Assert.That(callout.BuildingName, Is.Empty);
+      Assert.That(callout.GetComponentInChildren<TMP_Text>(true).maxVisibleCharacters, Is.EqualTo(int.MaxValue));
       Assert.That(callout.GetComponentInChildren<TMP_Text>(true).text, Is.Empty);
+    }
+    finally
+    {
+      Object.DestroyImmediate(parent);
+    }
+  }
+
+  [Test]
+  public void PlayNameReveal_ZeroIntervalLeavesNameVisible()
+  {
+    var parent = new GameObject("BuildingManagerEditModeTests_CalloutParent");
+    BuildingCallout callout = CreateCalloutPrefab();
+
+    try
+    {
+      SetPrivateField(callout, "nameRevealCharacterInterval", 0f);
+      callout.PrepareForUse(parent.transform);
+      callout.Init(new BuildingData { Name = "Instant" }, sphereRadius: 1f, slotIndex: 0);
+
+      callout.PlayNameReveal();
+
+      Assert.That(callout.GetComponentInChildren<TMP_Text>(true).maxVisibleCharacters, Is.EqualTo(int.MaxValue));
+      Assert.That(callout.GetComponentInChildren<TMP_Text>(true).text, Is.EqualTo("<u>Instant</u>"));
     }
     finally
     {
@@ -363,6 +411,17 @@ public sealed class BuildingManagerEditModeTests
     FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
     Assert.That(field, Is.Not.Null, $"Missing field {fieldName} on {target.GetType().Name}.");
     field.SetValue(target, value);
+  }
+
+  private static BuildingCallout FindCallout(BuildingCallout[] callouts, string buildingName)
+  {
+    foreach (BuildingCallout callout in callouts)
+    {
+      if (callout.BuildingName == buildingName)
+        return callout;
+    }
+
+    return null;
   }
 
   private static IDictionary GetStarBuildingState(BuildingManager manager)

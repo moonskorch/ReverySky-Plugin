@@ -264,6 +264,34 @@ public class StarVisual : MonoBehaviour
     BuildingManager.I.Refresh(this);
   }
 
+  public void PlayBuildingChangeAnimation(
+    StarPulseAnimator pulseAnimator,
+    IReadOnlyList<string> addedBuildingNames)
+  {
+    pulseAnimator?.Play(transform);
+
+    if (addedBuildingNames == null || addedBuildingNames.Count == 0)
+      return;
+
+    IReadOnlyList<BuildingCallout> callouts = BuildingManager.I.GetCallouts(this);
+    for (int i = 0; i < addedBuildingNames.Count; i++)
+    {
+      string addedBuildingName = addedBuildingNames[i];
+      for (int j = 0; j < callouts.Count; j++)
+      {
+        BuildingCallout callout = callouts[j];
+        if (callout == null ||
+            !string.Equals(callout.BuildingName, addedBuildingName, System.StringComparison.Ordinal))
+        {
+          continue;
+        }
+
+        callout.PlayNameReveal();
+        break;
+      }
+    }
+  }
+
   private void SyncBuildings()
   {
     bool focused = visibilitySource.HighlightState == LabelHighlightState.Focused;

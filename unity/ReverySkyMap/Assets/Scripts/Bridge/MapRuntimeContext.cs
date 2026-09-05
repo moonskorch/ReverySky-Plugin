@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 /// <summary>
@@ -35,7 +36,7 @@ public static class MapRuntimeContext
   public static event Action<string> OnTagActivateRequested;
   public static event Action<string> OnGraphReady;
   public static event Action<string, ScapeView?> OnNotesChanged;
-  public static event Action<string> OnNoteBuildingsChanged;
+  public static event Action<string, IReadOnlyList<string>> OnNoteBuildingsChanged;
 
   public static bool HasRuntimeNotes => Notes != null && Notes.Count > 0;
 
@@ -114,8 +115,21 @@ public static class MapRuntimeContext
       return false;
     }
 
+    var previousNames = new HashSet<string>(
+      (note.Buildings ?? Enumerable.Empty<BuildingData>())
+        .Where(building => building != null)
+        .Select(building => building.Name),
+      StringComparer.Ordinal);
+
     note.Buildings = buildings ?? new List<BuildingData>();
-    OnNoteBuildingsChanged?.Invoke(note.Id ?? string.Empty);
+    var addedNames = new List<string>();
+    foreach (BuildingData building in note.Buildings)
+    {
+      if (building != null && !previousNames.Contains(building.Name))
+        addedNames.Add(building.Name);
+    }
+
+    OnNoteBuildingsChanged?.Invoke(note.Id ?? string.Empty, addedNames);
     return true;
   }
 

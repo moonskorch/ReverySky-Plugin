@@ -1,11 +1,11 @@
 ﻿using TMPro;
+using System.Collections;
 using UnityEngine;
 
 public class BuildingCallout : MonoBehaviour
 {
   private const int SlotSalt = 101;
   private const float GoldenAngleRad = 2.3999631f;
-
   [SerializeField] private LineRenderer lineRenderer;
   [SerializeField] private Transform contentRoot;
   [SerializeField] private Transform buildingMarker;
@@ -14,9 +14,13 @@ public class BuildingCallout : MonoBehaviour
   [SerializeField] private Behaviour[] relatedBehaviours;
   [SerializeField] private Vector2 elevationAngleDegRange = new Vector2(15f, 90f);
   [SerializeField, Range(1, 64)] private int directionSlotCount = 16;
+  [SerializeField, Range(0f, 0.2f)] private float nameRevealCharacterInterval = 0.04f;
   [SerializeField] private float offset = 0.6f;
 
   public int DirectionSlotCount => directionSlotCount;
+  public string BuildingName { get; private set; } = string.Empty;
+
+  private Coroutine nameRevealCoroutine;
 
   public void PrepareForUse(Transform parent)
   {
@@ -34,6 +38,7 @@ public class BuildingCallout : MonoBehaviour
 
   public void PrepareForPool(Transform parent)
   {
+    StopNameReveal();
     gameObject.SetActive(false);
     SetRelatedBehavioursEnabled(false);
 
@@ -41,12 +46,15 @@ public class BuildingCallout : MonoBehaviour
       transform.SetParent(parent, false);
 
     lineRenderer.positionCount = 0;
+    BuildingName = string.Empty;
     nameText.text = string.Empty;
     nameText.ClearMesh(updateMesh: true);
   }
 
   public void Init(BuildingData building, float sphereRadius, int slotIndex)
   {
+    StopNameReveal();
+
     var dir = ResolveSlotDirection(slotIndex, DirectionSlotCount, elevationAngleDegRange);
 
     var startLocal = dir * sphereRadius;
@@ -60,7 +68,24 @@ public class BuildingCallout : MonoBehaviour
 
     contentRoot.localPosition = endLocal;     // name at the end of the line
 
-    nameText.text = $"<u>{building.Name}</u>";
+    BuildingName = building.Name;
+    nameText.text = $"<u>{BuildingName}</u>";
+  }
+
+  public void PlayNameReveal()
+  {
+    StopNameReveal();
+    if (nameRevealCharacterInterval <= 0f)
+      return;
+
+    nameText.ForceMeshUpdate();
+
+    int characterCount = nameText.textInfo.characterCount;
+    if (characterCount == 0)
+      return;
+
+    nameText.maxVisibleCharacters = 0;
+    nameRevealCoroutine = StartCoroutine(RevealNameRoutine(characterCount));
   }
 
   public void ApplyHighlight(LabelHighlightState state)
@@ -132,6 +157,30 @@ public class BuildingCallout : MonoBehaviour
 
   private static int PositiveModulo(int value, int modulo)
     => ((value % modulo) + modulo) % modulo;
+
+  private IEnumerator RevealNameRoutine(int characterCount)
+  {
+    var delay = new WaitForSeconds(nameRevealCharacterInterval);
+    for (int visibleCharacters = 1; visibleCharacters <= characterCount; visibleCharacters++)
+    {
+      nameText.maxVisibleCharacters = visibleCharacters;
+
+      if (visibleCharacters < characterCount)
+        yield return delay;
+    }
+
+    nameText.maxVisibleCharacters = int.MaxValue;
+    nameRevealCoroutine = null;
+  }
+
+  private void StopNameReveal()
+  {
+    if (nameRevealCoroutine != null)
+      StopCoroutine(nameRevealCoroutine);
+
+    nameRevealCoroutine = null;
+    nameText.maxVisibleCharacters = int.MaxValue;
+  }
 
   private void SetRelatedBehavioursEnabled(bool enabled)
   {

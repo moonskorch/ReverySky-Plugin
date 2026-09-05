@@ -120,9 +120,14 @@ public class ObsidianBridgeEditModeTests
     bridge.OnGraphSet(TestPayloads.BuildingsPayload);
     int notesVersion = MapRuntimeContext.NotesVersion;
     var changedNoteIds = new List<string>();
+    var addedBuildingNames = new List<string>();
     int notesChangedCount = 0;
 
-    void HandleNoteBuildingsChanged(string noteId) => changedNoteIds.Add(noteId);
+    void HandleNoteBuildingsChanged(string noteId, IReadOnlyList<string> addedNames)
+    {
+      changedNoteIds.Add(noteId);
+      addedBuildingNames.AddRange(addedNames);
+    }
     void HandleNotesChanged(string requestId, ScapeView? scapeView) => notesChangedCount++;
 
     MapRuntimeContext.OnNoteBuildingsChanged += HandleNoteBuildingsChanged;
@@ -136,6 +141,7 @@ public class ObsidianBridgeEditModeTests
       Assert.That(noteWithBuildings.Buildings[0].Name, Is.EqualTo("Tower"));
       Assert.That(noteWithBuildings.Buildings[1].Name, Is.EqualTo("Library"));
       Assert.That(changedNoteIds, Is.EqualTo(new List<string> { "b1" }));
+      Assert.That(addedBuildingNames, Is.EqualTo(new List<string> { "Tower", "Library" }));
       Assert.That(notesChangedCount, Is.EqualTo(0));
       Assert.That(MapRuntimeContext.NotesVersion, Is.EqualTo(notesVersion));
     }
@@ -143,6 +149,69 @@ public class ObsidianBridgeEditModeTests
     {
       MapRuntimeContext.OnNoteBuildingsChanged -= HandleNoteBuildingsChanged;
       MapRuntimeContext.OnNotesChanged -= HandleNotesChanged;
+    }
+  }
+
+  [Test]
+  public void TryUpdateNoteBuildings_EmitsOnlyNamesAbsentFromPreviousList()
+  {
+    MapRuntimeContext.SetNotes(
+      new List<NoteData>
+      {
+        new NoteData
+        {
+          Id = "b1",
+          Path = "buildings/b1.md",
+          Buildings = new List<BuildingData>
+          {
+            new BuildingData { Name = "Moon" },
+            new BuildingData { Name = "Apollo 11" }
+          }
+        }
+      },
+      string.Empty);
+
+    var addedNames = new List<string>();
+    void HandleNoteBuildingsChanged(string noteId, IReadOnlyList<string> names) => addedNames.AddRange(names);
+
+    MapRuntimeContext.OnNoteBuildingsChanged += HandleNoteBuildingsChanged;
+    try
+    {
+      Assert.That(
+        MapRuntimeContext.TryUpdateNoteBuildings(
+          "b1",
+          "buildings/b1.md",
+          new List<BuildingData>
+          {
+            new BuildingData { Name = "Moon" },
+            new BuildingData { Name = "Apollo 11" },
+            new BuildingData { Name = "Neil Armstrong" }
+          }),
+        Is.True);
+      Assert.That(addedNames, Is.EqualTo(new List<string> { "Neil Armstrong" }));
+
+      addedNames.Clear();
+      Assert.That(
+        MapRuntimeContext.TryUpdateNoteBuildings(
+          "b1",
+          "buildings/b1.md",
+          new List<BuildingData>
+          {
+            new BuildingData { Name = "Apollo 11" },
+            new BuildingData { Name = "Moon" }
+          }),
+        Is.True);
+      Assert.That(addedNames, Is.Empty);
+
+      addedNames.Clear();
+      Assert.That(
+        MapRuntimeContext.TryUpdateNoteBuildings("b1", "buildings/b1.md", null),
+        Is.True);
+      Assert.That(addedNames, Is.Empty);
+    }
+    finally
+    {
+      MapRuntimeContext.OnNoteBuildingsChanged -= HandleNoteBuildingsChanged;
     }
   }
 
@@ -161,7 +230,7 @@ public class ObsidianBridgeEditModeTests
   {
     bridge.OnGraphSet(TestPayloads.BuildingsPayload);
     var changedNoteIds = new List<string>();
-    void HandleNoteBuildingsChanged(string noteId) => changedNoteIds.Add(noteId);
+    void HandleNoteBuildingsChanged(string noteId, IReadOnlyList<string> addedNames) => changedNoteIds.Add(noteId);
 
     MapRuntimeContext.OnNoteBuildingsChanged += HandleNoteBuildingsChanged;
     try
@@ -210,7 +279,7 @@ public class ObsidianBridgeEditModeTests
       SetPrivateField(cartographer, "_activeEngine", engine);
       SetPrivateField(cartographer, "<GraphIndex>k__BackingField", graphIndex);
 
-      InvokePrivate(cartographer, "HandleNoteBuildingsChanged", "b1");
+      InvokePrivate(cartographer, "HandleNoteBuildingsChanged", "b1", new List<string>());
 
       Assert.That(cartographer.CurrentView, Is.EqualTo(ScapeView.Buildings));
       Assert.That(engine.ApplyViewCallCount, Is.EqualTo(1));

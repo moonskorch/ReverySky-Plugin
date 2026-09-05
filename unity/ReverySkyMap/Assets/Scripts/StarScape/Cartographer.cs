@@ -282,7 +282,7 @@ public class Cartographer : MonoBehaviour
     RebuildGraph(MapRuntimeContext.MapLayoutPreference, requestId, scapeView);
   }
 
-  private void HandleNoteBuildingsChanged(string noteId)
+  private void HandleNoteBuildingsChanged(string noteId, IReadOnlyList<string> addedBuildingNames)
   {
     if (string.IsNullOrWhiteSpace(noteId) || !GraphIndex.TryGetStar(noteId, out var star))
       return;
@@ -299,7 +299,7 @@ public class Cartographer : MonoBehaviour
       ApplyView(ScapeView.Buildings);
     }
 
-    starPulseAnimator?.Play(visual.transform);
+    visual?.PlayBuildingChangeAnimation(starPulseAnimator, addedBuildingNames);
   }
 
   private void BindActiveWarper(ScapeCameraWarper warper)
