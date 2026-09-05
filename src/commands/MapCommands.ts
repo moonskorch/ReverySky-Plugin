@@ -39,19 +39,28 @@ export function registerCommands(plugin: ReverySkyMapPlugin): void {
 export function registerEditorMenuCommands(plugin: ReverySkyMapPlugin): void {
   plugin.registerEvent(
     plugin.app.workspace.on("editor-menu", (menu, editor, info) => {
-      const landmark = normalizeLandmarkSelection(editor.getSelection());
       const file = info.file;
-      if (!file || !landmark) {
+      if (!file || !editor.somethingSelected()) {
         return;
       }
-      const landmarkSource = plugin.getLandmarkSource();
+
+      const landmark = normalizeLandmarkSelection(editor.getSelection());
+      if (!landmark) {
+        return;
+      }
+
+      const landmarkSourceProperty = plugin.getLandmarkSource();
+      const frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter;
+      if (!canWriteLandmarkField(frontmatter, landmarkSourceProperty)) {
+        return;
+      }
 
       menu.addItem((item) => {
         item
-          .setTitle(`Add to ${landmarkSource}`)
+          .setTitle(`Add to ${landmarkSourceProperty}`)
           .setIcon("map-pin")
           .onClick(async () => {
-            await addLandmarkToFile(plugin, file, landmark, landmarkSource);
+            await addLandmarkToFile(plugin, file, landmark, landmarkSourceProperty);
           });
       });
     })
@@ -64,31 +73,45 @@ export function normalizeLandmarkSelection(selection: string): string {
     .trim();
 }
 
+function canWriteLandmarkField(
+  frontmatter: Record<string, unknown> | null | undefined,
+  fieldName: string = DEFAULT_LANDMARK_SOURCE
+): boolean {
+  if (!frontmatter) {
+    return true;
+  }
+
+  const currentLandmarks = frontmatter[fieldName];
+  if (currentLandmarks === null || currentLandmarks === undefined) {
+    return true;
+  }
+
+  return (
+    Array.isArray(currentLandmarks) &&
+    currentLandmarks.every((currentLandmark) => typeof currentLandmark === "string")
+  );
+}
+
 export function addLandmarkToFrontmatter(
   frontmatter: Record<string, unknown>,
   landmark: string,
   landmarkSource: string = DEFAULT_LANDMARK_SOURCE
 ): void {
-  const fieldName = normalizeLandmarkSource(landmarkSource);
-  const currentLandmarks = frontmatter[fieldName];
+  const landmarkSourceProperty = normalizeLandmarkSource(landmarkSource);
+  if (!canWriteLandmarkField(frontmatter, landmarkSourceProperty)) {
+    return;
+  }
+
+  const currentLandmarks = frontmatter[landmarkSourceProperty];
   if (currentLandmarks === null || currentLandmarks === undefined) {
-    frontmatter[fieldName] = [landmark];
+    frontmatter[landmarkSourceProperty] = [landmark];
     return;
   }
 
   if (
-    !Array.isArray(currentLandmarks) ||
-    !currentLandmarks.every((currentLandmark) => typeof currentLandmark === "string")
+    Array.isArray(currentLandmarks) &&
+    !currentLandmarks.some((currentLandmark) => normalizeLandmarkSelection(currentLandmark) === landmark)
   ) {
-    return;
-  }
-
-  const hasDuplicate = currentLandmarks.some(
-    (currentLandmark) =>
-      typeof currentLandmark === "string" &&
-      normalizeLandmarkSelection(currentLandmark) === landmark
-  );
-  if (!hasDuplicate) {
     currentLandmarks.push(landmark);
   }
 }

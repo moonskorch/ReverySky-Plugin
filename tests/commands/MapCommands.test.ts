@@ -110,9 +110,7 @@ describe("registerEditorMenuCommands", () => {
     const frontmatter: Record<string, unknown> = {
       landmarks: ["Observatory"]
     };
-    let editorMenuHandler:
-      | ((menu: unknown, editor: unknown, info: { file?: unknown }) => void)
-      | null = null;
+    const { file, getEditorMenuHandler, plugin } = makeEditorMenuPlugin(frontmatter);
     let clickHandler: (() => Promise<void>) | null = null;
     const menuItem = {} as {
       setTitle: ReturnType<typeof vi.fn>;
@@ -128,29 +126,12 @@ describe("registerEditorMenuCommands", () => {
     const menu = {
       addItem: vi.fn((callback: (item: typeof menuItem) => void) => callback(menuItem))
     };
-    const plugin = {
-      registerEvent: vi.fn(),
-      getLandmarkSource: vi.fn().mockReturnValue("people"),
-      app: {
-        workspace: {
-          on: vi.fn((_name: string, callback: typeof editorMenuHandler) => {
-            editorMenuHandler = callback;
-            return { id: "editor-menu-event" };
-          })
-        },
-        fileManager: {
-          processFrontMatter: vi.fn(async (_file: unknown, callback: (frontmatter: Record<string, unknown>) => void) => {
-            callback(frontmatter);
-          })
-        }
-      }
-    };
 
     registerEditorMenuCommands(plugin as never);
-    editorMenuHandler?.(
+    getEditorMenuHandler()?.(
       menu,
-      { getSelection: () => "  Alice  " },
-      { file: { path: "Note.md" } }
+      { getSelection: () => "  Alice  ", somethingSelected: () => true },
+      { file }
     );
     expect(clickHandler).toBeTypeOf("function");
     expect(menuItem.setTitle).toHaveBeenCalledWith("Add to people");
@@ -160,4 +141,101 @@ describe("registerEditorMenuCommands", () => {
     expect(frontmatter.landmarks).toEqual(["Observatory"]);
     expect(frontmatter.people).toEqual(["Alice"]);
   });
+
+  it("does not show the command when the landmark source cannot be appended", () => {
+    const frontmatter: Record<string, unknown> = {
+      people: "Alice"
+    };
+    const { file, getEditorMenuHandler, plugin } = makeEditorMenuPlugin(frontmatter);
+    const menu = {
+      addItem: vi.fn()
+    };
+
+    registerEditorMenuCommands(plugin as never);
+    getEditorMenuHandler()?.(
+      menu,
+      { getSelection: () => "  Bob  ", somethingSelected: () => true },
+      { file }
+    );
+
+    expect(menu.addItem).not.toHaveBeenCalled();
+    expect(plugin.app.metadataCache.getFileCache).toHaveBeenCalledWith(file);
+  });
+
+  it("still shows the command when the selected landmark already exists", () => {
+    const frontmatter: Record<string, unknown> = {
+      people: ["Alice"]
+    };
+    const { file, getEditorMenuHandler, plugin } = makeEditorMenuPlugin(frontmatter);
+    const menu = {
+      addItem: vi.fn()
+    };
+
+    registerEditorMenuCommands(plugin as never);
+    getEditorMenuHandler()?.(
+      menu,
+      { getSelection: () => "  Alice  ", somethingSelected: () => true },
+      { file }
+    );
+
+    expect(menu.addItem).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not read selection text when the editor has no selection", () => {
+    const { file, getEditorMenuHandler, plugin } = makeEditorMenuPlugin({});
+    const menu = {
+      addItem: vi.fn()
+    };
+    const editor = {
+      getSelection: vi.fn(),
+      somethingSelected: vi.fn(() => false)
+    };
+
+    registerEditorMenuCommands(plugin as never);
+    getEditorMenuHandler()?.(
+      menu,
+      editor,
+      { file }
+    );
+
+    expect(editor.getSelection).not.toHaveBeenCalled();
+    expect(plugin.getLandmarkSource).not.toHaveBeenCalled();
+    expect(plugin.app.metadataCache.getFileCache).not.toHaveBeenCalled();
+    expect(menu.addItem).not.toHaveBeenCalled();
+  });
 });
+
+function makeEditorMenuPlugin(frontmatter: Record<string, unknown>, landmarkSource = "people") {
+  const file = { path: "Note.md" };
+  let editorMenuHandler:
+    | ((menu: unknown, editor: unknown, info: { file?: unknown }) => void)
+    | null = null;
+  const plugin = {
+    registerEvent: vi.fn(),
+    getLandmarkSource: vi.fn().mockReturnValue(landmarkSource),
+    app: {
+      workspace: {
+        on: vi.fn((_name: string, callback: typeof editorMenuHandler) => {
+          editorMenuHandler = callback;
+          return { id: "editor-menu-event" };
+        })
+      },
+      metadataCache: {
+        getFileCache: vi.fn().mockReturnValue({
+          frontmatter
+        })
+      },
+      fileManager: {
+        processFrontMatter: vi.fn(async (_file: unknown, callback: (frontmatter: Record<string, unknown>) => void) => {
+          callback(frontmatter);
+        })
+      }
+    }
+  };
+
+  return {
+    file,
+    getEditorMenuHandler: () => editorMenuHandler,
+    plugin
+  };
+}
