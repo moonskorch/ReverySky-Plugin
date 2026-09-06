@@ -92,6 +92,8 @@ The current filters, tag visibility, and layout settings continue to apply to th
 
 ## Landmarks
 
+![landmarks](docs/assets/reverysky-map-landmarks.webp)
+
 Landmarks show a context cloud around each note: names, places, concepts, events, keywords, or other key details stored in a text property.
 
 ReverySky uses the note's `landmarks` frontmatter property by default. You can choose any other text property as the `Landmark source` and switch between properties. Strings and arrays of strings are supported.
