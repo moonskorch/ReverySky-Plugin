@@ -1,12 +1,22 @@
 import { createHash } from "node:crypto";
-import { access, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { extract as tarExtract } from "tar/extract";
-import { list as tarList } from "tar/list";
 import {
   getEmbeddedUnityRuntimeArchiveBase64,
   getEmbeddedUnityRuntimeArchiveSha256
 } from "./EmbeddedUnityRuntimeArchive";
+import {
+  collectArchiveEntries,
+  createArchiveEntry,
+  drainArchiveEntry,
+  type EmbeddedRuntimeArchiveEntry,
+  parseArchiveBuffer,
+  readArchiveEntryBuffer
+} from "./EmbeddedUnityRuntimeArchiveParser";
+import {
+  createAdapterRuntimeFileSystem,
+  type EmbeddedUnityRuntimeInstallContext,
+  type RuntimeFileSystem
+} from "./EmbeddedUnityRuntimeFileSystem";
 
 export type EmbeddedUnityRuntimeInstallerOptions = {
   archiveBase64?: string;
@@ -23,13 +33,6 @@ type RuntimeFileMatch = {
   absolutePath: string;
 };
 
-type ReadArchiveEntry = {
-  path: string;
-  type?: string;
-  typeKey?: string;
-  linkpath?: string;
-};
-
 const RUNTIME_READY_MARKER_NAME = ".runtime-ready.json";
 const RUNTIME_ROOT_NAME = "unity-webgl";
 const RUNTIME_VERSION_ROOT_NAME = ".reverysky-runtime";
@@ -43,25 +46,27 @@ function normalizeSha256(value: string | null | undefined): string | null {
   return /^[0-9a-f]{64}$/.test(trimmed) ? trimmed : null;
 }
 
-async function pathExists(targetPath: string): Promise<boolean> {
-  try {
-    await access(targetPath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function ensureDirectoryExists(targetPath: string): Promise<void> {
-  await mkdir(targetPath, { recursive: true });
-}
-
-function isLinkEntry(entry: ReadArchiveEntry): boolean {
+function isLinkEntry(entry: EmbeddedRuntimeArchiveEntry): boolean {
   return (
     entry.type === "SymbolicLink" ||
     entry.type === "Link" ||
     entry.typeKey === "1" ||
     entry.typeKey === "2"
+  );
+}
+
+function isDirectoryEntry(entry: EmbeddedRuntimeArchiveEntry): boolean {
+  return entry.type === "Directory" || entry.type === "GNUDumpDir" || entry.typeKey === "5";
+}
+
+function isFileEntry(entry: EmbeddedRuntimeArchiveEntry): boolean {
+  return (
+    entry.type === "File" ||
+    entry.type === "OldFile" ||
+    entry.type === "ContiguousFile" ||
+    entry.typeKey === "0" ||
+    entry.typeKey === "" ||
+    entry.typeKey === "7"
   );
 }
 
@@ -91,30 +96,15 @@ function validateArchiveEntryPath(entryPath: string): void {
   }
 }
 
-async function collectArchiveEntries(archivePath: string): Promise<ReadArchiveEntry[]> {
-  const entries: ReadArchiveEntry[] = [];
-  await tarList({
-    file: archivePath,
-    strict: true,
-    preservePaths: true,
-    onReadEntry: (entry) => {
-      entries.push({
-        path: entry.path,
-        type: entry.type,
-        typeKey: (entry as { typeKey?: string }).typeKey,
-        linkpath: entry.linkpath
-      });
-      entry.resume();
-    }
-  });
-  return entries;
-}
-
-async function findUniqueMatchingFile(buildDir: string, prefix: string): Promise<RuntimeFileMatch> {
+async function findUniqueMatchingFile(
+  runtimeFileSystem: RuntimeFileSystem,
+  buildDir: string,
+  prefix: string
+): Promise<RuntimeFileMatch> {
   const matches: RuntimeFileMatch[] = [];
-  const entries = await readdir(buildDir, { withFileTypes: true });
+  const entries = await runtimeFileSystem.listDirectory(buildDir);
   for (const entry of entries) {
-    if (!entry.isFile() || !entry.name.startsWith(prefix)) {
+    if (!entry.isFile || !entry.name.startsWith(prefix)) {
       continue;
     }
 
@@ -133,7 +123,7 @@ async function findUniqueMatchingFile(buildDir: string, prefix: string): Promise
   return matches[0];
 }
 
-async function validateRuntimeDirectory(runtimeDir: string): Promise<void> {
+async function validateRuntimeDirectory(runtimeFileSystem: RuntimeFileSystem, runtimeDir: string): Promise<void> {
   const indexHtmlPath = path.join(runtimeDir, "index.html");
   const buildDir = path.join(runtimeDir, "Build");
   const requiredBuildFiles = [
@@ -142,34 +132,34 @@ async function validateRuntimeDirectory(runtimeDir: string): Promise<void> {
     "runtime-core.js"
   ];
 
-  if (!(await pathExists(indexHtmlPath))) {
+  if (!(await runtimeFileSystem.exists(indexHtmlPath))) {
     throw new Error(`Missing runtime file: ${indexHtmlPath}`);
   }
-  if (!(await pathExists(buildDir))) {
+  if (!(await runtimeFileSystem.exists(buildDir))) {
     throw new Error(`Missing runtime directory: ${buildDir}`);
   }
   for (const relativePath of requiredBuildFiles) {
     const absolutePath = path.join(buildDir, relativePath);
-    if (!(await pathExists(absolutePath))) {
+    if (!(await runtimeFileSystem.exists(absolutePath))) {
       throw new Error(`Missing runtime file: ${absolutePath}`);
     }
   }
 
-  await findUniqueMatchingFile(buildDir, "runtime-data.");
-  await findUniqueMatchingFile(buildDir, "runtime-code.");
+  await findUniqueMatchingFile(runtimeFileSystem, buildDir, "runtime-data.");
+  await findUniqueMatchingFile(runtimeFileSystem, buildDir, "runtime-code.");
 }
 
 /**
  * The ready marker is written only after extraction and shape validation.
  * A cache without a valid marker is treated as incomplete and rebuilt.
  */
-async function readRuntimeReadyMarker(markerPath: string): Promise<{
+async function readRuntimeReadyMarker(runtimeFileSystem: RuntimeFileSystem, markerPath: string): Promise<{
   schemaVersion?: unknown;
   pluginVersion?: unknown;
   archiveSha256?: unknown;
 } | null> {
   try {
-    const raw = await readFile(markerPath, "utf8");
+    const raw = await runtimeFileSystem.readText(markerPath);
     return JSON.parse(raw) as {
       schemaVersion?: unknown;
       pluginVersion?: unknown;
@@ -205,13 +195,18 @@ export class EmbeddedUnityRuntimeInstaller {
    * builds do not have an archive payload, so they validate and return the local
    * `unity-webgl/` folder beside the plugin bundle.
    */
-  async resolveRuntimeDirectory(pluginDir: string, pluginVersion: string): Promise<EmbeddedUnityRuntimeResolution> {
+  async resolveRuntimeDirectory(
+    pluginDir: string,
+    pluginVersion: string,
+    context: EmbeddedUnityRuntimeInstallContext
+  ): Promise<EmbeddedUnityRuntimeResolution> {
     const pluginDirResolved = path.resolve(pluginDir);
+    const runtimeFileSystem = createAdapterRuntimeFileSystem(pluginDirResolved, context);
     const runtimeRoot = path.join(pluginDirResolved, RUNTIME_VERSION_ROOT_NAME);
     const devRuntimeDir = path.join(pluginDirResolved, RUNTIME_ROOT_NAME);
 
     if (!this.archiveBase64 || !this.archiveSha256) {
-      await validateRuntimeDirectory(devRuntimeDir);
+      await validateRuntimeDirectory(runtimeFileSystem, devRuntimeDir);
       return {
         runtimeDir: devRuntimeDir,
         extracted: false
@@ -221,7 +216,7 @@ export class EmbeddedUnityRuntimeInstaller {
     const versionDir = path.join(runtimeRoot, pluginVersion);
     const runtimeDir = path.join(versionDir, RUNTIME_ROOT_NAME);
 
-    if (await this.isValidCachedRuntime(versionDir, pluginVersion)) {
+    if (await this.isValidCachedRuntime(versionDir, pluginVersion, runtimeFileSystem)) {
       return {
         runtimeDir,
         extracted: false
@@ -229,46 +224,35 @@ export class EmbeddedUnityRuntimeInstaller {
     }
 
     const archiveBuffer = this.decodeAndValidateArchive();
-    await ensureDirectoryExists(runtimeRoot);
-
-    const tempRoot = await mkdtemp(path.join(runtimeRoot, `.extracting-${Date.now()}-`));
-    const archivePath = path.join(tempRoot, "runtime.tar.gz");
-    const tempMarkerPath = path.join(tempRoot, RUNTIME_READY_MARKER_NAME);
+    const entries = await collectArchiveEntries(archiveBuffer);
+    this.validateArchiveEntries(entries);
 
     try {
-      await writeFile(archivePath, archiveBuffer);
-      const entries = await collectArchiveEntries(archivePath);
-      this.validateArchiveEntries(entries);
+      await runtimeFileSystem.ensureDirectory(runtimeRoot);
+      await runtimeFileSystem.removeDirectory(versionDir);
+      await runtimeFileSystem.ensureDirectory(versionDir);
 
-      await tarExtract({
-        file: archivePath,
-        cwd: tempRoot,
-        strict: true
-      });
-
-      const stagedRuntimeDir = path.join(tempRoot, RUNTIME_ROOT_NAME);
-      await validateRuntimeDirectory(stagedRuntimeDir);
+      await this.installArchiveEntries(archiveBuffer, versionDir, runtimeFileSystem);
+      await validateRuntimeDirectory(runtimeFileSystem, runtimeDir);
 
       const marker = {
         schemaVersion: 1,
         pluginVersion,
         archiveSha256: this.archiveSha256
       };
-      await writeFile(tempMarkerPath, `${JSON.stringify(marker, null, 2)}\n`, "utf8");
-
-      if (await pathExists(versionDir)) {
-        await rm(versionDir, { recursive: true, force: true });
-      }
-
-      await rename(tempRoot, versionDir);
+      await runtimeFileSystem.writeText(
+        path.join(versionDir, RUNTIME_READY_MARKER_NAME),
+        `${JSON.stringify(marker, null, 2)}\n`
+      );
       return {
         runtimeDir,
         extracted: true
       };
     } catch (error) {
-      await rm(tempRoot, { recursive: true, force: true });
+      const cleanupError = await this.removeIncompleteRuntimeCache(versionDir, runtimeFileSystem);
+      const cleanupMessage = cleanupError ? ` Cleanup also failed: ${cleanupError.message}` : "";
       throw new Error(
-        `Failed to prepare embedded Unity runtime cache for ${pluginVersion}: ${(error as Error).message}`
+        `Failed to prepare embedded Unity runtime cache for ${pluginVersion}: ${(error as Error).message}${cleanupMessage}`
       );
     }
   }
@@ -289,7 +273,7 @@ export class EmbeddedUnityRuntimeInstaller {
     return archiveBuffer;
   }
 
-  private validateArchiveEntries(entries: ReadArchiveEntry[]): void {
+  private validateArchiveEntries(entries: EmbeddedRuntimeArchiveEntry[]): void {
     for (const entry of entries) {
       validateArchiveEntryPath(entry.path);
       if (isLinkEntry(entry)) {
@@ -298,18 +282,70 @@ export class EmbeddedUnityRuntimeInstaller {
       if (typeof entry.linkpath === "string" && entry.linkpath.length > 0) {
         throw new Error(`Embedded runtime archive unexpectedly sets a link target: ${entry.path}`);
       }
+      if (entry.meta) {
+        continue;
+      }
+      if (!isDirectoryEntry(entry) && !isFileEntry(entry)) {
+        throw new Error(`Embedded runtime archive contains an unsupported entry type: ${entry.path}`);
+      }
     }
   }
 
-  private async isValidCachedRuntime(versionDir: string, pluginVersion: string): Promise<boolean> {
+  private async installArchiveEntries(
+    archiveBuffer: Buffer,
+    versionDir: string,
+    runtimeFileSystem: RuntimeFileSystem
+  ): Promise<void> {
+    await parseArchiveBuffer(archiveBuffer, async (entry) => {
+      const archiveEntry = createArchiveEntry(entry);
+      this.validateArchiveEntries([archiveEntry]);
+
+      if (archiveEntry.meta) {
+        await drainArchiveEntry(entry);
+        return;
+      }
+
+      const targetPath = path.join(versionDir, ...archiveEntry.path.split("/"));
+      if (isDirectoryEntry(archiveEntry)) {
+        await runtimeFileSystem.ensureDirectory(targetPath);
+        await drainArchiveEntry(entry);
+        return;
+      }
+
+      if (!isFileEntry(archiveEntry)) {
+        throw new Error(`Embedded runtime archive contains an unsupported entry type: ${archiveEntry.path}`);
+      }
+
+      const content = await readArchiveEntryBuffer(entry);
+      await runtimeFileSystem.writeBinary(targetPath, content);
+    });
+  }
+
+  private async removeIncompleteRuntimeCache(
+    versionDir: string,
+    runtimeFileSystem: RuntimeFileSystem
+  ): Promise<Error | null> {
+    try {
+      await runtimeFileSystem.removeDirectory(versionDir);
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  private async isValidCachedRuntime(
+    versionDir: string,
+    pluginVersion: string,
+    runtimeFileSystem: RuntimeFileSystem
+  ): Promise<boolean> {
     const markerPath = path.join(versionDir, RUNTIME_READY_MARKER_NAME);
     const runtimeDir = path.join(versionDir, RUNTIME_ROOT_NAME);
 
-    if (!(await pathExists(versionDir)) || !(await pathExists(markerPath))) {
+    if (!(await runtimeFileSystem.exists(versionDir)) || !(await runtimeFileSystem.exists(markerPath))) {
       return false;
     }
 
-    const marker = await readRuntimeReadyMarker(markerPath);
+    const marker = await readRuntimeReadyMarker(runtimeFileSystem, markerPath);
     if (!marker || marker.schemaVersion !== 1) {
       return false;
     }
@@ -318,7 +354,7 @@ export class EmbeddedUnityRuntimeInstaller {
     }
 
     try {
-      await validateRuntimeDirectory(runtimeDir);
+      await validateRuntimeDirectory(runtimeFileSystem, runtimeDir);
       return true;
     } catch {
       return false;

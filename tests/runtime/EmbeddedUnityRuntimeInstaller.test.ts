@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile, unlink } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile, unlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
+import type { DataAdapter, ListedFiles } from "obsidian";
 import { describe, expect, it } from "vitest";
 import { EmbeddedUnityRuntimeInstaller } from "../../src/runtime/EmbeddedUnityRuntimeInstaller";
 
@@ -67,6 +68,7 @@ function createFakeRuntimeArchive(options?: {
   missingRuntimeCode?: boolean;
   extraEntries?: TarEntry[];
   symlinkEntry?: boolean;
+  hardlinkEntry?: boolean;
   traversalEntry?: boolean;
 }): { base64: string; sha256: string } {
   const entries: TarEntry[] = [
@@ -124,6 +126,14 @@ function createFakeRuntimeArchive(options?: {
       path: "unity-webgl/Build/runtime-code.link",
       type: "2",
       linkpath: "../../outside"
+    });
+  }
+
+  if (options?.hardlinkEntry) {
+    entries.push({
+      path: "unity-webgl/Build/runtime-code.hardlink",
+      type: "1",
+      linkpath: "unity-webgl/Build/runtime-code.wasm"
     });
   }
 
@@ -210,14 +220,132 @@ async function createValidCache(pluginDir: string, pluginVersion: string, archiv
   return path.join(versionDir, "unity-webgl");
 }
 
+type AdapterOperation = {
+  method: string;
+  path: string;
+};
+
+class FakeRuntimeAdapter {
+  readonly operations: AdapterOperation[] = [];
+  private readonly racedMkdirPaths = new Set<string>();
+
+  constructor(
+    private readonly basePath: string,
+    private readonly options: {
+      failMkdirOncePathIncludes?: string;
+      failRmdirPathIncludes?: string;
+      failWriteBinaryPathIncludes?: string;
+    } = {}
+  ) {}
+
+  getName(): string {
+    return "FakeRuntimeAdapter";
+  }
+
+  async exists(normalizedPath: string): Promise<boolean> {
+    this.operations.push({ method: "exists", path: normalizedPath });
+    try {
+      await access(this.absolutePath(normalizedPath));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async list(normalizedPath: string): Promise<ListedFiles> {
+    this.operations.push({ method: "list", path: normalizedPath });
+    const entries = await readdir(this.absolutePath(normalizedPath), { withFileTypes: true });
+    return {
+      files: entries
+        .filter((entry) => entry.isFile())
+        .map((entry) => this.joinVaultPath(normalizedPath, entry.name)),
+      folders: entries
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => this.joinVaultPath(normalizedPath, entry.name))
+    };
+  }
+
+  async read(normalizedPath: string): Promise<string> {
+    this.operations.push({ method: "read", path: normalizedPath });
+    return readFile(this.absolutePath(normalizedPath), "utf8");
+  }
+
+  async write(normalizedPath: string, data: string): Promise<void> {
+    this.operations.push({ method: "write", path: normalizedPath });
+    await writeFile(this.absolutePath(normalizedPath), data, "utf8");
+  }
+
+  async writeBinary(normalizedPath: string, data: ArrayBuffer): Promise<void> {
+    this.operations.push({ method: "writeBinary", path: normalizedPath });
+    if (this.options.failWriteBinaryPathIncludes && normalizedPath.includes(this.options.failWriteBinaryPathIncludes)) {
+      throw new Error(`Injected adapter write failure for ${normalizedPath}`);
+    }
+
+    await writeFile(this.absolutePath(normalizedPath), Buffer.from(data));
+  }
+
+  async mkdir(normalizedPath: string): Promise<void> {
+    this.operations.push({ method: "mkdir", path: normalizedPath });
+    if (
+      this.options.failMkdirOncePathIncludes &&
+      normalizedPath.includes(this.options.failMkdirOncePathIncludes) &&
+      !this.racedMkdirPaths.has(normalizedPath)
+    ) {
+      this.racedMkdirPaths.add(normalizedPath);
+      await mkdir(this.absolutePath(normalizedPath), { recursive: true });
+      throw new Error(`Injected adapter mkdir race for ${normalizedPath}`);
+    }
+
+    await mkdir(this.absolutePath(normalizedPath));
+  }
+
+  async rmdir(normalizedPath: string, recursive: boolean): Promise<void> {
+    this.operations.push({ method: "rmdir", path: normalizedPath });
+    if (this.options.failRmdirPathIncludes && normalizedPath.includes(this.options.failRmdirPathIncludes)) {
+      throw new Error(`Injected adapter cleanup failure for ${normalizedPath}`);
+    }
+
+    await rm(this.absolutePath(normalizedPath), { recursive, force: false });
+  }
+
+  asDataAdapter(): DataAdapter {
+    return this as unknown as DataAdapter;
+  }
+
+  private absolutePath(normalizedPath: string): string {
+    return path.join(this.basePath, ...normalizedPath.split("/"));
+  }
+
+  private joinVaultPath(parent: string, child: string): string {
+    return parent ? `${parent}/${child}` : child;
+  }
+}
+
+function createAdapterRuntimeContext(root: string): {
+  pluginDir: string;
+  adapter: FakeRuntimeAdapter;
+  context: { adapter: DataAdapter; vaultBasePath: string };
+} {
+  const pluginDir = path.join(root, ".obsidian", "plugins", "reverysky-map");
+  const adapter = new FakeRuntimeAdapter(root);
+  return {
+    pluginDir,
+    adapter,
+    context: {
+      adapter: adapter.asDataAdapter(),
+      vaultBasePath: root
+    }
+  };
+}
+
 describe("EmbeddedUnityRuntimeInstaller", () => {
   it("returns <pluginDir>/unity-webgl in dev mode", async () => {
     await withTempRoot(async (root) => {
-      const pluginDir = path.join(root, "plugin");
+      const { pluginDir, context } = createAdapterRuntimeContext(root);
       await createDevRuntime(pluginDir);
 
       const installer = new EmbeddedUnityRuntimeInstaller();
-      const resolution = await installer.resolveRuntimeDirectory(pluginDir, "1.2.3");
+      const resolution = await installer.resolveRuntimeDirectory(pluginDir, "1.2.3", context);
 
       expect(resolution).toEqual({
         runtimeDir: path.join(pluginDir, "unity-webgl"),
@@ -228,7 +356,7 @@ describe("EmbeddedUnityRuntimeInstaller", () => {
 
   it("validates SHA and creates a versioned cache on first extraction", async () => {
     await withTempRoot(async (root) => {
-      const pluginDir = path.join(root, "plugin");
+      const { pluginDir, context } = createAdapterRuntimeContext(root);
       await mkdir(pluginDir, { recursive: true });
       const archive = createFakeRuntimeArchive();
       const installer = new EmbeddedUnityRuntimeInstaller({
@@ -236,7 +364,7 @@ describe("EmbeddedUnityRuntimeInstaller", () => {
         archiveSha256: archive.sha256
       });
 
-      const resolution = await installer.resolveRuntimeDirectory(pluginDir, "9.9.9");
+      const resolution = await installer.resolveRuntimeDirectory(pluginDir, "9.9.9", context);
       const versionDir = path.join(pluginDir, ".reverysky-runtime", "9.9.9");
       const runtimeDir = path.join(versionDir, "unity-webgl");
 
@@ -251,9 +379,105 @@ describe("EmbeddedUnityRuntimeInstaller", () => {
     });
   });
 
+  it("installs archive entries through the adapter without writing runtime.tar.gz", async () => {
+    await withTempRoot(async (root) => {
+      const { pluginDir, adapter, context } = createAdapterRuntimeContext(root);
+      await mkdir(pluginDir, { recursive: true });
+      const archive = createFakeRuntimeArchive();
+      const installer = new EmbeddedUnityRuntimeInstaller({
+        archiveBase64: archive.base64,
+        archiveSha256: archive.sha256
+      });
+
+      const resolution = await installer.resolveRuntimeDirectory(pluginDir, "9.9.9", context);
+      const versionDir = path.join(pluginDir, ".reverysky-runtime", "9.9.9");
+      const runtimeDir = path.join(versionDir, "unity-webgl");
+
+      expect(resolution).toEqual({
+        runtimeDir,
+        extracted: true
+      });
+      expect(adapter.operations.some((operation) => operation.path.includes("runtime.tar.gz"))).toBe(false);
+      expect(await pathExists(path.join(versionDir, "runtime.tar.gz"))).toBe(false);
+      expect(
+        adapter.operations.some((operation) =>
+          operation.method === "mkdir" && operation.path.endsWith("unity-webgl/Build")
+        )
+      ).toBe(true);
+      expect(
+        adapter.operations.some((operation) =>
+          operation.method === "writeBinary" && operation.path.endsWith("unity-webgl/Build/runtime-core.js")
+        )
+      ).toBe(true);
+      await expect(readFile(path.join(runtimeDir, "Build", "runtime-data.data"))).resolves.toEqual(Buffer.from([1, 2, 3, 4]));
+    });
+  });
+
+  it("tolerates directories created between adapter exists and mkdir calls", async () => {
+    await withTempRoot(async (root) => {
+      const pluginDir = path.join(root, ".obsidian", "plugins", "reverysky-map");
+      const adapter = new FakeRuntimeAdapter(root, {
+        failMkdirOncePathIncludes: "unity-webgl/Build"
+      });
+      const context = {
+        adapter: adapter.asDataAdapter(),
+        vaultBasePath: root
+      };
+      await mkdir(pluginDir, { recursive: true });
+      const archive = createFakeRuntimeArchive();
+      const installer = new EmbeddedUnityRuntimeInstaller({
+        archiveBase64: archive.base64,
+        archiveSha256: archive.sha256
+      });
+
+      const resolution = await installer.resolveRuntimeDirectory(pluginDir, "9.9.9", context);
+
+      expect(await pathExists(path.join(resolution.runtimeDir, "Build", "runtime-core.js"))).toBe(true);
+      expect(
+        adapter.operations.some((operation) =>
+          operation.method === "mkdir" && operation.path.endsWith("unity-webgl/Build")
+        )
+      ).toBe(true);
+    });
+  });
+
+  it("fails instead of silently falling back to Node fs when adapter context is incomplete", async () => {
+    await withTempRoot(async (root) => {
+      const pluginDir = path.join(root, ".obsidian", "plugins", "reverysky-map");
+      await mkdir(pluginDir, { recursive: true });
+      const archive = createFakeRuntimeArchive();
+      const adapter = new FakeRuntimeAdapter(root);
+      const installer = new EmbeddedUnityRuntimeInstaller({
+        archiveBase64: archive.base64,
+        archiveSha256: archive.sha256
+      });
+
+      await expect(installer.resolveRuntimeDirectory(pluginDir, "9.9.9", {
+        adapter: adapter.asDataAdapter()
+      } as never)).rejects.toThrow(/requires both an Obsidian adapter and a vault base path/i);
+    });
+  });
+
+  it("fails instead of using Node fs for embedded archive installation without adapter context", async () => {
+    await withTempRoot(async (root) => {
+      const pluginDir = path.join(root, ".obsidian", "plugins", "reverysky-map");
+      await mkdir(pluginDir, { recursive: true });
+      const archive = createFakeRuntimeArchive();
+      const installer = new EmbeddedUnityRuntimeInstaller({
+        archiveBase64: archive.base64,
+        archiveSha256: archive.sha256
+      });
+
+      await expect(installer.resolveRuntimeDirectory(pluginDir, "9.9.9", undefined as never)).rejects.toThrow(
+        /requires both an Obsidian adapter and a vault base path/i
+      );
+      expect(await pathExists(path.join(pluginDir, ".reverysky-runtime", "9.9.9"))).toBe(false);
+    });
+  });
+
   it("reuses a valid cache without extracting again", async () => {
     await withTempRoot(async (root) => {
-      const pluginDir = path.join(root, "plugin");
+      const { pluginDir, context } = createAdapterRuntimeContext(root);
       await mkdir(pluginDir, { recursive: true });
       const archive = createFakeRuntimeArchive();
       const runtimeDir = await createValidCache(pluginDir, "1.0.0", "deadbeef".repeat(8));
@@ -263,7 +487,7 @@ describe("EmbeddedUnityRuntimeInstaller", () => {
         archiveSha256: "deadbeef".repeat(8)
       });
 
-      const resolved = await installer.resolveRuntimeDirectory(pluginDir, "1.0.0");
+      const resolved = await installer.resolveRuntimeDirectory(pluginDir, "1.0.0", context);
       expect(resolved).toEqual({
         runtimeDir,
         extracted: false
@@ -272,9 +496,31 @@ describe("EmbeddedUnityRuntimeInstaller", () => {
     });
   });
 
+  it("reuses a valid adapter cache without writing files", async () => {
+    await withTempRoot(async (root) => {
+      const { pluginDir, adapter, context } = createAdapterRuntimeContext(root);
+      await mkdir(pluginDir, { recursive: true });
+      const archive = createFakeRuntimeArchive();
+      const runtimeDir = await createValidCache(pluginDir, "1.0.0", "deadbeef".repeat(8));
+      const installer = new EmbeddedUnityRuntimeInstaller({
+        archiveBase64: archive.base64,
+        archiveSha256: "deadbeef".repeat(8)
+      });
+
+      const resolved = await installer.resolveRuntimeDirectory(pluginDir, "1.0.0", context);
+
+      expect(resolved).toEqual({
+        runtimeDir,
+        extracted: false
+      });
+      expect(adapter.operations.some((operation) => operation.method === "writeBinary")).toBe(false);
+      expect(adapter.operations.some((operation) => operation.method === "write")).toBe(false);
+    });
+  });
+
   it("replaces a corrupt cache", async () => {
     await withTempRoot(async (root) => {
-      const pluginDir = path.join(root, "plugin");
+      const { pluginDir, context } = createAdapterRuntimeContext(root);
       await mkdir(pluginDir, { recursive: true });
       const archive = createFakeRuntimeArchive();
       const installer = new EmbeddedUnityRuntimeInstaller({
@@ -282,11 +528,11 @@ describe("EmbeddedUnityRuntimeInstaller", () => {
         archiveSha256: archive.sha256
       });
 
-      const firstResolution = await installer.resolveRuntimeDirectory(pluginDir, "2.0.0");
+      const firstResolution = await installer.resolveRuntimeDirectory(pluginDir, "2.0.0", context);
       const firstRuntimeDir = firstResolution.runtimeDir;
       await unlink(path.join(firstRuntimeDir, "Build", "runtime-core.js"));
 
-      const secondResolution = await installer.resolveRuntimeDirectory(pluginDir, "2.0.0");
+      const secondResolution = await installer.resolveRuntimeDirectory(pluginDir, "2.0.0", context);
       expect(secondResolution).toEqual({
         runtimeDir: firstRuntimeDir,
         extracted: true
@@ -298,7 +544,7 @@ describe("EmbeddedUnityRuntimeInstaller", () => {
 
   it("fails when runtime-code is missing and leaves no final cache", async () => {
     await withTempRoot(async (root) => {
-      const pluginDir = path.join(root, "plugin");
+      const { pluginDir, context } = createAdapterRuntimeContext(root);
       await mkdir(pluginDir, { recursive: true });
       const archive = createFakeRuntimeArchive({ missingRuntimeCode: true });
       const installer = new EmbeddedUnityRuntimeInstaller({
@@ -306,14 +552,78 @@ describe("EmbeddedUnityRuntimeInstaller", () => {
         archiveSha256: archive.sha256
       });
 
-      await expect(installer.resolveRuntimeDirectory(pluginDir, "3.0.0")).rejects.toThrow(/runtime-code/i);
+      await expect(installer.resolveRuntimeDirectory(pluginDir, "3.0.0", context)).rejects.toThrow(/runtime-code/i);
       expect(await pathExists(path.join(pluginDir, ".reverysky-runtime", "3.0.0"))).toBe(false);
+    });
+  });
+
+  it("does not write the ready marker when adapter installation validation fails", async () => {
+    await withTempRoot(async (root) => {
+      const { pluginDir, adapter, context } = createAdapterRuntimeContext(root);
+      await mkdir(pluginDir, { recursive: true });
+      const archive = createFakeRuntimeArchive({ missingRuntimeCode: true });
+      const installer = new EmbeddedUnityRuntimeInstaller({
+        archiveBase64: archive.base64,
+        archiveSha256: archive.sha256
+      });
+
+      await expect(installer.resolveRuntimeDirectory(pluginDir, "3.1.0", context)).rejects.toThrow(/runtime-code/i);
+      expect(
+        adapter.operations.some((operation) =>
+          operation.method === "write" && operation.path.endsWith(".runtime-ready.json")
+        )
+      ).toBe(false);
+      expect(await pathExists(path.join(pluginDir, ".reverysky-runtime", "3.1.0"))).toBe(false);
+    });
+  });
+
+  it("cleans the adapter cache when a file write is interrupted", async () => {
+    await withTempRoot(async (root) => {
+      const pluginDir = path.join(root, ".obsidian", "plugins", "reverysky-map");
+      await mkdir(pluginDir, { recursive: true });
+      const archive = createFakeRuntimeArchive();
+      const adapter = new FakeRuntimeAdapter(root, {
+        failWriteBinaryPathIncludes: "runtime-core.js"
+      });
+      const installer = new EmbeddedUnityRuntimeInstaller({
+        archiveBase64: archive.base64,
+        archiveSha256: archive.sha256
+      });
+
+      await expect(installer.resolveRuntimeDirectory(pluginDir, "3.2.0", {
+        adapter: adapter.asDataAdapter(),
+        vaultBasePath: root
+      })).rejects.toThrow(/injected adapter write failure/i);
+      expect(await pathExists(path.join(pluginDir, ".reverysky-runtime", "3.2.0"))).toBe(false);
+      expect(await pathExists(path.join(pluginDir, ".reverysky-runtime", "3.2.0", ".runtime-ready.json"))).toBe(false);
+    });
+  });
+
+  it("reports the original install failure when cleanup also fails", async () => {
+    await withTempRoot(async (root) => {
+      const pluginDir = path.join(root, ".obsidian", "plugins", "reverysky-map");
+      await mkdir(pluginDir, { recursive: true });
+      const archive = createFakeRuntimeArchive();
+      const adapter = new FakeRuntimeAdapter(root, {
+        failRmdirPathIncludes: ".reverysky-runtime/3.3.0",
+        failWriteBinaryPathIncludes: "runtime-core.js"
+      });
+      const installer = new EmbeddedUnityRuntimeInstaller({
+        archiveBase64: archive.base64,
+        archiveSha256: archive.sha256
+      });
+
+      await expect(installer.resolveRuntimeDirectory(pluginDir, "3.3.0", {
+        adapter: adapter.asDataAdapter(),
+        vaultBasePath: root
+      })).rejects.toThrow(/injected adapter write failure.*cleanup also failed.*injected adapter cleanup failure/i);
+      expect(await pathExists(path.join(pluginDir, ".reverysky-runtime", "3.3.0", ".runtime-ready.json"))).toBe(false);
     });
   });
 
   it("fails before writing final files when the SHA is wrong", async () => {
     await withTempRoot(async (root) => {
-      const pluginDir = path.join(root, "plugin");
+      const { pluginDir, context } = createAdapterRuntimeContext(root);
       await mkdir(pluginDir, { recursive: true });
       const archive = createFakeRuntimeArchive();
       const installer = new EmbeddedUnityRuntimeInstaller({
@@ -321,14 +631,14 @@ describe("EmbeddedUnityRuntimeInstaller", () => {
         archiveSha256: "0".repeat(64)
       });
 
-      await expect(installer.resolveRuntimeDirectory(pluginDir, "4.0.0")).rejects.toThrow(/sha-256 mismatch/i);
+      await expect(installer.resolveRuntimeDirectory(pluginDir, "4.0.0", context)).rejects.toThrow(/sha-256 mismatch/i);
       expect(await pathExists(path.join(pluginDir, ".reverysky-runtime", "4.0.0"))).toBe(false);
     });
   });
 
   it("rejects path traversal entries", async () => {
     await withTempRoot(async (root) => {
-      const pluginDir = path.join(root, "plugin");
+      const { pluginDir, context } = createAdapterRuntimeContext(root);
       await mkdir(pluginDir, { recursive: true });
       const archive = createFakeRuntimeArchive({ traversalEntry: true });
       const installer = new EmbeddedUnityRuntimeInstaller({
@@ -336,14 +646,14 @@ describe("EmbeddedUnityRuntimeInstaller", () => {
         archiveSha256: archive.sha256
       });
 
-      await expect(installer.resolveRuntimeDirectory(pluginDir, "5.0.0")).rejects.toThrow(/escapes unity-webgl/i);
+      await expect(installer.resolveRuntimeDirectory(pluginDir, "5.0.0", context)).rejects.toThrow(/escapes unity-webgl/i);
       expect(await pathExists(path.join(pluginDir, ".reverysky-runtime", "5.0.0"))).toBe(false);
     });
   });
 
   it("rejects symbolic link entries", async () => {
     await withTempRoot(async (root) => {
-      const pluginDir = path.join(root, "plugin");
+      const { pluginDir, context } = createAdapterRuntimeContext(root);
       await mkdir(pluginDir, { recursive: true });
       const archive = createFakeRuntimeArchive({ symlinkEntry: true });
       const installer = new EmbeddedUnityRuntimeInstaller({
@@ -351,15 +661,30 @@ describe("EmbeddedUnityRuntimeInstaller", () => {
         archiveSha256: archive.sha256
       });
 
-      await expect(installer.resolveRuntimeDirectory(pluginDir, "6.0.0")).rejects.toThrow(/link entry/i);
+      await expect(installer.resolveRuntimeDirectory(pluginDir, "6.0.0", context)).rejects.toThrow(/link entry/i);
       expect(await pathExists(path.join(pluginDir, ".reverysky-runtime", "6.0.0"))).toBe(false);
+    });
+  });
+
+  it("rejects hard link entries", async () => {
+    await withTempRoot(async (root) => {
+      const { pluginDir, context } = createAdapterRuntimeContext(root);
+      await mkdir(pluginDir, { recursive: true });
+      const archive = createFakeRuntimeArchive({ hardlinkEntry: true });
+      const installer = new EmbeddedUnityRuntimeInstaller({
+        archiveBase64: archive.base64,
+        archiveSha256: archive.sha256
+      });
+
+      await expect(installer.resolveRuntimeDirectory(pluginDir, "6.1.0", context)).rejects.toThrow(/link entry/i);
+      expect(await pathExists(path.join(pluginDir, ".reverysky-runtime", "6.1.0"))).toBe(false);
     });
   });
 });
 
 async function pathExists(targetPath: string): Promise<boolean> {
   try {
-    await readFile(targetPath);
+    await access(targetPath);
     return true;
   } catch {
     return false;

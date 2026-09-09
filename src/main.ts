@@ -170,12 +170,17 @@ export default class ReverySkyMapPlugin extends Plugin {
   private async resolveUnityRuntimeUrl(): Promise<string> {
     if (!this.unityWebglServer) {
       const pluginDir = this.resolvePluginDirectory();
+      const vaultBasePath = this.resolveVaultBasePath();
       const embeddedIndexHtml = getEmbeddedUnityIndexHtml();
       let runtimeSource: UnityWebglRuntimeSource;
       if (hasEmbeddedUnityRuntimeArchive()) {
         const runtimeResolution = await this.unityRuntimeInstaller.resolveRuntimeDirectory(
           pluginDir,
-          this.manifest.version
+          this.manifest.version,
+          {
+            adapter: this.app.vault.adapter,
+            vaultBasePath
+          }
         );
         runtimeSource = {
           kind: "directory",
@@ -236,12 +241,16 @@ export default class ReverySkyMapPlugin extends Plugin {
    * Resolve the installed plugin folder so the bundled WebGL export can be served from disk.
    */
   private resolvePluginDirectory(): string {
+    return path.join(this.resolveVaultBasePath(), this.app.vault.configDir, "plugins", this.manifest.id);
+  }
+
+  private resolveVaultBasePath(): string {
     const adapter = this.app.vault.adapter as { getBasePath?: () => string };
     if (!adapter.getBasePath) {
       throw new Error("File adapter base path is unavailable.");
     }
 
-    return path.join(adapter.getBasePath(), this.app.vault.configDir, "plugins", this.manifest.id);
+    return adapter.getBasePath();
   }
 
   private updateMapViewState(state: Record<string, unknown>, persist: boolean = true): void {

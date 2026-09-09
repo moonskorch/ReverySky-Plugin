@@ -591,7 +591,11 @@ describe("ReverySkyMapPlugin map view state persistence", () => {
 
     expect(embeddedRuntimeMock.resolveRuntimeDirectory).toHaveBeenCalledWith(
       path.join("C:\\Vault", ".obsidian", "plugins", "reverysky-map"),
-      "1.4.1"
+      "1.4.1",
+      {
+        adapter: (harness.plugin as ReverySkyMapPlugin & { app: { vault: { adapter: unknown } } }).app.vault.adapter,
+        vaultBasePath: "C:\\Vault"
+      }
     );
     expect(whatsNewFileMock.readWhatsNewFile).toHaveBeenCalledWith(embeddedRuntimeMock.runtimeDir);
     expect(whatsNewLeaf.setViewState).toHaveBeenCalledWith({
