@@ -100,6 +100,7 @@ Main system parts:
   - root `main.js` contains a compressed Unity runtime archive;
   - the first graph open extracts the runtime into a versioned local cache;
   - later graph opens reuse the cache when plugin version and archive SHA match;
+  - old version cache folders are removed best-effort after the current cache is valid;
   - the archive may contain one selected `whats-new/<version>.md` file;
   - What's New is checked only after fresh extraction, not on every plugin load or every graph view open;
   - no runtime network download is used;
@@ -167,7 +168,7 @@ The main entry points are plugin startup, the graph command, view startup, and i
    It selects the highest semantic version that does not exceed `manifest.version`.
 2. The package script copies only that selected file into the archive as `unity-webgl/whats-new/<version>.md`.
    Older source files may remain in the repository; they are not all copied into a release archive.
-3. `src/main.ts` -> `getUnityRuntimeUrl()` calls `EmbeddedUnityRuntimeInstaller.resolveRuntimeDirectory(pluginDir, manifest.version)` for `embedded-archive` builds.
+3. `src/main.ts` -> `getUnityRuntimeUrl()` calls `EmbeddedUnityRuntimeInstaller.resolveRuntimeDirectory(pluginDir, manifest.version, { adapter, vaultBasePath })` for `embedded-archive` builds.
 4. `src/runtime/EmbeddedUnityRuntimeInstaller.ts` returns `extracted: true` only when the current plugin version cache was rebuilt from the archive.
    Reused caches, folder-runtime installs, and embedded-html installs return or follow paths that do not trigger What's New.
 5. On `extracted: true`, `src/main.ts` calls `showWhatsNew(runtimeDir)`.

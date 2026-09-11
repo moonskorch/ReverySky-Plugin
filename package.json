@@ -27,6 +27,7 @@
     "check:release-metadata": "node scripts/check-release-metadata.mjs",
     "check:package:release-candidate": "npm run check:package:embedded-archive && npm run check:release-metadata",
     "test": "vitest run",
+    "test:installer": "npm run check:unity-webgl -- embedded-archive && vitest run --config vitest.installer.config.ts",
     "test:watch": "vitest",
     "test:ui-visual": "playwright test tests/visual",
     "test:ui-visual:update": "playwright test tests/visual --update-snapshots",

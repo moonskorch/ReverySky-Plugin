@@ -1,0 +1,70 @@
+name: Installer tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag, or commit SHA to test. Leave empty to use the selected workflow ref."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  installer-real-payload:
+    name: Installer real payload (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+
+    steps:
+      - name: Resolve checkout ref
+        id: checkout-ref
+        shell: bash
+        env:
+          REQUESTED_REF: ${{ inputs.ref }}
+          DEFAULT_REF: ${{ github.ref }}
+        run: |
+          if [ -n "$REQUESTED_REF" ]; then
+            echo "ref=$REQUESTED_REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=$DEFAULT_REF" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout requested ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.checkout-ref.outputs.ref }}
+          fetch-depth: 0
+
+      - name: Show checked-out revision
+        shell: bash
+        run: |
+          git rev-parse HEAD
+          git status --short
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build release assets
+        run: npm run build
+
+      - name: Run full checks
+        run: npm run check
+
+      - name: Run installer tests
+        run: npm run test:installer

@@ -18,7 +18,7 @@ export type RuntimeFileSystem = {
   ensureDirectory(targetPath: string): Promise<void>;
   removeDirectory(targetPath: string): Promise<void>;
   writeText(targetPath: string, content: string): Promise<void>;
-  writeBinary(targetPath: string, content: Buffer): Promise<void>;
+  writeBinary(targetPath: string, content: ArrayBuffer): Promise<void>;
 };
 
 function isInsideOrEqual(rootPath: string, targetPath: string): boolean {
@@ -33,12 +33,6 @@ function toVaultPath(absoluteVaultRoot: string, absolutePath: string): string {
   }
 
   return relativePath.split(path.sep).join("/");
-}
-
-function toArrayBuffer(content: Buffer): ArrayBuffer {
-  const arrayBuffer = new ArrayBuffer(content.byteLength);
-  new Uint8Array(arrayBuffer).set(content);
-  return arrayBuffer;
 }
 
 class AdapterRuntimeFileSystem implements RuntimeFileSystem {
@@ -67,10 +61,16 @@ class AdapterRuntimeFileSystem implements RuntimeFileSystem {
 
   async listDirectory(targetPath: string): Promise<RuntimeDirectoryEntry[]> {
     const listedFiles = await this.adapter.list(this.toPluginVaultPath(targetPath));
-    return listedFiles.files.map((filePath) => ({
-      name: path.posix.basename(filePath),
-      isFile: true
-    }));
+    return [
+      ...listedFiles.files.map((filePath) => ({
+        name: path.posix.basename(filePath),
+        isFile: true
+      })),
+      ...listedFiles.folders.map((folderPath) => ({
+        name: path.posix.basename(folderPath),
+        isFile: false
+      }))
+    ];
   }
 
   async ensureDirectory(targetPath: string): Promise<void> {
@@ -103,9 +103,9 @@ class AdapterRuntimeFileSystem implements RuntimeFileSystem {
     await this.adapter.write(this.toPluginVaultPath(targetPath), content);
   }
 
-  async writeBinary(targetPath: string, content: Buffer): Promise<void> {
+  async writeBinary(targetPath: string, content: ArrayBuffer): Promise<void> {
     await this.ensureDirectory(path.dirname(targetPath));
-    await this.adapter.writeBinary(this.toPluginVaultPath(targetPath), toArrayBuffer(content));
+    await this.adapter.writeBinary(this.toPluginVaultPath(targetPath), content);
   }
 
   private toPluginVaultPath(targetPath: string): string {

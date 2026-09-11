@@ -10,7 +10,7 @@ import {
   drainArchiveEntry,
   type EmbeddedRuntimeArchiveEntry,
   parseArchiveBuffer,
-  readArchiveEntryBuffer
+  readArchiveEntryArrayBuffer
 } from "./EmbeddedUnityRuntimeArchiveParser";
 import {
   createAdapterRuntimeFileSystem,
@@ -217,6 +217,7 @@ export class EmbeddedUnityRuntimeInstaller {
     const runtimeDir = path.join(versionDir, RUNTIME_ROOT_NAME);
 
     if (await this.isValidCachedRuntime(versionDir, pluginVersion, runtimeFileSystem)) {
+      await this.cleanupOldRuntimeCaches(runtimeRoot, pluginVersion, runtimeFileSystem);
       return {
         runtimeDir,
         extracted: false
@@ -244,13 +245,14 @@ export class EmbeddedUnityRuntimeInstaller {
         path.join(versionDir, RUNTIME_READY_MARKER_NAME),
         `${JSON.stringify(marker, null, 2)}\n`
       );
+      await this.cleanupOldRuntimeCaches(runtimeRoot, pluginVersion, runtimeFileSystem);
       return {
         runtimeDir,
         extracted: true
       };
     } catch (error) {
       const cleanupError = await this.removeIncompleteRuntimeCache(versionDir, runtimeFileSystem);
-      const cleanupMessage = cleanupError ? ` Cleanup also failed: ${cleanupError.message}` : "";
+      const cleanupMessage = cleanupError ? ` Cleanup incomplete cache also failed: ${cleanupError.message}` : "";
       throw new Error(
         `Failed to prepare embedded Unity runtime cache for ${pluginVersion}: ${(error as Error).message}${cleanupMessage}`
       );
@@ -316,7 +318,7 @@ export class EmbeddedUnityRuntimeInstaller {
         throw new Error(`Embedded runtime archive contains an unsupported entry type: ${archiveEntry.path}`);
       }
 
-      const content = await readArchiveEntryBuffer(entry);
+      const content = await readArchiveEntryArrayBuffer(entry);
       await runtimeFileSystem.writeBinary(targetPath, content);
     });
   }
@@ -330,6 +332,31 @@ export class EmbeddedUnityRuntimeInstaller {
       return null;
     } catch (error) {
       return error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  private async cleanupOldRuntimeCaches(
+    runtimeRoot: string,
+    pluginVersion: string,
+    runtimeFileSystem: RuntimeFileSystem
+  ): Promise<void> {
+    let entries;
+    try {
+      entries = await runtimeFileSystem.listDirectory(runtimeRoot);
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      if (entry.isFile || entry.name === pluginVersion) {
+        continue;
+      }
+
+      try {
+        await runtimeFileSystem.removeDirectory(path.join(runtimeRoot, entry.name));
+      } catch {
+        // Old runtime cache cleanup must not break a valid current install.
+      }
     }
   }
 

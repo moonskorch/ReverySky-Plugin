@@ -1,6 +1,8 @@
 import { Parser as TarParser } from "tar/parse";
 import type { ReadEntry } from "tar/read-entry";
 
+const ARCHIVE_WRITE_CHUNK_BYTES = 64 * 1024;
+
 export type EmbeddedRuntimeArchiveEntry = {
   path: string;
   type?: string;
@@ -27,16 +29,49 @@ export async function drainArchiveEntry(entry: ReadEntry): Promise<void> {
   });
 }
 
-export async function readArchiveEntryBuffer(entry: ReadEntry): Promise<Buffer> {
-  const chunks: Buffer[] = [];
+export async function readArchiveEntryArrayBuffer(entry: ReadEntry): Promise<ArrayBuffer> {
+  const content = new ArrayBuffer(entry.size);
+  const contentBytes = new Uint8Array(content);
+  let offset = 0;
+
   await new Promise<void>((resolve, reject) => {
     entry.on("data", (chunk: Buffer) => {
-      chunks.push(Buffer.from(chunk));
+      contentBytes.set(chunk, offset);
+      offset += chunk.byteLength;
     });
     entry.on("end", resolve);
     entry.on("error", reject);
   });
-  return Buffer.concat(chunks);
+
+  if (offset !== content.byteLength) {
+    throw new Error(`Embedded runtime archive entry size mismatch: ${entry.path}`);
+  }
+
+  return content;
+}
+
+async function writeArchiveChunk(parser: TarParser, chunk: Buffer): Promise<void> {
+  if (parser.write(chunk)) {
+    return;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const cleanup = (): void => {
+      parser.off("drain", handleDrain);
+      parser.off("error", handleError);
+    };
+    const handleDrain = (): void => {
+      cleanup();
+      resolve();
+    };
+    const handleError = (error: Error): void => {
+      cleanup();
+      reject(error);
+    };
+
+    parser.once("drain", handleDrain);
+    parser.once("error", handleError);
+  });
 }
 
 export async function parseArchiveBuffer(
@@ -69,7 +104,15 @@ export async function parseArchiveBuffer(
     });
   });
 
-  parser.end(archiveBuffer);
+  for (let offset = 0; offset < archiveBuffer.byteLength; offset += ARCHIVE_WRITE_CHUNK_BYTES) {
+    if (entryError) {
+      break;
+    }
+
+    await writeArchiveChunk(parser, archiveBuffer.subarray(offset, offset + ARCHIVE_WRITE_CHUNK_BYTES));
+  }
+
+  parser.end();
   try {
     await parserDone;
   } catch (error) {
