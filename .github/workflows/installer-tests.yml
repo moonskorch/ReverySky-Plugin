@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch, tag, or commit SHA to test. Leave empty to use the selected workflow ref."
-        required: false
+        description: "Branch, tag, or commit SHA to test."
+        required: true
         type: string
 
 permissions:
@@ -24,25 +24,13 @@ jobs:
           - ubuntu-latest
           - windows-latest
           - macos-latest
+          - macos-15-intel
 
     steps:
-      - name: Resolve checkout ref
-        id: checkout-ref
-        shell: bash
-        env:
-          REQUESTED_REF: ${{ inputs.ref }}
-          DEFAULT_REF: ${{ github.ref }}
-        run: |
-          if [ -n "$REQUESTED_REF" ]; then
-            echo "ref=$REQUESTED_REF" >> "$GITHUB_OUTPUT"
-          else
-            echo "ref=$DEFAULT_REF" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Checkout requested ref
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.checkout-ref.outputs.ref }}
+          ref: ${{ inputs.ref }}
           fetch-depth: 0
 
       - name: Show checked-out revision

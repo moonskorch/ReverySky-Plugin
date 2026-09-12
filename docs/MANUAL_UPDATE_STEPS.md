@@ -28,6 +28,8 @@ Use the root `main.js`, `manifest.json`, and `styles.css` produced by the build.
 ## GitHub Installer Action
 Use the separate installer workflow when you want the real-payload installer test to run on GitHub-hosted operating systems.
 
+For manual validation after the workflow exists on `master`:
+
 1. Push the commit you want to test.
 2. Open GitHub -> Actions.
 3. Select `Installer tests`.
@@ -38,6 +40,7 @@ Use the separate installer workflow when you want the real-payload installer tes
    - `ubuntu-latest`
    - `windows-latest`
    - `macos-latest`
+   - `macos-15-intel`
 
 The workflow runs:
 
